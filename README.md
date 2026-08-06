@@ -30,8 +30,8 @@ See [WAVES_DESIGN.md](WAVES_DESIGN.md) for the architecture behind these package
 - [EncinoWaves](https://github.com/HonuRobotics/encinowaves), required by the
   FFT wave model (see its README for installation)
 
-A Docker development environment with all of the above is available under
-[docker/](docker/) (see [docker/README.md](docker/README.md)).
+A Docker Compose development environment with all of the above is maintained
+separately in [HonuRobotics/drydock](https://github.com/HonuRobotics/drydock).
 
 ## Build
 
