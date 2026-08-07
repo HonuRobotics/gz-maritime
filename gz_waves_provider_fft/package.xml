@@ -37,11 +37,13 @@
        libtbb-dev. Writing the apt name directly fails with "Cannot locate
        rosdep definition for [libtbb-dev]".
 
-       Imath has NO rosdep key — no rule for imath, ilmbase or openexr exists
-       in any rosdistro list — so it cannot be declared and `rosdep install`
-       will not install it. Install libimath-dev yourself, or use a container
-       that carries it (HonuRobotics/drydock does). -->
+       Imath itself has no rosdep key — there is no rule for `imath` or
+       `ilmbase` in any rosdistro list. `libopenexr-dev` is a valid key, and
+       on Ubuntu that package depends on libimath-dev, so declaring it is how
+       rosdep installs Imath. Indirect, but it keeps `rosdep install`
+       sufficient with no manual apt step. -->
   <depend>tbb</depend>
+  <depend>libopenexr-dev</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
