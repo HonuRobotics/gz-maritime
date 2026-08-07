@@ -120,4 +120,10 @@ if(BUILD_TESTING)
     gz_waves::gz_waves gz-waves-provider-gerstner)
 endif()
 
+# GZ_SIM_SYSTEM_PLUGIN_PATH hook so gz-sim finds this package's system/GUI
+# plugin libraries in an isolated colcon layout (a merged prefix is covered by
+# any sibling's hook, which is how this was masked before).
+ament_environment_hooks("hooks/hook.dsv.in")
+ament_environment_hooks("hooks/hook.sh.in")
+
 ament_package()
