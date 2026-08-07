@@ -28,7 +28,7 @@ this repo is `~/vrx_ws/src/vrx`.
 
 ```bash
 cd ~/vrx_ws
-colcon build --symlink-install
+colcon build --merge-install
 source install/setup.bash
 ```
 
