@@ -29,11 +29,19 @@
        gives colcon the topological ordering, so Ehukai is built and its
        CMake config is on CMAKE_PREFIX_PATH before this package configures.
        Without it colcon may configure this package first and find_package
-       silently resolves against a stale system install, or fails.
-       Its CMake config transitively requires Eigen / TBB / Imath. -->
+       silently resolves against a stale system install, or fails. -->
   <depend>ehukai</depend>
-  <depend>libtbb-dev</depend>
-  <depend>libimath-dev</depend>
+
+  <!-- Ehukai's CMake config transitively requires Eigen / TBB / Imath.
+       These are rosdep KEYS, not apt package names: `tbb` resolves to
+       libtbb-dev. Writing the apt name directly fails with "Cannot locate
+       rosdep definition for [libtbb-dev]".
+
+       Imath has NO rosdep key — no rule for imath, ilmbase or openexr exists
+       in any rosdistro list — so it cannot be declared and `rosdep install`
+       will not install it. Install libimath-dev yourself, or use a container
+       that carries it (HonuRobotics/drydock does). -->
+  <depend>tbb</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_lint_auto</test_depend>

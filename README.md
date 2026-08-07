@@ -28,7 +28,10 @@ See [WAVES_DESIGN.md](WAVES_DESIGN.md) for the architecture behind these package
 - [Gazebo Jetty](https://gazebosim.org/docs/jetty)
 - [ros_gz](https://github.com/gazebosim/ros_gz) (matching the Lyrical / Jetty pairing)
 - [Ehukai](https://github.com/HonuRobotics/ehukai), required by the
-  FFT wave model (see its README for installation)
+  FFT wave model. Check it out into the same workspace and colcon builds it
+  first; it has no rosdep key, so `rosdep install` cannot fetch it for you.
+- `libimath-dev`, required transitively by Ehukai. There is no rosdep
+  rule for Imath in any rosdistro list, so this one is a manual `apt install`.
 
 A Docker Compose development environment with all of the above is maintained
 separately in [HonuRobotics/drydock](https://github.com/HonuRobotics/drydock).
@@ -37,11 +40,17 @@ separately in [HonuRobotics/drydock](https://github.com/HonuRobotics/drydock).
 
 ```bash
 mkdir -p ~/maritime_ws/src && cd ~/maritime_ws/src
-git clone https://github.com/HonuRobotics/gz-maritime.git
+git clone git@github.com:HonuRobotics/gz-maritime.git
+git clone git@github.com:HonuRobotics/encinowaves.git
 cd ~/maritime_ws
+sudo apt install libimath-dev          # no rosdep key; see Requirements
+rosdep install --from-paths src --ignore-src -y
 colcon build --merge-install
 source install/setup.bash
 ```
+
+EncinoWaves is a plain CMake package in the same workspace, so colcon builds
+it ahead of `gz_waves_provider_fft` and no separate install step is needed.
 
 ## Run
 
