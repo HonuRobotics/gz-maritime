@@ -27,7 +27,7 @@ See [WAVES_DESIGN.md](WAVES_DESIGN.md) for the architecture behind these package
 - [ROS 2 Lyrical](https://docs.ros.org/en/lyrical/)
 - [Gazebo Jetty](https://gazebosim.org/docs/jetty)
 - [ros_gz](https://github.com/gazebosim/ros_gz) (matching the Lyrical / Jetty pairing)
-- [Ehukai](https://github.com/HonuRobotics/ehukai) (EncinoWaves API), required by the
+- [Ehukai](https://github.com/HonuRobotics/ehukai), required by the
   FFT wave model (see its README for installation)
 
 A Docker Compose development environment with all of the above is maintained

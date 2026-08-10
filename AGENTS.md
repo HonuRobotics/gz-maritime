@@ -32,7 +32,7 @@ colcon build --merge-install
 source install/setup.bash
 ```
 
-The FFT wave engine depends on **Ehukai** (EncinoWaves API), an external system library
+The FFT wave engine depends on **Ehukai**, an external system library
 (installed separately, not vendored). It must be discoverable via
 `CMAKE_PREFIX_PATH` (e.g. installed under `~/.local`) or
 `gz_waves_provider_fft` will fail to configure.

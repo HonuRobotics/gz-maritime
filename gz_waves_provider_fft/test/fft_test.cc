@@ -234,7 +234,7 @@ TEST(FFTWaveSimulation, BandPassFilterReshapesField)
     << "band-pass filter should reshape the field";
 }
 
-// The <spectrum>/<spreading>/<dispersion> SDF selectors feed EncinoWaves. Two
+// The <spectrum>/<spreading>/<dispersion> SDF selectors feed Ehukai. Two
 // different spectra with the same seed produce different fields.
 //////////////////////////////////////////////////
 TEST(FFTWaveSimulation, SpectrumSelectorChangesField)

@@ -20,7 +20,7 @@
 namespace gz::sim::systems
 {
 /// \brief Wave source system backed by the stochastic FFT engine — the
-/// Apache-2.0 EncinoWaves spectral library (TMA/JONSWAP/PM spectra, default
+/// Apache-2.0 Ehukai spectral library (TMA/JONSWAP/PM spectra, default
 /// TMA + Hasselmann spreading + capillary dispersion). Loaded by SDF as
 /// `gz-sim-waves-fft-system`. The ECM/source plumbing lives in WavesSystemBase;
 /// this names the engine and owns the FFT parameter surface below.
@@ -42,11 +42,11 @@ namespace gz::sim::systems
 /// | `<grid_size>` | uint | 128 | Grid samples/axis (power of two; rounded up) |
 /// | `<seed>` | uint | 0 | RNG seed for the spectrum amplitudes |
 /// | `<choppiness>` | double | -1.0 | Tessendorf horizontal-displacement multiplier (~[-2, 0]); applied in the visual shader |
-/// | `<spectrum>` | string | tma | EncinoWaves spectrum: `pms`, `jonswap`, `tma` |
+/// | `<spectrum>` | string | tma | Ehukai spectrum: `pms`, `jonswap`, `tma` |
 /// | `<spreading>` | string | hasselmann | Directional spreading: `poscos2`, `mitsuyasu`, `hasselmann`, `donelanbanner` |
 /// | `<dispersion>` | string | capillary | Dispersion relation: `deep`, `finite`, `capillary` |
-/// | `<depth>` | double [m] | 100 | Water depth (EncinoWaves dispersion input) |
-/// | `<fetch>` | double [km] | 300 | Wind fetch (EncinoWaves spectrum input) |
+/// | `<depth>` | double [m] | 100 | Water depth (Ehukai dispersion input) |
+/// | `<fetch>` | double [km] | 300 | Wind fetch (Ehukai spectrum input) |
 /// | `<swell>` | double | 0 | Swell elongation (directional spreading) |
 /// | `<trough_damping>` | double [0,1] | 0 | Breaking-wave trough damping |
 /// | `<filter_min_wl>` | double [m] | 0 | Band-pass lower edge; >0 enables the filter |
@@ -67,7 +67,7 @@ namespace gz::sim::systems
 ///   spectrum/spreading/dispersion tags, ...) is independent of `<sea_state>`
 ///   and applies in both modes — combine freely.
 ///
-/// `<direction>` is parsed but not applied — EncinoWaves assumes wind along +X.
+/// `<direction>` is parsed but not applied — Ehukai assumes wind along +X.
 ///
 /// \verbatim
 /// <plugin filename="gz-sim-waves-fft-system" name="gz::sim::systems::FftWaves">

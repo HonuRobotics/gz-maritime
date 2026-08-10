@@ -5,7 +5,7 @@
   <version>0.0.0</version>
   <description>
     Stochastic FFT wave-field engine for gz_waves, backed by the Apache-2.0
-    EncinoWaves spectral library: TMA/JONSWAP/Pierson-Moskowitz spectra with
+    Ehukai spectral library: TMA/JONSWAP/Pierson-Moskowitz spectra with
     directional spreading and dispersion, selected via the spectrum, spreading
     and dispersion SDF parameters. Provides the IWaveField engine library and
     the gz-sim-waves-fft-system plugin.
@@ -21,9 +21,9 @@
   <depend>gz_common_vendor</depend>
   <depend>gz_plugin_vendor</depend>
   <depend>eigen</depend>
-  <!-- The Apache-2.0 EncinoWaves spectral library is a required dependency the
+  <!-- The Apache-2.0 Ehukai spectral library is a required dependency the
        FFT engine is built on. It is consumed as a regular system package via
-       find_package(EncinoWaves), built and installed from
+       find_package(ehukai), built and installed from
        https://github.com/HonuRobotics/ehukai (no rosdep key, so it is not
        listed here). Its CMake config transitively requires Eigen / TBB / Imath,
        declared here so rosdep installs them. -->

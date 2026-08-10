@@ -29,15 +29,15 @@ find_package(gz-common REQUIRED)         # gzerr/gzmsg console
 find_package(Eigen3 REQUIRED)
 # Apache-2.0 Horvath spectrum library — REQUIRED, consumed as a regular system
 # package (installed from HonuRobotics/ehukai, not vendored in-tree). The
-# fft engine is the EncinoWaves spectral synthesizer (TMA/JONSWAP/PM spectra +
+# fft engine is the Ehukai spectral synthesizer (TMA/JONSWAP/PM spectra +
 # directional spreading + dispersion), selected via
 # <spectrum>/<spreading>/<dispersion>. Its CMake config transitively pulls in
 # Eigen3 / TBB / Imath.
-find_package(EncinoWaves REQUIRED)
+find_package(ehukai REQUIRED)
 
 # --------------------------------------------------------------------------
 # FFT wave-field engine (libgz-waves-provider-fft): a plain IWaveField
-# implementation backed by the EncinoWaves spectral library.
+# implementation backed by the Ehukai spectral library.
 # It is LINKED directly by the fft system plugin (server) and the water visual
 # (GUI), not discovered by a runtime loader, so it carries no GZ_ADD_PLUGIN and
 # is exported as a normal library target. MakeFFTWaveField() is the factory the
@@ -55,7 +55,7 @@ target_include_directories(gz-waves-provider-fft PRIVATE
 # anything that includes it (the system plugin, the water visual) needs Eigen.
 target_link_libraries(gz-waves-provider-fft
   PUBLIC  Eigen3::Eigen gz-math::gz-math
-  PRIVATE EncinoWaves::EncinoWaves gz-common::gz-common)
+  PRIVATE ehukai::ehukai gz-common::gz-common)
 
 # --------------------------------------------------------------------------
 # FFT wave source system (gz-sim-waves-fft-system): a WavesSystemBase subclass
