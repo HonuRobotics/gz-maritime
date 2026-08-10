@@ -24,7 +24,7 @@
   <!-- The Apache-2.0 EncinoWaves spectral library is a required dependency the
        FFT engine is built on. It is consumed as a regular system package via
        find_package(EncinoWaves), built and installed from
-       https://github.com/HonuRobotics/encinowaves (no rosdep key, so it is not
+       https://github.com/HonuRobotics/ehukai (no rosdep key, so it is not
        listed here). Its CMake config transitively requires Eigen / TBB / Imath,
        declared here so rosdep installs them. -->
   <depend>libtbb-dev</depend>

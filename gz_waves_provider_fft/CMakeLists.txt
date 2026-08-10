@@ -28,7 +28,7 @@ find_package(gz-common REQUIRED)         # gzerr/gzmsg console
 # a direct dependency.
 find_package(Eigen3 REQUIRED)
 # Apache-2.0 Horvath spectrum library — REQUIRED, consumed as a regular system
-# package (installed from HonuRobotics/encinowaves, not vendored in-tree). The
+# package (installed from HonuRobotics/ehukai, not vendored in-tree). The
 # fft engine is the EncinoWaves spectral synthesizer (TMA/JONSWAP/PM spectra +
 # directional spreading + dispersion), selected via
 # <spectrum>/<spreading>/<dispersion>. Its CMake config transitively pulls in

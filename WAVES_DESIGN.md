@@ -465,7 +465,7 @@ empty-plugin SDF re-parse warning.
 
 `gz_waves_provider_fft` does `find_package(EncinoWaves REQUIRED)` and links
 `EncinoWaves::EncinoWaves` (pulling in Eigen3 / TBB / Imath). EncinoWaves is an
-external **system** package (installed from `HonuRobotics/encinowaves`, not
+external **system** package (installed from `HonuRobotics/ehukai`, not
 vendored); it has no rosdep key, so `package.xml` lists its transitive system
 deps (`libtbb-dev`, `libimath-dev`) rather than EncinoWaves itself.
 
@@ -683,7 +683,7 @@ source. Done — `WaterVisual`, buoyancy, and the core are untouched.
 - ROS Lyrical with Gazebo Jetty: the target platform, and currently the most
   modern stable ROS and Gazebo combination. If your system defaults to a
   different Gazebo version, install Gazebo Jetty before building.
-- EncinoWaves installed and on CMAKE_PREFIX_PATH (from HonuRobotics/encinowaves),
+- EncinoWaves installed and on CMAKE_PREFIX_PATH (from HonuRobotics/ehukai),
   required by the FFT package.
 - Remaining Gazebo dependencies via rosdep install --from-paths src --ignore-src -y.
 - A real GPU for the GUI: the Ogre2 render path does not initialise under software GL.
