@@ -40,18 +40,18 @@ separately in [HonuRobotics/drydock](https://github.com/HonuRobotics/drydock).
 ```bash
 mkdir -p ~/maritime_ws/src && cd ~/maritime_ws/src
 git clone https://github.com/HonuRobotics/gz-maritime.git
-git clone https://github.com/HonuRobotics/encinowaves.git
+git clone https://github.com/HonuRobotics/ehukai.git
 cd ~/maritime_ws
 rosdep install --from-paths src --ignore-src -y
 colcon build --merge-install
 source install/setup.bash
 ```
 
-EncinoWaves is a plain CMake package in the same workspace, so colcon builds
+Ehukai is a plain CMake package in the same workspace, so colcon builds
 it ahead of `gz_waves_provider_fft` and no separate install step is needed.
 
-If you installed EncinoWaves outside the workspace rather than cloning it as a
-peer, add `--skip-keys encinowaves` to the `rosdep install` command — the key
+If you installed Ehukai outside the workspace rather than cloning it as a
+peer, add `--skip-keys ehukai` to the `rosdep install` command — the key
 is unresolvable by design and rosdep will otherwise stop before installing
 anything.
 
