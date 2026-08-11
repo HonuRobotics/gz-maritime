@@ -687,7 +687,8 @@ source. Done — `WaterVisual`, buoyancy, and the core are untouched.
   required by the FFT package.
 - Remaining Gazebo dependencies via rosdep install --from-paths src --ignore-src -y.
 - A real GPU for the GUI: the Ogre2 render path does not initialise under software GL.
-- Container setup: TBD.
+- Container setup: [HonuRobotics/drydock](https://github.com/HonuRobotics/drydock)
+  provides all of the above as a Docker Compose environment.
 
 ```bash
 # Build (EncinoWaves must be installed and on CMAKE_PREFIX_PATH for the FFT package)
