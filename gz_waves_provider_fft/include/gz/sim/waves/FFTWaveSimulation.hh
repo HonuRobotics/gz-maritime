@@ -24,7 +24,7 @@ namespace gz::sim::waves
 
 struct WaveParameters;
 
-/// \brief Stochastic FFT-based wave field engine backed by the Apache-2.0 EncinoWaves
+/// \brief Stochastic FFT-based wave field engine backed by the Apache-2.0 Ehukai
 /// spectral library (Horvath 2015): the inverse 2D FFT of an empirically
 /// modelled directional spectrum (TMA/JONSWAP/PM + directional spreading +
 /// dispersion), selected via the <spectrum>/<spreading>/<dispersion> params.
@@ -34,7 +34,7 @@ struct WaveParameters;
 /// regenerates the grid for that time; per-point queries (`Elevation`,
 /// `ParticleVelocity`, ...) bilinear-sample the stored grid.
 ///
-/// \note Sim time is handed to EncinoWaves in single precision (its API is
+/// \note Sim time is handed to Ehukai in single precision (its API is
 /// the float instantiation), so on multi-hour runs the float grid coarsens
 /// and gradually degrades the wave animation and the particle-velocity
 /// finite difference.
@@ -48,7 +48,7 @@ class FFTWaveSimulation final : public IWaveField
   /// \param[in] _params Wave parameters; derives wind speed from `period`
   ///   (deep-water PMS relation: V19 ≈ 0.879·g/omegaP). `gain` scales
   ///   spectrum amplitudes uniformly. `direction` is parsed but not yet
-  ///   applied (EncinoWaves assumes wind along +X).
+  ///   applied (Ehukai assumes wind along +X).
   /// \param[in] _tileSize Physical tile extent in metres; the wave field is
   ///   periodic with this period along both x and y.
   /// \param[in] _gridSize Resolution per axis (must be a power of two for
@@ -60,7 +60,7 @@ class FFTWaveSimulation final : public IWaveField
                             std::size_t _gridSize,
                             std::uint32_t _seed);
 
-  /// \brief Destructor (out-of-line so the EncinoState pimpl stays in the .cc).
+  /// \brief Destructor (out-of-line so the EhukaiState pimpl stays in the .cc).
   public: ~FFTWaveSimulation() override;
 
   // Documentation inherited
@@ -146,7 +146,7 @@ class FFTWaveSimulation final : public IWaveField
   private: Eigen::MatrixXd dispXGrid;
   /// \brief Horizontal y-displacement grid Dy.
   private: Eigen::MatrixXd dispYGrid;
-  /// \brief Folding/whitecap metric (Encino path): per-cell minimum eigenvalue
+  /// \brief Folding/whitecap metric (Ehukai path): per-cell minimum eigenvalue
   /// of the displacement Jacobian, 1 = flat. Sampled by Jacobian() → FoamMask().
   private: Eigen::MatrixXd minEGrid;
 
@@ -173,20 +173,20 @@ class FFTWaveSimulation final : public IWaveField
   /// would dangle. Mutable because Field() is const.
   private: mutable WaveField2D field;
 
-  /// \brief Forward declaration of the EncinoWaves Update state. Defined
-  /// entirely in FFTWaveSimulation.cc so the vendored EncinoWaves headers don't
+  /// \brief Forward declaration of the Ehukai Update state. Defined
+  /// entirely in FFTWaveSimulation.cc so the vendored Ehukai headers don't
   /// leak into this public include surface.
-  private: struct EncinoState;
-  /// \brief The EncinoWaves-backed Update state (pimpl).
-  private: std::unique_ptr<EncinoState> encino;
+  private: struct EhukaiState;
+  /// \brief The Ehukai-backed Update state (pimpl).
+  private: std::unique_ptr<EhukaiState> ehukai;
 
-  /// \brief Physics-based amplitude calibration for the Encino path. Encino's
+  /// \brief Physics-based amplitude calibration for the Ehukai path. Ehukai's
   /// intrinsic field variance is far larger than a physical sea state at our
   /// wind speeds, so we measure its intrinsic RMS once at construction and
   /// store the factor that rescales the significant wave height to the
   /// fully-developed Pierson-Moskowitz relation (Hs = 0.21·V19.5²/g). Applied
   /// to η/Dx/Dy every Update.
-  private: double encinoScale{1.0};
+  private: double ehukaiScale{1.0};
 
   /// \brief Sim time of the last Update(). The field is deterministic in time,
   /// so Update() short-circuits on a repeat call — letting several consumers

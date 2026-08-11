@@ -19,7 +19,7 @@
 
 #include "gz/sim/waves/Wavefield.hh"
 
-#include "EncinoWaves/All.h"
+#include "ehukai/All.h"
 
 namespace gz::sim::waves
 {
@@ -29,7 +29,7 @@ namespace
 /// Forward-difference step [s] for the lazy particle-velocity computation.
 constexpr double kVelDt = 0.05;
 
-/// Row-major float matrix view of EncinoWaves' spatial buffers (Encino stores
+/// Row-major float matrix view of Ehukai's spatial buffers (Ehukai stores
 /// row-major float; our grids are column-major double).
 using RowMatF = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic,
                               Eigen::RowMajor>;
@@ -54,101 +54,101 @@ std::size_t CeilPow2(std::size_t _n)
 }
 
 //////////////////////////////////////////////////
-// ---- Human-readable names for the EncinoWaves model enums (logging) --------
-const char *SpectrumName(EncinoWaves::SpectrumType _t)
+// ---- Human-readable names for the Ehukai model enums (logging) --------
+const char *SpectrumName(ehukai::SpectrumType _t)
 {
   switch (_t)
   {
-    case EncinoWaves::kPiersonMoskowitzSpectrum: return "pms";
-    case EncinoWaves::kJONSWAPSpectrum:          return "jonswap";
-    case EncinoWaves::kTMASpectrum:              return "tma";
+    case ehukai::kPiersonMoskowitzSpectrum: return "pms";
+    case ehukai::kJONSWAPSpectrum:          return "jonswap";
+    case ehukai::kTMASpectrum:              return "tma";
     default:                                     return "?";
   }
 }
 
 //////////////////////////////////////////////////
-const char *DispersionName(EncinoWaves::DispersionType _t)
+const char *DispersionName(ehukai::DispersionType _t)
 {
   switch (_t)
   {
-    case EncinoWaves::kDeepDispersion:        return "deep";
-    case EncinoWaves::kFiniteDepthDispersion: return "finite";
-    case EncinoWaves::kCapillaryDispersion:   return "capillary";
+    case ehukai::kDeepDispersion:        return "deep";
+    case ehukai::kFiniteDepthDispersion: return "finite";
+    case ehukai::kCapillaryDispersion:   return "capillary";
     default:                                  return "?";
   }
 }
 
 //////////////////////////////////////////////////
-const char *SpreadingName(EncinoWaves::DirectionalSpreadingType _t)
+const char *SpreadingName(ehukai::DirectionalSpreadingType _t)
 {
   switch (_t)
   {
-    case EncinoWaves::kPosCosThetaSqrDirectionalSpreading: return "poscos2";
-    case EncinoWaves::kMitsuyasuDirectionalSpreading:      return "mitsuyasu";
-    case EncinoWaves::kHasselmannDirectionalSpreading:     return "hasselmann";
-    case EncinoWaves::kDonelanBannerDirectionalSpreading:  return "donelanbanner";
+    case ehukai::kPosCosThetaSqrDirectionalSpreading: return "poscos2";
+    case ehukai::kMitsuyasuDirectionalSpreading:      return "mitsuyasu";
+    case ehukai::kHasselmannDirectionalSpreading:     return "hasselmann";
+    case ehukai::kDonelanBannerDirectionalSpreading:  return "donelanbanner";
     default:                                               return "?";
   }
 }
 
 //////////////////////////////////////////////////
-const char *FilterName(EncinoWaves::FilterType _t)
+const char *FilterName(ehukai::FilterType _t)
 {
   switch (_t)
   {
-    case EncinoWaves::kNullFilter:                   return "none";
-    case EncinoWaves::kSmoothInvertibleBandPassFilter: return "bandpass";
+    case ehukai::kNullFilter:                   return "none";
+    case ehukai::kSmoothInvertibleBandPassFilter: return "bandpass";
     default:                                         return "?";
   }
 }
 
 //////////////////////////////////////////////////
-// ---- <spectrum>/<spreading>/<dispersion> SDF strings -> EncinoWaves enums ---
+// ---- <spectrum>/<spreading>/<dispersion> SDF strings -> Ehukai enums ---
 // Names match the *Name() helpers above and the SDF tag values. Return false on
-// an unrecognised value so the caller can warn and keep the Encino default.
-bool SpectrumFromString(const std::string &_s, EncinoWaves::SpectrumType &_out)
+// an unrecognised value so the caller can warn and keep the Ehukai default.
+bool SpectrumFromString(const std::string &_s, ehukai::SpectrumType &_out)
 {
-  if (_s == "pms" || _s == "pm") _out = EncinoWaves::kPiersonMoskowitzSpectrum;
-  else if (_s == "jonswap")     _out = EncinoWaves::kJONSWAPSpectrum;
-  else if (_s == "tma")         _out = EncinoWaves::kTMASpectrum;
+  if (_s == "pms" || _s == "pm") _out = ehukai::kPiersonMoskowitzSpectrum;
+  else if (_s == "jonswap")     _out = ehukai::kJONSWAPSpectrum;
+  else if (_s == "tma")         _out = ehukai::kTMASpectrum;
   else return false;
   return true;
 }
 
 //////////////////////////////////////////////////
 bool DispersionFromString(const std::string &_s,
-                          EncinoWaves::DispersionType &_out)
+                          ehukai::DispersionType &_out)
 {
-  if (_s == "deep")           _out = EncinoWaves::kDeepDispersion;
+  if (_s == "deep")           _out = ehukai::kDeepDispersion;
   else if (_s == "finite" || _s == "finite_depth")
-                             _out = EncinoWaves::kFiniteDepthDispersion;
-  else if (_s == "capillary") _out = EncinoWaves::kCapillaryDispersion;
+                             _out = ehukai::kFiniteDepthDispersion;
+  else if (_s == "capillary") _out = ehukai::kCapillaryDispersion;
   else return false;
   return true;
 }
 
 //////////////////////////////////////////////////
 bool SpreadingFromString(const std::string &_s,
-                         EncinoWaves::DirectionalSpreadingType &_out)
+                         ehukai::DirectionalSpreadingType &_out)
 {
   if (_s == "poscos2" || _s == "poscossqr")
-    _out = EncinoWaves::kPosCosThetaSqrDirectionalSpreading;
+    _out = ehukai::kPosCosThetaSqrDirectionalSpreading;
   else if (_s == "mitsuyasu")
-    _out = EncinoWaves::kMitsuyasuDirectionalSpreading;
+    _out = ehukai::kMitsuyasuDirectionalSpreading;
   else if (_s == "hasselmann")
-    _out = EncinoWaves::kHasselmannDirectionalSpreading;
+    _out = ehukai::kHasselmannDirectionalSpreading;
   else if (_s == "donelanbanner" || _s == "donelan")
-    _out = EncinoWaves::kDonelanBannerDirectionalSpreading;
+    _out = ehukai::kDonelanBannerDirectionalSpreading;
   else return false;
   return true;
 }
 
 //////////////////////////////////////////////////
 // Map the SDF spectrum selectors and numeric knobs onto `ep`. Unknown selector
-// values warn and leave the Encino default in place. The numeric knobs default
-// (via WaveParameters) to Encino's own defaults, so an SDF that sets none of
+// values warn and leave the Ehukai default in place. The numeric knobs default
+// (via WaveParameters) to Ehukai's own defaults, so an SDF that sets none of
 // them reproduces the stock Horvath "good ocean" config.
-void ApplyEncinoParams(EncinoWaves::Parametersf &_ep, const WaveParameters &_p)
+void ApplyEhukaiParams(ehukai::Parametersf &_ep, const WaveParameters &_p)
 {
   if (!SpectrumFromString(_p.spectrum, _ep.spectrum.type))
     gzerr << "[FFTWaveSimulation] ignoring unknown <spectrum>='"
@@ -176,7 +176,7 @@ void ApplyEncinoParams(EncinoWaves::Parametersf &_ep, const WaveParameters &_p)
   // wavelengths survive rather than the overall sea height.
   if (_p.filterMinWavelength > 0.0 || _p.filterMaxWavelength > 0.0)
   {
-    _ep.filter.type = EncinoWaves::kSmoothInvertibleBandPassFilter;
+    _ep.filter.type = ehukai::kSmoothInvertibleBandPassFilter;
     _ep.filter.smallWavelength = static_cast<float>(_p.filterMinWavelength);
     if (_p.filterMaxWavelength > 0.0)
       _ep.filter.bigWavelength = static_cast<float>(_p.filterMaxWavelength);
@@ -193,19 +193,19 @@ void ApplyEncinoParams(EncinoWaves::Parametersf &_ep, const WaveParameters &_p)
 }  // namespace
 
 //-----------------------------------------------------------------------------
-// EncinoState — pimpl that holds the vendored Horvath-spectrum library's
-// per-instance state. Defined here (not in the header) so EncinoWaves headers
+// EhukaiState — pimpl that holds the vendored Horvath-spectrum library's
+// per-instance state. Defined here (not in the header) so Ehukai headers
 // stay out of the public include surface.
 //-----------------------------------------------------------------------------
-struct FFTWaveSimulation::EncinoState
+struct FFTWaveSimulation::EhukaiState
 {
-  EncinoWaves::Parametersf params;
-  std::unique_ptr<EncinoWaves::InitialStatef> initial;
-  std::unique_ptr<EncinoWaves::Propagationf>   propagation;
-  std::unique_ptr<EncinoWaves::PropagatedStatef> state;
+  ehukai::Parametersf params;
+  std::unique_ptr<ehukai::InitialStatef> initial;
+  std::unique_ptr<ehukai::Propagationf>   propagation;
+  std::unique_ptr<ehukai::PropagatedStatef> state;
   /// Scratch state propagated at t+dt to finite-difference particle velocity;
   /// filled lazily by ParticleVelocity(), not by Update().
-  std::unique_ptr<EncinoWaves::PropagatedStatef> scratch;
+  std::unique_ptr<ehukai::PropagatedStatef> scratch;
 };
 
 FFTWaveSimulation::~FFTWaveSimulation() = default;
@@ -242,7 +242,7 @@ void FFTWaveSimulation::SetParameters(const WaveParameters &_params)
   this->velTime    = -1.0;
   const std::uint32_t seed = p.seed;
 
-  // EncinoWaves requires a power-of-two grid; round up if the SDF asks for
+  // Ehukai requires a power-of-two grid; round up if the SDF asks for
   // something else.
   if (Log2Pow2(this->gridSize) < 0)
   {
@@ -266,31 +266,31 @@ void FFTWaveSimulation::SetParameters(const WaveParameters &_params)
   this->velYGrid   = Eigen::MatrixXd::Zero(N, N);
   this->velZGrid   = Eigen::MatrixXd::Zero(N, N);
 
-  // Build the EncinoWaves spectral state -- the spectral engine the fft system
+  // Build the Ehukai spectral state -- the spectral engine the fft system
   // is built on. The <spectrum>/<spreading>/<dispersion> SDF selectors choose
   // the spectral models (default TMA + Hasselmann + capillary).
-  this->encino = std::make_unique<EncinoState>();
-  auto &ep = this->encino->params;
+  this->ehukai = std::make_unique<EhukaiState>();
+  auto &ep = this->ehukai->params;
   ep.resolutionPowerOfTwo = Log2Pow2(this->gridSize);
   ep.domain        = static_cast<float>(this->tileSize);
   ep.windSpeed     = static_cast<float>(this->windSpeed);
   ep.amplitudeGain = static_cast<float>(this->gain);
   ep.random.seed   = static_cast<int>(seed);
 
-  // Map the SDF spectrum selectors + numeric/filter knobs onto Encino.
-  ApplyEncinoParams(ep, p);
+  // Map the SDF spectrum selectors + numeric/filter knobs onto Ehukai.
+  ApplyEhukaiParams(ep, p);
 
-  this->encino->initial =
-      std::make_unique<EncinoWaves::InitialStatef>(ep);
-  this->encino->propagation =
-      std::make_unique<EncinoWaves::Propagationf>(ep, /*nthreads=*/-1);
-  this->encino->state =
-      std::make_unique<EncinoWaves::PropagatedStatef>(ep);
-  this->encino->scratch =
-      std::make_unique<EncinoWaves::PropagatedStatef>(ep);
+  this->ehukai->initial =
+      std::make_unique<ehukai::InitialStatef>(ep);
+  this->ehukai->propagation =
+      std::make_unique<ehukai::Propagationf>(ep, /*nthreads=*/-1);
+  this->ehukai->state =
+      std::make_unique<ehukai::PropagatedStatef>(ep);
+  this->ehukai->scratch =
+      std::make_unique<ehukai::PropagatedStatef>(ep);
 
   // --- Physics-based amplitude calibration -------------------------------
-  // EncinoWaves' amplitudeGain only feeds its (here unused) normal computation,
+  // Ehukai's amplitudeGain only feeds its (here unused) normal computation,
   // not the height field, and its intrinsic variance does not correspond to a
   // physical sea state at our wind speeds. Measure the intrinsic RMS once (one
   // propagation past the ramp) and rescale so the significant wave height
@@ -298,21 +298,21 @@ void FFTWaveSimulation::SetParameters(const WaveParameters &_params)
   // Hs = 0.21 * V19.5^2 / g, i.e. sigma = Hs/4. The selected spectrum still
   // sets the spectral *shape*; this only fixes the overall energy.
   {
-    this->encino->propagation->propagate(
-        this->encino->params, *this->encino->initial,
-        *this->encino->state, 10.0f);
+    this->ehukai->propagation->propagate(
+        this->ehukai->params, *this->ehukai->initial,
+        *this->ehukai->state, 10.0f);
     const int M = ep.resolution();
-    const double sigmaEncino = std::sqrt(
-        Eigen::Map<const RowMatF>(this->encino->state->Height.cdata(),
+    const double sigmaEhukai = std::sqrt(
+        Eigen::Map<const RowMatF>(this->ehukai->state->Height.cdata(),
                                   M, M).cast<double>().array()
             .square().mean());
     const double sigmaTarget =
         0.21 / (4.0 * p.gravity) * this->windSpeed * this->windSpeed;
-    this->encinoScale =
-        (sigmaEncino > 1e-9) ? (sigmaTarget / sigmaEncino) : 1.0;
+    this->ehukaiScale =
+        (sigmaEhukai > 1e-9) ? (sigmaTarget / sigmaEhukai) : 1.0;
   }
 
-  gzmsg << "[FFTWaveSimulation] EncinoWaves spectrum library active "
+  gzmsg << "[FFTWaveSimulation] Ehukai spectrum library active "
         << "(res=" << ep.resolution() << " domain=" << ep.domain
         << "m wind=" << ep.windSpeed << "m/s seed=" << ep.random.seed
         << " spectrum=" << SpectrumName(ep.spectrum.type)
@@ -322,7 +322,7 @@ void FFTWaveSimulation::SetParameters(const WaveParameters &_params)
         << " swell=" << ep.directionalSpreading.swell
         << " troughDamp=" << ep.troughDamping
         << " filter=" << FilterName(ep.filter.type)
-        << " ampCalib=" << this->encinoScale
+        << " ampCalib=" << this->ehukaiScale
         << " targetHs=" << (4.0 * 0.21 / (4.0 * p.gravity) *
                             this->windSpeed * this->windSpeed)
         << "m)" << '\n';
@@ -341,46 +341,46 @@ void FFTWaveSimulation::Update(double _simTime)
     return;
   this->lastUpdateT = _simTime;
 
-  if (!this->encino || !this->encino->propagation)
+  if (!this->ehukai || !this->ehukai->propagation)
     return;  // default-constructed, not yet configured
 
   const int N = static_cast<int>(this->gridSize);
 
-  this->encino->propagation->propagate(
-      this->encino->params,
-      *this->encino->initial,
-      *this->encino->state,
+  this->ehukai->propagation->propagate(
+      this->ehukai->params,
+      *this->ehukai->initial,
+      *this->ehukai->state,
       static_cast<float>(_simTime));
 
   // Combined output scale per Update:
   //  * ramp         — fade the field in over `tau`;
-  //  * this->encinoScale — physics-based amplitude calibration to a PM sea state
-  //                   (Encino's amplitudeGain doesn't scale the height);
-  //  * this->gain        — the SDF <gain> user multiplier (a no-op via Encino's
+  //  * this->ehukaiScale — physics-based amplitude calibration to a PM sea state
+  //                   (Ehukai's amplitudeGain doesn't scale the height);
+  //  * this->gain        — the SDF <gain> user multiplier (a no-op via Ehukai's
   //                   amplitudeGain, so we apply it here to make it work).
   const double scale =
-      StartupRamp(_simTime, this->tau) * this->encinoScale * this->gain;
+      StartupRamp(_simTime, this->tau) * this->ehukaiScale * this->gain;
 
   // Map+cast assignment lets Eigen vectorize the float→double conversion and
   // row→column layout swap; the scale folds into the same expression.
   this->heightGrid = Eigen::Map<const RowMatF>(
-      this->encino->state->Height.cdata(), N, N).cast<double>() * scale;
+      this->ehukai->state->Height.cdata(), N, N).cast<double>() * scale;
   // WaveField2D carries the FINAL horizontal displacement, so the Tessendorf
   // choppiness multiplier folds in here (the shader applies dx/dy as-is; a
   // shader-side chopFactor would invert the Gerstner engine's baked chop).
   const double chopScale = scale * this->choppiness;
   this->dispXGrid = Eigen::Map<const RowMatF>(
-      this->encino->state->Dx.cdata(), N, N).cast<double>() * chopScale;
+      this->ehukai->state->Dx.cdata(), N, N).cast<double>() * chopScale;
   this->dispYGrid = Eigen::Map<const RowMatF>(
-      this->encino->state->Dy.cdata(), N, N).cast<double>() * chopScale;
+      this->ehukai->state->Dy.cdata(), N, N).cast<double>() * chopScale;
 
-  // Foam: Encino computes MinE = -(min eigenvalue of the displacement
+  // Foam: Ehukai computes MinE = -(min eigenvalue of the displacement
   // Jacobian) at its internal amplitude. At our calibrated amplitude the
   // minimum eigenvalue is 1 - scale*(MinE + 1). Jacobian() bilinear-samples
   // this; Eval::FoamMask turns values below its threshold into whitecaps. At
   // t=0 (scale=0) the surface is flat -> eigenvalue 1 -> no foam.
   this->minEGrid = (1.0 - scale *
-      (Eigen::Map<const RowMatF>(this->encino->state->MinE.cdata(), N, N)
+      (Eigen::Map<const RowMatF>(this->ehukai->state->MinE.cdata(), N, N)
           .cast<double>().array() + 1.0)).matrix();
 
   // The particle-velocity grids are NOT refreshed here: their finite
@@ -438,7 +438,7 @@ gz::math::Vector3d FFTWaveSimulation::ParticleVelocity(
   double _x, double _y, double /*_t*/) const
 {
   // Particle velocity = Eulerian time derivative of the displacement field
-  // (∂Dx/∂t, ∂Dy/∂t, ∂η/∂t). EncinoWaves exposes no velocity field and no
+  // (∂Dx/∂t, ∂Dy/∂t, ∂η/∂t). Ehukai exposes no velocity field and no
   // public spectral coefficients, so finite-difference a scratch propagation a
   // small step ahead — done LAZILY on the first velocity query after an
   // Update, because the extra propagation roughly doubles the engine's
@@ -448,33 +448,33 @@ gz::math::Vector3d FFTWaveSimulation::ParticleVelocity(
   // applied to both samples, so it factors out as the wave motion's velocity
   // (the startup ramp's own d/dt is intentionally excluded — it's a
   // transient, not water motion).
-  if (this->encino && this->encino->propagation &&
+  if (this->ehukai && this->ehukai->propagation &&
       this->velTime != this->lastUpdateT)
   {
     const int N = static_cast<int>(this->gridSize);
-    this->encino->propagation->propagate(
-        this->encino->params,
-        *this->encino->initial,
-        *this->encino->scratch,
+    this->ehukai->propagation->propagate(
+        this->ehukai->params,
+        *this->ehukai->initial,
+        *this->ehukai->scratch,
         static_cast<float>(this->lastUpdateT + kVelDt));
     const double scale = StartupRamp(this->lastUpdateT, this->tau) *
-                         this->encinoScale * this->gain;
+                         this->ehukaiScale * this->gain;
     const double velK = scale / kVelDt;
     // Horizontal velocity uses the choppiness-scaled displacement so it
     // tracks the surface's actual motion.
     const double velKxy = velK * this->choppiness;
     this->velZGrid = velK *
-        (Eigen::Map<const RowMatF>(this->encino->scratch->Height.cdata(), N, N)
+        (Eigen::Map<const RowMatF>(this->ehukai->scratch->Height.cdata(), N, N)
            - Eigen::Map<const RowMatF>(
-                 this->encino->state->Height.cdata(), N, N)).cast<double>();
+                 this->ehukai->state->Height.cdata(), N, N)).cast<double>();
     this->velXGrid = velKxy *
-        (Eigen::Map<const RowMatF>(this->encino->scratch->Dx.cdata(), N, N)
+        (Eigen::Map<const RowMatF>(this->ehukai->scratch->Dx.cdata(), N, N)
            - Eigen::Map<const RowMatF>(
-                 this->encino->state->Dx.cdata(), N, N)).cast<double>();
+                 this->ehukai->state->Dx.cdata(), N, N)).cast<double>();
     this->velYGrid = velKxy *
-        (Eigen::Map<const RowMatF>(this->encino->scratch->Dy.cdata(), N, N)
+        (Eigen::Map<const RowMatF>(this->ehukai->scratch->Dy.cdata(), N, N)
            - Eigen::Map<const RowMatF>(
-                 this->encino->state->Dy.cdata(), N, N)).cast<double>();
+                 this->ehukai->state->Dy.cdata(), N, N)).cast<double>();
     this->velTime = this->lastUpdateT;
   }
 
@@ -521,7 +521,7 @@ const WaveField2D *FFTWaveSimulation::Field() const
   // (Update refreshes them in place), so a view cached across a reconfigure
   // would dangle. Eigen is column-major, matching WaveField2D's documented
   // (i + j*N) layout. The renderer finite-diffs η for normals; foam is the
-  // Encino MinE folding metric.
+  // Ehukai MinE folding metric.
   this->field.n    = this->gridSize;
   this->field.tile = this->tileSize;
   this->field.dz   = this->heightGrid.data();

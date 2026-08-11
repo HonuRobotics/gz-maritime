@@ -196,7 +196,7 @@ void WavesSystemBase::Implementation::ParseSdf(const sdf::ElementPtr &_sdf)
   auto &p = this->data.params;
   // Every <wave> tag and its type comes from GZ_WAVES_PARAM_TABLE — the same
   // source serialization and the set_parameters service use. (Tags not relevant
-  // to a given engine — e.g. the FFT/EncinoWaves selectors for Gerstner — are
+  // to a given engine — e.g. the FFT/Ehukai selectors for Gerstner — are
   // simply ignored by that backend; parsing them here is harmless.)
 #define GZ_WAVES_SDF_DBL(m, name)  p.m = wave->Get<double>(name, p.m).first;
 #define GZ_WAVES_SDF_SIZE(m, name) \

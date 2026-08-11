@@ -392,12 +392,12 @@ void WaterVisual::Implementation::UploadUniforms()
   // Foam: the grid path packs a folding metric into the heightmap's alpha
   // channel, so the FS reads it directly (one sample) instead of
   // finite-differencing the displacement. foamThreshold is the smoothstep
-  // half-width around J = 0 (Encino's MinE; the Phillips path leaves it ≈1).
+  // half-width around J = 0 (Ehukai's MinE; the Phillips path leaves it ≈1).
   (*fsParams)["tileSize"]      = this->cachedTileSize;
   // Foam is engine-specific. The analytic Gerstner engine's Jacobian
   // determinant barely leaves 1.0, so it carries no usable folding signal and
   // foam is unsupported for it (foamStrength=0 makes the FS skip the whole foam
-  // path). The FFT/Encino engine writes a real min-eigenvalue metric and keeps
+  // path). The FFT/Ehukai engine writes a real min-eigenvalue metric and keeps
   // foam. (`sim` is this visual's private, render-thread engine.)
   const bool gerstner = this->sim && this->sim->Kind() == "gerstner";
   (*fsParams)["foamStrength"]  = gerstner ? 0.0f : this->foamStrength;
