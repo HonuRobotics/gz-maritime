@@ -166,7 +166,7 @@ TEST(FFTWaveSimulation, RampUpFromZero)
   EXPECT_GT(rmsLong, 1e-4);
 }
 
-// Encino's MinE folding metric is hooked through Jacobian() → Eval::FoamMask:
+// Ehukai's MinE folding metric is hooked through Jacobian() → Eval::FoamMask:
 // pinched crests report Jacobian < 1 and produce whitecaps.
 //////////////////////////////////////////////////
 TEST(FFTWaveSimulation, FoamFromJacobian)
@@ -200,8 +200,8 @@ TEST(FFTWaveSimulation, FoamFromJacobian)
       maxFoam = std::max(maxFoam, foam);
     }
 
-  EXPECT_LT(minJac, 0.6) << "Encino crests should fold below the foam threshold";
-  EXPECT_GT(maxFoam, 0.0) << "Encino path should produce whitecaps";
+  EXPECT_LT(minJac, 0.6) << "Ehukai crests should fold below the foam threshold";
+  EXPECT_GT(maxFoam, 0.0) << "Ehukai path should produce whitecaps";
 }
 
 // The <filter_*> band-pass reshapes which wavelengths survive in the spectrum.
@@ -422,7 +422,7 @@ TEST(FFTWaveSimulation, ParticleVelocityZeroAtRest)
 //////////////////////////////////////////////////
 TEST(FFTWaveSimulation, WindDirectionBiasesAmplitude)
 {
-  // Encino's directional spreading concentrates energy along the wind axis
+  // Ehukai's directional spreading concentrates energy along the wind axis
   // (assumed +x). We expect a higher RMS along x than perpendicular when
   // sampled over a long enough strip.
   gsw::WaveParameters p = DefaultParams();
@@ -476,7 +476,7 @@ TEST(FFTWaveSimulation, SeaStateSetsSignificantWaveHeight)
   sim.SetParameters(p);
   sim.Update(50.0);  // past the startup ramp
 
-  // Hs = 4 * RMS(eta). Encino calibrates to the PM Hs derived from the
+  // Hs = 4 * RMS(eta). Ehukai calibrates to the PM Hs derived from the
   // sea-state wind/period, so it should land near the canonical value.
   const double hs = 4.0 * RmsHeight(sim.HeightGrid());
   gsw::SeaStateSpec s;

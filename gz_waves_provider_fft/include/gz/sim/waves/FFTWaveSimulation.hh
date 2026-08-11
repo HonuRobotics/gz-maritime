@@ -60,7 +60,7 @@ class FFTWaveSimulation final : public IWaveField
                             std::size_t _gridSize,
                             std::uint32_t _seed);
 
-  /// \brief Destructor (out-of-line so the EncinoState pimpl stays in the .cc).
+  /// \brief Destructor (out-of-line so the EhukaiState pimpl stays in the .cc).
   public: ~FFTWaveSimulation() override;
 
   // Documentation inherited
@@ -146,7 +146,7 @@ class FFTWaveSimulation final : public IWaveField
   private: Eigen::MatrixXd dispXGrid;
   /// \brief Horizontal y-displacement grid Dy.
   private: Eigen::MatrixXd dispYGrid;
-  /// \brief Folding/whitecap metric (Encino path): per-cell minimum eigenvalue
+  /// \brief Folding/whitecap metric (Ehukai path): per-cell minimum eigenvalue
   /// of the displacement Jacobian, 1 = flat. Sampled by Jacobian() → FoamMask().
   private: Eigen::MatrixXd minEGrid;
 
@@ -176,17 +176,17 @@ class FFTWaveSimulation final : public IWaveField
   /// \brief Forward declaration of the Ehukai Update state. Defined
   /// entirely in FFTWaveSimulation.cc so the vendored Ehukai headers don't
   /// leak into this public include surface.
-  private: struct EncinoState;
+  private: struct EhukaiState;
   /// \brief The Ehukai-backed Update state (pimpl).
-  private: std::unique_ptr<EncinoState> encino;
+  private: std::unique_ptr<EhukaiState> ehukai;
 
-  /// \brief Physics-based amplitude calibration for the Encino path. Encino's
+  /// \brief Physics-based amplitude calibration for the Ehukai path. Ehukai's
   /// intrinsic field variance is far larger than a physical sea state at our
   /// wind speeds, so we measure its intrinsic RMS once at construction and
   /// store the factor that rescales the significant wave height to the
   /// fully-developed Pierson-Moskowitz relation (Hs = 0.21·V19.5²/g). Applied
   /// to η/Dx/Dy every Update.
-  private: double encinoScale{1.0};
+  private: double ehukaiScale{1.0};
 
   /// \brief Sim time of the last Update(). The field is deterministic in time,
   /// so Update() short-circuits on a repeat call — letting several consumers

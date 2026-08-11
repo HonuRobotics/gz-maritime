@@ -34,7 +34,7 @@ three of them statistical:
 
 The choices are independent, though the roadmap notes only a handful of
 combinations are physically sensible (e.g. the fully deterministic legacy sea, or
-the random amplitude Gaussian sea that EncinoWaves draws). The engines shipped
+the random amplitude Gaussian sea that Ehukai draws). The engines shipped
 today are two points in this space, and their package names are a **pragmatic
 shorthand for each engine's dominant distinguishing choice**, not a claim that the
 choices are coupled:
@@ -43,7 +43,7 @@ choices are coupled:
   deterministic amplitude, frequency, and phase. Implemented in this repository.
 - `gz_waves_provider_fft`: IFFT, Gerstner chop, random amplitude, evenly spaced
   frequency, random phase (the Gaussian sea). The transform, spectra, sampling,
-  and kinematics all live in the **external EncinoWaves library**; the VRX package
+  and kinematics all live in the **external Ehukai library**; the VRX package
   is a thin wrapper (§6).
 
 The `IWaveField` contract itself is **agnostic** to all five choices: a new engine
@@ -53,7 +53,7 @@ the roadmap's design-choice vocabulary is an open design question.)
 
 ## Packages
 
-All `gz_waves*` packages live in **this repository** (vrx). **EncinoWaves is the
+All `gz_waves*` packages live in **this repository** (vrx). **Ehukai is the
 one external dependency**: its own repository, installed separately, **not**
 vendored.
 
@@ -61,7 +61,7 @@ vendored.
 |---------|------|
 | `gz_waves` | Engine-agnostic **core**: the `IWaveField` contract, the engine registry, the `Wavefield` ECM component, the `Eval` query facade, and `WavesSystemBase` (the source-plugin base). |
 | `gz_waves_provider_gerstner` | Analytic **Gerstner** WFE + source system + GUI registrar. |
-| `gz_waves_provider_fft` | Spectral **FFT** WFE (wraps EncinoWaves) + source system + GUI registrar. |
+| `gz_waves_provider_fft` | Spectral **FFT** WFE (wraps Ehukai) + source system + GUI registrar. |
 | `gz_waves_rendering` | Engine-agnostic **WaterVisual** renderer + the Ogre2 C-ABI bridge + the `water_surface` model; wires a runnable demo world. |
 
 All new source files carry the **Honu Robotics** Apache-2.0 copyright header.
@@ -401,12 +401,12 @@ moving waves with no extra setup (R3, R7).
 
 ### 6.1 Engine + system
 
-**VRX vs. EncinoWaves.** For the FFT engine the external **EncinoWaves** library
+**VRX vs. Ehukai.** For the FFT engine the external **Ehukai** library
 owns the wave-field *generation* across all five WFE choices: the inverse
 transform (IFFT), the spectra/spreading/dispersion models, the random amplitude
 and uniform phase sampling (with an evenly spaced frequency grid), and the
 horizontal-displacement (Gerstner "chop") kinematics. VRX's `gz_waves_provider_fft` is a **thin wrapper**: it configures
-EncinoWaves from the `<wave>` recipe, samples the grid, computes particle
+Ehukai from the `<wave>` recipe, samples the grid, computes particle
 velocity by finite difference (below), calibrates RMS to the target `Hs`, and
 exposes the result through `Field()`/`Elevation()`. The contrast with the
 in-repo Gerstner engine, whose kinematics live in VRX, is deliberate, and
@@ -414,20 +414,20 @@ illustrates that the `IWaveField` boundary lets an engine externalize as much or
 as little of the generation as it likes.
 
 - **Engine** `FFTWaveSimulation` (`MakeFFTWaveField()`): an inverse-FFT of an
-  empirically-modelled directional spectrum from the external **EncinoWaves**
+  empirically-modelled directional spectrum from the external **Ehukai**
   library (Horvath 2015, Apache-2.0). `Update` propagates the spectrum and runs
   the IFFT once per tick (cached by time, so multiple consumers share one FFT);
   output is calibrated so the RMS matches the Pierson–Moskowitz `Hs`. Periodic
   over `tileSize`; `Elevation` bilinearly samples the grid; `Field()` exposes
   height + x/y displacement + a folding (foam) metric.
-- **Particle velocity** is computed by **time finite-difference**: EncinoWaves
+- **Particle velocity** is computed by **time finite-difference**: Ehukai
   exposes no analytic velocity field, so a scratch state is propagated a small
   `dt` ahead and the displacement grids differenced (∂Dx/∂t, ∂Dy/∂t, ∂η/∂t).
   This happens **lazily**, on the first `ParticleVelocity` call after an
   `Update` — the extra propagation roughly doubles the per-tick cost, so
   consumers that never query velocity (the renderer reads `Field()` only)
   never pay it.
-- **Selectable spectral models** (SDF string → Encino enum): spectrum
+- **Selectable spectral models** (SDF string → Ehukai enum): spectrum
   `pms`/`pm`, `jonswap`, `tma`; spreading `poscos2`/`poscossqr`, `mitsuyasu`,
   `hasselmann`, `donelanbanner`/`donelan`; dispersion `deep`,
   `finite`/`finite_depth`, `capillary`. A smooth band-pass (or notch) filter is
@@ -435,7 +435,7 @@ as little of the generation as it likes.
 - **Source system** `gz-sim-waves-fft-system` (`FftWaves : WavesSystemBase`):
   `EngineToken()` ⇒ `"fft"`. Its doc block carries the full FFT SDF table and the
   `<sea_state>` precedence section (see §3.6 / §8). Note `<direction>` is parsed
-  but not yet applied (EncinoWaves assumes wind along +X).
+  but not yet applied (Ehukai assumes wind along +X).
 - *Tests:* `fft_test.cc` covers finiteness/bounds, ramp-up, foam from the
   Jacobian, band-pass reshaping, spectrum selection, time evolution, `Field()`
   views, determinism vs. seed, periodicity, unit normals, particle velocity, and
@@ -461,13 +461,13 @@ The empty `System` body exists only so gz-sim has a plugin to load (which
 triggers the `dlopen`). Carrying no `Configure`/SDF deliberately avoids gz-sim's
 empty-plugin SDF re-parse warning.
 
-### 6.3 EncinoWaves dependency
+### 6.3 Ehukai dependency
 
-`gz_waves_provider_fft` does `find_package(EncinoWaves REQUIRED)` and links
-`EncinoWaves::EncinoWaves` (pulling in Eigen3 / TBB / Imath). EncinoWaves is an
+`gz_waves_provider_fft` does `find_package(ehukai REQUIRED)` and links
+`ehukai::ehukai` (pulling in Eigen3 / TBB / Imath). Ehukai is an
 external **system** package (installed from `HonuRobotics/ehukai`, not
 vendored); it has no rosdep key, so `package.xml` lists its transitive system
-deps (`libtbb-dev`, `libimath-dev`) rather than EncinoWaves itself.
+deps (`libtbb-dev`, `libimath-dev`) rather than Ehukai itself.
 
 ---
 
@@ -683,7 +683,7 @@ source. Done — `WaterVisual`, buoyancy, and the core are untouched.
 - ROS Lyrical with Gazebo Jetty: the target platform, and currently the most
   modern stable ROS and Gazebo combination. If your system defaults to a
   different Gazebo version, install Gazebo Jetty before building.
-- EncinoWaves installed and on CMAKE_PREFIX_PATH (from HonuRobotics/ehukai),
+- Ehukai installed and on CMAKE_PREFIX_PATH (from HonuRobotics/ehukai),
   required by the FFT package.
 - Remaining Gazebo dependencies via rosdep install --from-paths src --ignore-src -y.
 - A real GPU for the GUI: the Ogre2 render path does not initialise under software GL.
@@ -691,7 +691,7 @@ source. Done — `WaterVisual`, buoyancy, and the core are untouched.
   provides all of the above as a Docker Compose environment.
 
 ```bash
-# Build (EncinoWaves must be installed and on CMAKE_PREFIX_PATH for the FFT package)
+# Build (Ehukai must be installed and on CMAKE_PREFIX_PATH for the FFT package)
 cd ~/vrx_ws
 colcon build --merge-install
 
@@ -710,9 +710,9 @@ ros2 launch vrx_bringup simulation.launch.xml
 
 ## 11. Status notes
 
-- `<direction>` is parsed by the FFT system but not yet applied (EncinoWaves
+- `<direction>` is parsed by the FFT system but not yet applied (Ehukai
   assumes wind along +X).
-- The FFT engine hands sim time to EncinoWaves in single precision (float
+- The FFT engine hands sim time to Ehukai in single precision (float
   API), so on multi-hour runs the float grid coarsens and gradually degrades
   the wave animation and the particle-velocity finite difference.
 - Foam/whitecaps are effectively **FFT-only**. The renderer derives foam from

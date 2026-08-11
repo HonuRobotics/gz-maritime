@@ -29,7 +29,7 @@ namespace
 /// Forward-difference step [s] for the lazy particle-velocity computation.
 constexpr double kVelDt = 0.05;
 
-/// Row-major float matrix view of Ehukai' spatial buffers (Encino stores
+/// Row-major float matrix view of Ehukai's spatial buffers (Ehukai stores
 /// row-major float; our grids are column-major double).
 using RowMatF = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic,
                               Eigen::RowMajor>;
@@ -105,7 +105,7 @@ const char *FilterName(ehukai::FilterType _t)
 //////////////////////////////////////////////////
 // ---- <spectrum>/<spreading>/<dispersion> SDF strings -> Ehukai enums ---
 // Names match the *Name() helpers above and the SDF tag values. Return false on
-// an unrecognised value so the caller can warn and keep the Encino default.
+// an unrecognised value so the caller can warn and keep the Ehukai default.
 bool SpectrumFromString(const std::string &_s, ehukai::SpectrumType &_out)
 {
   if (_s == "pms" || _s == "pm") _out = ehukai::kPiersonMoskowitzSpectrum;
@@ -145,10 +145,10 @@ bool SpreadingFromString(const std::string &_s,
 
 //////////////////////////////////////////////////
 // Map the SDF spectrum selectors and numeric knobs onto `ep`. Unknown selector
-// values warn and leave the Encino default in place. The numeric knobs default
-// (via WaveParameters) to Encino's own defaults, so an SDF that sets none of
+// values warn and leave the Ehukai default in place. The numeric knobs default
+// (via WaveParameters) to Ehukai's own defaults, so an SDF that sets none of
 // them reproduces the stock Horvath "good ocean" config.
-void ApplyEncinoParams(ehukai::Parametersf &_ep, const WaveParameters &_p)
+void ApplyEhukaiParams(ehukai::Parametersf &_ep, const WaveParameters &_p)
 {
   if (!SpectrumFromString(_p.spectrum, _ep.spectrum.type))
     gzerr << "[FFTWaveSimulation] ignoring unknown <spectrum>='"
@@ -193,11 +193,11 @@ void ApplyEncinoParams(ehukai::Parametersf &_ep, const WaveParameters &_p)
 }  // namespace
 
 //-----------------------------------------------------------------------------
-// EncinoState — pimpl that holds the vendored Horvath-spectrum library's
+// EhukaiState — pimpl that holds the vendored Horvath-spectrum library's
 // per-instance state. Defined here (not in the header) so Ehukai headers
 // stay out of the public include surface.
 //-----------------------------------------------------------------------------
-struct FFTWaveSimulation::EncinoState
+struct FFTWaveSimulation::EhukaiState
 {
   ehukai::Parametersf params;
   std::unique_ptr<ehukai::InitialStatef> initial;
@@ -269,28 +269,28 @@ void FFTWaveSimulation::SetParameters(const WaveParameters &_params)
   // Build the Ehukai spectral state -- the spectral engine the fft system
   // is built on. The <spectrum>/<spreading>/<dispersion> SDF selectors choose
   // the spectral models (default TMA + Hasselmann + capillary).
-  this->encino = std::make_unique<EncinoState>();
-  auto &ep = this->encino->params;
+  this->ehukai = std::make_unique<EhukaiState>();
+  auto &ep = this->ehukai->params;
   ep.resolutionPowerOfTwo = Log2Pow2(this->gridSize);
   ep.domain        = static_cast<float>(this->tileSize);
   ep.windSpeed     = static_cast<float>(this->windSpeed);
   ep.amplitudeGain = static_cast<float>(this->gain);
   ep.random.seed   = static_cast<int>(seed);
 
-  // Map the SDF spectrum selectors + numeric/filter knobs onto Encino.
-  ApplyEncinoParams(ep, p);
+  // Map the SDF spectrum selectors + numeric/filter knobs onto Ehukai.
+  ApplyEhukaiParams(ep, p);
 
-  this->encino->initial =
+  this->ehukai->initial =
       std::make_unique<ehukai::InitialStatef>(ep);
-  this->encino->propagation =
+  this->ehukai->propagation =
       std::make_unique<ehukai::Propagationf>(ep, /*nthreads=*/-1);
-  this->encino->state =
+  this->ehukai->state =
       std::make_unique<ehukai::PropagatedStatef>(ep);
-  this->encino->scratch =
+  this->ehukai->scratch =
       std::make_unique<ehukai::PropagatedStatef>(ep);
 
   // --- Physics-based amplitude calibration -------------------------------
-  // Ehukai' amplitudeGain only feeds its (here unused) normal computation,
+  // Ehukai's amplitudeGain only feeds its (here unused) normal computation,
   // not the height field, and its intrinsic variance does not correspond to a
   // physical sea state at our wind speeds. Measure the intrinsic RMS once (one
   // propagation past the ramp) and rescale so the significant wave height
@@ -298,18 +298,18 @@ void FFTWaveSimulation::SetParameters(const WaveParameters &_params)
   // Hs = 0.21 * V19.5^2 / g, i.e. sigma = Hs/4. The selected spectrum still
   // sets the spectral *shape*; this only fixes the overall energy.
   {
-    this->encino->propagation->propagate(
-        this->encino->params, *this->encino->initial,
-        *this->encino->state, 10.0f);
+    this->ehukai->propagation->propagate(
+        this->ehukai->params, *this->ehukai->initial,
+        *this->ehukai->state, 10.0f);
     const int M = ep.resolution();
-    const double sigmaEncino = std::sqrt(
-        Eigen::Map<const RowMatF>(this->encino->state->Height.cdata(),
+    const double sigmaEhukai = std::sqrt(
+        Eigen::Map<const RowMatF>(this->ehukai->state->Height.cdata(),
                                   M, M).cast<double>().array()
             .square().mean());
     const double sigmaTarget =
         0.21 / (4.0 * p.gravity) * this->windSpeed * this->windSpeed;
-    this->encinoScale =
-        (sigmaEncino > 1e-9) ? (sigmaTarget / sigmaEncino) : 1.0;
+    this->ehukaiScale =
+        (sigmaEhukai > 1e-9) ? (sigmaTarget / sigmaEhukai) : 1.0;
   }
 
   gzmsg << "[FFTWaveSimulation] Ehukai spectrum library active "
@@ -322,7 +322,7 @@ void FFTWaveSimulation::SetParameters(const WaveParameters &_params)
         << " swell=" << ep.directionalSpreading.swell
         << " troughDamp=" << ep.troughDamping
         << " filter=" << FilterName(ep.filter.type)
-        << " ampCalib=" << this->encinoScale
+        << " ampCalib=" << this->ehukaiScale
         << " targetHs=" << (4.0 * 0.21 / (4.0 * p.gravity) *
                             this->windSpeed * this->windSpeed)
         << "m)" << '\n';
@@ -341,46 +341,46 @@ void FFTWaveSimulation::Update(double _simTime)
     return;
   this->lastUpdateT = _simTime;
 
-  if (!this->encino || !this->encino->propagation)
+  if (!this->ehukai || !this->ehukai->propagation)
     return;  // default-constructed, not yet configured
 
   const int N = static_cast<int>(this->gridSize);
 
-  this->encino->propagation->propagate(
-      this->encino->params,
-      *this->encino->initial,
-      *this->encino->state,
+  this->ehukai->propagation->propagate(
+      this->ehukai->params,
+      *this->ehukai->initial,
+      *this->ehukai->state,
       static_cast<float>(_simTime));
 
   // Combined output scale per Update:
   //  * ramp         — fade the field in over `tau`;
-  //  * this->encinoScale — physics-based amplitude calibration to a PM sea state
-  //                   (Encino's amplitudeGain doesn't scale the height);
-  //  * this->gain        — the SDF <gain> user multiplier (a no-op via Encino's
+  //  * this->ehukaiScale — physics-based amplitude calibration to a PM sea state
+  //                   (Ehukai's amplitudeGain doesn't scale the height);
+  //  * this->gain        — the SDF <gain> user multiplier (a no-op via Ehukai's
   //                   amplitudeGain, so we apply it here to make it work).
   const double scale =
-      StartupRamp(_simTime, this->tau) * this->encinoScale * this->gain;
+      StartupRamp(_simTime, this->tau) * this->ehukaiScale * this->gain;
 
   // Map+cast assignment lets Eigen vectorize the float→double conversion and
   // row→column layout swap; the scale folds into the same expression.
   this->heightGrid = Eigen::Map<const RowMatF>(
-      this->encino->state->Height.cdata(), N, N).cast<double>() * scale;
+      this->ehukai->state->Height.cdata(), N, N).cast<double>() * scale;
   // WaveField2D carries the FINAL horizontal displacement, so the Tessendorf
   // choppiness multiplier folds in here (the shader applies dx/dy as-is; a
   // shader-side chopFactor would invert the Gerstner engine's baked chop).
   const double chopScale = scale * this->choppiness;
   this->dispXGrid = Eigen::Map<const RowMatF>(
-      this->encino->state->Dx.cdata(), N, N).cast<double>() * chopScale;
+      this->ehukai->state->Dx.cdata(), N, N).cast<double>() * chopScale;
   this->dispYGrid = Eigen::Map<const RowMatF>(
-      this->encino->state->Dy.cdata(), N, N).cast<double>() * chopScale;
+      this->ehukai->state->Dy.cdata(), N, N).cast<double>() * chopScale;
 
-  // Foam: Encino computes MinE = -(min eigenvalue of the displacement
+  // Foam: Ehukai computes MinE = -(min eigenvalue of the displacement
   // Jacobian) at its internal amplitude. At our calibrated amplitude the
   // minimum eigenvalue is 1 - scale*(MinE + 1). Jacobian() bilinear-samples
   // this; Eval::FoamMask turns values below its threshold into whitecaps. At
   // t=0 (scale=0) the surface is flat -> eigenvalue 1 -> no foam.
   this->minEGrid = (1.0 - scale *
-      (Eigen::Map<const RowMatF>(this->encino->state->MinE.cdata(), N, N)
+      (Eigen::Map<const RowMatF>(this->ehukai->state->MinE.cdata(), N, N)
           .cast<double>().array() + 1.0)).matrix();
 
   // The particle-velocity grids are NOT refreshed here: their finite
@@ -448,33 +448,33 @@ gz::math::Vector3d FFTWaveSimulation::ParticleVelocity(
   // applied to both samples, so it factors out as the wave motion's velocity
   // (the startup ramp's own d/dt is intentionally excluded — it's a
   // transient, not water motion).
-  if (this->encino && this->encino->propagation &&
+  if (this->ehukai && this->ehukai->propagation &&
       this->velTime != this->lastUpdateT)
   {
     const int N = static_cast<int>(this->gridSize);
-    this->encino->propagation->propagate(
-        this->encino->params,
-        *this->encino->initial,
-        *this->encino->scratch,
+    this->ehukai->propagation->propagate(
+        this->ehukai->params,
+        *this->ehukai->initial,
+        *this->ehukai->scratch,
         static_cast<float>(this->lastUpdateT + kVelDt));
     const double scale = StartupRamp(this->lastUpdateT, this->tau) *
-                         this->encinoScale * this->gain;
+                         this->ehukaiScale * this->gain;
     const double velK = scale / kVelDt;
     // Horizontal velocity uses the choppiness-scaled displacement so it
     // tracks the surface's actual motion.
     const double velKxy = velK * this->choppiness;
     this->velZGrid = velK *
-        (Eigen::Map<const RowMatF>(this->encino->scratch->Height.cdata(), N, N)
+        (Eigen::Map<const RowMatF>(this->ehukai->scratch->Height.cdata(), N, N)
            - Eigen::Map<const RowMatF>(
-                 this->encino->state->Height.cdata(), N, N)).cast<double>();
+                 this->ehukai->state->Height.cdata(), N, N)).cast<double>();
     this->velXGrid = velKxy *
-        (Eigen::Map<const RowMatF>(this->encino->scratch->Dx.cdata(), N, N)
+        (Eigen::Map<const RowMatF>(this->ehukai->scratch->Dx.cdata(), N, N)
            - Eigen::Map<const RowMatF>(
-                 this->encino->state->Dx.cdata(), N, N)).cast<double>();
+                 this->ehukai->state->Dx.cdata(), N, N)).cast<double>();
     this->velYGrid = velKxy *
-        (Eigen::Map<const RowMatF>(this->encino->scratch->Dy.cdata(), N, N)
+        (Eigen::Map<const RowMatF>(this->ehukai->scratch->Dy.cdata(), N, N)
            - Eigen::Map<const RowMatF>(
-                 this->encino->state->Dy.cdata(), N, N)).cast<double>();
+                 this->ehukai->state->Dy.cdata(), N, N)).cast<double>();
     this->velTime = this->lastUpdateT;
   }
 
@@ -521,7 +521,7 @@ const WaveField2D *FFTWaveSimulation::Field() const
   // (Update refreshes them in place), so a view cached across a reconfigure
   // would dangle. Eigen is column-major, matching WaveField2D's documented
   // (i + j*N) layout. The renderer finite-diffs η for normals; foam is the
-  // Encino MinE folding metric.
+  // Ehukai MinE folding metric.
   this->field.n    = this->gridSize;
   this->field.tile = this->tileSize;
   this->field.dz   = this->heightGrid.data();

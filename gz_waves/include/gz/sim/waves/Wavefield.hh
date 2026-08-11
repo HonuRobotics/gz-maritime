@@ -91,27 +91,27 @@ struct WaveParameters
   /// [-2, 0]; 0 disables choppy displacement.
   double choppiness{-1.0};
 
-  /// \brief FFT spectrum model (EncinoWaves): "pms", "jonswap", or "tma".
+  /// \brief FFT spectrum model (Ehukai): "pms", "jonswap", or "tma".
   std::string spectrum{"tma"};
 
-  /// \brief FFT directional spreading (EncinoWaves): "poscos2", "mitsuyasu",
+  /// \brief FFT directional spreading (Ehukai): "poscos2", "mitsuyasu",
   /// "hasselmann", or "donelanbanner".
   std::string spreading{"hasselmann"};
 
-  /// \brief FFT dispersion relation (EncinoWaves): "deep", "finite", or
+  /// \brief FFT dispersion relation (Ehukai): "deep", "finite", or
   /// "capillary".
   std::string dispersion{"capillary"};
 
-  /// \brief FFT water depth [m] (EncinoWaves dispersion input).
+  /// \brief FFT water depth [m] (Ehukai dispersion input).
   double depth{100.0};
 
-  /// \brief FFT wind fetch [km] (EncinoWaves spectrum input).
+  /// \brief FFT wind fetch [km] (Ehukai spectrum input).
   double fetch{300.0};
 
-  /// \brief FFT swell elongation (EncinoWaves directional spreading); 0 = none.
+  /// \brief FFT swell elongation (Ehukai directional spreading); 0 = none.
   double swell{0.0};
 
-  /// \brief FFT breaking-wave trough damping in [0, 1] (EncinoWaves); 0 = none.
+  /// \brief FFT breaking-wave trough damping in [0, 1] (Ehukai); 0 = none.
   double troughDamping{0.0};
 
   /// \brief FFT band-pass filter lower edge [m]. > 0 enables the band-pass,
