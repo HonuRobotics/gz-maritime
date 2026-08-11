@@ -22,13 +22,28 @@
   <depend>gz_plugin_vendor</depend>
   <depend>eigen</depend>
   <!-- The Apache-2.0 Ehukai spectral library is a required dependency the
-       FFT engine is built on. It is consumed as a regular system package via
-       find_package(ehukai), built and installed from
-       https://github.com/HonuRobotics/ehukai (no rosdep key, so it is not
-       listed here). Its CMake config transitively requires Eigen / TBB / Imath,
-       declared here so rosdep installs them. -->
-  <depend>libtbb-dev</depend>
-  <depend>libimath-dev</depend>
+       FFT engine is built on, consumed via find_package(ehukai). It has no
+       rosdep key: rosdep will report `ehukai` as unresolvable unless it is
+       a peer in the same workspace, which is the supported arrangement — see
+       https://github.com/HonuRobotics/ehukai. Declaring it here is what
+       gives colcon the topological ordering, so Ehukai is built and its
+       CMake config is on CMAKE_PREFIX_PATH before this package configures.
+       Without it colcon may configure this package first and find_package
+       silently resolves against a stale system install, or fails. -->
+  <depend>ehukai</depend>
+
+  <!-- Ehukai's CMake config transitively requires Eigen / TBB / Imath.
+       These are rosdep KEYS, not apt package names: `tbb` resolves to
+       libtbb-dev. Writing the apt name directly fails with "Cannot locate
+       rosdep definition for [libtbb-dev]".
+
+       Imath itself has no rosdep key — there is no rule for `imath` or
+       `ilmbase` in any rosdistro list. `libopenexr-dev` is a valid key, and
+       on Ubuntu that package depends on libimath-dev, so declaring it is how
+       rosdep installs Imath. Indirect, but it keeps `rosdep install`
+       sufficient with no manual apt step. -->
+  <depend>tbb</depend>
+  <depend>libopenexr-dev</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_lint_auto</test_depend>

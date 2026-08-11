@@ -27,13 +27,19 @@ find_package(gz-common REQUIRED)         # gzerr/gzmsg console
 # FFTWaveSimulation's public header returns Eigen::MatrixXd grids, so Eigen is
 # a direct dependency.
 find_package(Eigen3 REQUIRED)
-# Apache-2.0 Horvath spectrum library — REQUIRED, consumed as a regular system
-# package (installed from HonuRobotics/ehukai, not vendored in-tree). The
-# fft engine is the Ehukai spectral synthesizer (TMA/JONSWAP/PM spectra +
-# directional spreading + dispersion), selected via
-# <spectrum>/<spreading>/<dispersion>. Its CMake config transitively pulls in
-# Eigen3 / TBB / Imath.
-find_package(ehukai REQUIRED)
+# Apache-2.0 Horvath spectrum library — REQUIRED, consumed as a regular CMake
+# package (from HonuRobotics/ehukai, not vendored in-tree; normally a peer
+# in the same colcon workspace, see this package's package.xml). The fft engine
+# is the Ehukai spectral synthesizer (TMA/JONSWAP/PM spectra + directional
+# spreading + dispersion), selected via <spectrum>/<spreading>/<dispersion>.
+# Its CMake config transitively pulls in Eigen3 / TBB / Imath.
+#
+# The version request is deliberate: with none at all, ANY ehukai build
+# configures cleanly here and an incompatible one fails at link or load time
+# instead. Note ehukaiConfigVersion.cmake is written with COMPATIBILITY
+# SameMajorVersion, so while this rejects a future 1.x, it still accepts any
+# 0.x — tightening that is an upstream change to ehukai/CMakeLists.txt.
+find_package(ehukai 0.0.1 REQUIRED)
 
 # --------------------------------------------------------------------------
 # FFT wave-field engine (libgz-waves-provider-fft): a plain IWaveField
