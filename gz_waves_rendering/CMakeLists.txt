@@ -1,6 +1,16 @@
 cmake_minimum_required(VERSION 3.16)
 project(gz_waves_rendering)
 
+# A plain colcon build sets no build type, which compiles the hot paths
+# without optimization. Default to an optimized build with debug info;
+# an explicit -DCMAKE_BUILD_TYPE always wins.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "No CMAKE_BUILD_TYPE given; defaulting to RelWithDebInfo")
+  set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY
+    STRINGS Debug Release RelWithDebInfo MinSizeRel)
+endif()
+
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
