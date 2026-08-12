@@ -5,7 +5,8 @@ the deeper design docs it points to. This file applies to the whole repo; if a
 subdirectory adds its own `AGENTS.md`, the closest one to the file you are
 editing wins.
 
-VRX (Virtual RobotX) is a Gazebo + ROS 2 maritime simulation. The substantive
+Kai (Hawaiian for sea) is a Gazebo + ROS 2 maritime simulation, continuing
+the VRX rewrite. The substantive
 subsystem today is the **wave simulation packages** (`gz_waves*`); more
 subsystems will be added over time.
 
@@ -17,17 +18,17 @@ subsystems will be added over time.
 | `gz_waves_provider_gerstner/`, `gz_waves_provider_fft/` | Wave field **engines** (an `IWaveField` implementation + its server source plugin + a GUI registrar). |
 | `gz_waves_rendering/` | Engine-agnostic **renderer** (`WaterVisual`) + the Ogre2 C-ABI bridge + the `water_surface` model. |
 | `gz_waves_buoyancy/` | A wave-field **consumer** (`WaveBuoyancy`). |
-| `vrx_gazebo/` | Worlds (`open_water.sdf`) + resource-path hooks. |
-| `vrx_bringup/` | ROS 2 launch + `ros_gz_bridge` config. |
+| `kai_gazebo/` | Worlds (`open_water.sdf`) + resource-path hooks. |
+| `kai_bringup/` | ROS 2 launch + `ros_gz_bridge` config. |
 | `WAVES_DESIGN.md` | Full design + contributor reference for the wave packages. |
 
 ## Setup & build
 
-ROS 2 Rolling + Gazebo Jetty (+ matching `ros_gz`). The workspace is `~/vrx_ws`,
-this repo is `~/vrx_ws/src/vrx`.
+ROS 2 Rolling + Gazebo Jetty (+ matching `ros_gz`). The workspace is `~/kai_ws`,
+this repo is `~/kai_ws/src/gz-maritime`.
 
 ```bash
-cd ~/vrx_ws
+cd ~/kai_ws
 colcon build --merge-install
 source install/setup.bash
 ```
@@ -40,8 +41,8 @@ The FFT wave engine depends on **Ehukai**, an external system library
 ## Run
 
 ```bash
-ros2 launch vrx_bringup simulation.launch.xml          # boots open_water.sdf with a moving ocean
-gz sim -r src/vrx/vrx_gazebo/worlds/open_water.sdf      # world directly
+ros2 launch kai_bringup simulation.launch.xml          # boots open_water.sdf with a moving ocean
+gz sim -r src/gz-maritime/kai_gazebo/worlds/open_water.sdf  # world directly
 ```
 
 ## Test — run before declaring work done

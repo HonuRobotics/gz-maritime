@@ -1,6 +1,6 @@
-# VRX Wave Simulation — Design & Contributor Reference
+# Kai Wave Simulation — Design & Contributor Reference
 
-This document is the single reference for the VRX wave simulation packages
+This document is the single reference for the Kai wave simulation packages
 (`gz_waves*`): the layer that connects a pluggable wave field engine to Gazebo
 physics and rendering. It captures the **requirements**, the **architecture and
 design decisions**, the **per-package implementation details**, and a
@@ -43,7 +43,7 @@ choices are coupled:
   deterministic amplitude, frequency, and phase. Implemented in this repository.
 - `gz_waves_provider_fft`: IFFT, Gerstner chop, random amplitude, evenly spaced
   frequency, random phase (the Gaussian sea). The transform, spectra, sampling,
-  and kinematics all live in the **external Ehukai library**; the VRX package
+  and kinematics all live in the **external Ehukai library**; the Kai package
   is a thin wrapper (§6).
 
 The `IWaveField` contract itself is **agnostic** to all five choices: a new engine
@@ -53,7 +53,7 @@ the roadmap's design-choice vocabulary is an open design question.)
 
 ## Packages
 
-All `gz_waves*` packages live in **this repository** (vrx). **Ehukai is the
+All `gz_waves*` packages live in **this repository** (gz-maritime). **Ehukai is the
 one external dependency**: its own repository, installed separately, **not**
 vendored.
 
@@ -87,7 +87,7 @@ All new source files carry the **Honu Robotics** Apache-2.0 copyright header.
   a transport service, without restarting the simulation.
 - **R6 — Determinism.** Given the same parameters and seed, the FFT field is
   reproducible run-to-run (and across the server/GUI split).
-- **R7 — Runnable out of the box.** `ros2 launch vrx_bringup simulation.launch.xml`
+- **R7 — Runnable out of the box.** `ros2 launch kai_bringup simulation.launch.xml`
   brings up a moving ocean with no extra arguments.
 
 ### Non-functional
@@ -391,8 +391,8 @@ CMake builds `waves-ogre2-bridge` and `gz-sim-water-visual-system` (the latter
 links `${CMAKE_DL_LIBS}`, not the bridge), and probes the Ogre Next header path
 to match the resolved `gz-rendering::ogre2`. The `water_surface` model ships the
 mesh (`water.dae`), the shaders (`fft_water_vs_330.glsl`, `water_fs_330.glsl`),
-and the normal/skybox textures. `vrx_gazebo/worlds/open_water.sdf` is wired as a
-self-contained ocean so `ros2 launch vrx_bringup simulation.launch.xml` renders
+and the normal/skybox textures. `kai_gazebo/worlds/open_water.sdf` is wired as a
+self-contained ocean so `ros2 launch kai_bringup simulation.launch.xml` renders
 moving waves with no extra setup (R3, R7).
 
 ---
@@ -401,15 +401,15 @@ moving waves with no extra setup (R3, R7).
 
 ### 6.1 Engine + system
 
-**VRX vs. Ehukai.** For the FFT engine the external **Ehukai** library
+**Kai vs. Ehukai.** For the FFT engine the external **Ehukai** library
 owns the wave-field *generation* across all five WFE choices: the inverse
 transform (IFFT), the spectra/spreading/dispersion models, the random amplitude
 and uniform phase sampling (with an evenly spaced frequency grid), and the
-horizontal-displacement (Gerstner "chop") kinematics. VRX's `gz_waves_provider_fft` is a **thin wrapper**: it configures
+horizontal-displacement (Gerstner "chop") kinematics. Kai's `gz_waves_provider_fft` is a **thin wrapper**: it configures
 Ehukai from the `<wave>` recipe, samples the grid, computes particle
 velocity by finite difference (below), calibrates RMS to the target `Hs`, and
 exposes the result through `Field()`/`Elevation()`. The contrast with the
-in-repo Gerstner engine, whose kinematics live in VRX, is deliberate, and
+in-repo Gerstner engine, whose kinematics live in Kai, is deliberate, and
 illustrates that the `IWaveField` boundary lets an engine externalize as much or
 as little of the generation as it likes.
 
@@ -692,13 +692,13 @@ source. Done — `WaterVisual`, buoyancy, and the core are untouched.
 
 ```bash
 # Build (Ehukai must be installed and on CMAKE_PREFIX_PATH for the FFT package)
-cd ~/vrx_ws
+cd ~/kai_ws
 colcon build --merge-install
 
 # Run (FFT or Gerstner per open_water.sdf)
 source install/setup.bash
-ros2 launch vrx_bringup simulation.launch.xml
-#   or directly:  gz sim -r src/vrx/vrx_gazebo/worlds/open_water.sdf
+ros2 launch kai_bringup simulation.launch.xml
+#   or directly:  gz sim -r src/gz-maritime/kai_gazebo/worlds/open_water.sdf
 
 # Tests
 ./build/gz_waves/wave_core_test

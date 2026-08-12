@@ -16,8 +16,8 @@ This repository continues the `vrx4` rewrite of
   realistic ocean from a single sea state setting.
 - [`gz_waves_rendering`](gz_waves_rendering/): the visual ocean, drawing the moving water surface in
   the Gazebo GUI.
-- [`vrx_gazebo`](vrx_gazebo/): the simulation worlds.
-- [`vrx_bringup`](vrx_bringup/): launch files and configuration to start everything from
+- [`kai_gazebo`](kai_gazebo/): the simulation worlds.
+- [`kai_bringup`](kai_bringup/): launch files and configuration to start everything from
   ROS 2.
 
 See [WAVES_DESIGN.md](WAVES_DESIGN.md) for the architecture behind these packages.
@@ -58,7 +58,7 @@ anything.
 ## Run
 
 ```bash
-ros2 launch vrx_bringup simulation.launch.xml
+ros2 launch kai_bringup simulation.launch.xml
 ```
 
 Launch arguments:
