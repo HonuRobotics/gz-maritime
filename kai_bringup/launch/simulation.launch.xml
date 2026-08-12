@@ -19,7 +19,7 @@
   <!-- 3. ROS-Gazebo bridge (shares ros_gz_container) -->
   <ros_gz_bridge
       bridge_name="ros_gz_bridge"
-      config_file="$(find-pkg-share vrx_bringup)/config/ros_gz_bridge.yaml"
+      config_file="$(find-pkg-share kai_bringup)/config/ros_gz_bridge.yaml"
       container_name="ros_gz_container"
       create_own_container="false"
       use_composition="$(var use_composition)">

@@ -5,7 +5,7 @@
   <version>0.0.0</version>
   <description>
     Wave field component, evaluators, and spectrum sampling for Gazebo.
-    Designed to be upstreamed into gz-sim; lives in the VRX repository
+    Designed to be upstreamed into gz-sim; lives in the gz-maritime repository
     during the bridging period.
   </description>
   <maintainer email="cen.aguero@gmail.com">Carlos Agüero</maintainer>

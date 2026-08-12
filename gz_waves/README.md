@@ -1,6 +1,6 @@
 # gz_waves
 
-The core of VRX's wave simulation: the engine-agnostic wave-field **contract**
+The core of Kai's wave simulation: the engine-agnostic wave-field **contract**
 shared by the wave engines and their consumers. It builds standalone and depends
 on no particular wave backend.
 
