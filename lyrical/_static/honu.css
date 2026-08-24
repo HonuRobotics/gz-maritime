@@ -1,0 +1,42 @@
+/* Honu skin over the stock RTD theme. Functionality is deliberately untouched:
+   docs.ros.org runs this theme stock (their entire custom CSS is the max-width
+   rule below), so every override here is paint only. */
+
+/* From ros2_documentation custom.css */
+.wy-nav-content {
+    max-width: 64rem;
+}
+
+/* Brand paint: midnight navy chrome, ocean steel details */
+.wy-side-nav-search, .wy-nav-top {
+  background-color: #082133;
+}
+.wy-side-nav-search input[type="text"] {
+  border-color: #9dbbcc;
+}
+.rst-content a:not(.headerlink) {
+  color: #0b4f6e;
+}
+.wy-menu-vertical header, .wy-menu-vertical p.caption {
+  color: #9dbbcc;
+}
+.rst-versions .rst-current-version {
+  background-color: #04121d;
+  color: #9dbbcc;
+}
+::selection {
+  background: #9dbbcc;
+  color: #082133;
+}
+.wy-side-nav-search > a img.logo {
+  max-width: 9rem;
+  padding: 0.4rem 0;
+}
+
+/* ONE deliberate deviation from stock: the theme's expanded-branch items rest
+   on #c9c9c9 with higher specificity than its own hover rule, so hover is
+   invisible there (docs.ros.org has the same dead hover). Paint only. */
+.wy-menu-vertical li a:hover {
+  background-color: #9dbbcc !important;
+  color: #082133 !important;
+}
