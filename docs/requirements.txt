@@ -1,0 +1,1 @@
+sphinx-honu @ git+https://github.com/HonuRobotics/honu-docs@v0.1.0
