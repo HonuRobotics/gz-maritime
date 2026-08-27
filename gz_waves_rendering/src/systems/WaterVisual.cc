@@ -212,14 +212,24 @@ WaterVisual::Implementation::~Implementation()
 //////////////////////////////////////////////////
 bool WaterVisual::Implementation::ResolveVisual()
 {
-  if (this->visual)
+  // Fully resolved only when BOTH the visual and the material exist. The
+  // first calls can find the visual while the wavefield recipe has not
+  // arrived yet (material creation is deferred below); short-circuiting on
+  // the visual alone made that deferral permanent — the material block
+  // became unreachable and the ocean stayed on the default white material,
+  // flat and frozen. Whether the race went that way depended on how fast
+  // the first render frame came up relative to the recipe (vehicles in the
+  // initial scene reliably tipped it).
+  if (this->visual && this->material)
     return true;
   if (!this->scene)
     this->scene = gz::rendering::sceneFromFirstRenderEngine();
   if (!this->scene)
     return false;
 
-  // BFS for the visual matching our entity id.
+  // BFS for the visual matching our entity id (skip when already found).
+  if (!this->visual)
+  {
   auto root = this->scene->RootVisual();
   std::list<gz::rendering::NodePtr> queue{root};
   while (!queue.empty())
@@ -238,6 +248,7 @@ bool WaterVisual::Implementation::ResolveVisual()
     }
     for (unsigned int i = 0; i < node->ChildCount(); ++i)
       queue.push_back(node->ChildByIndex(i));
+  }
   }
 
   if (!this->visual)
