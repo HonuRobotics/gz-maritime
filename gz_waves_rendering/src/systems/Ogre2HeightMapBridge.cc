@@ -40,11 +40,6 @@ namespace
   {
     Ogre::TextureGpu *texture{nullptr};
     Ogre::TextureGpuManager *manager{nullptr};
-    // Persistent staging texture, reused on every Upload(). Acquiring a
-    // fresh one per frame from Ogre's pool was causing rapid pool growth
-    // and "Texture memory budget exceeded. Stalling GPU." stalls that
-    // visibly froze the GUI for a couple of minutes.
-    Ogre::StagingTexture *staging{nullptr};
     Ogre::HlmsSamplerblock samplerblock;
     std::size_t gridSize{0};
     bool ready{false};
@@ -102,8 +97,11 @@ try
   // (heightMap, bumpMap, cubeMap) can coexist without tripping
   // "Texture memory budget exceeded. Stalling GPU." early in scene load.
   // Default in 2.3.x is conservative for a scene with several streaming
-  // textures.
-  manager->setStagingTextureMaxBudgetBytes(std::size_t{256} * 1024 * 1024);  // 256 MB
+  // textures. 256 MB survived the ocean alone; spawning vehicles with PBR
+  // GLB meshes into the same scene exceeded it, and Ogre's "Freeing memory"
+  // response evicted the water heightmap: flat white ocean the moment a
+  // vehicle loads. 1 GB gives the combined scene headroom.
+  manager->setStagingTextureMaxBudgetBytes(std::size_t{1024} * 1024 * 1024);  // 1 GB
 
   auto *hm = new HeightMap();
   hm->gridSize = _gridSize;
@@ -187,13 +185,6 @@ try
   }
   hm->ready = true;
 
-  // Allocate one persistent staging texture and reuse it on every Upload().
-  // Acquiring a fresh staging texture per frame leaks them into Ogre's
-  // pool, which trips the engine's "Texture memory budget exceeded" path.
-  hm->staging = hm->manager->getStagingTexture(
-      static_cast<Ogre::uint32>(_gridSize),
-      static_cast<Ogre::uint32>(_gridSize),
-      1u, 1u, Ogre::PFG_RGBA32_FLOAT);
   return hm;
 }
 catch (const Ogre::Exception &e)
@@ -226,18 +217,30 @@ try
           << _cols << ", expected " << N << "x" << N << ")" << '\n';
     return 0;
   }
-  if (!hm->staging)
-    return 0;
-
   // Schedule residency on every upload (asv_wave_sim's pattern). No-op
   // once the texture is already Resident, but the repeated call appears
   // to be what keeps the engine's state machine "alive" through the
   // first-frame streaming flow on Jetty + NVIDIA.
   hm->texture->scheduleTransitionTo(Ogre::GpuResidency::Resident, nullptr);
 
-  hm->staging->startMapRegion();
+  // Staging texture: acquired for THIS upload and returned right after.
+  // Do not cache one across frames — under texture memory pressure (for
+  // example a vehicle with PBR meshes spawning into the scene) Ogre's
+  // "Stalling was not enough. Freeing memory." path destroys idle staging
+  // textures, and a cached pointer dangles: every later upload silently
+  // no-ops and the ocean freezes flat. Acquire-and-return per frame is the
+  // supported pattern; the manager pools returned textures, so this is a
+  // lookup, not an allocation, and returning it is what prevents the leak
+  // that motivated the old persistent cache.
+  Ogre::StagingTexture *staging = hm->manager->getStagingTexture(
+      static_cast<Ogre::uint32>(N), static_cast<Ogre::uint32>(N),
+      1u, 1u, Ogre::PFG_RGBA32_FLOAT);
+  if (!staging)
+    return 0;
+
+  staging->startMapRegion();
   const Ogre::TextureBox box =
-      hm->staging->mapRegion(N, N, 1u, 1u, Ogre::PFG_RGBA32_FLOAT);
+      staging->mapRegion(N, N, 1u, 1u, Ogre::PFG_RGBA32_FLOAT);
 
   // Pack one RGBA32F texel per (row, col): (η, Dx, Dy, foam). Inputs are the
   // column-major WaveField2D grids (element (i, j) = world (x_i, y_j) at index
@@ -265,8 +268,9 @@ try
     }
   }
 
-  hm->staging->stopMapRegion();
-  hm->staging->upload(box, hm->texture, 0u, nullptr, nullptr);
+  staging->stopMapRegion();
+  staging->upload(box, hm->texture, 0u, nullptr, nullptr);
+  hm->manager->removeStagingTexture(staging);
 
   // Tell Ogre Next the texture data has arrived (asv_wave_sim's
   // contract). Without this the engine can keep the texture in an
@@ -347,20 +351,6 @@ void waves_ogre2_heightmap_destroy(waves_heightmap_t _handle)
   // extern "C" boundary and aborts the process.
   if (hm->manager)
   {
-    if (hm->staging)
-    {
-      try
-      {
-        hm->manager->removeStagingTexture(hm->staging);
-      }
-      catch (const Ogre::Exception &e)
-      {
-        gzdbg << "[waves_ogre2_heightmap] removeStagingTexture threw during "
-              << "shutdown (likely already destroyed): "
-              << e.getDescription() << '\n';
-      }
-      hm->staging = nullptr;
-    }
     if (hm->texture)
     {
       try
