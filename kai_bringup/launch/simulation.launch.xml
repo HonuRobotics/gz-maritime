@@ -1,5 +1,14 @@
 <launch>
 
+  <!-- Pin gz-transport to loopback. On hosts with several interfaces
+       (wifi, docker0, VPNs) the server and GUI can select different ones and
+       discovery partially fails: the scene arrives but the wave field clock
+       does not, freezing the GUI water flat at t = 0, which renders as a
+       glassy mirror of the sky. Everything this launch starts runs on one
+       machine, so loopback is correct; override gz_ip for distributed use. -->
+  <arg name="gz_ip" default="127.0.0.1" description="GZ_IP for every gz process; override for multi machine setups"/>
+  <set_env name="GZ_IP" value="$(var gz_ip)"/>
+
   <!-- Launch arguments -->
   <arg name="world" default="open_water.sdf" description="World SDF file name (resolved via GZ_SIM_RESOURCE_PATH)"/>
   <arg name="use_composition" default="true" description="Use composable nodes for GzServer and bridge"/>
