@@ -4,6 +4,8 @@
   <arg name="world" default="open_water.sdf" description="World SDF file name (resolved via GZ_SIM_RESOURCE_PATH)"/>
   <arg name="use_composition" default="true" description="Use composable nodes for GzServer and bridge"/>
   <arg name="gazebo_gui" default="true" description="Launch Gazebo GUI"/>
+  <arg name="spawn_blueboat" default="true" description="Spawn the default BlueBoat at the surface"/>
+  <arg name="spawn_bluerov2" default="true" description="Spawn the default BlueROV2 near the surface"/>
 
   <!-- 1. Gazebo Server (composable node) -->
   <gz_server
@@ -24,5 +26,21 @@
       create_own_container="false"
       use_composition="$(var use_composition)">
   </ros_gz_bridge>
+
+  <!-- 4. Vehicles: the default generated models from bluerobotics_models,
+       spawned side by side. Model names must match the world's per link
+       buoyancy enables (blueboat::hull_displacement,
+       bluerov2::buoyancy_displacement); renaming a vehicle here means it
+       spawns without buoyancy and sinks. Spawn heights follow each package's
+       own launch defaults: the boat drops onto the waterline, the ROV settles
+       from just above it. -->
+  <node pkg="ros_gz_sim" exec="create" name="spawn_blueboat" output="screen"
+        if="$(var spawn_blueboat)"
+        args="-name blueboat -x 0 -y 5 -z 0.05
+              -file $(find-pkg-share blueboat_gazebo)/models/blueboat/model.sdf"/>
+  <node pkg="ros_gz_sim" exec="create" name="spawn_bluerov2" output="screen"
+        if="$(var spawn_bluerov2)"
+        args="-name bluerov2 -x 0 -y -5 -z 0.5
+              -file $(find-pkg-share bluerov2_gazebo)/model.sdf"/>
 
 </launch>

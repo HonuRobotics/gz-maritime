@@ -5,7 +5,7 @@
     <!-- Physics -->
     <physics name="default_physics" type="dart">
       <max_step_size>0.004</max_step_size>
-      <!-- <real_time_factor>0</real_time_factor> -->
+      <real_time_factor>1</real_time_factor>
     </physics>
 
     <!-- Spherical coordinates for Portuguese Ledge, Monterey Bay.
@@ -328,8 +328,24 @@
       <uri>model://water_surface</uri>
     </include>
 
-    <!-- A wave-coupled test buoy (model://test_buoy) is added once the
-         gz_waves_buoyancy consumer lands; this demo world is ocean-only. -->
+    <!-- Graded buoyancy so spawned vehicles float: seawater below z 0, air
+         above. The interface is the FLAT z = 0 plane, not the displaced wave
+         surface; a wave coupled gz_waves_buoyancy consumer replaces this once
+         it lands. Per link enables keep the wave field and any other spawned
+         geometry out of the sum; each entry names a displacement link of a
+         vehicle the bringup launch spawns. -->
+    <plugin filename="gz-sim-buoyancy-system"
+            name="gz::sim::systems::Buoyancy">
+      <graded_buoyancy>
+        <default_density>1025</default_density>
+        <density_change>
+          <above_depth>0</above_depth>
+          <density>1</density>
+        </density_change>
+      </graded_buoyancy>
+      <enable>blueboat::hull_displacement</enable>
+      <enable>bluerov2</enable>
+    </plugin>
 
   </world>
 </sdf>
