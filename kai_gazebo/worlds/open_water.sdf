@@ -99,8 +99,14 @@
         <!-- Simplest control: a WMO sea-state code (0-9) sets the whole sea. It
              overrides <period>/<gain> (3 = slight, 5 = rough, 0 = calm). For a
              hand-tuned sea, comment <sea_state> and uncomment the advanced block
-             (delete the two comment markers wrapping it). -->
-        <sea_state>5</sea_state>
+             (delete the two comment markers wrapping it).
+
+             1 (calm, rippled, Hs 5 cm) while vehicles couple to the FLAT z = 0
+             buoyancy plane: the visuals then match the physics. Avoid 0: a
+             mathematically glassy sea mirrors the sky and reads as white.
+             Restore 5 (rough) for the wave showcase once the wave coupled
+             buoyancy consumer lands. -->
+        <sea_state>1</sea_state>
 
         <!-- Advanced / manual setup (a working configuration). <period> sets
              wind speed; <gain> is the amplitude multiplier (9.5 = dramatic and
