@@ -61,7 +61,14 @@ class gz::sim::maritime::ThrusterPrivateData
     ForceCmd = 0,
     /// \brief Takes in angular velocity commands in radians per second and
     /// calculates the appropriate force.
-    AngVelCmd
+    AngVelCmd,
+    /// \brief Takes in a normalized command in [-1, 1] and scales it onto the
+    /// thrust limits: +1 is max_thrust_cmd, -1 is min_thrust_cmd, 0 is stop.
+    /// Real thrusters are commanded this way - an autopilot scales every
+    /// output to a normalized range and the ESC maps it onto its own band -
+    /// and thrust in newtons is not something a driver can honor, because it
+    /// depends on battery voltage and propeller state.
+    NormalizedCmd
   } opmode = OperationMode::ForceCmd;
 
   /// \brief Mutex for read/write access to class
@@ -261,7 +268,18 @@ void Thruster::Configure(
   }
 
   // Get the operation mode
-  if (_sdf->HasElement("use_angvel_cmd"))
+  if (_sdf->HasElement("use_normalized_cmd") &&
+      _sdf->Get<bool>("use_normalized_cmd"))
+  {
+    if (_sdf->HasElement("use_angvel_cmd") &&
+        _sdf->Get<bool>("use_angvel_cmd"))
+    {
+      gzwarn << "Both [use_normalized_cmd] and [use_angvel_cmd] are set; "
+             << "using normalized command mode." << std::endl;
+    }
+    this->dataPtr->opmode = ThrusterPrivateData::OperationMode::NormalizedCmd;
+  }
+  else if (_sdf->HasElement("use_angvel_cmd"))
   {
     this->dataPtr->opmode = _sdf->Get<bool>("use_angvel_cmd") ?
       ThrusterPrivateData::OperationMode::AngVelCmd :
@@ -346,7 +364,7 @@ void Thruster::Configure(
       ns + "/" + this->dataPtr->topic);
     this->dataPtr->deadbandTopic = gz::transport::TopicUtils::AsValidTopic(
       ns + "/" + this->dataPtr->topic + "/enable_deadband");
-    if (this->dataPtr->opmode == ThrusterPrivateData::OperationMode::ForceCmd)
+    if (this->dataPtr->opmode != ThrusterPrivateData::OperationMode::AngVelCmd)
     {
       this->dataPtr->node.Subscribe(
           thrusterTopic,
@@ -367,12 +385,17 @@ void Thruster::Configure(
           ns + "/" + this->dataPtr->topic + "/force");
     }
   }
-  else if (this->dataPtr->opmode ==
-           ThrusterPrivateData::OperationMode::ForceCmd)
+  else if (this->dataPtr->opmode !=
+           ThrusterPrivateData::OperationMode::AngVelCmd)
   {
-    // Subscribe to force commands
+    // Subscribe to force or normalized commands. The topic is named for the
+    // mode, as cmd_vel is below, so a subscriber cannot silently send the
+    // wrong units.
+    const std::string cmdName =
+      this->dataPtr->opmode == ThrusterPrivateData::OperationMode::NormalizedCmd
+        ? "/cmd_normalized" : "/cmd_thrust";
     thrusterTopic = gz::transport::TopicUtils::AsValidTopic(
-      "/model/" + ns + "/joint/" + jointName + "/cmd_thrust");
+      "/model/" + ns + "/joint/" + jointName + cmdName);
 
     this->dataPtr->node.Subscribe(
       thrusterTopic,
@@ -517,8 +540,19 @@ void Thruster::Configure(
 void ThrusterPrivateData::OnCmdThrust(const gz::msgs::Double &_msg)
 {
   std::lock_guard<std::mutex> lock(mtx);
-  this->thrust = gz::math::clamp(gz::math::fixnan(_msg.data()),
-    this->cmdMin, this->cmdMax);
+  double value = gz::math::fixnan(_msg.data());
+
+  if (this->opmode == OperationMode::NormalizedCmd)
+  {
+    // [-1, 1] onto the thrust limits, each direction scaled by its own limit.
+    // They are not symmetric for a real thruster: a T200 makes appreciably
+    // less astern than ahead, so +1 and -1 are full command rather than equal
+    // force.
+    value = gz::math::clamp(value, -1.0, 1.0);
+    value = value >= 0.0 ? value * this->cmdMax : -value * this->cmdMin;
+  }
+
+  this->thrust = gz::math::clamp(value, this->cmdMin, this->cmdMax);
 
   // Thrust is proportional to the Rotation Rate squared
   // See Thor I Fossen's  "Guidance and Control of ocean vehicles" p. 246
@@ -742,7 +776,7 @@ void Thruster::PreUpdate(
     angvel.set_data(desiredPropellerAngVel);
   }
 
-  if (this->dataPtr->opmode == ThrusterPrivateData::OperationMode::ForceCmd)
+  if (this->dataPtr->opmode != ThrusterPrivateData::OperationMode::AngVelCmd)
   {
     this->dataPtr->pub.Publish(angvel);
   }
