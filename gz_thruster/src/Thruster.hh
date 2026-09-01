@@ -63,6 +63,20 @@ namespace maritime
   /// - `<use_angvel_cmd>`: If set to true will make the thruster
   ///   plugin accept commands in angular velocity in radians per seconds in
   ///   terms of newtons. [Optional, Boolean, defaults to false]
+  /// - `<use_normalized_cmd>`: If set to true the thruster accepts a
+  ///   normalized command in [-1, 1] instead of a force, and scales it onto
+  ///   the thrust limits: +1 gives `<max_thrust_cmd>`, -1 gives
+  ///   `<min_thrust_cmd>`, 0 is stop. The two directions are scaled
+  ///   independently, so +1 and -1 are full command rather than equal force -
+  ///   a real thruster makes appreciably less astern than ahead.
+  ///   The topic is `/model/{ns}/joint/{joint_name}/cmd_normalized`, and
+  ///   feedback is angular velocity as in the default mode.
+  ///   This is how thrusters are actually driven: an autopilot scales every
+  ///   output to a normalized range and an ESC maps it onto its own band.
+  ///   Thrust in newtons is not something a driver can honor, since it
+  ///   depends on battery voltage and propeller state. Takes precedence over
+  ///   `<use_angvel_cmd>` if both are set.
+  ///   [Optional, Boolean, defaults to false]
   /// - `<fluid_density>`: The fluid density of the liquid in which the thruster
   ///   is operating in. [Optional, kg/m^3, defaults to 1000 kg/m^3]
   /// - `<propeller_diameter>`: The diameter of the propeller in meters.
