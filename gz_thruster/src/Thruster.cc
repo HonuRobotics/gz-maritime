@@ -50,9 +50,9 @@
 
 using namespace gz;
 using namespace sim;
-using namespace systems;
+using namespace maritime;
 
-class gz::sim::systems::ThrusterPrivateData
+class gz::sim::maritime::ThrusterPrivateData
 {
   /// \brief The mode of operation
   public: enum OperationMode {
@@ -778,4 +778,4 @@ GZ_ADD_PLUGIN(
   Thruster::ISystemPreUpdate,
   Thruster::ISystemPostUpdate)
 
-GZ_ADD_PLUGIN_ALIAS(Thruster, "gz::sim::systems::Thruster")
+GZ_ADD_PLUGIN_ALIAS(Thruster, "gz::sim::maritime::Thruster")

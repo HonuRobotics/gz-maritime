@@ -14,8 +14,8 @@
  * limitations under the License.
  *
  */
-#ifndef GZ_SIM_SYSTEMS_THRUSTER_HH_
-#define GZ_SIM_SYSTEMS_THRUSTER_HH_
+#ifndef GZ_SIM_MARITIME_THRUSTER_HH_
+#define GZ_SIM_MARITIME_THRUSTER_HH_
 
 #include <gz/sim/System.hh>
 
@@ -27,7 +27,11 @@ namespace sim
 {
 // Inline bracket to help doxygen filtering.
 inline namespace GZ_SIM_VERSION_NAMESPACE {
-namespace systems
+// Leaf namespace renamed from `systems` so this plugin's registered alias
+// does not collide with gz-sim's own Thruster when both libraries are on
+// GZ_SIM_SYSTEM_PLUGIN_PATH. Still nested inside gz::sim, so every gz-sim
+// type the body uses unqualified still resolves. The class is unmodified.
+namespace maritime
 {
   // Forward declaration
   class ThrusterPrivateData;
