@@ -46,7 +46,12 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Getting started</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Getting started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#build">Build</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#run">Run</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="../vehicles/index.html">Vehicles</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../how-to/index.html">How to guides</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a></li>
@@ -80,11 +85,53 @@
              
   <section id="getting-started">
 <h1>Getting started<a class="headerlink" href="#getting-started" title="Link to this heading"></a></h1>
-<p>Requirements, installation and a first simulation.</p>
-<div class="note admonition">
-<p class="admonition-title">Draft</p>
-<p>This section is being written.</p>
+<section id="requirements">
+<h2>Requirements<a class="headerlink" href="#requirements" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://docs.ros.org/en/lyrical/">ROS 2 Lyrical</a></p></li>
+<li><p><a class="reference external" href="https://gazebosim.org/docs/jetty">Gazebo Jetty</a></p></li>
+<li><p><a class="reference external" href="https://github.com/gazebosim/ros_gz">ros_gz</a> (matching the Lyrical / Jetty pairing)</p></li>
+<li><p><a class="reference external" href="https://github.com/HonuRobotics/ehukai">Ehukai</a>, required by the
+FFT wave model. It has no rosdep key, so check it out as a peer in the same
+workspace and colcon builds it ahead of <code class="docutils literal notranslate"><span class="pre">gz_waves_provider_fft</span></code>. See its
+README for standalone build and install instructions.</p></li>
+</ul>
+<p>A Docker Compose development environment with all of the above is maintained
+separately in <a class="reference external" href="https://github.com/HonuRobotics/drydock">HonuRobotics/drydock</a>.</p>
+</section>
+<section id="build">
+<h2>Build<a class="headerlink" href="#build" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>-p<span class="w"> </span>~/maritime_ws/src<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>~/maritime_ws/src
+git<span class="w"> </span>clone<span class="w"> </span>https://github.com/HonuRobotics/gz-maritime.git
+git<span class="w"> </span>clone<span class="w"> </span>https://github.com/HonuRobotics/ehukai.git
+<span class="nb">cd</span><span class="w"> </span>~/maritime_ws
+rosdep<span class="w"> </span>install<span class="w"> </span>--from-paths<span class="w"> </span>src<span class="w"> </span>--ignore-src<span class="w"> </span>-y
+colcon<span class="w"> </span>build<span class="w"> </span>--merge-install
+<span class="nb">source</span><span class="w"> </span>install/setup.bash
+</pre></div>
 </div>
+<p>Ehukai is a plain CMake package in the same workspace, so colcon builds
+it ahead of <code class="docutils literal notranslate"><span class="pre">gz_waves_provider_fft</span></code> and no separate install step is needed.</p>
+<p>If you installed Ehukai outside the workspace rather than cloning it as a
+peer, add <code class="docutils literal notranslate"><span class="pre">--skip-keys</span> <span class="pre">ehukai</span></code> to the <code class="docutils literal notranslate"><span class="pre">rosdep</span> <span class="pre">install</span></code> command — the key
+is unresolvable by design and rosdep will otherwise stop before installing
+anything.</p>
+</section>
+<section id="run">
+<h2>Run<a class="headerlink" href="#run" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>simulation.launch.xml
+</pre></div>
+</div>
+<p>Launch arguments:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">world</span></code> (default <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code>): world file to load.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">gazebo_gui</span></code> (default <code class="docutils literal notranslate"><span class="pre">true</span></code>): start the Gazebo GUI.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">use_composition</span></code> (default <code class="docutils literal notranslate"><span class="pre">true</span></code>): run the Gazebo server and bridge as
+composable nodes in a shared container.</p></li>
+</ul>
+<p>The default world starts with the FFT wave model on a moderate sea; sea
+conditions can be changed while the simulation runs.</p>
+</section>
 </section>
 
 
