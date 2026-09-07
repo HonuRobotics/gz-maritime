@@ -116,4 +116,4 @@ changes**. Follow the step-by-step recipe in **`WAVES_DESIGN.md` §9**, using
 
 - `WAVES_DESIGN.md` — wave-package requirements, architecture, per-package detail,
   and the "add a new engine" guide.
-- `README.md` — user-facing build/run summary.
+- `docs/` — user-facing documentation.
