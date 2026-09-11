@@ -5,6 +5,17 @@
   <arg name="use_composition" default="true" description="Use composable nodes for GzServer and bridge"/>
   <arg name="gazebo_gui" default="true" description="Launch Gazebo GUI"/>
 
+  <!-- Vehicle arguments. This launch names no vehicle: a vehicle package passes
+       these from its own launch file, and with none set it runs the ocean only. -->
+  <arg name="vehicle_sdf" default="" description="Model SDF file to spawn; empty spawns nothing"/>
+  <arg name="vehicle_name" default="vehicle" description="Name the model is spawned under, which is also the name buoyancy registration uses"/>
+  <arg name="vehicle_x" default="0" description="Spawn position x [m]"/>
+  <arg name="vehicle_y" default="0" description="Spawn position y [m]"/>
+  <arg name="vehicle_z" default="0" description="Spawn position z [m]; 0 is the waterline"/>
+  <arg name="vehicle_yaw" default="0" description="Spawn yaw [rad]"/>
+  <arg name="bridge_config" default="$(find-pkg-share kai_bringup)/config/ros_gz_bridge.yaml" description="ros_gz_bridge YAML file. Replaces the default, which bridges only /clock, so a replacement should bridge /clock too"/>
+  <arg name="buoyancy_enable" default="" description="Model or model::link name to register with the world's buoyancy system, for a model with no BuoyancyEnable plugin (e.g. blueboat::hull_displacement); separate several with spaces; empty registers nothing"/>
+
   <!-- 1. Gazebo Server (composable node) -->
   <gz_server
       world_sdf_file="$(var world)"
@@ -19,10 +30,31 @@
   <!-- 3. ROS-Gazebo bridge (shares ros_gz_container) -->
   <ros_gz_bridge
       bridge_name="ros_gz_bridge"
-      config_file="$(find-pkg-share kai_bringup)/config/ros_gz_bridge.yaml"
+      config_file="$(var bridge_config)"
       container_name="ros_gz_container"
       create_own_container="false"
       use_composition="$(var use_composition)">
   </ros_gz_bridge>
+
+  <!-- 4. Vehicle. create waits for the server and spawns into whichever world
+       it is running.
+       Both guards below test for an empty argument by comparing it with a
+       prefix, because the XML frontend parses a bare '' as the text "[]":
+       $(not-equals $(var vehicle_sdf) '') is always true. -->
+  <node pkg="ros_gz_sim" exec="create" name="spawn_vehicle" output="screen"
+        if="$(not-equals _$(var vehicle_sdf) _)"
+        args="-name $(var vehicle_name) -file $(var vehicle_sdf)
+              -x $(var vehicle_x) -y $(var vehicle_y) -z $(var vehicle_z)
+              -Y $(var vehicle_yaw)"/>
+
+  <!-- 5. Buoyancy registration from outside the model. open_water.sdf floats
+       nothing it has not been told about, and a model carrying the
+       BuoyancyEnable plugin tells it itself, so this is only for models that
+       cannot be edited. The script waits for the server; whether it runs
+       before or after the spawn does not matter, because the buoyancy system
+       re-scans existing links when a name is added. -->
+  <node pkg="kai_bringup" exec="buoyancy_enable.py" output="screen"
+        if="$(not-equals _$(var buoyancy_enable) _)"
+        args="$(var buoyancy_enable)"/>
 
 </launch>
