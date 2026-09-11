@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<!--
+  The same box under the vendored plugin with neither <enable> nor
+  <enable_by_default>, which is upstream's default: everything floats. Guards
+  the delta against changing the behaviour of a world that does not ask for
+  any of it.
+-->
+<sdf version="1.9">
+  <world name="buoyancy_default_test">
+    <gravity>0 0 -9.8</gravity>
+
+    <physics name="fast" type="dart">
+      <max_step_size>0.002</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+
+    <plugin filename="gz-maritime-buoyancy-system"
+            name="gz::sim::maritime::Buoyancy">
+      <graded_buoyancy>
+        <default_density>1025</default_density>
+        <density_change>
+          <above_depth>0</above_depth>
+          <density>1</density>
+        </density_change>
+      </graded_buoyancy>
+    </plugin>
+
+    <model name="plain_box">
+      <pose>0 0 -0.2 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>500</mass>
+          <inertia>
+            <ixx>83.333</ixx><iyy>83.333</iyy><izz>83.333</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><box><size>1 1 1</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+  </world>
+</sdf>
