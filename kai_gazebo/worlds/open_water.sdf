@@ -10,7 +10,8 @@
 
     <!-- Spherical coordinates for Portuguese Ledge, Monterey Bay.
          Required by the magnetometer system, which computes the magnetic field
-         from the World Magnetic Model (WMM) at the given lat/lon. -->
+         from the World Magnetic Model (WMM) at the given lat/lon, and by the
+         NavSat system, which reports fixes relative to this origin. -->
     <spherical_coordinates>
       <surface_model>EARTH_WGS84</surface_model>
       <world_frame_orientation>ENU</world_frame_orientation>
@@ -79,6 +80,40 @@
       name="gz::sim::systems::Imu">
     </plugin>
 
+    <plugin
+      filename="gz-sim-navsat-system"
+      name="gz::sim::systems::NavSat">
+    </plugin>
+
+    <!-- Buoyancy (gz_buoyancy): graded, seawater (1025 kg/m^3) below z = 0
+         and air (1 kg/m^3) above. The interface is the FLAT z = 0 plane, not
+         the wave surface: for vehicle physics the waves are visual only.
+         Coupling buoyancy to the waves is the job of the future
+         gz_waves_buoyancy consumer (WAVES_DESIGN.md §11).
+
+         Restricted mode: <enable_by_default> false and no <enable> list, so
+         nothing floats until it is registered, and this world names no
+         vehicle. A vehicle registers by the name it was spawned under, either
+         the whole model or one model::link, in one of two ways:
+           * from inside the model, the gz-maritime-buoyancy-enable-system
+             plugin (gz::sim::maritime::BuoyancyEnable) with one <link> per
+             displacement link, or none for the whole model;
+           * from outside, for a model you cannot edit, a gz.msgs.StringMsg
+             naming it to the /world/default/buoyancy/enable service
+             (/world/default/buoyancy/disable undoes it).
+         Registering before or after the spawn both work. -->
+    <plugin
+      filename="gz-maritime-buoyancy-system"
+      name="gz::sim::maritime::Buoyancy">
+      <graded_buoyancy>
+        <default_density>1025</default_density>
+        <density_change>
+          <above_depth>0</above_depth>
+          <density>1</density>
+        </density_change>
+      </graded_buoyancy>
+      <enable_by_default>false</enable_by_default>
+    </plugin>
 
     <!-- ==================================================================
          WAVE SOURCE — the engine is the plugin's identity. Keep exactly ONE of
@@ -91,16 +126,23 @@
     <!-- Wave source. Two engines are available: FFT (EncinoWaves spectral,
          higher fidelity) is active here; Gerstner (analytic sum of component
          waves) is the commented alternative below. Full parameter lists and the
-         <sea_state> precedence rules live in each plugin's documentation. -->
+         <sea_state> precedence rules live in each plugin's documentation.
+
+         Both blocks set sea state 1 (rippled, Hs 5 cm). Vehicles float on the
+         flat z = 0 plane of the buoyancy system above, not on this surface, so
+         a rougher sea only shows waves passing through hulls that do not ride
+         them. Not 0: a glassy sea mirrors the sky and reads as white. Raise it
+         at runtime through /world/default/wave/set_parameters (gz.msgs.Param,
+         key sea_state; WAVES_DESIGN.md §8). -->
     <plugin filename="gz-sim-waves-fft-system"
             name="gz::sim::systems::FftWaves">
       <update_rate>30</update_rate>
       <wave>
         <!-- Simplest control: a WMO sea-state code (0-9) sets the whole sea. It
-             overrides <period>/<gain> (3 = slight, 5 = rough, 0 = calm). For a
-             hand-tuned sea, comment <sea_state> and uncomment the advanced block
-             (delete the two comment markers wrapping it). -->
-        <sea_state>5</sea_state>
+             overrides <period>/<gain> (1 = rippled, 3 = slight, 5 = rough,
+             0 = glassy). For a hand-tuned sea, comment <sea_state> and uncomment
+             the advanced block (delete the two comment markers wrapping it). -->
+        <sea_state>1</sea_state>
 
         <!-- Advanced / manual setup (a working configuration). <period> sets
              wind speed; <gain> is the amplitude multiplier (9.5 = dramatic and
@@ -132,7 +174,7 @@
             name="gz::sim::systems::GerstnerWaves">
       <update_rate>30</update_rate>
       <wave>
-        <sea_state>5</sea_state>
+        <sea_state>1</sea_state>
         <model>PMS</model>
         <number>3</number>
         <angle>0.4</angle>
@@ -328,8 +370,9 @@
       <uri>model://water_surface</uri>
     </include>
 
-    <!-- A wave-coupled test buoy (model://test_buoy) is added once the
-         gz_waves_buoyancy consumer lands; this demo world is ocean-only. -->
+    <!-- No vehicles here: every platform shares this world, so vehicles are
+         spawned into it (ros_gz_sim create, or the /world/default/create
+         service) and register with the buoyancy system above. -->
 
   </world>
 </sdf>

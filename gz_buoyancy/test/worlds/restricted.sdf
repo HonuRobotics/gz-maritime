@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<!--
+  A world running the vendored Buoyancy system in restricted mode: no <enable>
+  list, and <enable_by_default>false</enable_by_default>, so nothing floats
+  until something registers. Two identical boxes sit at the waterline. Neither
+  is named here; plain_box waits for a service call, self_box registers itself
+  through the model-side plugin.
+
+  Each box is 1 m on a side and 500 kg, so it displaces its own weight at a
+  draft of 500 / 1025 ~= 0.49 m and floats about half out of the water. Half
+  the density of the fluid on purpose: there is no hydrodynamic damping here,
+  and a light box would be thrown clear of the water by the first correction,
+  leaving the tests measuring ballistics. The tests assert on the direction of
+  motion and on the volume components rather than on a settled height.
+-->
+<sdf version="1.9">
+  <world name="buoyancy_test">
+    <gravity>0 0 -9.8</gravity>
+
+    <physics name="fast" type="dart">
+      <max_step_size>0.002</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+
+    <!-- So a test can spawn a model into the running world, which is how a
+         vehicle normally arrives and a different code path from a model the
+         world file carries. -->
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+
+    <plugin filename="gz-maritime-buoyancy-system"
+            name="gz::sim::maritime::Buoyancy">
+      <graded_buoyancy>
+        <default_density>1025</default_density>
+        <density_change>
+          <above_depth>0</above_depth>
+          <density>1</density>
+        </density_change>
+      </graded_buoyancy>
+      <enable_by_default>false</enable_by_default>
+    </plugin>
+
+    <model name="plain_box">
+      <pose>0 0 0 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>500</mass>
+          <inertia>
+            <ixx>83.333</ixx><iyy>83.333</iyy><izz>83.333</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><box><size>1 1 1</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+    <model name="self_box">
+      <pose>5 0 0 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>500</mass>
+          <inertia>
+            <ixx>83.333</ixx><iyy>83.333</iyy><izz>83.333</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><box><size>1 1 1</size></box></geometry>
+        </collision>
+      </link>
+
+      <plugin filename="gz-maritime-buoyancy-enable-system"
+              name="gz::sim::maritime::BuoyancyEnable">
+        <link>link</link>
+      </plugin>
+    </model>
+
+  </world>
+</sdf>
