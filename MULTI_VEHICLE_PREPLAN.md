@@ -69,3 +69,8 @@ A note on timing. I think we should, if we can, merge the SITL work before start
 > **Decision 8 — SITL merge first?** Do we wait for the normalized thruster interface (SITL work) into `lyrical` before branching this work?
 
 
+## What success looks like
+
+The CI will evolve naturally to cover new tests associated with the features of this task.  The final end-to-end check will be the tutorial/demo described above, run in the drydock container (so that any compatiblity issues with drydock are discovered)
+
+
