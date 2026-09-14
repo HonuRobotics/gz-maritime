@@ -16,13 +16,20 @@ This repository continues the `vrx4` rewrite of
   realistic ocean from a single sea state setting.
 - [`gz_waves_rendering`](gz_waves_rendering/): the visual ocean, drawing the moving water surface in
   the Gazebo GUI.
+- [`gz_buoyancy`](gz_buoyancy/): Gazebo's buoyancy with marked collisions: a
+  vehicle marks the shapes that float it, so a world never has to name it.
+  Carries an upstream gz-sim change until a release ships it.
 - [`kai_gazebo`](kai_gazebo/): the simulation worlds.
-- [`kai_bringup`](kai_bringup/): launch files and configuration to start everything from
-  ROS 2.
+- [`kai_bringup`](kai_bringup/): the simulation launch (Gazebo on the ocean, the
+  GUI, `/clock`) that every vehicle's spawn launch sits next to.
+- [`tutorial_usv_description`](tutorial_usv_description/) and
+  [`tutorial_usv_gazebo`](tutorial_usv_gazebo/): a small example catamaran, the
+  worked example for bringing your own vehicle.
 
 See [WAVES_DESIGN.md](WAVES_DESIGN.md) for the architecture behind these packages.
 
-Full documentation, including build and run instructions, is at
+Full documentation, including build and run instructions and how to bring your
+own vehicle, is at
 [honurobotics.github.io/gz-maritime](https://honurobotics.github.io/gz-maritime/).
 
 ## License
