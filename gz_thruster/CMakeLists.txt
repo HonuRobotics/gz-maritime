@@ -66,6 +66,21 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   set(ament_cmake_uncrustify_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
+
+  # Compiles src/Thruster.cc into the test binary rather than linking the
+  # plugin, because the scaling under test is a method of ThrusterPrivateData,
+  # which upstream declares in the .cc. See the note in the test.
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(normalized_cmd_test test/normalized_cmd_test.cc)
+  target_include_directories(normalized_cmd_test PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>)
+  target_link_libraries(normalized_cmd_test
+    gz-sim::core
+    gz-plugin::register
+    gz-math::gz-math
+    gz-common::gz-common
+    gz-transport::gz-transport
+    gz-msgs::gz-msgs)
 endif()
 
 # GZ_SIM_SYSTEM_PLUGIN_PATH hook so gz-sim finds this package's system plugin
