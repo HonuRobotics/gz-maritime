@@ -140,14 +140,21 @@ a second bridge of the same topic would publish it twice.
 
 ## Drive
 
+One terminal per propeller. Terminal 1:
+
 ```bash
-ros2 topic pub -t 5 -r 5 /tutorial_usv/motor_port/thrust std_msgs/msg/Float64 "{data: 5.0}" &
-ros2 topic pub -t 5 -r 5 /tutorial_usv/motor_stbd/thrust std_msgs/msg/Float64 "{data: 5.0}" &
-wait
+ros2 topic pub -r 5 /tutorial_usv/motor_port/thrust std_msgs/msg/Float64 "{data: 5.0}"
 ```
 
-Commands latch until the next one arrives, so start the two commands together
-and send `0.0` to stop.
+Terminal 2:
+
+```bash
+ros2 topic pub -r 5 /tutorial_usv/motor_stbd/thrust std_msgs/msg/Float64 "{data: 5.0}"
+```
+
+Commands latch until the next one arrives, so start the second right after
+the first, and stop by sending `0.0` to both
+([First simulation](../getting-started/first-simulation.md#3-drive-it)).
 
 ## Change the sea while it runs
 

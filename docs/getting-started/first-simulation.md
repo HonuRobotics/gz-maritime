@@ -44,21 +44,35 @@ ros2 topic list | grep tutorial_usv  # thrust commands and sensors
 
 ## 3. Drive it
 
-Each propeller takes a thrust command in newtons. Send both at once:
+Each propeller takes a thrust command in newtons and keeps the last one it
+got until a new one arrives. Drive with one terminal per propeller, both
+sourced, and start the second right after the first.
+
+Terminal 1, the port propeller:
 
 ```bash
-ros2 topic pub -t 5 -r 5 /tutorial_usv/motor_port/thrust std_msgs/msg/Float64 "{data: 5.0}" &
-ros2 topic pub -t 5 -r 5 /tutorial_usv/motor_stbd/thrust std_msgs/msg/Float64 "{data: 5.0}" &
-wait
+ros2 topic pub -r 5 /tutorial_usv/motor_port/thrust std_msgs/msg/Float64 "{data: 5.0}"
 ```
 
-The boat moves forward. Send `0.0` to both to stop, or two different values
-to turn.
+Terminal 2, the starboard propeller:
+
+```bash
+ros2 topic pub -r 5 /tutorial_usv/motor_stbd/thrust std_msgs/msg/Float64 "{data: 5.0}"
+```
+
+The boat turns for the moment only one propeller pushes, then moves straight
+ahead. Two different values turn it. To stop, Ctrl+C both, then send `0.0`
+once to each:
+
+```bash
+ros2 topic pub --once /tutorial_usv/motor_port/thrust std_msgs/msg/Float64 "{data: 0.0}"
+ros2 topic pub --once /tutorial_usv/motor_stbd/thrust std_msgs/msg/Float64 "{data: 0.0}"
+```
 
 ```{warning}
 Thrust commands **latch**: a propeller keeps its last command until it gets a
-new one. Always start both commands together, as above. If one arrives well
-before the other, the boat spins before it moves forward.
+new one. Ctrl+C alone does not stop the boat, `0.0` does; and the longer the
+second command waits, the further the boat turns before it goes straight.
 ```
 
 ## 4. Look at it in RViz
@@ -88,12 +102,17 @@ ros2 launch tutorial_usv_gazebo two_usvs.launch.xml
 ```
 
 Two identical boats, `boat_a` and `boat_b`, float 4 m apart. Each has its own
-topics, so this drives only one of them:
+topics, so the same two terminals as in step 3, on `boat_a`'s topics, drive
+only that boat. Terminal 1:
 
 ```bash
-ros2 topic pub -t 5 -r 5 /boat_a/motor_port/thrust std_msgs/msg/Float64 "{data: 5.0}" &
-ros2 topic pub -t 5 -r 5 /boat_a/motor_stbd/thrust std_msgs/msg/Float64 "{data: 5.0}" &
-wait
+ros2 topic pub -r 5 /boat_a/motor_port/thrust std_msgs/msg/Float64 "{data: 5.0}"
+```
+
+Terminal 2:
+
+```bash
+ros2 topic pub -r 5 /boat_a/motor_stbd/thrust std_msgs/msg/Float64 "{data: 5.0}"
 ```
 
 A third one can join a running simulation:

@@ -17,13 +17,11 @@ Regenerate the Gazebo screenshots used in the documentation.
 
 Each figure is rendered by a camera sensor in a copy of the installed
 open_water.sdf, with the vehicles included in the world, and saved from the
-camera's image topic. Two changes to the copy, both for the picture only:
+camera's image topic. One change to the copy, for the picture only:
 
 * the scene ambient light is set to the Gazebo GUI's 0.4 grey, so vehicles
   keep the colours the GUI shows (the world's own deep-ocean ambient tints
-  camera sensors cyan);
-* `<enable>` names the BlueBoat's displacement link, because the generated
-  BlueBoat model does not yet mark its displacement collisions.
+  camera sensors cyan).
 
 Needs a sourced workspace with gz-maritime and bluerobotics_models built, a
 GPU with an X display, and the gz-transport Python bindings
@@ -94,7 +92,6 @@ FIGURES = {
     'blueboat': {
         'out': DOCS / 'vehicles' / 'images' / 'blueboat.jpg',
         'vehicles': [('model://blueboat', 'blueboat')],
-        'enable': ['blueboat::hull_displacement'],
         'sea_state': 1,
         'camera': '2.1 -1.7 0.95 0 0.33 2.46',
         'fov': 0.75,
@@ -129,11 +126,6 @@ def figure_world(_figure):
                           '<ambient>0.4 0.4 0.4</ambient>', 1)
     world = world.replace('<sea_state>1</sea_state>',
                           f'<sea_state>{_figure["sea_state"]}</sea_state>', 1)
-    enables = ''.join(f'<enable>{name}</enable>'
-                      for name in _figure.get('enable', []))
-    world = world.replace('<enable_by_default>false</enable_by_default>',
-                          '<enable_by_default>false</enable_by_default>'
-                          + enables, 1)
     extra = ''.join(
         f'<include><uri>{uri}</uri><name>{name}</name></include>'
         for uri, name in _figure['vehicles'])

@@ -139,11 +139,16 @@ that follows the waves is planned.
 ## Already have a model?
 
 You don't need the two-package layout to try your vehicle out. Mark the
-collision that should float it, as above, then start the ocean and spawn
-the file next to it:
+collision that should float it, as above, then start the ocean in one
+terminal:
 
 ```bash
-ros2 launch kai_bringup simulation.launch.xml &
+ros2 launch kai_bringup simulation.launch.xml
+```
+
+and spawn the file into it from another:
+
+```bash
 ros2 run ros_gz_sim create -name my_boat -file /path/to/model.sdf -z 0
 ```
 

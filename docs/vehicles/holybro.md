@@ -31,12 +31,12 @@ together.
 
 ## On the ocean
 
-The X500 can be spawned into gz-maritime's world like any model:
+Its launch file takes `world:=` like the others, so it can be brought up on
+gz-maritime's world in one command:
 
 ```bash
-ros2 launch kai_bringup simulation.launch.xml &
-ros2 run ros_gz_sim create -name x500 -z 1.0 \
-  -file $(ros2 pkg prefix --share x500_gazebo)/models/x500/model.sdf
+ros2 launch x500_gazebo sim.launch.xml \
+  world:=$(ros2 pkg prefix --share kai_gazebo)/worlds/open_water.sdf z:=1.0
 ```
 
 What to expect: it appears 1 m above the water, and with no flight
@@ -45,3 +45,8 @@ floating vehicle: none of its collision shapes are marked as displacement
 volume, and they shouldn't be, because they are the airframe, battery and
 landing gear, sized for contact with the ground. It has no water damping
 either, so it falls fast.
+
+Its bridge comes up with it (`/x500/imu`, `/x500/mag`, `/x500/gps/fix`,
+`/joint_states`); the sensor topics are bridged lazily, so they appear in
+`ros2 topic list` once something subscribes. The barometer stays silent on
+this world, which runs no air-pressure system.
