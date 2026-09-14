@@ -47,14 +47,38 @@ RViz opens with sliders that spin the propellers.
 
 ## Drive it
 
+Each propeller takes a thrust command in newtons on
+`/<name>/motor_<side>/thrust`, where `<name>` is the instance the boat was
+spawned as. Commands latch, so send both of a boat's commands together and
+send `0.0` to stop (see
+[First simulation](../getting-started/first-simulation.md#3-drive-it)).
+
+The one boat of `sim.launch.xml` is `tutorial_usv`. Straight ahead:
+
 ```bash
 ros2 topic pub -t 5 -r 5 /tutorial_usv/motor_port/thrust std_msgs/msg/Float64 "{data: 5.0}" &
 ros2 topic pub -t 5 -r 5 /tutorial_usv/motor_stbd/thrust std_msgs/msg/Float64 "{data: 5.0}" &
 wait
 ```
 
-Commands latch, so send both together and send `0.0` to stop (see
-[First simulation](../getting-started/first-simulation.md#3-drive-it)).
+The two boats of `two_usvs.launch.xml` are `boat_a` and `boat_b`, and each
+listens only to its own topics. Send `boat_a` ahead and turn `boat_b` to
+port with more starboard thrust, all at once:
+
+```bash
+ros2 topic pub -t 5 -r 5 /boat_a/motor_port/thrust std_msgs/msg/Float64 "{data: 5.0}" &
+ros2 topic pub -t 5 -r 5 /boat_a/motor_stbd/thrust std_msgs/msg/Float64 "{data: 5.0}" &
+ros2 topic pub -t 5 -r 5 /boat_b/motor_port/thrust std_msgs/msg/Float64 "{data: 2.0}" &
+ros2 topic pub -t 5 -r 5 /boat_b/motor_stbd/thrust std_msgs/msg/Float64 "{data: 6.0}" &
+wait
+```
+
+A boat added later with `spawn.launch.xml name:=boat_c` answers on
+`/boat_c/...` the same way. To see which boats are there:
+
+```bash
+ros2 topic list | grep '/thrust$'
+```
 
 ## Topics
 
