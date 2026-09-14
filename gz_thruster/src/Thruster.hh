@@ -38,23 +38,26 @@ namespace maritime
 
   /// \brief This plugin simulates a maritime thruster for
   /// boats and underwater vehicles. It uses the equations described in Fossen's
-  /// "Guidance and Control of Ocean Vehicles" in page 246. This plugin has two
-  /// modes of operation. In the default mode it takes in a
+  /// "Guidance and Control of Ocean Vehicles" in page 246. This plugin has
+  /// three modes of operation. In the default mode it takes in a
   /// force in Newtons and applies it to the thruster. It also calculates the
   /// theoretical angular velocity of the blades and spins them accordingly.
   /// Alternatively, one may send angular velocity commands to calculate the
-  /// force to be applied using the said equation. In the default mode the
+  /// force to be applied using the said equation, or a normalized command in
+  /// [-1, 1] which is scaled onto the thrust limits. In the default mode the
   /// plugin will publish angular velocity in radians per second on
   /// `/model/{ns}/joint/{joint_name}/ang_vel` as a gz.msgs.double. If
   /// `<use_angvel_cmd>` is set to true it publishes force in Newtons instead to
-  /// `/model/{ns}/joint/{joint_name}/force`.
+  /// `/model/{ns}/joint/{joint_name}/force`. Normalized mode publishes angular
+  /// velocity, as the default mode does.
   ///
   /// ## System Parameters
   ///
   /// - `<namespace>`: The namespace in which the robot exists. The plugin will
-  ///   listen on the topic `/model/{namespace}/joint/{joint_name}/cmd_thrust`or
-  ///   `/model/{namespace}/joint/{joint_name}/cmd_vel` depending on the mode of
-  ///   operation. If {topic} is set then the plugin will listen on
+  ///   listen on the topic `/model/{namespace}/joint/{joint_name}/cmd_thrust`,
+  ///   `/model/{namespace}/joint/{joint_name}/cmd_vel` or
+  ///   `/model/{namespace}/joint/{joint_name}/cmd_normalized` depending on the
+  ///   mode of operation. If {topic} is set then the plugin will listen on
   ///   {namespace}/{topic}
   ///   [Optional]
   /// - `<topic>`: The topic for receiving thrust commands. [Optional]
