@@ -1,0 +1,55 @@
+# ros_gz_bridge configuration for one tutorial USV instance. @name@ is the
+# instance name, filled in by the build for the default instance and by
+# configure_vehicle.py --name for any other; the gz topic names match
+# model.sdf.xacro expanded with the same name.
+#
+# No /clock here: the simulation launch bridges it once for every vehicle.
+
+# Thrust commands [N]. Commands latch: the thruster keeps the last one.
+- ros_topic_name: /@name@/motor_port/thrust
+  gz_topic_name: /@name@/motor_port/thrust
+  ros_type_name: std_msgs/msg/Float64
+  gz_type_name: gz.msgs.Double
+  direction: ROS_TO_GZ
+- ros_topic_name: /@name@/motor_stbd/thrust
+  gz_topic_name: /@name@/motor_stbd/thrust
+  ros_type_name: std_msgs/msg/Float64
+  gz_type_name: gz.msgs.Double
+  direction: ROS_TO_GZ
+
+# Propeller angular velocity [rad/s].
+- ros_topic_name: /@name@/motor_port/thrust/ang_vel
+  gz_topic_name: /@name@/motor_port/thrust/ang_vel
+  ros_type_name: std_msgs/msg/Float64
+  gz_type_name: gz.msgs.Double
+  direction: GZ_TO_ROS
+- ros_topic_name: /@name@/motor_stbd/thrust/ang_vel
+  gz_topic_name: /@name@/motor_stbd/thrust/ang_vel
+  ros_type_name: std_msgs/msg/Float64
+  gz_type_name: gz.msgs.Double
+  direction: GZ_TO_ROS
+
+# Propeller joint states, for this instance's robot_state_publisher, which
+# runs in the /@name@ namespace and subscribes to joint_states there.
+- ros_topic_name: /@name@/joint_states
+  gz_topic_name: /@name@/joint_states
+  ros_type_name: sensor_msgs/msg/JointState
+  gz_type_name: gz.msgs.Model
+  direction: GZ_TO_ROS
+
+# Sensors.
+- ros_topic_name: /@name@/imu
+  gz_topic_name: /@name@/imu
+  ros_type_name: sensor_msgs/msg/Imu
+  gz_type_name: gz.msgs.IMU
+  direction: GZ_TO_ROS
+- ros_topic_name: /@name@/navsat
+  gz_topic_name: /@name@/navsat
+  ros_type_name: sensor_msgs/msg/NavSatFix
+  gz_type_name: gz.msgs.NavSat
+  direction: GZ_TO_ROS
+- ros_topic_name: /@name@/magnetometer
+  gz_topic_name: /@name@/magnetometer
+  ros_type_name: sensor_msgs/msg/MagneticField
+  gz_type_name: gz.msgs.Magnetometer
+  direction: GZ_TO_ROS

@@ -1,0 +1,209 @@
+<?xml version="1.0"?>
+<!--
+  Simulation model of the tutorial USV, expanded to model.sdf at build time
+  for the default instance and by configure_vehicle.py for any other.
+
+  It merge-includes the URDF from tutorial_usv_description and adds what a
+  URDF cannot say: the displacement volume that floats the boat, the
+  thrusters, hydrodynamic damping, sensors and joint states. The description
+  stays Gazebo-free.
+
+  One name per instance. The `name` argument is the model name, the prefix
+  of every topic and the prefix of every sensor frame id, so several boats
+  can share a simulation: expand this file once per boat with a different
+  name (configure_vehicle.py, name option) and spawn each result under that
+  name.
+
+  Spawn it into a world that runs gz_buoyancy, e.g. through
+  tutorial_usv_gazebo's spawn.launch.xml, or in a world file:
+      <include><uri>model://tutorial_usv</uri></include>
+-->
+<sdf version="1.12" xmlns:xacro="http://ros.org/wiki/xacro"
+     xmlns:gz="http://gazebosim.org/schema">
+
+  <!-- The instance name: model name, topic prefix and frame prefix. Must
+       match the name the model is spawned under. -->
+  <xacro:arg name="name" default="tutorial_usv"/>
+  <!-- The URDF to merge: the description's build-time expansion, installed
+       next to this model, or (configure_vehicle.py) a file:// URI of the
+       copy written next to the generated model. -->
+  <xacro:arg name="urdf_uri" default="model://tutorial_usv/tutorial_usv.urdf"/>
+  <xacro:property name="name" value="$(arg name)"/>
+
+  <!-- The same dimensions the URDF is built from, so the displacement boxes
+       below match the hulls and the thrusters match the propellers. -->
+  <xacro:include filename="$(find tutorial_usv_description)/urdf/dimensions.xacro"/>
+
+  <!-- ===================== Displacement =====================
+       One box per hull, the same size and place as the URDF's hull, marked
+       gz:buoyancy="true": the buoyancy system floats the link by its marked
+       collisions alone, under whatever name the model was spawned, and the
+       world never has to know this vehicle (gz-sim commit 229ec07e). The
+       zero collide_bitmask keeps the box out of contact: the URDF's hulls
+       are what the boat bumps with. -->
+  <xacro:macro name="pontoon" params="side y">
+    <collision name="pontoon_${side}" gz:buoyancy="true">
+      <pose>0 ${y} ${hull_z} 0 0 0</pose>
+      <geometry>
+        <box><size>${hull_length} ${hull_width} ${hull_height}</size></box>
+      </geometry>
+      <surface>
+        <contact><collide_bitmask>0x00</collide_bitmask></contact>
+      </surface>
+    </collision>
+  </xacro:macro>
+
+  <!-- One Thruster per propeller joint. Thrust commands [N] arrive on
+       /<name>/motor_<side>/thrust and the propeller speed is published on
+       .../thrust/ang_vel. The plugin prefixes a custom <topic> with its
+       <namespace>, which defaults to the model name; it is emptied so the
+       instance name appears exactly once. The two propellers turn in
+       opposite directions, hence the opposite coefficient signs. -->
+  <xacro:macro name="thruster" params="side coefficient">
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>motor_${side}_joint</joint_name>
+      <namespace></namespace>
+      <topic>${name}/motor_${side}/thrust</topic>
+      <thrust_coefficient>${coefficient}</thrust_coefficient>
+      <fluid_density>${water_density}</fluid_density>
+      <propeller_diameter>${prop_diameter}</propeller_diameter>
+      <velocity_control>true</velocity_control>
+      <max_thrust_cmd>20.0</max_thrust_cmd>
+      <min_thrust_cmd>-15.0</min_thrust_cmd>
+    </plugin>
+  </xacro:macro>
+
+  <!-- A sensor on a near-massless link fixed to base_link, posed at a frame
+       the URDF declares. The URDF conversion lumps imu_link and gps_link into
+       base_link but keeps them as named frames, so relative_to finds them.
+       The link is needed because base_link comes from the URDF, and a merged
+       include cannot add elements to an included link. The message frame is
+       the instance-prefixed URDF frame, which is what robot_state_publisher
+       puts in TF when it runs with frame_prefix set to the instance name. -->
+  <xacro:macro name="sensor_link" params="sensor_name frame *sensor">
+    <link name="${sensor_name}_sensor">
+      <pose relative_to="${frame}">0 0 0 0 0 0</pose>
+      <inertial>
+        <mass>1e-5</mass>
+        <inertia>
+          <ixx>1e-8</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>1e-8</iyy><iyz>0</iyz><izz>1e-8</izz>
+        </inertia>
+      </inertial>
+      <xacro:insert_block name="sensor"/>
+    </link>
+    <joint name="${sensor_name}_sensor_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>${sensor_name}_sensor</child>
+    </joint>
+  </xacro:macro>
+
+  <model name="${name}">
+    <include merge="true">
+      <uri>$(arg urdf_uri)</uri>
+    </include>
+
+    <!-- The displacement volume, on a link of its own fixed to base_link so
+         the URDF's contact geometry and this floating geometry never mix.
+         Physics sees one rigid body. -->
+    <link name="hull_displacement">
+      <pose relative_to="base_link">0 0 0 0 0 0</pose>
+      <inertial>
+        <mass>1e-5</mass>
+        <inertia>
+          <ixx>1e-8</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>1e-8</iyy><iyz>0</iyz><izz>1e-8</izz>
+        </inertia>
+      </inertial>
+      <xacro:pontoon side="port" y="${hull_spacing / 2}"/>
+      <xacro:pontoon side="stbd" y="${-hull_spacing / 2}"/>
+    </link>
+    <joint name="hull_displacement_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>hull_displacement</child>
+    </joint>
+
+    <!-- ===================== Propulsion ===================== -->
+    <xacro:thruster side="port" coefficient="0.02"/>
+    <xacro:thruster side="stbd" coefficient="-0.02"/>
+
+    <!-- ===================== Hydrodynamics =====================
+         Fossen damping on base_link. Placeholder surface-vessel coefficients,
+         the magnitudes the BlueBoat uses: strong sway and yaw resistance,
+         moderate surge, and heave, roll and pitch damping so the boat settles
+         on the buoyancy instead of bobbing. Tune them against the real
+         vehicle. -->
+    <plugin filename="gz-sim-hydrodynamics-system"
+            name="gz::sim::systems::Hydrodynamics">
+      <link_name>base_link</link_name>
+      <water_density>${water_density}</water_density>
+      <xU>-20</xU>    <yV>-40</yV>    <zW>-30</zW>
+      <kP>-20</kP>    <mQ>-20</mQ>    <nR>-15</nR>
+      <xUabsU>-30</xUabsU>
+      <yVabsV>-90</yVabsV>
+      <zWabsW>-100</zWabsW>
+      <kPabsP>-40</kPabsP>
+      <mQabsQ>-40</mQabsQ>
+      <nRabsR>-30</nRabsR>
+    </plugin>
+
+    <!-- Added mass: water accelerated along with the hull. Gazebo takes it as
+         <fluid_added_mass> inside a link's <inertial> (SDF 1.11 and later),
+         which cannot live in the URDF: URDF has no such element, and a merged
+         include cannot amend base_link's inertial from here. Left out, since
+         it is small for a boat this size at these speeds. In a link written
+         in SDF it would read, with values to be identified for the hull:
+
+         <inertial>
+           <mass>12</mass>
+           <fluid_added_mass>
+             <xx>0.6</xx>
+             <yy>6.0</yy>
+             <zz>12.0</zz>
+             <pp>0.1</pp>
+             <qq>0.5</qq>
+             <rr>0.5</rr>
+           </fluid_added_mass>
+         </inertial>
+    -->
+
+    <!-- ===================== Sensors =====================
+         They need the world to run the sensors, IMU, magnetometer and NavSat
+         systems, and NavSat needs the world's <spherical_coordinates>. -->
+    <xacro:sensor_link sensor_name="imu" frame="imu_link">
+      <sensor name="imu" type="imu">
+        <frame_id>${name}/imu_link</frame_id>
+        <topic>${name}/imu</topic>
+        <update_rate>50</update_rate>
+        <always_on>true</always_on>
+      </sensor>
+    </xacro:sensor_link>
+
+    <xacro:sensor_link sensor_name="magnetometer" frame="imu_link">
+      <sensor name="magnetometer" type="magnetometer">
+        <frame_id>${name}/imu_link</frame_id>
+        <topic>${name}/magnetometer</topic>
+        <update_rate>50</update_rate>
+        <always_on>true</always_on>
+      </sensor>
+    </xacro:sensor_link>
+
+    <xacro:sensor_link sensor_name="navsat" frame="gps_link">
+      <sensor name="navsat" type="navsat">
+        <frame_id>${name}/gps_link</frame_id>
+        <topic>${name}/navsat</topic>
+        <update_rate>5</update_rate>
+        <always_on>true</always_on>
+      </sensor>
+    </xacro:sensor_link>
+
+    <!-- Propeller joint states, so robot_state_publisher can spin the
+         propellers in RViz. Bridged to /<name>/joint_states. -->
+    <plugin filename="gz-sim-joint-state-publisher-system"
+            name="gz::sim::systems::JointStatePublisher">
+      <topic>${name}/joint_states</topic>
+      <joint_name>motor_port_joint</joint_name>
+      <joint_name>motor_stbd_joint</joint_name>
+    </plugin>
+  </model>
+</sdf>

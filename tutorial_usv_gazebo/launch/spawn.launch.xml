@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<!--
+  The spawn part of a tutorial USV bring-up: one instance of the boat, under
+  one name, into a simulation that is already running.
+
+  Everything about the instance is derived from `name` at launch time by
+  configure_vehicle.py (URDF, composed model, bridge config, into
+  $ROS_HOME/tutorial_usv_gazebo/<name>): the model is spawned under that
+  name, its bridge and robot_state_publisher run in the /<name> namespace,
+  and robot_state_publisher prefixes every TF frame with <name>/. Include
+  this file once per boat next to kai_bringup's simulation.launch.xml, which
+  starts Gazebo and bridges /clock once; sim.launch.xml does that for one
+  boat and two_usvs.launch.xml for two.
+
+      ros2 launch tutorial_usv_gazebo spawn.launch.xml name:=boat_b y:=4
+-->
+<launch>
+  <arg name="name" default="tutorial_usv"
+       description="Instance name: model name, topic prefix, ROS namespace and TF prefix"/>
+  <arg name="x" default="0" description="Spawn position x [m]"/>
+  <arg name="y" default="0" description="Spawn position y [m]"/>
+  <arg name="z" default="0"
+       description="Spawn position z [m]; base_link is the design waterline, so 0 is floating at rest"/>
+  <arg name="yaw" default="0" description="Spawn heading [rad]"/>
+  <arg name="use_composition" default="true"
+       description="Load the bridge and robot_state_publisher into ros_gz_container"/>
+
+  <!-- Every artifact of this instance, generated now from its name. -->
+  <let name="vehicle_dir"
+       value="$(command '$(find-pkg-prefix tutorial_usv_gazebo)/lib/tutorial_usv_gazebo/configure_vehicle.py --name $(var name) --cache')"/>
+  <let name="robot_description" value="$(command 'cat $(var vehicle_dir)/tutorial_usv.urdf')"/>
+
+  <!-- The model, spawned under the instance name. create waits for the
+       server and spawns into whichever world it runs. -->
+  <node pkg="ros_gz_sim" exec="create" name="spawn" namespace="$(var name)"
+        output="screen"
+        args="-name $(var name) -file $(var vehicle_dir)/model.sdf
+              -x $(var x) -y $(var y) -z $(var z) -Y $(var yaw)"/>
+
+  <!-- This instance's bridge, in its namespace. The config bridges only this
+       boat's topics; /clock comes from the simulation launch. -->
+  <ros_gz_bridge bridge_name="ros_gz_bridge"
+                 namespace="$(var name)"
+                 config_file="$(var vehicle_dir)/ros_gz_bridge.yaml"
+                 container_name="ros_gz_container"
+                 create_own_container="false"
+                 use_composition="$(var use_composition)"/>
+
+  <!-- robot_state_publisher in the instance namespace, so it reads
+       /<name>/joint_states, and with frame_prefix so TF carries
+       <name>/base_link and the rest: a composable node in the shared
+       container when composing... -->
+  <load_composable_node target="ros_gz_container" if="$(var use_composition)">
+    <composable_node pkg="robot_state_publisher"
+                     plugin="robot_state_publisher::RobotStatePublisher"
+                     name="robot_state_publisher" namespace="$(var name)">
+      <param name="robot_description" value="$(var robot_description)" type="str"/>
+      <param name="frame_prefix" value="$(var name)/" type="str"/>
+      <param name="use_sim_time" value="true" type="bool"/>
+    </composable_node>
+  </load_composable_node>
+
+  <!-- ...or a plain node when not. -->
+  <node pkg="robot_state_publisher" exec="robot_state_publisher"
+        name="robot_state_publisher" namespace="$(var name)"
+        unless="$(var use_composition)">
+    <param name="robot_description" value="$(var robot_description)" type="str"/>
+    <param name="frame_prefix" value="$(var name)/" type="str"/>
+    <param name="use_sim_time" value="true" type="bool"/>
+  </node>
+</launch>

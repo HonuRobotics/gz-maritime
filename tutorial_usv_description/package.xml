@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>tutorial_usv_description</name>
+  <version>0.0.0</version>
+  <description>
+    Description of the gz-maritime tutorial USV, a 1 m twin-hull catamaran:
+    URDF/xacro and an RViz config. Gazebo-free; tutorial_usv_gazebo composes
+    the simulation model from it. The worked example of the "bring your own
+    vehicle" guides.
+  </description>
+  <maintainer email="acordero@honurobotics.com">Alejandro Hernandez Cordero</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>xacro</buildtool_depend>
+
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher_gui</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>ament_index_python</test_depend>
+  <test_depend>python3-pytest</test_depend>
+  <!-- check_urdf -->
+  <test_depend>liburdfdom-tools</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

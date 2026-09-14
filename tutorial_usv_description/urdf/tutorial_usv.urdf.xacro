@@ -1,0 +1,137 @@
+<?xml version="1.0"?>
+<!--
+  Tutorial USV: a 1 m twin-hull box catamaran, the worked example of the
+  gz-maritime "bring your own vehicle" guides.
+
+  This is the vehicle's source of truth, and it stays Gazebo-free: links,
+  joints, mass, contact geometry and named frames only. It carries no
+  instance name and no displacement geometry. tutorial_usv_gazebo merges the
+  expanded URDF into a simulation model and adds the displacement volume,
+  the plugins and the sensors; robot_state_publisher's frame_prefix gives
+  each spawned instance its own TF frames.
+
+  Frames follow REP-103 (x forward, y left, z up). base_link's origin is the
+  design waterline: the hulls are placed from the draft the mass implies, so
+  in seawater the boat floats with base_link at z = 0.
+
+      xacro tutorial_usv.urdf.xacro > tutorial_usv.urdf
+-->
+<robot xmlns:xacro="http://ros.org/wiki/xacro" name="tutorial_usv">
+
+  <!-- Every dimension, shared with the Gazebo model (a relative include:
+       the package is not in the index yet when the build expands this). -->
+  <xacro:include filename="dimensions.xacro"/>
+
+  <material name="hull">
+    <color rgba="1.0 0.45 0.0 1.0"/>
+  </material>
+  <material name="deck">
+    <color rgba="0.25 0.25 0.25 1.0"/>
+  </material>
+  <material name="propeller">
+    <color rgba="0.1 0.1 0.1 1.0"/>
+  </material>
+
+  <!-- ===================== base_link ===================== -->
+  <!-- The collisions are the hulls, as contact geometry: what the boat bumps
+       with. They do not float it. gz-maritime's buoyancy floats a link by
+       the collisions it marks as displacement volume, and that mark is a
+       Gazebo attribute a URDF cannot carry, so the displacement boxes live in
+       tutorial_usv_gazebo, sized from the same dimensions as these hulls. -->
+  <xacro:macro name="hull" params="side y">
+    <visual name="hull_${side}">
+      <origin xyz="0 ${y} ${hull_z}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${hull_length} ${hull_width} ${hull_height}"/>
+      </geometry>
+      <material name="hull"/>
+    </visual>
+    <collision name="hull_${side}">
+      <origin xyz="0 ${y} ${hull_z}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${hull_length} ${hull_width} ${hull_height}"/>
+      </geometry>
+    </collision>
+  </xacro:macro>
+
+  <link name="base_link">
+    <!-- The mass modelled as two uniform solid hulls: each hull's own box
+         inertia plus the parallel-axis term for its offset from the centre
+         line. -->
+    <inertial>
+      <origin xyz="0 0 ${hull_z}" rpy="0 0 0"/>
+      <mass value="${base_mass}"/>
+      <inertia
+        ixx="${base_mass * ((hull_width**2 + hull_height**2) / 12 + (hull_spacing / 2)**2)}"
+        iyy="${base_mass * (hull_length**2 + hull_height**2) / 12}"
+        izz="${base_mass * ((hull_length**2 + hull_width**2) / 12 + (hull_spacing / 2)**2)}"
+        ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <xacro:hull side="port" y="${hull_spacing / 2}"/>
+    <xacro:hull side="stbd" y="${-hull_spacing / 2}"/>
+    <visual name="deck">
+      <origin xyz="0 0 ${deck_z}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${deck_length} ${hull_spacing + hull_width} ${deck_thickness}"/>
+      </geometry>
+      <material name="deck"/>
+    </visual>
+  </link>
+
+  <!-- ===================== Propellers ===================== -->
+  <!-- A continuous joint about +x per propeller: the joint a thruster drives.
+       No collision, so a propeller neither displaces nor snags. It keeps a
+       small mass because Gazebo's URDF conversion drops massless links that
+       are not on fixed joints. -->
+  <xacro:macro name="propeller" params="side y">
+    <link name="motor_${side}">
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${prop_mass}"/>
+        <!-- A thin disc spinning about x. -->
+        <inertia
+          ixx="${prop_mass * (prop_diameter / 2)**2 / 2}"
+          iyy="${prop_mass * (3 * (prop_diameter / 2)**2 + prop_thickness**2) / 12}"
+          izz="${prop_mass * (3 * (prop_diameter / 2)**2 + prop_thickness**2) / 12}"
+          ixy="0" ixz="0" iyz="0"/>
+      </inertial>
+      <visual>
+        <!-- A cylinder's axis is z; pitch it onto x. -->
+        <origin xyz="0 0 0" rpy="0 ${pi / 2} 0"/>
+        <geometry>
+          <cylinder radius="${prop_diameter / 2}" length="${prop_thickness}"/>
+        </geometry>
+        <material name="propeller"/>
+      </visual>
+    </link>
+    <joint name="motor_${side}_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="motor_${side}"/>
+      <origin xyz="${prop_x} ${y} ${prop_z}" rpy="0 0 0"/>
+      <axis xyz="1 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:propeller side="port" y="${hull_spacing / 2}"/>
+  <xacro:propeller side="stbd" y="${-hull_spacing / 2}"/>
+
+  <!-- ===================== Sensor frames ===================== -->
+  <!-- Massless links on fixed joints: frames for tutorial_usv_gazebo to hang
+       its sensors on, and for robot_state_publisher to put in TF. Gazebo's
+       URDF conversion lumps them into base_link but keeps each one as a
+       named frame. -->
+  <link name="imu_link"/>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 ${deck_z + deck_thickness / 2}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="gps_link"/>
+  <joint name="gps_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="gps_link"/>
+    <origin xyz="${-deck_length / 2 + 0.05} 0 ${deck_z + 0.25}" rpy="0 0 0"/>
+  </joint>
+
+</robot>
