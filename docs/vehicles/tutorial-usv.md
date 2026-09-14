@@ -26,6 +26,7 @@ ros2 launch tutorial_usv_gazebo sim.launch.xml                     # one boat, w
 ros2 launch tutorial_usv_gazebo sim.launch.xml gazebo_gui:=false   # headless
 ros2 launch tutorial_usv_gazebo two_usvs.launch.xml                # boat_a and boat_b
 ros2 launch tutorial_usv_gazebo spawn.launch.xml name:=boat_c y:=-6 use_composition:=false   # one more, into a running simulation
+ros2 launch tutorial_usv_gazebo rviz.launch.xml name:=boat_a                              # RViz on one of them
 ```
 
 | Argument | Default | |

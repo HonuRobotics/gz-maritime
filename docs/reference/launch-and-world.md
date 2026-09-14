@@ -35,6 +35,16 @@ The simulation part plus one spawn. Takes the union of the arguments above.
 The simulation part plus two spawns, `boat_a` at y = 2 and `boat_b` at
 y = -2. Takes the simulation part's arguments.
 
+### `tutorial_usv_gazebo` `rviz.launch.xml`
+
+RViz on one instance in a running simulation: the fixed frame, the
+description topic and the RobotModel display's TF Prefix all set to the
+instance, with simulation time.
+
+| Argument | Default | Description |
+|---|---|---|
+| `name` | `tutorial_usv` | Instance to look at. |
+
 ### `tutorial_usv_description` `display.launch.xml`
 
 Shows the tutorial USV's URDF in RViz, with no Gazebo and no frame prefix.
@@ -51,8 +61,8 @@ What the spawn launch runs. You can also run it on its own:
 ros2 run tutorial_usv_gazebo configure_vehicle.py --name NAME (--out-dir DIR | --cache)
 ```
 
-It writes `model.sdf`, `model.config`, `tutorial_usv.urdf` and
-`ros_gz_bridge.yaml` for the instance `NAME`. With `--cache` the directory
+It writes `model.sdf`, `model.config`, `tutorial_usv.urdf`,
+`ros_gz_bridge.yaml` and `tutorial_usv.rviz` for the instance `NAME`. With `--cache` the directory
 is `$ROS_HOME/tutorial_usv_gazebo/NAME` and its path is printed.
 
 ## The `open_water.sdf` world

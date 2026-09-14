@@ -292,8 +292,9 @@ runs the same xacro with another name and fills the same bridge template:
 ros2 run tutorial_usv_gazebo configure_vehicle.py --name boat_a --out-dir ~/boat_a
 ```
 
-That writes `model.sdf`, `model.config`, `tutorial_usv.urdf` and
-`ros_gz_bridge.yaml` for `boat_a`; the launch files call it for you.
+That writes `model.sdf`, `model.config`, `tutorial_usv.urdf`,
+`ros_gz_bridge.yaml` and an RViz config for `boat_a`; the launch files call
+it for you.
 
 ```{tip}
 Don't name the model directory after the package. Gazebo first looks for

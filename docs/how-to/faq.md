@@ -91,10 +91,14 @@ waterline).
 ## RViz shows nothing, or "Fixed Frame does not exist"
 
 In a simulation every frame carries the instance name: the fixed frame is
-`tutorial_usv/base_link`, not `base_link`, and the description is on
-`/tutorial_usv/robot_description`. Start RViz inside the instance's
-namespace with that fixed frame
+`tutorial_usv/base_link`, not `base_link`, the description is on
+`/tutorial_usv/robot_description`, and the RobotModel display only finds
+the links if its **TF Prefix** property is the instance name; without it
+the display reports "No transform from [base_link] to [tutorial_usv/base_link]"
+and draws nothing. `ros2 launch tutorial_usv_gazebo rviz.launch.xml name:=<name>`
+starts RViz on a config with all three set
 ([Look at it in RViz](../getting-started/first-simulation.md#4-look-at-it-in-rviz)).
+For your own vehicle, set the same three things in your RViz config.
 `display.launch.xml`, which runs without Gazebo, uses no prefix.
 
 ## robot_state_publisher warns about the root link inertia

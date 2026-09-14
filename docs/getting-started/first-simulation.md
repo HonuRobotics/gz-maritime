@@ -64,15 +64,14 @@ before the other, the boat spins before it moves forward.
 ## 4. Look at it in RViz
 
 ```bash
-rviz2 -d $(ros2 pkg prefix --share tutorial_usv_description)/rviz/tutorial_usv.rviz \
-  -f tutorial_usv/base_link --ros-args -r __ns:=/tutorial_usv -p use_sim_time:=true
+ros2 launch tutorial_usv_gazebo rviz.launch.xml
 ```
 
-RViz shows the boat and its frames. Every frame carries the boat's name
-(`tutorial_usv/base_link`), and the description is published in the boat's
-namespace, which is what the two options give RViz. Keep
-`use_sim_time:=true`: the transforms carry simulation time, and without it
-RViz discards them as too old.
+RViz shows the boat and its frames. In a simulation every frame carries the
+boat's name (`tutorial_usv/base_link`) and the description is published in
+the boat's namespace, so the launch starts RViz on a config pointed at that
+instance, with simulation time. For another boat, pass its name:
+`name:=boat_a`.
 
 ## 5. Add a second boat
 

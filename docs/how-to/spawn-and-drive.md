@@ -99,11 +99,13 @@ Everything about an instance follows its `name`:
 | ROS namespace | `/boat_a/ros_gz_bridge`, `/boat_a/robot_state_publisher` |
 | TF frames | `boat_a/base_link`, `boat_a/imu_link`, ... |
 | Sensor `frame_id` | `boat_a/imu_link` |
+| RViz | fixed frame `boat_a/base_link`, RobotModel TF Prefix `boat_a`, description on `/boat_a/robot_description` |
 
 The model file carries the name in its topics and frame ids (that is what
 `configure_vehicle.py` expands), the launch puts the nodes in the namespace,
-and `robot_state_publisher`'s `frame_prefix` puts it on the TF frames. The
-URDF itself never contains it. A name must work as all four at once:
+`robot_state_publisher`'s `frame_prefix` puts it on the TF frames, and the
+generated RViz config looks the robot up under it (`rviz.launch.xml`
+starts RViz on that config). The URDF itself never contains it. A name must work as all four at once:
 letters, digits and underscores, starting with a letter.
 
 ## The bridge configuration
