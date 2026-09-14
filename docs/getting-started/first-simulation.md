@@ -67,6 +67,12 @@ before the other, the boat spins before it moves forward.
 ros2 launch tutorial_usv_gazebo rviz.launch.xml
 ```
 
+```{figure} images/tutorial-usv-rviz.jpg
+:alt: RViz showing the tutorial USV as an orange twin-hull model over a grid, with the Displays panel listing a RobotModel whose description topic is /tutorial_usv/robot_description and whose TF Prefix is tutorial_usv
+
+The tutorial USV in RViz, on the config the launch generates for it.
+```
+
 RViz shows the boat and its frames. In a simulation every frame carries the
 boat's name (`tutorial_usv/base_link`) and the description is published in
 the boat's namespace, so the launch starts RViz on a config pointed at that
