@@ -9,6 +9,12 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <!-- Plugins and models open_water.sdf loads by name at run time. -->
+  <exec_depend>gz_buoyancy</exec_depend>
+  <exec_depend>gz_waves_provider_fft</exec_depend>
+  <exec_depend>gz_waves_provider_gerstner</exec_depend>
+  <exec_depend>gz_waves_rendering</exec_depend>
+
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
