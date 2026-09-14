@@ -62,12 +62,8 @@ class gz::sim::maritime::ThrusterPrivateData
     /// \brief Takes in angular velocity commands in radians per second and
     /// calculates the appropriate force.
     AngVelCmd,
-    /// \brief Takes in a normalized command in [-1, 1] and scales it onto the
-    /// thrust limits: +1 is max_thrust_cmd, -1 is min_thrust_cmd, 0 is stop.
-    /// Real thrusters are commanded this way - an autopilot scales every
-    /// output to a normalized range and the ESC maps it onto its own band -
-    /// and thrust in newtons is not something a driver can honor, because it
-    /// depends on battery voltage and propeller state.
+    /// \brief Takes in a normalized command in [-1, 1] and scales it onto
+    /// the thrust limits.
     NormalizedCmd
   } opmode = OperationMode::ForceCmd;
 
@@ -471,6 +467,20 @@ void Thruster::Configure(
   {
     this->dataPtr->cmdMax = maxThrustCmd;
     this->dataPtr->cmdMin = minThrustCmd;
+  }
+
+  // Normalized mode scales +1 onto <max_thrust_cmd> and -1 onto
+  // <min_thrust_cmd>, so it reads them as the ahead and astern limits of a
+  // real thruster. Straddling zero is not enforced - the scaling stays
+  // well defined either way - but a range that does not is almost always a
+  // typo, and the symptom is a vehicle that will not back down.
+  if (this->dataPtr->opmode == ThrusterPrivateData::OperationMode::NormalizedCmd
+      && (this->dataPtr->cmdMin >= 0.0 || this->dataPtr->cmdMax <= 0.0))
+  {
+    gzwarn << "Normalized command mode expects a thrust range that straddles "
+           << "zero, with <min_thrust_cmd> negative and <max_thrust_cmd> "
+           << "positive. Got min: " << this->dataPtr->cmdMin
+           << ", max: " << this->dataPtr->cmdMax << std::endl;
   }
 
   if (_sdf->HasElement("velocity_control"))
