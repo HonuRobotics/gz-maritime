@@ -99,8 +99,7 @@
          geometry, and a mark needs a zero <collide_bitmask> so the
          displacement volume touches nothing. gz_buoyancy carries that change
          until a Gazebo release with it reaches ROS; then this block switches
-         to gz-sim-buoyancy-system / gz::sim::systems::Buoyancy unchanged
-         (gz_buoyancy/PROVENANCE.md). -->
+         to gz-sim-buoyancy-system / gz::sim::systems::Buoyancy unchanged. -->
     <plugin
       filename="gz-maritime-buoyancy-system"
       name="gz::sim::maritime::Buoyancy">
