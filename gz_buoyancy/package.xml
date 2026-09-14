@@ -12,8 +12,8 @@
     &lt;enable_by_default&gt;false&lt;/enable_by_default&gt;.
 
     The change is upstream in gz-sim (commit 229ec07e); this package carries
-    it, vendored, until a Gazebo release that ships it reaches ROS. See
-    PROVENANCE.md, including for when to retire it.
+    it, vendored, until a Gazebo release that ships it reaches ROS. Then
+    worlds switch back to gz-sim-buoyancy-system and this package goes.
   </description>
   <maintainer email="acordero@honurobotics.com">Alejandro Hernandez Cordero</maintainer>
   <license>Apache-2.0</license>
