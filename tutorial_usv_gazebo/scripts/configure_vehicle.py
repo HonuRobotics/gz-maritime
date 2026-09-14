@@ -17,10 +17,11 @@ Generate every artifact of one tutorial USV instance from its name.
 
 Writes into an output directory the URDF, the composed Gazebo model
 (model.sdf plus model.config, so the directory works as a model:// root on
-GZ_SIM_RESOURCE_PATH) and the ros_gz bridge config, all expanded with the
-same instance name, which is the model name, the prefix of every topic and
-the prefix of every sensor frame. Several boats in one simulation are
-several instances with different names:
+GZ_SIM_RESOURCE_PATH), the ros_gz bridge config and an RViz config, all
+expanded with the same instance name, which is the model name, the prefix
+of every topic, the prefix of every sensor frame and the TF prefix RViz
+looks the links up under. Several boats in one simulation are several
+instances with different names:
 
     ros2 run tutorial_usv_gazebo configure_vehicle.py --name boat_a --out-dir ~/boat_a
     ros2 launch tutorial_usv_gazebo spawn.launch.xml name:=boat_a   # does this for you
@@ -38,6 +39,7 @@ import subprocess
 import sys
 
 from ament_index_python.packages import get_package_share_directory
+import yaml
 
 MODEL_CONFIG = """\
 <?xml version="1.0"?>
@@ -84,7 +86,30 @@ def configure(name, out_dir):
     (out_dir / 'model.config').write_text(MODEL_CONFIG.format(name=name))
     template = (gz / 'config' / 'ros_gz_bridge.yaml.in').read_text()
     (out_dir / 'ros_gz_bridge.yaml').write_text(template.replace('@name@', name))
+    (out_dir / 'tutorial_usv.rviz').write_text(
+        rviz_config((desc / 'rviz' / 'tutorial_usv.rviz').read_text(), name))
     return out_dir
+
+
+def rviz_config(text, name):
+    """
+    Return the description's RViz config, pointed at one instance.
+
+    In a simulation every TF frame carries the instance name and the
+    description is published in its namespace, so RViz needs the fixed frame
+    and the description topic of that instance, and the RobotModel display's
+    TF Prefix, without which it looks the links up under their bare URDF
+    names and draws nothing.
+    """
+    config = yaml.safe_load(text)
+    manager = config['Visualization Manager']
+    manager['Global Options']['Fixed Frame'] = f'{name}/base_link'
+    manager['Views']['Current']['Target Frame'] = f'{name}/base_link'
+    for display in manager['Displays']:
+        if display.get('Class') == 'rviz_default_plugins/RobotModel':
+            display['TF Prefix'] = name
+            display['Description Topic']['Value'] = f'/{name}/robot_description'
+    return yaml.safe_dump(config, sort_keys=False)
 
 
 def cache_dir(name):
@@ -108,8 +133,8 @@ def main(argv=None):
     if args.cache:
         sys.stdout.write(str(out_dir))
     else:
-        print(f'wrote tutorial_usv.urdf, model.sdf, model.config and '
-              f'ros_gz_bridge.yaml for {args.name} to {out_dir}')
+        print(f'wrote tutorial_usv.urdf, model.sdf, model.config, '
+              f'ros_gz_bridge.yaml and tutorial_usv.rviz for {args.name} to {out_dir}')
 
 
 if __name__ == '__main__':

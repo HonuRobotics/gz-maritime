@@ -32,8 +32,8 @@ find_package(gz-msgs REQUIRED)
 # --------------------------------------------------------------------------
 # The buoyancy system (gz-maritime-buoyancy-system). Upstream builds this file
 # with gz_add_system(), a gz-sim-internal macro that is not available out of
-# tree, so the target is declared directly. The source is gz-sim's with the
-# marked-collision change applied; see PROVENANCE.md.
+# tree, so the target is declared directly. The source is gz-sim's Buoyancy
+# at main f5ea94da0 with the marked-collision change (gz-sim 229ec07e) applied.
 #
 # The library name deliberately differs from gz-sim's own
 # gz-sim-buoyancy-system: both end up on GZ_SIM_SYSTEM_PLUGIN_PATH, and a world
