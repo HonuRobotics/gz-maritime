@@ -54,7 +54,7 @@ def test_writes_every_artifact(boats):
     """A model directory, its bridge config and the URDF it merges."""
     for out_dir in boats.values():
         for name in ('model.sdf', 'model.config', 'tutorial_usv.urdf',
-                     'ros_gz_bridge.yaml'):
+                     'ros_gz_bridge.yaml', 'tutorial_usv.rviz'):
             assert (out_dir / name).is_file(), name
 
 
@@ -116,11 +116,30 @@ def test_bridge_config_carries_the_name_and_no_clock(boats):
         assert '/clock' not in {e['gz_topic_name'] for e in entries}
 
 
+def test_rviz_config_points_at_the_instance(boats):
+    """
+    The RViz config looks the robot up where this instance publishes it.
+
+    Every TF frame carries the name, so the fixed frame and the RobotModel
+    display's TF Prefix must too, and the description is on the instance's
+    namespaced topic.
+    """
+    for name, out_dir in boats.items():
+        config = yaml.safe_load((out_dir / 'tutorial_usv.rviz').read_text())
+        manager = config['Visualization Manager']
+        assert manager['Global Options']['Fixed Frame'] == f'{name}/base_link'
+        robots = [d for d in manager['Displays']
+                  if d['Class'] == 'rviz_default_plugins/RobotModel']
+        assert len(robots) == 1
+        assert robots[0]['TF Prefix'] == name
+        assert robots[0]['Description Topic']['Value'] == f'/{name}/robot_description'
+
+
 def test_two_instances_share_nothing_but_the_urdf(boats):
     """boat_a and boat_b differ only where the name appears."""
     a, b = boats['boat_a'], boats['boat_b']
     assert (a / 'tutorial_usv.urdf').read_text() == (b / 'tutorial_usv.urdf').read_text()
-    for name in ('model.sdf', 'ros_gz_bridge.yaml', 'model.config'):
+    for name in ('model.sdf', 'ros_gz_bridge.yaml', 'model.config', 'tutorial_usv.rviz'):
         # The directory first: its own name contains the instance name.
         text_a = (a / name).read_text().replace(str(a), 'DIR').replace('boat_a', 'NAME')
         text_b = (b / name).read_text().replace(str(b), 'DIR').replace('boat_b', 'NAME')
