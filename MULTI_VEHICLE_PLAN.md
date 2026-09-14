@@ -105,14 +105,16 @@ because the world is loaded before it knows the names.
 **Example.** A boat spawned as `boat_a` sinks because the world only enables
 `blueboat::hull_displacement`.
 
-**Solution.** Extend the existing Gazebo plugin, keeping its behaviour, so it
-can also be attached to a model. The world instance works as today and in
-addition publishes the fluid density as a component. A model instance reads
-that density and does the same physics scoped to the links of its own model,
-so a vehicle floats whatever it is called and the world names nobody. This
-does not change how collisions or displacement links are modelled. Developed
-here first, then sent upstream. The work is tracked in its own pull requests,
-starting from #26.
+**Solution.** Mark the collisions that displace water. gz-sim commit
+[229ec07e](https://github.com/gazebosim/gz-sim/commit/229ec07e673b6317fec57af50fd652bcd9bde0ed)
+lets a link mark them with `gz:buoyancy="true"`: such a link floats by those
+collisions alone, whatever the model is called, and its other collisions stay
+contact geometry. A world that only describes the fluid adds
+`<enable_by_default>false</enable_by_default>`, so it floats only marked
+links and names nobody. `gz_buoyancy` carries the change until a Gazebo
+release ships it; vehicles never change when it does. The vehicle generators
+emit the mark on their displacement collisions behind a flag. Wave coupled
+buoyancy stays a later step.
 
 ## 7. Controllers
 

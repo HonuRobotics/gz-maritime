@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>gz_buoyancy</name>
+  <version>0.0.0</version>
+  <description>
+    Gazebo's Buoyancy system with marked collisions: a link marks the
+    collisions that displace water with gz:buoyancy="true" and floats by
+    those alone, under whatever name its model was spawned, so a world
+    shared by many vehicles never has to name them in an &lt;enable&gt; list.
+    A world that only describes the fluid adds
+    &lt;enable_by_default&gt;false&lt;/enable_by_default&gt;.
+
+    The change is upstream in gz-sim (commit 229ec07e); this package carries
+    it, vendored, until a Gazebo release that ships it reaches ROS. See
+    PROVENANCE.md, including for when to retire it.
+  </description>
+  <maintainer email="acordero@honurobotics.com">Alejandro Hernandez Cordero</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>gz_sim_vendor</depend>
+  <depend>gz_plugin_vendor</depend>
+  <depend>gz_math_vendor</depend>
+  <depend>gz_common_vendor</depend>
+  <depend>gz_msgs_vendor</depend>
+
+  <!-- The test spawns a model through the world's create service. -->
+  <test_depend>gz_transport_vendor</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
