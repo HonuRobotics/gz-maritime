@@ -1,0 +1,246 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spawn any vehicle into the ocean &mdash; Gz Maritime lyrical documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/honu.css?v=44af46ee" />
+
+  
+    <link rel="shortcut icon" href="../_static/honu-robotics-favicon.svg"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=46f74c5b"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Reference" href="../reference/index.html" />
+    <link rel="prev" title="How to guides" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Gz Maritime
+              <img src="../_static/honu-robotics-white-logo.svg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting-started/index.html">Getting started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/index.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/index.html#build">Build</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/index.html#run">Run</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../vehicles/index.html">Vehicles</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How to guides</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Spawn any vehicle into the ocean</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#what-the-launch-needs-from-a-vehicle">What the launch needs from a vehicle</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#rules-for-a-vehicle-to-be-spawnable-more-than-once">Rules for a vehicle to be spawnable more than once</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../design/index.html">Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../project/index.html">Project</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Gz Maritime</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">How to guides</a></li>
+      <li class="breadcrumb-item active">Spawn any vehicle into the ocean</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/how-to/spawn-vehicle.md" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="spawn-any-vehicle-into-the-ocean">
+<h1>Spawn any vehicle into the ocean<a class="headerlink" href="#spawn-any-vehicle-into-the-ocean" title="Link to this heading"></a></h1>
+<p>The simulation and the vehicles are separate launches. The simulation launch
+starts Gazebo on the open water world, the GUI and one bridge for the clock,
+and names no vehicle:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>simulation.launch.xml
+</pre></div>
+</div>
+<p>The spawn launch adds one vehicle instance to it, under a name and at a
+pose, and can be run as many times as there are instances:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">boat</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>blueboat_gazebo<span class="k">)</span><span class="s2">/lib/blueboat_gazebo/configure_vehicle.py --config </span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>blueboat_description<span class="k">)</span><span class="s2">/config/blueboat.yaml"</span>
+ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>spawn_vehicle.launch.xml<span class="w"> </span>generator:<span class="o">=</span><span class="s2">"</span><span class="nv">$boat</span><span class="s2">"</span><span class="w"> </span>name:<span class="o">=</span>boat_a<span class="w"> </span>y:<span class="o">=</span><span class="m">2</span>
+ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>spawn_vehicle.launch.xml<span class="w"> </span>generator:<span class="o">=</span><span class="s2">"</span><span class="nv">$boat</span><span class="s2">"</span><span class="w"> </span>name:<span class="o">=</span>boat_b<span class="w"> </span>y:<span class="o">=</span>-2<span class="w"> </span>yaw:<span class="o">=</span><span class="m">1</span>.57
+</pre></div>
+</div>
+<p>Each instance gets its own model, its own Gazebo and ROS topics under
+<code class="docutils literal notranslate"><span class="pre">/&lt;name&gt;/</span></code>, its own bridge and state publisher in the <code class="docutils literal notranslate"><span class="pre">/&lt;name&gt;</span></code> namespace,
+and its own TF frames prefixed with <code class="docutils literal notranslate"><span class="pre">&lt;name&gt;/</span></code>. The world knows nothing about
+any of them.</p>
+<section id="what-the-launch-needs-from-a-vehicle">
+<h2>What the launch needs from a vehicle<a class="headerlink" href="#what-the-launch-needs-from-a-vehicle" title="Link to this heading"></a></h2>
+<p>For one name, a model to spawn and, when the vehicle has them, a bridge
+config and a URDF. The launch gets them from one of two sources:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">generator:=&lt;command&gt;</span></code>: a command that, called with <code class="docutils literal notranslate"><span class="pre">--name</span> <span class="pre">&lt;name&gt;</span> <span class="pre">--out-dir</span> <span class="pre">&lt;dir&gt;</span></code>, writes <code class="docutils literal notranslate"><span class="pre">model.sdf</span></code>, <code class="docutils literal notranslate"><span class="pre">ros_gz_bridge.yaml</span></code> and a URDF for
+the name into that directory. The Blue Robotics vehicles ship one, and
+the command carries whatever else it needs, such as the vehicle config
+above. The BlueROV2 works the same way with its own generator and config.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">xacro:=&lt;file&gt;</span></code> with optional <code class="docutils literal notranslate"><span class="pre">bridge:=&lt;file&gt;</span></code> and <code class="docutils literal notranslate"><span class="pre">urdf:=&lt;file&gt;</span></code>: a
+model xacro that takes a <code class="docutils literal notranslate"><span class="pre">name</span></code> argument and uses it for the model name
+and every topic, a bridge config template with <code class="docutils literal notranslate"><span class="pre">&#64;name&#64;</span></code> wherever the name
+goes, and a URDF (xacro or plain) for the state publisher. The launch
+renders the xacros for the name, and hands the model xacro the rendered
+URDF as <code class="docutils literal notranslate"><span class="pre">urdf_uri:=file://...</span></code> so it can merge it. A vehicle that has no
+generator of its own needs nothing else to be spawned any number of
+times. With a vehicle laid out that way, say <code class="docutils literal notranslate"><span class="pre">my_usv</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>spawn_vehicle.launch.xml<span class="w"> </span>name:<span class="o">=</span>usv_1<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>xacro:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>my_usv<span class="k">)</span>/model.sdf.xacro<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>bridge:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>my_usv<span class="k">)</span>/config/ros_gz_bridge.yaml.in<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>urdf:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>my_usv<span class="k">)</span>/urdf/my_usv.urdf.xacro
+</pre></div>
+</div>
+</li>
+</ul>
+<p>The pose arguments are <code class="docutils literal notranslate"><span class="pre">x</span></code>, <code class="docutils literal notranslate"><span class="pre">y</span></code>, <code class="docutils literal notranslate"><span class="pre">z</span></code>, <code class="docutils literal notranslate"><span class="pre">roll</span></code>, <code class="docutils literal notranslate"><span class="pre">pitch</span></code> and <code class="docutils literal notranslate"><span class="pre">yaw</span></code>. <code class="docutils literal notranslate"><span class="pre">world</span></code>
+picks the world when several run; empty spawns into the one running.
+<code class="docutils literal notranslate"><span class="pre">instance_dir</span></code> is where the files of the instance are written, by default
+<code class="docutils literal notranslate"><span class="pre">$ROS_HOME/kai_bringup/&lt;name&gt;</span></code> (<code class="docutils literal notranslate"><span class="pre">~/.ros/kai_bringup/&lt;name&gt;</span></code>).</p>
+</section>
+<section id="rules-for-a-vehicle-to-be-spawnable-more-than-once">
+<h2>Rules for a vehicle to be spawnable more than once<a class="headerlink" href="#rules-for-a-vehicle-to-be-spawnable-more-than-once" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Every topic its plugins and sensors use carries the instance name, from
+the xacro <code class="docutils literal notranslate"><span class="pre">name</span></code> argument or because the vehicle’s generator writes it. A
+topic without the name is shared by every instance.</p></li>
+<li><p>The bridge config lists only the vehicle’s own topics. A <code class="docutils literal notranslate"><span class="pre">/clock</span></code> entry is
+dropped by the launch, since the simulation bridges the clock once.</p></li>
+<li><p>The URDF is the one for <code class="docutils literal notranslate"><span class="pre">robot_state_publisher</span></code>; its frames get the
+<code class="docutils literal notranslate"><span class="pre">&lt;name&gt;/</span></code> prefix in TF. Sensor messages carry whatever frame id the model
+gives them, so those should carry the name too.</p></li>
+<li><p>File and mesh references inside the model are absolute or <code class="docutils literal notranslate"><span class="pre">model://</span></code>
+URIs, since the model is written to the instance directory.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="How to guides" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../reference/index.html" class="btn btn-neutral float-right" title="Reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Honu Robotics.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  
+<div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    <span class="fa fa-book"> Other Versions</span>
+    v: lyrical
+    <span class="fa fa-caret-down"></span>
+  </span>
+  <div class="rst-other-versions">
+    <dl id="honu-version-list">
+      <dt>Distributions</dt>
+      <dd><a href="/gz-maritime/lyrical/" data-version="lyrical">Lyrical</a></dd>
+    </dl>
+  </div>
+</div>
+<script>
+  (function () {
+    var current = "lyrical";
+    var base = "/gz-maritime/";
+
+    /* Keep the reader on the same page when switching versions; the
+       version root href stays as the fallback for pages a version lacks. */
+    function wire() {
+      document.querySelectorAll('.rst-other-versions a[data-version]').forEach(function (a) {
+        var target = a.getAttribute('data-version');
+        var path = window.location.pathname;
+        if (target !== current && path.indexOf('/' + current + '/') !== -1) {
+          a.href = path.replace('/' + current + '/', '/' + target + '/');
+        }
+      });
+    }
+
+    if (!window.fetch) { wire(); return; }
+
+    /* The deploy tool maintains versions.json at the site root; reading it
+       at runtime lets builds published before a new distribution existed
+       still offer it in the flyout. Offline or local preview builds fall
+       back to the build time list rendered above. */
+    fetch(base + 'versions.json', {cache: 'no-cache'}).then(function (response) {
+      if (!response.ok) { throw new Error(response.status); }
+      return response.json();
+    }).then(function (entries) {
+      var list = document.getElementById('honu-version-list');
+      if (!list || !entries.length) { return; }
+      list.querySelectorAll('dd').forEach(function (dd) { dd.remove(); });
+      entries.forEach(function (entry) {
+        var a = document.createElement('a');
+        a.href = entry.url;
+        a.setAttribute('data-version', entry.name);
+        a.textContent = entry.name.charAt(0).toUpperCase() + entry.name.slice(1);
+        var dd = document.createElement('dd');
+        dd.appendChild(a);
+        list.appendChild(dd);
+      });
+    }).catch(function () {}).finally(wire);
+  })();
+</script><script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
