@@ -1,30 +1,31 @@
-# ros_gz_bridge configuration for one tutorial USV instance. @name@ is the
+# ros_gz_bridge configuration for one custom USV instance. @name@ is the
 # instance name, filled in by the build for the default instance and by
-# configure_vehicle.py --name for any other; the gz topic names match
-# model.sdf.xacro expanded with the same name.
+# kai_bringup's spawn_vehicle.launch.xml for any other; the gz topic names
+# match model.sdf.xacro expanded with the same name.
 #
 # No /clock here: the simulation launch bridges it once for every vehicle.
 
-# Thrust commands [N]. Commands latch: the thruster keeps the last one.
-- ros_topic_name: /@name@/motor_port/thrust
-  gz_topic_name: /@name@/motor_port/thrust
+# Thrust commands: a fraction of full thrust in [-1, 1], +1 full ahead and
+# -1 full astern. Commands latch: the thruster keeps the last one.
+- ros_topic_name: /@name@/motor_port/cmd
+  gz_topic_name: /@name@/motor_port/cmd
   ros_type_name: std_msgs/msg/Float64
   gz_type_name: gz.msgs.Double
   direction: ROS_TO_GZ
-- ros_topic_name: /@name@/motor_stbd/thrust
-  gz_topic_name: /@name@/motor_stbd/thrust
+- ros_topic_name: /@name@/motor_stbd/cmd
+  gz_topic_name: /@name@/motor_stbd/cmd
   ros_type_name: std_msgs/msg/Float64
   gz_type_name: gz.msgs.Double
   direction: ROS_TO_GZ
 
 # Propeller angular velocity [rad/s].
-- ros_topic_name: /@name@/motor_port/thrust/ang_vel
-  gz_topic_name: /@name@/motor_port/thrust/ang_vel
+- ros_topic_name: /@name@/motor_port/cmd/ang_vel
+  gz_topic_name: /@name@/motor_port/cmd/ang_vel
   ros_type_name: std_msgs/msg/Float64
   gz_type_name: gz.msgs.Double
   direction: GZ_TO_ROS
-- ros_topic_name: /@name@/motor_stbd/thrust/ang_vel
-  gz_topic_name: /@name@/motor_stbd/thrust/ang_vel
+- ros_topic_name: /@name@/motor_stbd/cmd/ang_vel
+  gz_topic_name: /@name@/motor_stbd/cmd/ang_vel
   ros_type_name: std_msgs/msg/Float64
   gz_type_name: gz.msgs.Double
   direction: GZ_TO_ROS

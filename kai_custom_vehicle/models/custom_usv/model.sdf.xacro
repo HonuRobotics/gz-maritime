@@ -1,38 +1,44 @@
 <?xml version="1.0"?>
 <!--
-  Simulation model of the tutorial USV, expanded to model.sdf at build time
-  for the default instance and by configure_vehicle.py for any other.
+  Simulation model of the custom USV, expanded to model.sdf at build time
+  for the default instance and by kai_bringup's spawn_vehicle.launch.xml for
+  any other.
 
-  It merge-includes the URDF from tutorial_usv_description and adds what a
-  URDF cannot say: the displacement volume that floats the boat, the
+  It merge-includes the URDF from this package's urdf/ directory and adds
+  what a URDF cannot say: the displacement volume that floats the boat, the
   thrusters, hydrodynamic damping, sensors and joint states. The description
   stays Gazebo-free.
 
   One name per instance. The `name` argument is the model name, the prefix
   of every topic and the prefix of every sensor frame id, so several boats
   can share a simulation: expand this file once per boat with a different
-  name (configure_vehicle.py, name option) and spawn each result under that
-  name.
+  name and spawn each result under that name. That is what the spawn launch
+  does, given this file, the bridge template and the URDF xacro (share is
+  the package's share directory):
 
-  Spawn it into a world that runs gz_buoyancy, e.g. through
-  tutorial_usv_gazebo's spawn.launch.xml, or in a world file:
-      <include><uri>model://tutorial_usv</uri></include>
+      ros2 launch kai_bringup spawn_vehicle.launch.xml name:=boat_a \
+          xacro:=<share>/models/custom_usv/model.sdf.xacro \
+          bridge:=<share>/config/ros_gz_bridge.yaml.in \
+          urdf:=<share>/urdf/custom_usv.urdf.xacro
+
+  Or, as the default instance, in a world that runs gz_buoyancy:
+      <include><uri>model://custom_usv</uri></include>
 -->
 <sdf version="1.12" xmlns:xacro="http://ros.org/wiki/xacro"
      xmlns:gz="http://gazebosim.org/schema">
 
   <!-- The instance name: model name, topic prefix and frame prefix. Must
        match the name the model is spawned under. -->
-  <xacro:arg name="name" default="tutorial_usv"/>
-  <!-- The URDF to merge: the description's build-time expansion, installed
-       next to this model, or (configure_vehicle.py) a file:// URI of the
-       copy written next to the generated model. -->
-  <xacro:arg name="urdf_uri" default="model://tutorial_usv/tutorial_usv.urdf"/>
+  <xacro:arg name="name" default="custom_usv"/>
+  <!-- The URDF to merge: the build-time expansion installed next to this
+       model, or (spawn launch) a file:// URI of the one rendered next to
+       the instance's model. -->
+  <xacro:arg name="urdf_uri" default="model://custom_usv/custom_usv.urdf"/>
   <xacro:property name="name" value="$(arg name)"/>
 
   <!-- The same dimensions the URDF is built from, so the displacement boxes
        below match the hulls and the thrusters match the propellers. -->
-  <xacro:include filename="$(find tutorial_usv_description)/urdf/dimensions.xacro"/>
+  <xacro:include filename="../../urdf/dimensions.xacro"/>
 
   <!-- ===================== Displacement =====================
        One box per hull, the same size and place as the URDF's hull, marked
@@ -53,21 +59,27 @@
     </collision>
   </xacro:macro>
 
-  <!-- One Thruster per propeller joint. Thrust commands [N] arrive on
-       /<name>/motor_<side>/thrust and the propeller speed is published on
-       .../thrust/ang_vel. The plugin prefixes a custom <topic> with its
-       <namespace>, which defaults to the model name; it is emptied so the
-       instance name appears exactly once. The two propellers turn in
-       opposite directions, hence the opposite coefficient signs. -->
+  <!-- One Thruster per propeller joint: gz-maritime's thruster system in its
+       normalized mode, the interface every vehicle here is driven with. A
+       command in [-1, 1] on /<name>/motor_<side>/cmd is scaled onto the
+       limits below, +1 to max_thrust_cmd ahead and -1 to min_thrust_cmd
+       astern, and the propeller speed is published on .../cmd/ang_vel. The
+       plugin prefixes a custom <topic> with its <namespace>, which defaults
+       to the model name; it is emptied so the instance name appears exactly
+       once. The two propellers turn in opposite directions, hence the
+       opposite coefficient signs. -->
   <xacro:macro name="thruster" params="side coefficient">
-    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+    <plugin filename="gz-maritime-thruster-system"
+            name="gz::sim::maritime::Thruster">
       <joint_name>motor_${side}_joint</joint_name>
       <namespace></namespace>
-      <topic>${name}/motor_${side}/thrust</topic>
+      <topic>${name}/motor_${side}/cmd</topic>
+      <use_normalized_cmd>true</use_normalized_cmd>
       <thrust_coefficient>${coefficient}</thrust_coefficient>
       <fluid_density>${water_density}</fluid_density>
       <propeller_diameter>${prop_diameter}</propeller_diameter>
       <velocity_control>true</velocity_control>
+      <!-- The thrust limits [N]: what +1 and -1 command. -->
       <max_thrust_cmd>20.0</max_thrust_cmd>
       <min_thrust_cmd>-15.0</min_thrust_cmd>
     </plugin>

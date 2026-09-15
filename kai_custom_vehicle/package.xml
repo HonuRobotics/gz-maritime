@@ -1,15 +1,15 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>tutorial_usv_gazebo</name>
+  <name>kai_custom_vehicle</name>
   <version>0.0.0</version>
   <description>
-    Gazebo simulation of the gz-maritime tutorial USV: the composed model
-    (tutorial_usv_description's URDF plus its displacement volume, thrusters,
-    hydrodynamics and sensors), the ros_gz bridge configuration, a generator
-    that expands both for any instance name, and the launch files that put
-    one or several boats on the open_water world. The template to copy for
-    your own vehicle.
+    A custom vehicle on the gz-maritime ocean, the worked example of the
+    "bring your own vehicle" guides: the custom USV, a 1 m twin-hull
+    catamaran. One package holds what a vehicle brings: a Gazebo-free URDF,
+    the simulation model that merges it and marks the volume that floats it,
+    the ros_gz bridge template and an RViz config. kai_bringup spawns it
+    under any name, as often as needed. Copy this package and rename it.
   </description>
   <maintainer email="acordero@honurobotics.com">Alejandro Hernandez Cordero</maintainer>
   <license>Apache-2.0</license>
@@ -17,34 +17,35 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>xacro</buildtool_depend>
 
-  <!-- Build time too: model.sdf.xacro reads the description's dimensions
-       through $(find), and the model installs a copy of its URDF. -->
-  <depend>tutorial_usv_description</depend>
-
+  <!-- The simulation and spawn launches, and the script that renders the
+       xacros for an instance name. -->
+  <exec_depend>kai_bringup</exec_depend>
+  <exec_depend>kai_gazebo</exec_depend>
+  <!-- The buoyancy system that reads the model's marked collisions, and the
+       thruster system with the normalized command. -->
+  <exec_depend>gz_buoyancy</exec_depend>
+  <exec_depend>gz_thruster</exec_depend>
+  <exec_depend>xacro</exec_depend>
   <exec_depend>ros_gz_sim</exec_depend>
   <exec_depend>ros_gz_bridge</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
-  <exec_depend>kai_bringup</exec_depend>
-  <exec_depend>kai_gazebo</exec_depend>
-  <!-- The buoyancy system that reads the model's marked collisions. -->
-  <exec_depend>gz_buoyancy</exec_depend>
-  <!-- configure_vehicle.py expands the xacros and the RViz config at launch time. -->
-  <exec_depend>xacro</exec_depend>
-  <exec_depend>ament_index_python</exec_depend>
-  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>joint_state_publisher_gui</exec_depend>
   <exec_depend>rviz2</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
   <!-- ROS message types the bridge maps to. -->
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
-  <exec_depend>rclcpp_components</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
   <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>ament_index_python</test_depend>
   <test_depend>python3-pytest</test_depend>
   <test_depend>ros2cli</test_depend>
+  <!-- check_urdf -->
+  <test_depend>liburdfdom-tools</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

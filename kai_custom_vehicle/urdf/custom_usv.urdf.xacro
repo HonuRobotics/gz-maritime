@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <!--
-  Tutorial USV: a 1 m twin-hull box catamaran, the worked example of the
+  Custom USV: a 1 m twin-hull box catamaran, the worked example of the
   gz-maritime "bring your own vehicle" guides.
 
   This is the vehicle's source of truth, and it stays Gazebo-free: links,
   joints, mass, contact geometry and named frames only. It carries no
-  instance name and no displacement geometry. tutorial_usv_gazebo merges the
-  expanded URDF into a simulation model and adds the displacement volume,
+  instance name and no displacement geometry. models/custom_usv/model.sdf.xacro
+  merges the expanded URDF into a simulation model and adds the displacement volume,
   the plugins and the sensors; robot_state_publisher's frame_prefix gives
   each spawned instance its own TF frames.
 
@@ -14,9 +14,9 @@
   design waterline: the hulls are placed from the draft the mass implies, so
   in seawater the boat floats with base_link at z = 0.
 
-      xacro tutorial_usv.urdf.xacro > tutorial_usv.urdf
+      xacro custom_usv.urdf.xacro > custom_usv.urdf
 -->
-<robot xmlns:xacro="http://ros.org/wiki/xacro" name="tutorial_usv">
+<robot xmlns:xacro="http://ros.org/wiki/xacro" name="custom_usv">
 
   <!-- Every dimension, shared with the Gazebo model (a relative include:
        the package is not in the index yet when the build expands this). -->
@@ -37,7 +37,7 @@
        with. They do not float it. gz-maritime's buoyancy floats a link by
        the collisions it marks as displacement volume, and that mark is a
        Gazebo attribute a URDF cannot carry, so the displacement boxes live in
-       tutorial_usv_gazebo, sized from the same dimensions as these hulls. -->
+       the simulation model, sized from the same dimensions as these hulls. -->
   <xacro:macro name="hull" params="side y">
     <visual name="hull_${side}">
       <origin xyz="0 ${y} ${hull_z}" rpy="0 0 0"/>
@@ -116,7 +116,7 @@
   <xacro:propeller side="stbd" y="${-hull_spacing / 2}"/>
 
   <!-- ===================== Sensor frames ===================== -->
-  <!-- Massless links on fixed joints: frames for tutorial_usv_gazebo to hang
+  <!-- Massless links on fixed joints: frames for the simulation model to hang
        its sensors on, and for robot_state_publisher to put in TF. Gazebo's
        URDF conversion lumps them into base_link but keeps each one as a
        named frame. -->
