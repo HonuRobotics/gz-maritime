@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<!--
+  The custom USV's dimensions, shared by the description and the simulation
+  model.
+
+  custom_usv.urdf.xacro builds the description from these, and
+  models/custom_usv/model.sdf.xacro builds the displacement volume and
+  the thrusters from the same numbers, so the hulls the boat bumps with, the
+  boxes that float it and the propellers it turns cannot drift apart. Change
+  a value here and both follow.
+
+  Units: metres, kilograms.
+-->
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!-- Mass of the rigid hull and deck; the propellers add their own. -->
+  <xacro:property name="base_mass" value="12.0"/>
+  <!-- Two box hulls; hull_spacing is centre to centre. -->
+  <xacro:property name="hull_length" value="1.0"/>
+  <xacro:property name="hull_width" value="0.15"/>
+  <xacro:property name="hull_height" value="0.15"/>
+  <xacro:property name="hull_spacing" value="0.5"/>
+  <!-- Deck plate bridging the hulls; visual only. -->
+  <xacro:property name="deck_length" value="0.6"/>
+  <xacro:property name="deck_thickness" value="0.02"/>
+  <!-- Propellers. -->
+  <xacro:property name="prop_diameter" value="0.08"/>
+  <xacro:property name="prop_thickness" value="0.01"/>
+  <xacro:property name="prop_mass" value="0.05"/>
+  <!-- Seawater, as in the gz-maritime open_water world. -->
+  <xacro:property name="water_density" value="1025.0"/>
+
+  <!-- ===================== Derived ===================== -->
+  <!-- Draft: the depth at which the two hulls displace the whole boat's
+       weight, mass / (density * waterplane area). About 4 cm here. -->
+  <xacro:property name="total_mass" value="${base_mass + 2 * prop_mass}"/>
+  <xacro:property name="draft"
+                  value="${total_mass / (water_density * 2 * hull_length * hull_width)}"/>
+  <!-- Hull centre height: the hull bottoms sit one draft below base_link,
+       which puts base_link's origin on the design waterline. -->
+  <xacro:property name="hull_z" value="${hull_height / 2 - draft}"/>
+  <xacro:property name="deck_z" value="${hull_z + hull_height / 2 + deck_thickness / 2}"/>
+  <!-- Propellers just below the stern of each hull. -->
+  <xacro:property name="prop_x" value="${-hull_length / 2}"/>
+  <xacro:property name="prop_z" value="${hull_z - hull_height / 2 - prop_diameter / 2}"/>
+
+</robot>

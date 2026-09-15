@@ -1,3 +1,16 @@
+<!--
+  The simulation part of a gz-maritime bring-up: the Gazebo server on the
+  ocean world, the GUI, and a bridge for /clock. Nothing else, and no
+  vehicle: this file names none, so one simulation can carry any number.
+
+  A vehicle package includes this once and spawn_vehicle.launch.xml once per
+  instance; kai_custom_vehicle/launch/sim.launch.xml is the template. The
+  spawn launch brings the model, its bridge (without /clock, which is bridged
+  here once) and its robot_state_publisher, all under the instance's name.
+
+      ros2 launch kai_bringup simulation.launch.xml                 # ocean only
+      ros2 launch kai_custom_vehicle sim.launch.xml               # with a boat
+-->
 <launch>
 
   <!-- Launch arguments -->
@@ -5,7 +18,8 @@
   <arg name="use_composition" default="true" description="Use composable nodes for GzServer and bridge"/>
   <arg name="gazebo_gui" default="true" description="Launch Gazebo GUI"/>
 
-  <!-- 1. Gazebo Server (composable node) -->
+  <!-- 1. Gazebo Server (composable node). It creates ros_gz_container, which
+       a vehicle's spawn launch joins with its own bridge and state publisher. -->
   <gz_server
       world_sdf_file="$(var world)"
       container_name="ros_gz_container"
@@ -16,7 +30,7 @@
   <!-- 2. Gazebo GUI (separate process) -->
   <executable cmd="gz sim -g" output="screen" if="$(var gazebo_gui)"/>
 
-  <!-- 3. ROS-Gazebo bridge (shares ros_gz_container) -->
+  <!-- 3. ROS-Gazebo bridge for the world's own topics: /clock, once. -->
   <ros_gz_bridge
       bridge_name="ros_gz_bridge"
       config_file="$(find-pkg-share kai_bringup)/config/ros_gz_bridge.yaml"
