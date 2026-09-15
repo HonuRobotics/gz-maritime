@@ -3,13 +3,13 @@
   ocean world, the GUI, and a bridge for /clock. Nothing else, and no
   vehicle: this file names none, so one simulation can carry any number.
 
-  A vehicle package includes this once and its own spawn launch once per
-  instance; tutorial_usv_gazebo/launch/sim.launch.xml is the template. The
+  A vehicle package includes this once and spawn_vehicle.launch.xml once per
+  instance; kai_custom_vehicle/launch/sim.launch.xml is the template. The
   spawn launch brings the model, its bridge (without /clock, which is bridged
   here once) and its robot_state_publisher, all under the instance's name.
 
       ros2 launch kai_bringup simulation.launch.xml                 # ocean only
-      ros2 launch tutorial_usv_gazebo sim.launch.xml               # with a boat
+      ros2 launch kai_custom_vehicle sim.launch.xml               # with a boat
 -->
 <launch>
 

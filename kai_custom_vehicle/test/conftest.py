@@ -14,9 +14,9 @@
 """
 Shared plumbing for the integration test modules.
 
-The gz and ros2 suites launch a long-lived process, poll it until ready, and
-audit its output; the mechanics live here once so a change to (say) the log
-handling cannot drift between the two modules.
+The two-instance suite launches long-lived processes, polls them until ready
+and audits their output; the mechanics live here so the test module reads as
+what it asserts.
 """
 
 import os

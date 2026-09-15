@@ -1,9 +1,10 @@
 <?xml version="1.0"?>
 <!--
-  The tutorial USV's dimensions, shared by its two packages.
+  The custom USV's dimensions, shared by the description and the simulation
+  model.
 
-  tutorial_usv.urdf.xacro builds the description from these, and
-  tutorial_usv_gazebo's model.sdf.xacro builds the displacement volume and
+  custom_usv.urdf.xacro builds the description from these, and
+  models/custom_usv/model.sdf.xacro builds the displacement volume and
   the thrusters from the same numbers, so the hulls the boat bumps with, the
   boxes that float it and the propellers it turns cannot drift apart. Change
   a value here and both follow.
