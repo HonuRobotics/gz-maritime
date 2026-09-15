@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" width="1000" height="600" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="16">
+  <!-- Tutorial USV from above, to scale: 1 m = 500 px, base_link origin at (470, 300). -->
+  <defs>
+    <marker id="head-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/>
+    </marker>
+    <marker id="head-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1e8449"/>
+    </marker>
+    <marker id="head-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1f2933"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1000" height="600" fill="#ffffff"/>
+  <text x="20" y="32" fill="#1f2933" font-size="18" font-weight="bold">Seen from above, bow to the right</text>
+
+  <!-- Hulls and deck -->
+  <rect x="220" y="137.5" width="500" height="75" fill="#ff7300" stroke="#7a3700" stroke-width="2"/>
+  <rect x="220" y="387.5" width="500" height="75" fill="#ff7300" stroke="#7a3700" stroke-width="2"/>
+  <rect x="320" y="137.5" width="300" height="325" fill="#404040" fill-opacity="0.82" stroke="#1f2933" stroke-width="2"/>
+  <text x="680" y="130" text-anchor="end" fill="#7a3700">port hull</text>
+  <text x="680" y="484" text-anchor="end" fill="#7a3700">starboard hull</text>
+
+  <!-- Bow / stern -->
+  <line x1="760" y1="560" x2="880" y2="560" stroke="#1f2933" stroke-width="2" marker-end="url(#head-dark)"/>
+  <text x="890" y="566" fill="#1f2933" font-weight="bold">bow</text>
+  <text x="20" y="566" fill="#1f2933" font-weight="bold">stern</text>
+
+  <!-- Propellers: discs seen edge on, just below each hull's stern -->
+  <rect x="217.5" y="155" width="5" height="40" fill="#111111"/>
+  <rect x="217.5" y="405" width="5" height="40" fill="#111111"/>
+  <line x1="214" y1="175" x2="182" y2="175" stroke="#1f2933" stroke-width="1.2"/>
+  <line x1="214" y1="425" x2="182" y2="425" stroke="#1f2933" stroke-width="1.2"/>
+  <text x="176" y="170" text-anchor="end" fill="#1f2933" font-weight="bold">motor_port_joint</text>
+  <text x="176" y="190" text-anchor="end" fill="#1f2933" font-size="14">spins about x</text>
+  <text x="176" y="420" text-anchor="end" fill="#1f2933" font-weight="bold">motor_stbd_joint</text>
+  <text x="176" y="440" text-anchor="end" fill="#1f2933" font-size="14">spins about x</text>
+
+  <!-- gps_link, on a mast towards the stern -->
+  <circle cx="345" cy="300" r="7" fill="#8e44ad" stroke="#ffffff" stroke-width="2"/>
+  <line x1="338" y1="304" x2="182" y2="300" stroke="#8e44ad" stroke-width="1.2"/>
+  <text x="176" y="296" text-anchor="end" fill="#8e44ad" font-weight="bold">gps_link</text>
+  <text x="176" y="316" text-anchor="end" fill="#8e44ad" font-size="14">mast, 0.37 m up</text>
+
+  <!-- base_link axes: x forward, y left, z up out of the page -->
+  <line x1="470" y1="300" x2="575" y2="300" stroke="#c0392b" stroke-width="4" marker-end="url(#head-red)"/>
+  <line x1="470" y1="300" x2="470" y2="195" stroke="#1e8449" stroke-width="4" marker-end="url(#head-green)"/>
+  <circle cx="470" cy="300" r="10" fill="#ffffff" stroke="#1f5fbf" stroke-width="3"/>
+  <circle cx="470" cy="300" r="3.5" fill="#1f5fbf"/>
+  <text x="582" y="306" fill="#ffffff" font-weight="bold">x</text>
+  <text x="478" y="200" fill="#ffffff" font-weight="bold">y</text>
+
+  <!-- Callouts on the right -->
+  <line x1="481" y1="296" x2="745" y2="262" stroke="#1f2933" stroke-width="1.2"/>
+  <text x="752" y="250" fill="#1f2933" font-weight="bold">base_link</text>
+  <text x="752" y="270" fill="#1f2933" font-size="14">origin on the waterline</text>
+  <text x="752" y="290" fill="#1f2933" font-size="14">x forward, y left, z up</text>
+
+  <line x1="480" y1="306" x2="745" y2="352" stroke="#1f5fbf" stroke-width="1.2"/>
+  <text x="752" y="346" fill="#1f5fbf" font-weight="bold">imu_link</text>
+  <text x="752" y="366" fill="#1f5fbf" font-size="14">straight above base_link,</text>
+  <text x="752" y="386" fill="#1f5fbf" font-size="14">on the deck, 0.13 m up</text>
+</svg>

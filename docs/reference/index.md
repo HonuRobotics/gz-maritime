@@ -1,9 +1,10 @@
 # Reference
 
-Packages, topics, frames, worlds and configuration schemas.
+Look-up tables for the launch files, the world, its services and the example
+vehicle.
 
-```{admonition} Draft
-:class: note
+```{toctree}
+:maxdepth: 2
 
-This section is being written.
+launch-and-world
 ```
