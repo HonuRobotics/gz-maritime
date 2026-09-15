@@ -19,6 +19,11 @@ This repository continues the `vrx4` rewrite of
 - [`gz_buoyancy`](gz_buoyancy/): Gazebo's buoyancy with marked collisions: a
   vehicle marks the shapes that float it, so a world never has to name it.
   Carries an upstream gz-sim change until a release ships it.
+- [`gz_thruster`](gz_thruster/): Gazebo's thruster system with a normalized
+  command interface, so an autopilot or a custom controller commands a fraction
+  of full thrust rather than a force in newtons. Vendored from gz-sim and
+  intended to go back upstream; see
+  [`gz_thruster/PROVENANCE.md`](gz_thruster/PROVENANCE.md).
 - [`kai_gazebo`](kai_gazebo/): the simulation worlds.
 - [`kai_bringup`](kai_bringup/): the simulation launch (Gazebo on the ocean, the
   GUI, `/clock`) that every vehicle's spawn launch sits next to.

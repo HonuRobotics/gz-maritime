@@ -18,6 +18,9 @@ always a real file to look at.
 
 ## More
 
+- [Spawn any vehicle into the ocean](spawn-vehicle.md): the generic spawn
+  launch in `kai_bringup`, for the Blue Robotics vehicles or any model xacro
+  laid out the same way.
 - [Use your own world](own-world.md)
 - [Troubleshooting](faq.md)
 
@@ -30,6 +33,7 @@ vehicle-description
 gazebo-composition
 spawn-and-drive
 sensors
+spawn-vehicle
 own-world
 faq
 ```
