@@ -3,15 +3,19 @@ project(kai_bringup)
 
 find_package(ament_cmake REQUIRED)
 
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  set(ament_cmake_copyright_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
-endif()
-
 install(DIRECTORY
   config
   launch
   DESTINATION share/${PROJECT_NAME})
+install(PROGRAMS scripts/instantiate_vehicle.py DESTINATION lib/${PROJECT_NAME})
+
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  set(ament_cmake_copyright_FOUND TRUE)
+  ament_lint_auto_find_test_dependencies()
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_instantiate_vehicle test/test_instantiate_vehicle.py
+    TIMEOUT 120)
+endif()
 
 ament_package()

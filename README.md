@@ -16,6 +16,11 @@ This repository continues the `vrx4` rewrite of
   realistic ocean from a single sea state setting.
 - [`gz_waves_rendering`](gz_waves_rendering/): the visual ocean, drawing the moving water surface in
   the Gazebo GUI.
+- [`gz_thruster`](gz_thruster/): Gazebo's thruster system with a normalized
+  command interface, so an autopilot or a custom controller commands a fraction
+  of full thrust rather than a force in newtons. Vendored from gz-sim and
+  intended to go back upstream; see
+  [`gz_thruster/PROVENANCE.md`](gz_thruster/PROVENANCE.md).
 - [`kai_gazebo`](kai_gazebo/): the simulation worlds.
 - [`kai_bringup`](kai_bringup/): launch files and configuration to start everything from
   ROS 2.
