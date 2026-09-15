@@ -2,8 +2,8 @@
 
 Task oriented guides for common workflows.
 
-```{admonition} Draft
-:class: note
+```{toctree}
+:maxdepth: 1
 
-This section is being written.
+spawn-vehicle
 ```
