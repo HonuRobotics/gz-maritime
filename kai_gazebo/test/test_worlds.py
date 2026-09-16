@@ -36,8 +36,10 @@ import pytest
 
 WORLDS = Path(get_package_share_directory('kai_gazebo')) / 'worlds'
 ALL = ('open_water', 'sydney_regatta', 'benderson_park', 'sand_island', 'la_spezia')
-LOCAL = ('open_water', 'sand_island', 'la_spezia')
-LOCAL_TERRAIN = ('sand_island', 'la_spezia')
+# Worlds with no Fuel model in them, so they load with no network and no cache.
+# Sand Island's terrain is local, but its shore camp comes from Fuel.
+LOCAL = ('open_water', 'la_spezia')
+LOCAL_TERRAIN = ('la_spezia',)
 REQUIRED_SYSTEMS = (
     'gz-sim-physics-system', 'gz-sim-user-commands-system',
     'gz-sim-scene-broadcaster-system', 'gz-sim-sensors-system',
