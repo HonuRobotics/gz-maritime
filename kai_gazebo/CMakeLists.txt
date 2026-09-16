@@ -15,6 +15,7 @@ ament_environment_hooks("hooks/hook.sh.in")
 
 install(DIRECTORY
   worlds
+  models
   DESTINATION share/${PROJECT_NAME})
 
 ament_package()

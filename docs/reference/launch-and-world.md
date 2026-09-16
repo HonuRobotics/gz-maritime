@@ -34,6 +34,13 @@ the simulation runs.
 | `use_composition` | `true` | Load the bridge and state publisher into `container_name`. |
 | `container_name` | `ros_gz_container` | The simulation launch's container. |
 
+### `kai_bringup` `multi_vehicle_demo.launch.xml`
+
+The simulation part plus one vehicle of each type through their own
+generators: a BlueBoat at the origin, a BlueROV2 six metres ahead and one
+metre down, an X500 on the landing pad. Needs bluerobotics_models and
+holybro_models in the workspace. Takes the simulation part's arguments.
+
 ### `kai_custom_vehicle` `sim.launch.xml`
 
 The simulation part plus one spawn of the custom USV, from the package's
@@ -95,10 +102,11 @@ World name: `default`.
 | `gz-sim-user-commands-system` | Spawning, moving and removing models |
 | `gz-sim-scene-broadcaster-system` | Scene for the GUI |
 | `gz-sim-sensors-system` | Rendered sensors (ogre2) |
-| `gz-sim-imu-system`, `gz-sim-magnetometer-system`, `gz-sim-navsat-system` | IMU, magnetometer and GPS sensors |
+| `gz-sim-imu-system`, `gz-sim-magnetometer-system`, `gz-sim-navsat-system`, `gz-sim-air-pressure-system` | IMU, magnetometer, GPS and barometer sensors |
 | `gz-maritime-buoyancy-system` | Seawater 1025 kg/m³ below z = 0, air 1 kg/m³ above; `<enable_by_default>false</enable_by_default>`, no `<enable>` list |
 | `gz-sim-waves-fft-system` | Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out) |
 | `model://water_surface` | Draws the sea |
+| `model://landing_pad` at (8, -8) | A static 4 m deck 1 m above the water, the only solid ground; spawn a quad on it at z = 1.25 |
 | `<spherical_coordinates>` | 36.693509° N, 121.936568° W, elevation 0, ENU |
 
 ## Buoyancy markup

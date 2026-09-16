@@ -85,6 +85,13 @@
       name="gz::sim::systems::NavSat">
     </plugin>
 
+    <!-- Barometers: the air pressure system, for aerial vehicles such as the
+         X500 that carry an air_pressure sensor. -->
+    <plugin
+      filename="gz-sim-air-pressure-system"
+      name="gz::sim::systems::AirPressure">
+    </plugin>
+
     <!-- Buoyancy (gz_buoyancy): graded, seawater (1025 kg/m^3) below z = 0
          and air (1 kg/m^3) above. The interface is the FLAT z = 0 plane, not
          the wave surface: for vehicle physics the waves are visual only.
@@ -366,6 +373,15 @@
     <!-- Water surface visual (wave-displaced mesh). -->
     <include>
       <uri>model://water_surface</uri>
+    </include>
+
+    <!-- A landing pad for aerial vehicles: a static deck 1 m above the
+         water at (8, -8), the only solid ground in this world. Nothing
+         marks its collision, so it does not float; it is held up by being
+         static. Spawn a quad on it at z = 1.25. -->
+    <include>
+      <uri>model://landing_pad</uri>
+      <pose>8 -8 0 0 0 0</pose>
     </include>
 
     <!-- No vehicles here: every platform shares this world, so vehicles are
