@@ -15,17 +15,20 @@
 """
 Regenerate the Gazebo screenshots used in the documentation.
 
-Each figure is rendered by a camera sensor in a copy of the installed
-open_water.sdf, with the vehicles included in the world, and saved from the
-camera's image topic. One change to the copy, for the picture only:
+Each figure is rendered by a camera sensor in a copy of an installed world
+(open_water.sdf unless the figure names another), with the vehicles included
+in the world, and saved from the camera's image topic. One change to the
+copy of open water, for the picture only:
 
-* the scene ambient light is set to the Gazebo GUI's 0.4 grey, so vehicles
-  keep the colours the GUI shows (the world's own deep-ocean ambient tints
-  camera sensors cyan).
+* its deep-ocean ambient light is set to the Gazebo GUI's 0.4 grey, so
+  vehicles keep the colours the GUI shows (that ambient tints camera sensors
+  cyan). The site worlds already light their terrain with a white ambient.
 
 Needs a sourced workspace with gz-maritime and bluerobotics_models built, a
-GPU with an X display, and the gz-transport Python bindings
-(python3-gz-transport15 on Jetty, python3-gz-transport14 on Ionic).
+GPU with an X display, the gz-transport Python bindings
+(python3-gz-transport15 on Jetty, python3-gz-transport14 on Ionic) and, for
+the site figures, the Sydney Regatta and Benderson Park terrains in the Fuel
+cache (run each world once).
 
     python3 docs/_tools/gazebo_figures.py            # every figure
     python3 docs/_tools/gazebo_figures.py first-simulation
@@ -56,10 +59,13 @@ IMAGE_TOPIC = '/world/default/model/docs_camera/link/link/sensor/camera/image'
 
 FONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 
-# name: output file, vehicles to include, sea state, camera pose and FOV, and
-# the simulation times [s] to capture. The sea has a fixed seed, so a given
-# time gives the same picture on every run. Several times make one image of
+# name: output file, world (open_water unless given), vehicles to include
+# (uri, name, and an optional pose), sea state, camera pose and FOV, and the
+# simulation times [s] to capture. The sea has a fixed seed, so a given time
+# gives the same picture on every run. Several times make one image of
 # labelled panels side by side.
+USV = 'model://custom_usv'
+SITE_FOV = 1.05  # the GUI's own field of view: the figure is the opening view
 FIGURES = {
     'ocean': {
         # Low and looking out to the horizon: from the GUI's own, steeper
@@ -97,6 +103,46 @@ FIGURES = {
         'fov': 0.75,
         'at': [10],
     },
+    # The four site worlds from their opening views, with the custom USV at
+    # the start point each world's header recommends. A 16:9 sensor sees
+    # less sky than the GUI's taller viewport, so two cameras pitch up a
+    # little from the world's pose to keep the hills in.
+    'sydney-regatta': {
+        'out': DOCS / 'how-to' / 'images' / 'sydney-regatta.jpg',
+        'world': 'sydney_regatta',
+        'vehicles': [(USV, 'usv', '-532 162 0 0 0 1')],
+        'sea_state': 1,
+        'camera': '-478.1 148.2 13.2 0 0.25 2.94',
+        'fov': SITE_FOV,
+        'at': [10],
+    },
+    'benderson-park': {
+        'out': DOCS / 'how-to' / 'images' / 'benderson-park.jpg',
+        'world': 'benderson_park',
+        'vehicles': [(USV, 'usv', '0 0 0 0 0 1.57')],
+        'sea_state': 1,
+        'camera': '-193 1175 30 0 0.12 -1.18',
+        'fov': SITE_FOV,
+        'at': [10],
+    },
+    'sand-island': {
+        'out': DOCS / 'how-to' / 'images' / 'sand-island.jpg',
+        'world': 'sand_island',
+        'vehicles': [(USV, 'usv', '158 108 0 0 0 -2.76')],
+        'sea_state': 2,
+        'camera': '173 122 4 0 0.22 -1.2',
+        'fov': SITE_FOV,
+        'at': [10],
+    },
+    'la-spezia': {
+        'out': DOCS / 'how-to' / 'images' / 'la-spezia.jpg',
+        'world': 'la_spezia',
+        'vehicles': [(USV, 'usv', '10 -372 0 0 0 0.3816')],
+        'sea_state': 2,
+        'camera': '200 -480 55 0 0.2 -2.65',
+        'fov': SITE_FOV,
+        'at': [10],
+    },
 }
 
 CAMERA = """
@@ -119,16 +165,17 @@ CAMERA = """
 
 
 def figure_world(_figure):
-    """Return open_water.sdf with the figure's vehicles, camera and tweaks."""
+    """Return the figure's world with its vehicles, camera and tweaks."""
     world = (Path(get_package_share_directory('kai_gazebo'))
-             / 'worlds' / 'open_water.sdf').read_text()
+             / 'worlds' / f'{_figure.get("world", "open_water")}.sdf').read_text()
     world = world.replace('<ambient>0.0 1.0 1.0</ambient>',
                           '<ambient>0.4 0.4 0.4</ambient>', 1)
     world = world.replace('<sea_state>1</sea_state>',
                           f'<sea_state>{_figure["sea_state"]}</sea_state>', 1)
     extra = ''.join(
-        f'<include><uri>{uri}</uri><name>{name}</name></include>'
-        for uri, name in _figure['vehicles'])
+        f'<include><uri>{v[0]}</uri><name>{v[1]}</name>'
+        + (f'<pose>{v[2]}</pose>' if len(v) > 2 else '') + '</include>'
+        for v in _figure['vehicles'])
     extra += CAMERA.format(pose=_figure['camera'], fov=_figure['fov'])
     return world.replace('</world>', extra + '</world>', 1)
 

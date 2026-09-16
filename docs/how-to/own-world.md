@@ -7,7 +7,8 @@ resource path or a full path:
 ros2 launch kai_custom_vehicle sim.launch.xml world:=/path/to/my_world.sdf
 ```
 
-The easiest start is a copy of `open_water.sdf`:
+The easiest start is a copy of `open_water.sdf`, or of one of the four
+[site worlds](site-worlds.md), which add a terrain to the same contract:
 
 ```bash
 cp $(ros2 pkg prefix --share kai_gazebo)/worlds/open_water.sdf my_world.sdf
