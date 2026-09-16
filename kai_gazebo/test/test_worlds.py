@@ -61,7 +61,8 @@ def test_world_keeps_the_contract(world):
     """Named after its file, with every system a vehicle needs, buoyancy naming nobody, a sea."""
     root = ET.parse(WORLDS / f'{world}.sdf').getroot()
     w = root.find('world')
-    assert w.get('name') == ('default' if world == 'open_water' else world)
+    # Every world is named 'default' so /world/default/... commands work on all.
+    assert w.get('name') == 'default'
     plugins = {p.get('filename') for p in w.findall('plugin')}
     assert set(REQUIRED_SYSTEMS) <= plugins, set(REQUIRED_SYSTEMS) - plugins
     assert any(f.startswith('gz-sim-waves-') for f in plugins), 'no wave source'

@@ -71,9 +71,11 @@ and nothing else changes.
 ## The world name
 
 The wave service includes the world's name:
-`/world/<name>/wave/set_parameters`. In `open_water.sdf` the name is
-`default`. Commands you type yourself have to use your world's name; the
-launch files don't care.
+`/world/<name>/wave/set_parameters`. Every world shipped here is named
+`default`, whatever its file is called, so the commands in these docs work
+on all of them. Keep that name in your own world and they will work there
+too; if you pick another, commands you type yourself have to use it. The
+launch files don't care either way.
 
 ## Adding a seabed
 

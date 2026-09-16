@@ -12,7 +12,7 @@
       ros2 launch kai_bringup spawn_vehicle.launch.xml name:=boat_a x:=10 y:=-372 ...
 -->
 <sdf version="1.12">
-  <world name="la_spezia">
+  <world name="default">
 
     <!-- Physics -->
     <physics name="default_physics" type="dart">

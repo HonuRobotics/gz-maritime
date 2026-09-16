@@ -12,7 +12,7 @@
       ros2 launch kai_bringup spawn_vehicle.launch.xml name:=boat_a x:=0 y:=0 ...
 -->
 <sdf version="1.12">
-  <world name="benderson_park">
+  <world name="default">
 
     <!-- Physics -->
     <physics name="default_physics" type="dart">
