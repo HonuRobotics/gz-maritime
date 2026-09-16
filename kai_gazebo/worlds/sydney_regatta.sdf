@@ -32,12 +32,14 @@
       <heading_deg>0</heading_deg>
     </spherical_coordinates>
 
-    <!-- Scene: deep ocean ambient + procedural sky. The <sky> element
-         tells gz-rendering to draw its built-in procedural sky cube
-         (sun, horizon transition) so the water has something to
-         reflect and the background isn't a flat colour. -->
+    <!-- Scene: neutral white ambient, as in the VRX worlds, so the terrain
+         textures keep their colours (open water uses a cyan ambient tuned for
+         the sea alone, which turns sand green), plus a procedural sky: the
+         <sky> element tells gz-rendering to draw its built-in sky cube (sun,
+         horizon transition) so the water has something to reflect and the
+         background isn't a flat colour. -->
     <scene>
-      <ambient>0.0 1.0 1.0</ambient>
+      <ambient>1.0 1.0 1.0</ambient>
       <background>0.0 0.7 0.8</background>
       <sky></sky>
       <grid>false</grid>
