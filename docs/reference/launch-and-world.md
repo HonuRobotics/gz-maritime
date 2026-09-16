@@ -44,7 +44,7 @@ walks through it.
 
 | Argument | Default | Description |
 |---|---|---|
-| `site` | `sydney_regatta` | The world and where the vehicles go in it: `sydney_regatta` (off the start point) or `open_water` (around the origin). |
+| `world` | `sydney_regatta.sdf` | World file, as for the simulation launch, among those the demo has poses for: `sydney_regatta.sdf` (off the start point) or `open_water.sdf` (around the origin). |
 | `gazebo_gui` | `true` | Start the Gazebo GUI. |
 | `use_composition` | `true` | Run Gazebo, the bridges and the state publishers in one container. |
 

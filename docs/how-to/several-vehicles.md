@@ -30,8 +30,9 @@ through the vehicle's own generator with a name and a pose: `blueboat` at
 the waterline off the start point, `bluerov2` six metres ahead and one
 metre under, `x500` on the landing pad. Nothing in it is specific to these
 three: any vehicle joins the same way
-([Spawn and drive](spawn-and-drive.md)). `site:=open_water` runs the same
-demo around the origin of the open water world.
+([Spawn and drive](spawn-and-drive.md)). `world:=open_water.sdf` runs the
+same demo around the origin of the open water world; the demo knows where
+to put its vehicles in those two worlds.
 
 ## 2. One name each
 

@@ -116,7 +116,7 @@ def sim(request):
                ROS_HOME=tempfile.mkdtemp(prefix='kai_multi_vehicle_'))
     launch_sim(request, 'demo launch',
                ['ros2', 'launch', 'kai_bringup', 'multi_vehicle_demo.launch.py',
-                'site:=open_water', 'gazebo_gui:=false'],
+                'world:=open_water.sdf', 'gazebo_gui:=false'],
                env, ready=lambda e: all(f'/{v}/robot_state_publisher' in nodes(e)
                                         for v in VEHICLES), stop=stop)
     poll_until(lambda: all(v in gz(env, 'model', '--list')[1] for v in VEHICLES), 60,

@@ -20,14 +20,14 @@ ahead of it and one metre down, and an X500 on a landing pad. Each vehicle
 gets its topics under its name, its bridge and state publisher in its
 namespace and its own TF prefix; the clock is bridged once.
 
-`site:=` picks the world and where the vehicles go in it, from the table
-below: the Sydney Regatta lake by default, or the open water world. Needs
-bluerobotics_models and holybro_models built in the workspace. A vehicle
-of another type joins a running demo the same way: one more spawn launch
-with its generator or its files and a new name.
+`world:=` picks the world, as in every launch here, and with it where the
+vehicles go, from the table below: the Sydney Regatta lake by default, or
+the open water world. Needs bluerobotics_models and holybro_models built
+in the workspace. A vehicle of another type joins a running demo the same
+way: one more spawn launch with its generator or its files and a new name.
 
     ros2 launch kai_bringup multi_vehicle_demo.launch.py
-    ros2 launch kai_bringup multi_vehicle_demo.launch.py site:=open_water gazebo_gui:=false
+    ros2 launch kai_bringup multi_vehicle_demo.launch.py world:=open_water.sdf gazebo_gui:=false
 """
 
 from launch import LaunchDescription
@@ -37,19 +37,17 @@ from launch.launch_description_sources import AnyLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.substitutions import FindPackagePrefix, FindPackageShare
 
-# Per site: the world file and the pose of each vehicle (x, y, z, yaw). The
+# Per world, by file name: the pose of each vehicle (x, y, z, yaw). The
 # boat sits at the waterline, the ROV a metre under, the X500 on the pad of
 # that world, which is 1 m above the water; z = 1.25 drops it onto its
 # landing gear.
-SITES = {
-    'sydney_regatta': {
-        'world': 'sydney_regatta.sdf',
+POSES = {
+    'sydney_regatta.sdf': {
         'blueboat': (-532, 162, 0.05, 1.0),
         'bluerov2': (-528.8, 167.0, -1, 1.0),
         'x500': (-540, 168, 1.25, 0),
     },
-    'open_water': {
-        'world': 'open_water.sdf',
+    'open_water.sdf': {
         'blueboat': (0, 0, 0.05, 0),
         'bluerov2': (6, 0, -1, 0),
         'x500': (8, -8, 1.25, 0),
@@ -71,19 +69,23 @@ def generator(gazebo_pkg, description_pkg, vehicle):
 
 
 def demo(context):
-    """Return the simulation launch and one spawn launch per vehicle, for the site."""
-    site = SITES[LaunchConfiguration('site').perform(context)]
+    """Return the simulation launch and one spawn launch per vehicle, for the world."""
+    world = LaunchConfiguration('world').perform(context)
+    if world not in POSES:
+        raise ValueError(f'the demo knows where to put its vehicles in {sorted(POSES)}, '
+                         f'not in {world}')
+    poses = POSES[world]
     use_composition = LaunchConfiguration('use_composition')
     actions = [IncludeLaunchDescription(
         AnyLaunchDescriptionSource(
             [FindPackageShare('kai_bringup'), '/launch/simulation.launch.xml']),
         launch_arguments={
-            'world': site['world'],
+            'world': world,
             'gazebo_gui': LaunchConfiguration('gazebo_gui'),
             'use_composition': use_composition,
         }.items())]
     for name, (gazebo_pkg, description_pkg, vehicle) in GENERATORS.items():
-        x, y, z, yaw = site[name]
+        x, y, z, yaw = poses[name]
         # Each spawn in its own group, so what one instance derives from
         # its name does not leak into the next.
         actions.append(GroupAction([IncludeLaunchDescription(
@@ -102,8 +104,9 @@ def demo(context):
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
-            'site', default_value='sydney_regatta', choices=sorted(SITES),
-            description='The world and where the vehicles go in it.'),
+            'world', default_value='sydney_regatta.sdf',
+            description='World SDF file name (resolved via GZ_SIM_RESOURCE_PATH); '
+                        f'the demo places its vehicles in {sorted(POSES)}.'),
         DeclareLaunchArgument(
             'gazebo_gui', default_value='true', description='Launch the Gazebo GUI'),
         DeclareLaunchArgument(
