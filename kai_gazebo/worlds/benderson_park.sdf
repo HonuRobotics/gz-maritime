@@ -1,0 +1,626 @@
+<?xml version="1.0"?>
+<!--
+  Nathan Benderson Park: the RobotX 2022 venue in Sarasota, Florida: a rowing lake with its grandstand and island, from the Fuel model the VRX worlds use.
+
+  The same world contract as open_water.sdf (the systems every vehicle
+  needs, gz-maritime's buoyancy reading marked collisions, the waterline at
+  z = 0, the wave field for the drawn sea), with this site's terrain and
+  coordinates. Vehicles are spawned into it by name; a good start point is
+  0 0 0 0 0 1.57:
+
+      ros2 launch kai_bringup simulation.launch.xml world:=benderson_park.sdf
+      ros2 launch kai_bringup spawn_vehicle.launch.xml name:=boat_a x:=0 y:=0 ...
+-->
+<sdf version="1.12">
+  <world name="benderson_park">
+
+    <!-- Physics -->
+    <physics name="default_physics" type="dart">
+      <max_step_size>0.004</max_step_size>
+      <!-- <real_time_factor>0</real_time_factor> -->
+    </physics>
+
+    <!-- Spherical coordinates of the site, required by the magnetometer
+         system (World Magnetic Model at this lat/lon) and by the NavSat
+         system (fixes relative to this origin). -->
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <world_frame_orientation>ENU</world_frame_orientation>
+      <latitude_deg>27.367256</latitude_deg>
+      <longitude_deg>-82.451120</longitude_deg>
+      <elevation>0</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+
+    <!-- Scene: deep ocean ambient + procedural sky. The <sky> element
+         tells gz-rendering to draw its built-in procedural sky cube
+         (sun, horizon transition) so the water has something to
+         reflect and the background isn't a flat colour. -->
+    <scene>
+      <ambient>0.0 1.0 1.0</ambient>
+      <background>0.0 0.7 0.8</background>
+      <sky></sky>
+      <grid>false</grid>
+    </scene>
+
+    <!-- Directional light (sun, attenuated by water) -->
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 20 0 0 0</pose>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>0.5 0.5 0.5 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <!-- Core systems -->
+    <plugin
+      filename="gz-sim-physics-system"
+      name="gz::sim::systems::Physics">
+    </plugin>
+
+    <plugin
+      filename="gz-sim-user-commands-system"
+      name="gz::sim::systems::UserCommands">
+    </plugin>
+
+    <plugin
+      filename="gz-sim-scene-broadcaster-system"
+      name="gz::sim::systems::SceneBroadcaster">
+    </plugin>
+
+    <plugin
+      filename="gz-sim-sensors-system"
+      name="gz::sim::systems::Sensors">
+    </plugin>
+
+    <plugin
+      filename="gz-sim-magnetometer-system"
+      name="gz::sim::systems::Magnetometer">
+      <use_units_gauss>false</use_units_gauss>
+      <use_earth_frame_ned>false</use_earth_frame_ned>
+    </plugin>
+
+    <plugin
+      filename="gz-sim-imu-system"
+      name="gz::sim::systems::Imu">
+    </plugin>
+
+    <plugin
+      filename="gz-sim-navsat-system"
+      name="gz::sim::systems::NavSat">
+    </plugin>
+
+    <!-- Buoyancy (gz_buoyancy): graded, seawater (1025 kg/m^3) below z = 0
+         and air (1 kg/m^3) above. The interface is the FLAT z = 0 plane, not
+         the wave surface: for vehicle physics the waves are visual only.
+         Coupling buoyancy to the waves is the job of the future
+         gz_waves_buoyancy consumer (WAVES_DESIGN.md §11).
+
+         This world names no vehicle. <enable_by_default> false and no
+         <enable> list: the world only describes the fluid, and a link floats
+         by the collisions it marks as buoyancy geometry with
+         gz:buoyancy="true" (gz-sim commit 229ec07e), whatever name its
+         model was spawned under. A vehicle's contact geometry stays contact
+         geometry, and a mark needs a zero <collide_bitmask> so the
+         displacement volume touches nothing. gz_buoyancy carries that change
+         until a Gazebo release with it reaches ROS; then this block switches
+         to gz-sim-buoyancy-system / gz::sim::systems::Buoyancy unchanged. -->
+    <plugin
+      filename="gz-maritime-buoyancy-system"
+      name="gz::sim::maritime::Buoyancy">
+      <graded_buoyancy>
+        <default_density>1025</default_density>
+        <density_change>
+          <above_depth>0</above_depth>
+          <density>1</density>
+        </density_change>
+      </graded_buoyancy>
+      <enable_by_default>false</enable_by_default>
+    </plugin>
+
+    <!-- ==================================================================
+         WAVE SOURCE — the engine is the plugin's identity. Keep exactly ONE of
+         the two <plugin> blocks below active and comment the other out. Both
+         blocks are deliberately comment-free so either can be wrapped in an XML
+         comment cleanly (XML comments cannot nest). Per-parameter notes live in
+         the comment directly above each block.
+         ================================================================== -->
+
+    <!-- Wave source. Two engines are available: FFT (EncinoWaves spectral,
+         higher fidelity) is active here; Gerstner (analytic sum of component
+         waves) is the commented alternative below. Full parameter lists and the
+         <sea_state> precedence rules live in each plugin's documentation.
+
+         Both blocks set sea state 1 (rippled, Hs 5 cm). Vehicles float on the
+         flat z = 0 plane of the buoyancy system above, not on this surface, so
+         a rougher sea only shows waves passing through hulls that do not ride
+         them. Not 0: a glassy sea mirrors the sky and reads as white. Raise it
+         at runtime through /world/default/wave/set_parameters (gz.msgs.Param,
+         key sea_state; WAVES_DESIGN.md §8). -->
+    <plugin filename="gz-sim-waves-fft-system"
+            name="gz::sim::systems::FftWaves">
+      <update_rate>30</update_rate>
+      <wave>
+        <!-- Simplest control: a WMO sea-state code (0-9) sets the whole sea. It
+             overrides <period>/<gain> (1 = rippled, 3 = slight, 5 = rough,
+             0 = glassy). For a hand-tuned sea, comment <sea_state> and uncomment
+             the advanced block (delete the two comment markers wrapping it). -->
+        <sea_state>1</sea_state>
+
+        <!-- Advanced / manual setup (a working configuration). <period> sets
+             wind speed; <gain> is the amplitude multiplier (9.5 = dramatic and
+             intentionally unphysical, ~1.0 = physical Hs); <tile_size> and
+             <grid_size> are the periodic domain and FFT resolution; <choppiness>
+             sharpens crests; <direction> is parsed but not yet applied
+             (EncinoWaves assumes wind along +X). -->
+        <!--
+        <period>3.2</period>
+        <gain>9.5</gain>
+        <direction>2.356</direction>
+        <tau>2.0</tau>
+        <tile_size>256</tile_size>
+        <grid_size>128</grid_size>
+        <seed>42</seed>
+        <choppiness>-2.0</choppiness>
+        -->
+      </wave>
+    </plugin>
+
+    <!-- Gerstner alternative (gz-sim-waves-gerstner-system): analytic sum of
+         component waves. To use it instead of FFT, comment the <plugin> above
+         and uncomment this one. <sea_state> drives the height; every other
+         tag below is the engine default, kept explicit for discoverability.
+         Extras like <direction> or <steepness> can be added per the plugin
+         docs (they are NOT defaults, so adding them changes the sea). -->
+    <!--
+    <plugin filename="gz-sim-waves-gerstner-system"
+            name="gz::sim::systems::GerstnerWaves">
+      <update_rate>30</update_rate>
+      <wave>
+        <sea_state>1</sea_state>
+        <model>PMS</model>
+        <number>3</number>
+        <angle>0.4</angle>
+        <scale>1.1</scale>
+        <tau>2.0</tau>
+        <grid_size>128</grid_size>
+      </wave>
+    </plugin>
+    -->
+
+    <!-- GUI -->
+    <gui fullscreen="0">
+      <!-- 3D scene -->
+      <plugin filename="MinimalScene" name="3D View">
+        <gz-gui>
+          <title>3D View</title>
+          <property type="bool" key="showTitleBar">false</property>
+          <property type="string" key="state">docked</property>
+        </gz-gui>
+        <engine>ogre2</engine>
+        <scene>scene</scene>
+        <ambient_light>0.4 0.4 0.4</ambient_light>
+        <background_color>0.0 0.7 0.8</background_color>
+        <!-- Matches asv_wave_sim's reference camera_pose for fair
+             side-by-side visual comparison: 6m east of origin, 6m
+             above water, pitched ~29° down. -->
+        <camera_pose>0 -300 40 0 0.3 1.57</camera_pose>
+        <camera_clip>
+          <near>0.1</near>
+          <far>50000</far>
+        </camera_clip>
+      </plugin>
+
+      <!-- Scene management plugins -->
+      <plugin filename="EntityContextMenuPlugin" name="Entity context menu">
+        <gz-gui>
+          <property key="state" type="string">floating</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <plugin filename="GzSceneManager" name="Scene Manager">
+        <gz-gui>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <plugin filename="InteractiveViewControl" name="Interactive view control">
+        <gz-gui>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <plugin filename="CameraTracking" name="Camera Tracking">
+        <gz-gui>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <plugin filename="MarkerManager" name="Marker manager">
+        <gz-gui>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+        <warn_on_action_failure>false</warn_on_action_failure>
+      </plugin>
+
+      <plugin filename="SelectEntities" name="Select Entities">
+        <gz-gui>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <plugin filename="VisualizationCapabilities" name="Visualization Capabilities">
+        <gz-gui>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <plugin filename="Spawn" name="Spawn Entities">
+        <gz-gui>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <!-- World control -->
+      <plugin filename="WorldControl" name="World control">
+        <gz-gui>
+          <title>World control</title>
+          <property type="bool" key="showTitleBar">false</property>
+          <property type="bool" key="resizable">false</property>
+          <property type="double" key="height">72</property>
+          <property type="double" key="z">1</property>
+          <property type="string" key="state">floating</property>
+          <anchors target="3D View">
+            <line own="left" target="left"/>
+            <line own="bottom" target="bottom"/>
+          </anchors>
+        </gz-gui>
+        <play_pause>true</play_pause>
+        <step>true</step>
+        <start_paused>false</start_paused>
+      </plugin>
+
+      <!-- World statistics -->
+      <plugin filename="WorldStats" name="World stats">
+        <gz-gui>
+          <title>World stats</title>
+          <property type="bool" key="showTitleBar">false</property>
+          <property type="bool" key="resizable">false</property>
+          <property type="double" key="height">110</property>
+          <property type="double" key="width">290</property>
+          <property type="double" key="z">1</property>
+          <property type="string" key="state">floating</property>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="bottom" target="bottom"/>
+          </anchors>
+        </gz-gui>
+        <sim_time>true</sim_time>
+        <real_time>true</real_time>
+        <real_time_factor>true</real_time_factor>
+        <iterations>true</iterations>
+      </plugin>
+
+      <plugin filename="ComponentInspector" name="Component Inspector">
+        <gz-gui>
+          <title>Inspector</title>
+          <property type="string" key="state">docked_collapsed</property>
+        </gz-gui>
+      </plugin>
+    </gui>
+
+    <!-- Terrain: the VRX Nathan Benderson Park model from Fuel (downloaded
+         on first use, about 220 MB, cached under ~/.gz/fuel). Static; its
+         collisions are the shore and the island. -->
+    <include>
+      <pose>0 0 0 0 0 0</pose>
+      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/nathan_benderson_park</uri>
+    </include>
+
+    <!-- The drawn sea: 46 tiles of the water_surface model, each one 200 m
+         tile of the wave field, over the rowing lake, found where the heightmap lies below the waterline. The
+         field is periodic over the tile, so they join without seams; the
+         list was measured from the terrain, one tile per 200 m cell of
+         water. Buoyancy does not depend on this: it is the flat z = 0
+         plane everywhere. -->
+    <include>
+      <name>water_surface_0</name>
+      <pose>-300 -1100 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_1</name>
+      <pose>-300 -900 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_2</name>
+      <pose>-300 -700 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_3</name>
+      <pose>-300 -500 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_4</name>
+      <pose>-300 -300 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_5</name>
+      <pose>-300 -100 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_6</name>
+      <pose>-300 100 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_7</name>
+      <pose>-300 300 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_8</name>
+      <pose>-300 500 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_9</name>
+      <pose>-300 700 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_10</name>
+      <pose>-300 900 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_11</name>
+      <pose>-300 1100 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_12</name>
+      <pose>-300 1500 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_13</name>
+      <pose>-100 -1100 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_14</name>
+      <pose>-100 -900 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_15</name>
+      <pose>-100 -700 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_16</name>
+      <pose>-100 -500 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_17</name>
+      <pose>-100 -300 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_18</name>
+      <pose>-100 -100 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_19</name>
+      <pose>-100 100 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_20</name>
+      <pose>-100 300 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_21</name>
+      <pose>-100 500 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_22</name>
+      <pose>-100 1500 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_23</name>
+      <pose>100 -1100 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_24</name>
+      <pose>100 -900 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_25</name>
+      <pose>100 -700 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_26</name>
+      <pose>100 -500 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_27</name>
+      <pose>100 -300 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_28</name>
+      <pose>100 -100 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_29</name>
+      <pose>100 100 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_30</name>
+      <pose>100 300 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_31</name>
+      <pose>100 500 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_32</name>
+      <pose>100 700 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_33</name>
+      <pose>100 1500 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_34</name>
+      <pose>300 -1100 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_35</name>
+      <pose>300 -900 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_36</name>
+      <pose>300 -700 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_37</name>
+      <pose>300 -500 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_38</name>
+      <pose>300 -300 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_39</name>
+      <pose>300 -100 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_40</name>
+      <pose>300 100 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_41</name>
+      <pose>300 300 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_42</name>
+      <pose>300 500 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_43</name>
+      <pose>300 700 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_44</name>
+      <pose>300 900 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <include>
+      <name>water_surface_45</name>
+      <pose>300 1500 0 0 0 0</pose>
+      <uri>model://water_surface</uri>
+    </include>
+    <!-- No vehicles here: every platform shares this world, so vehicles are
+         spawned into it (ros_gz_sim create, or the /world/default/create
+         service) and float by the collisions they mark. -->
+
+  </world>
+</sdf>
