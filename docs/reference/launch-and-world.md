@@ -103,13 +103,19 @@ Virtual Ocean Robotics Challenge (VORC).
 All of them are named `default` inside, so the services below work on
 every one.
 
-| World | Site | Terrain | Where to start |
-|---|---|---|---|
-| `open_water.sdf` | Open sea, Monterey Bay coordinates | None; a landing pad at (8, -8) | Spawn anywhere |
-| `sydney_regatta.sdf` | Sydney International Regatta Centre, VRX 2022 to 2024 | Fuel, fetched on first use (about 140 MB) | around x -530, y 170; start at x -532, y 162 |
-| `benderson_park.sdf` | Nathan Benderson Park, Sarasota, RobotX 2022 | Fuel, fetched on first use (about 220 MB) | the lake runs along y; start at the origin, heading 1.57 |
-| `sand_island.sdf` | Sand Island, Honolulu, RobotX 2018 and VRX 2019 | VRX mesh, fetched by the build; the shore camp from Fuel | start at x 158, y 108 |
-| `la_spezia.sdf` | La Spezia marina, VORC 2020 | VORC mesh, fetched by the build | start at x 10, y -372 |
+| World | Site | Terrain | Where to start | Water and sea states |
+|---|---|---|---|---|
+| `open_water.sdf` | Open sea, Monterey Bay coordinates | None; a landing pad at (8, -8) | Spawn anywhere | Open sea, any |
+| `sydney_regatta.sdf` | Sydney International Regatta Centre, VRX 2022 to 2024 | Fuel, fetched on first use (about 140 MB) | around x -530, y 170; start at x -532, y 162 | Rowing lake, 0 to 2 |
+| `benderson_park.sdf` | Nathan Benderson Park, Sarasota, RobotX 2022 | Fuel, fetched on first use (about 220 MB) | the lake runs along y; start at the origin, heading 1.57 | Rowing lake, 0 to 2 |
+| `sand_island.sdf` | Sand Island, Honolulu, RobotX 2018 and VRX 2019 | VRX mesh, fetched by the build; the shore camp from Fuel | start at x 158, y 108 | Sheltered lagoon, 0 to 3 |
+| `la_spezia.sdf` | La Spezia marina, VORC 2020 | VORC mesh, fetched by the build | start at x 10, y -372 | Marina and gulf, 0 to 3 |
+
+Every world starts at sea state 1 and takes any of the ten codes, but the
+last column says what fits the site: a rowing lake never sees more than
+wind chop (code 2 is 0.3 m waves), a sheltered lagoon or gulf at most a
+slight sea (code 3 is about 0.9 m), and the open water world takes them
+all. Change it with the wave service below.
 
 The site worlds place the water surface model once, at the centre of their
 water: it draws a 3 km square of wave tiles around itself, and the terrain

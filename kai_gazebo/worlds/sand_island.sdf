@@ -5,6 +5,10 @@
   ground station tents, on a terrain mesh fetched at build time from the VRX
   repository.
 
+  The water is Keehi Lagoon, the sheltered harbour water between the island
+  and the reef, so sea states 0 to 3 fit (ripples to a slight sea of about
+  0.9 m); the ocean swell stays outside the reef.
+
   The same world contract as open_water.sdf (the systems every vehicle
   needs, gz-maritime's buoyancy reading marked collisions, the waterline at
   z = 0, the wave field for the drawn sea), with this site's terrain and

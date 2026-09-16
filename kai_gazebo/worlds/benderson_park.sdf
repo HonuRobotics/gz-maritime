@@ -4,6 +4,10 @@
   rowing lake with its grandstand and island, from the Fuel model the
   Virtual RobotX (VRX) competition worlds use.
 
+  The water is a lake: the man made rowing lake of the park, fresh, flat and
+  sheltered, so keep the sea state between 0 and 2 (wind ripples and chop up
+  to 0.3 m); anything higher is open sea and looks wrong here.
+
   The same world contract as open_water.sdf (the systems every vehicle
   needs, gz-maritime's buoyancy reading marked collisions, the waterline at
   z = 0, the wave field for the drawn sea), with this site's terrain and

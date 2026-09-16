@@ -4,6 +4,10 @@
   in the Gulf of La Spezia, Italy: the marina with its breakwaters and
   quays, on a terrain mesh fetched at build time from the VORC repository.
 
+  The water is the marina inside its breakwaters and, beyond them, the Gulf
+  of La Spezia, so sea states 0 to 2 fit the marina and up to 3 the gulf (a
+  slight sea of about 0.9 m); the open Ligurian Sea is not in this world.
+
   The same world contract as open_water.sdf (the systems every vehicle
   needs, gz-maritime's buoyancy reading marked collisions, the waterline at
   z = 0, the wave field for the drawn sea), with this site's terrain and

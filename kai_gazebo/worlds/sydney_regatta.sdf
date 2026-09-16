@@ -4,6 +4,10 @@
   venue: a rowing lake with its pontoon, shore and buildings, from the Fuel
   model the VRX worlds use.
 
+  The water is a lake: the man made rowing course at Penrith Lakes, fresh,
+  flat and sheltered, so keep the sea state between 0 and 2 (wind ripples
+  and chop up to 0.3 m); anything higher is open sea and looks wrong here.
+
   The same world contract as open_water.sdf (the systems every vehicle
   needs, gz-maritime's buoyancy reading marked collisions, the waterline at
   z = 0, the wave field for the drawn sea), with this site's terrain and
