@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 540" width="920" height="540" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="17">
+  <!-- Custom USV seen from the stern, to scale: 1 m = 1000 px, z = 0 at y = 250. -->
+  <defs>
+    <marker id="head-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1f2933"/>
+    </marker>
+    <marker id="head-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1d4ed8"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="920" height="540" fill="#ffffff"/>
+
+  <!-- Axes legend: looking forward from the stern -->
+  <g transform="translate(62,66)">
+    <line x1="0" y1="0" x2="0" y2="-44" stroke="#1f2933" stroke-width="2.5" marker-end="url(#head-dark)"/>
+    <line x1="0" y1="0" x2="-44" y2="0" stroke="#1f2933" stroke-width="2.5" marker-end="url(#head-dark)"/>
+    <circle cx="0" cy="0" r="8" fill="#ffffff" stroke="#1f2933" stroke-width="2"/>
+    <line x1="-5" y1="-5" x2="5" y2="5" stroke="#1f2933" stroke-width="2"/>
+    <line x1="5" y1="-5" x2="-5" y2="5" stroke="#1f2933" stroke-width="2"/>
+  </g>
+  <text x="84" y="46" fill="#1f2933" font-size="15" font-weight="bold">Seen from the stern</text>
+  <text x="84" y="66" fill="#1f2933" font-size="15">z up, y left, x forward (into the page)</text>
+
+  <!-- Hulls and deck -->
+  <rect x="125" y="139.3" width="150" height="150" fill="#ff7300" stroke="#7a3700" stroke-width="2"/>
+  <rect x="625" y="139.3" width="150" height="150" fill="#ff7300" stroke="#7a3700" stroke-width="2"/>
+  <rect x="125" y="119.3" width="650" height="20" fill="#404040" stroke="#1f2933" stroke-width="2"/>
+  <text x="200" y="210" text-anchor="middle" fill="#ffffff" font-weight="bold">port hull</text>
+  <text x="700" y="210" text-anchor="middle" fill="#ffffff" font-weight="bold">starboard hull</text>
+  <text x="450" y="108" text-anchor="middle" fill="#1f2933">deck</text>
+
+  <!-- Water, drawn over the hulls so their submerged part reads as under water -->
+  <rect x="0" y="250" width="920" height="290" fill="#3b9ad9" fill-opacity="0.35"/>
+  <line x1="0" y1="250" x2="920" y2="250" stroke="#0b5394" stroke-width="2.5" stroke-dasharray="10 6"/>
+  <text x="8" y="242" fill="#0b5394" font-weight="bold">waterline</text>
+  <text x="8" y="274" fill="#0b5394">z = 0</text>
+
+  <!-- Centre of mass, on the centre line 3.6 cm above base_link -->
+  <circle cx="450" cy="214.3" r="10" fill="#ffffff" stroke="#b42318" stroke-width="2.5"/>
+  <path d="M450,214.3 L450,204.3 A10,10 0 0,1 460,214.3 z" fill="#b42318"/>
+  <path d="M450,214.3 L450,224.3 A10,10 0 0,1 440,214.3 z" fill="#b42318"/>
+  <line x1="439" y1="208" x2="418" y2="190" stroke="#b42318" stroke-width="1.5"/>
+  <text x="414" y="184" text-anchor="end" fill="#b42318" font-size="16" font-weight="bold">centre of mass</text>
+
+  <!-- base_link origin, on the waterline -->
+  <circle cx="450" cy="250" r="8" fill="#ffffff" stroke="#1f2933" stroke-width="2.5"/>
+  <line x1="445" y1="245" x2="455" y2="255" stroke="#1f2933" stroke-width="2"/>
+  <line x1="455" y1="245" x2="445" y2="255" stroke="#1f2933" stroke-width="2"/>
+  <line x1="443" y1="257" x2="404" y2="298" stroke="#1f2933" stroke-width="1.5"/>
+  <text x="398" y="312" text-anchor="end" fill="#1f2933" font-weight="bold">base_link origin</text>
+  <text x="398" y="332" text-anchor="end" fill="#1f2933" font-size="15">on the design waterline</text>
+
+  <!-- Buoyancy on each hull, at the centre of its submerged volume -->
+  <circle cx="200" cy="269.7" r="6" fill="#1d4ed8"/>
+  <circle cx="700" cy="269.7" r="6" fill="#1d4ed8"/>
+  <line x1="200" y1="350" x2="200" y2="277" stroke="#1d4ed8" stroke-width="3.5" marker-end="url(#head-blue)"/>
+  <line x1="700" y1="350" x2="700" y2="277" stroke="#1d4ed8" stroke-width="3.5" marker-end="url(#head-blue)"/>
+  <text x="200" y="374" text-anchor="middle" fill="#1d4ed8" font-weight="bold">buoyancy</text>
+  <text x="700" y="374" text-anchor="middle" fill="#1d4ed8" font-weight="bold">buoyancy</text>
+
+  <!-- Draft dimension on the starboard hull -->
+  <line x1="775" y1="289.3" x2="835" y2="289.3" stroke="#1f2933" stroke-width="1.5"/>
+  <line x1="820" y1="250" x2="820" y2="289.3" stroke="#1f2933" stroke-width="2" marker-start="url(#head-dark)" marker-end="url(#head-dark)"/>
+  <text x="840" y="270" fill="#1f2933" font-weight="bold">draft</text>
+  <text x="840" y="290" fill="#1f2933">3.9 cm</text>
+
+  <!-- The arithmetic -->
+  <rect x="140" y="408" width="620" height="110" rx="8" fill="#ffffff" fill-opacity="0.92" stroke="#0b5394" stroke-width="1.5"/>
+  <text x="450" y="440" text-anchor="middle" fill="#1f2933" font-size="19" font-weight="bold">draft = mass / (water density × waterplane area)</text>
+  <text x="450" y="471" text-anchor="middle" fill="#1f2933">= 12.1 kg / (1025 kg/m³ × 2 × 1.0 m × 0.15 m) ≈ 0.039 m</text>
+  <text x="450" y="500" text-anchor="middle" fill="#1f2933">At that depth buoyancy equals the weight: the boat floats here.</text>
+</svg>
