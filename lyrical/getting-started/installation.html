@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Getting started &mdash; Gz Maritime lyrical documentation</title>
+  <title>Installation &mdash; Gz Maritime lyrical documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/honu.css?v=44af46ee" />
@@ -21,8 +21,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Requirements" href="requirements.html" />
-    <link rel="prev" title="Gz Maritime" href="../index.html" /> 
+    <link rel="next" title="First simulation" href="first-simulation.html" />
+    <link rel="prev" title="Requirements" href="requirements.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -46,17 +46,17 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Getting started</a><ul>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting started</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="requirements.html">Requirements</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="requirements.html#optional">Optional</a></li>
 <li class="toctree-l3"><a class="reference internal" href="requirements.html#docker">Docker</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="installation.html">Installation</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="installation.html#clone">1. Clone</a></li>
-<li class="toctree-l3"><a class="reference internal" href="installation.html#install-the-dependencies">2. Install the dependencies</a></li>
-<li class="toctree-l3"><a class="reference internal" href="installation.html#build">3. Build</a></li>
-<li class="toctree-l3"><a class="reference internal" href="installation.html#check">4. Check</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Installation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#clone">1. Clone</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#install-the-dependencies">2. Install the dependencies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#build">3. Build</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#check">4. Check</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="first-simulation.html">First simulation</a><ul>
@@ -243,9 +243,10 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Getting started</li>
+          <li class="breadcrumb-item"><a href="index.html">Getting started</a></li>
+      <li class="breadcrumb-item active">Installation</li>
       <li class="wy-breadcrumbs-aside">
-              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/getting-started/index.md" class="fa fa-github"> Edit on GitHub</a>
+              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/getting-started/installation.md" class="fa fa-github"> Edit on GitHub</a>
       </li>
   </ul>
   <hr/>
@@ -253,26 +254,59 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="getting-started">
-<h1>Getting started<a class="headerlink" href="#getting-started" title="Link to this heading"></a></h1>
-<p>Three short pages take you from a fresh machine to driving a boat on the
-ocean:</p>
-<ol class="arabic simple">
-<li><p><a class="reference internal" href="requirements.html"><span class="std std-doc">Requirements</span></a>: what to have installed first.</p></li>
-<li><p><a class="reference internal" href="installation.html"><span class="std std-doc">Installation</span></a>: build the workspace.</p></li>
-<li><p><a class="reference internal" href="first-simulation.html"><span class="std std-doc">First simulation</span></a>: start the ocean, put a boat on
-it, and drive it.</p></li>
-</ol>
-<div class="toctree-wrapper compound">
+  <section id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h1>
+<p>gz-maritime builds from source in a colcon workspace, with Ehukai next to it.</p>
+<section id="clone">
+<h2>1. Clone<a class="headerlink" href="#clone" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>-p<span class="w"> </span>~/maritime_ws/src<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>~/maritime_ws/src
+git<span class="w"> </span>clone<span class="w"> </span>https://github.com/HonuRobotics/gz-maritime.git
+git<span class="w"> </span>clone<span class="w"> </span>https://github.com/HonuRobotics/ehukai.git
+</pre></div>
 </div>
+<p>Ehukai is a plain CMake package. In the same workspace, colcon builds it
+before the wave package that needs it, so there is no separate install step.</p>
+</section>
+<section id="install-the-dependencies">
+<h2>2. Install the dependencies<a class="headerlink" href="#install-the-dependencies" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>~/maritime_ws
+rosdep<span class="w"> </span>update
+rosdep<span class="w"> </span>install<span class="w"> </span>--from-paths<span class="w"> </span>src<span class="w"> </span>--ignore-src<span class="w"> </span>-y
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you installed Ehukai somewhere else instead of cloning it, add
+<code class="docutils literal notranslate"><span class="pre">--skip-keys</span> <span class="pre">ehukai</span></code>. Ehukai has no rosdep key, and without that flag rosdep
+stops before installing anything.</p>
+</div>
+</section>
+<section id="build">
+<h2>3. Build<a class="headerlink" href="#build" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>colcon<span class="w"> </span>build<span class="w"> </span>--merge-install
+<span class="nb">source</span><span class="w"> </span>install/setup.bash
+</pre></div>
+</div>
+<p>Source <code class="docutils literal notranslate"><span class="pre">install/setup.bash</span></code> in every new terminal. Besides ROS, it tells
+Gazebo where to find the worlds, models and plugins.</p>
+</section>
+<section id="check">
+<h2>4. Check<a class="headerlink" href="#check" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>pkg<span class="w"> </span>list<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s2">"kai_|gz_buoyancy|gz_thruster"</span>
+</pre></div>
+</div>
+<p>You should see <code class="docutils literal notranslate"><span class="pre">gz_buoyancy</span></code>, <code class="docutils literal notranslate"><span class="pre">gz_thruster</span></code>, <code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code>,
+<code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> and <code class="docutils literal notranslate"><span class="pre">kai_gazebo</span></code>.</p>
+<p>Next: <a class="reference internal" href="first-simulation.html"><span class="std std-doc">First simulation</span></a>.</p>
+</section>
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../index.html" class="btn btn-neutral float-left" title="Gz Maritime" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="requirements.html" class="btn btn-neutral float-right" title="Requirements" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="requirements.html" class="btn btn-neutral float-left" title="Requirements" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="first-simulation.html" class="btn btn-neutral float-right" title="First simulation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

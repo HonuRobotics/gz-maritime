@@ -1,9 +1,19 @@
 # Vehicles
 
-One manual per vehicle: running, driving, sensors and configuration.
+| Vehicle | What it is | Where it comes from |
+|---|---|---|
+| [Custom USV](custom-usv.md) | A 1 m catamaran, the worked example of the how-to guides | This repository |
+| [BlueBoat and BlueROV2](bluerobotics.md) | Blue Robotics' surface boat and underwater ROV | [bluerobotics_models](https://github.com/HonuRobotics/bluerobotics_models) |
+| [Holybro X500](holybro.md) | A quadcopter drone, with its own world: not a maritime vehicle, but built the same way | [holybro_models](https://github.com/HonuRobotics/holybro_models) |
 
-```{admonition} Draft
-:class: note
+Any other vehicle works too; [Bring your own vehicle](../how-to/own-vehicle.md)
+shows how.
 
-This section is being written.
+```{toctree}
+:hidden:
+:maxdepth: 1
+
+custom-usv
+bluerobotics
+holybro
 ```

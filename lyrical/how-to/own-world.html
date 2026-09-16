@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>How to guides &mdash; Gz Maritime lyrical documentation</title>
+  <title>Use your own world &mdash; Gz Maritime lyrical documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/honu.css?v=44af46ee" />
@@ -21,8 +21,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Bring your own vehicle" href="own-vehicle.html" />
-    <link rel="prev" title="Holybro X500" href="../vehicles/holybro.html" /> 
+    <link rel="next" title="Troubleshooting" href="faq.html" />
+    <link rel="prev" title="Add sensors" href="sensors.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -94,9 +94,9 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">How to guides</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#bring-your-own-vehicle">Bring your own vehicle</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#more">More</a><ul>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How to guides</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="index.html#bring-your-own-vehicle">Bring your own vehicle</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#more">More</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="own-vehicle.html">Bring your own vehicle</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#who-does-what">Who does what</a></li>
 <li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#the-path">The path</a><ul>
@@ -162,11 +162,11 @@
 <li class="toctree-l4"><a class="reference internal" href="sensors.html#check-a-sensor">Check a sensor</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="own-world.html">Use your own world</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="own-world.html#what-a-world-needs">What a world needs</a></li>
-<li class="toctree-l4"><a class="reference internal" href="own-world.html#the-buoyancy-system">The buoyancy system</a></li>
-<li class="toctree-l4"><a class="reference internal" href="own-world.html#the-world-name">The world name</a></li>
-<li class="toctree-l4"><a class="reference internal" href="own-world.html#adding-a-seabed">Adding a seabed</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Use your own world</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#what-a-world-needs">What a world needs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#the-buoyancy-system">The buoyancy system</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#the-world-name">The world name</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#adding-a-seabed">Adding a seabed</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="faq.html">Troubleshooting</a><ul>
@@ -243,9 +243,10 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">How to guides</li>
+          <li class="breadcrumb-item"><a href="index.html">How to guides</a></li>
+      <li class="breadcrumb-item active">Use your own world</li>
       <li class="wy-breadcrumbs-aside">
-              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/how-to/index.md" class="fa fa-github"> Edit on GitHub</a>
+              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/how-to/own-world.md" class="fa fa-github"> Edit on GitHub</a>
       </li>
   </ul>
   <hr/>
@@ -253,34 +254,139 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="how-to-guides">
-<h1>How to guides<a class="headerlink" href="#how-to-guides" title="Link to this heading"></a></h1>
-<section id="bring-your-own-vehicle">
-<h2>Bring your own vehicle<a class="headerlink" href="#bring-your-own-vehicle" title="Link to this heading"></a></h2>
-<p>Follow these in order the first time. Every step uses the
-<a class="reference internal" href="../vehicles/custom-usv.html"><span class="std std-doc">custom USV</span></a> as the worked example, so there is
-always a real file to look at, and the snippets on these pages are taken
-from its files.</p>
-<ol class="arabic simple">
-<li><p><a class="reference internal" href="own-vehicle.html"><span class="std std-doc">Overview</span></a>: what the world gives you, what your vehicle
-brings, and how a vehicle starts floating.</p></li>
-<li><p><a class="reference internal" href="vehicle-description.html"><span class="std std-doc">Describe the vehicle</span></a>: the URDF, with its frames,
-mass, collision shapes and waterline.</p></li>
-<li><p><a class="reference internal" href="gazebo-composition.html"><span class="std std-doc">Compose the Gazebo model</span></a>: buoyancy registration,
-thrusters, damping and sensors on top of the URDF.</p></li>
-<li><p><a class="reference internal" href="spawn-and-drive.html"><span class="std std-doc">Spawn and drive</span></a>: the spawn launch, the bridge, and
-driving.</p></li>
-<li><p><a class="reference internal" href="sensors.html"><span class="std std-doc">Add sensors</span></a>: IMU, GPS, magnetometer and cameras.</p></li>
-</ol>
-</section>
-<section id="more">
-<h2>More<a class="headerlink" href="#more" title="Link to this heading"></a></h2>
-<ul class="simple">
-<li><p><a class="reference internal" href="own-world.html"><span class="std std-doc">Use your own world</span></a></p></li>
-<li><p><a class="reference internal" href="faq.html"><span class="std std-doc">Troubleshooting</span></a></p></li>
-</ul>
-<div class="toctree-wrapper compound">
+  <section id="use-your-own-world">
+<h1>Use your own world<a class="headerlink" href="#use-your-own-world" title="Link to this heading"></a></h1>
+<p>Any launch file here takes <code class="docutils literal notranslate"><span class="pre">world:=</span></code>, with a file name found on Gazebo’s
+resource path or a full path:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_custom_vehicle<span class="w"> </span>sim.launch.xml<span class="w"> </span>world:<span class="o">=</span>/path/to/my_world.sdf
+</pre></div>
 </div>
+<p>The easiest start is a copy of <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cp<span class="w"> </span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_gazebo<span class="k">)</span>/worlds/open_water.sdf<span class="w"> </span>my_world.sdf
+</pre></div>
+</div>
+<section id="what-a-world-needs">
+<h2>What a world needs<a class="headerlink" href="#what-a-world-needs" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Piece</p></th>
+<th class="head"><p>Why</p></th>
+<th class="head"><p>In <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Physics, user commands and scene broadcaster systems</p></td>
+<td><p>Physics, spawning models, and the GUI view</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-physics-system</span></code>, <code class="docutils literal notranslate"><span class="pre">gz-sim-user-commands-system</span></code>, <code class="docutils literal notranslate"><span class="pre">gz-sim-scene-broadcaster-system</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>The gz-maritime buoyancy system</strong></p></td>
+<td><p>Floats the collisions vehicles mark</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">gz-maritime-buoyancy-system</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>A wave source</p></td>
+<td><p>The moving sea: its state, and the <code class="docutils literal notranslate"><span class="pre">set_parameters</span></code> service</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-waves-fft-system</span></code> (or <code class="docutils literal notranslate"><span class="pre">gz-sim-waves-gerstner-system</span></code>)</p></td>
+</tr>
+<tr class="row-odd"><td><p>The <code class="docutils literal notranslate"><span class="pre">water_surface</span></code> model</p></td>
+<td><p>Draws the sea</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&lt;include&gt;&lt;uri&gt;model://water_surface&lt;/uri&gt;&lt;/include&gt;</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Sensor systems</p></td>
+<td><p>IMU, magnetometer, GPS and rendered sensors</p></td>
+<td><p>see <a class="reference internal" href="sensors.html#what-the-world-provides"><span class="std std-ref">Add sensors</span></a></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;spherical_coordinates&gt;</span></code></p></td>
+<td><p>GPS origin and magnetic field location</p></td>
+<td><p>Portuguese Ledge, Monterey Bay</p></td>
+</tr>
+</tbody>
+</table>
+<p>Leave out what you don’t need. A world without waves, for example, still
+floats vehicles; it just draws no sea.</p>
+</section>
+<section id="the-buoyancy-system">
+<h2>The buoyancy system<a class="headerlink" href="#the-buoyancy-system" title="Link to this heading"></a></h2>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;plugin</span><span class="w"> </span><span class="na">filename=</span><span class="s">"gz-maritime-buoyancy-system"</span>
+<span class="w">        </span><span class="na">name=</span><span class="s">"gz::sim::maritime::Buoyancy"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;graded_buoyancy&gt;</span>
+<span class="w">    </span><span class="nt">&lt;default_density&gt;</span>1025<span class="nt">&lt;/default_density&gt;</span>
+<span class="w">    </span><span class="nt">&lt;density_change&gt;</span>
+<span class="w">      </span><span class="nt">&lt;above_depth&gt;</span>0<span class="nt">&lt;/above_depth&gt;</span>
+<span class="w">      </span><span class="nt">&lt;density&gt;</span>1<span class="nt">&lt;/density&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/density_change&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/graded_buoyancy&gt;</span>
+<span class="w">  </span><span class="nt">&lt;enable_by_default&gt;</span>false<span class="nt">&lt;/enable_by_default&gt;</span>
+<span class="nt">&lt;/plugin&gt;</span>
+</pre></div>
+</div>
+<p>Read it as: seawater (1025 kg/m³) everywhere, except above z = 0, where there
+is air (1 kg/m³). <code class="docutils literal notranslate"><span class="pre">&lt;enable_by_default&gt;false&lt;/enable_by_default&gt;</span></code> means the
+world floats nothing on its own: only the collisions vehicles mark with
+<code class="docutils literal notranslate"><span class="pre">gz:buoyancy=&quot;true&quot;</span></code> displace water.</p>
+<p>Marked collisions float in every mode. The tags only decide what happens to
+the <strong>unmarked</strong> ones:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">&lt;enable&gt;</span></code> list</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">&lt;enable_by_default&gt;</span></code></p></th>
+<th class="head"><p>Unmarked collisions</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>none</p></td>
+<td><p>not set</p></td>
+<td><p><strong>All float.</strong> Every collision of every model, as in stock Gazebo.</p></td>
+</tr>
+<tr class="row-odd"><td><p>present</p></td>
+<td><p>not set</p></td>
+<td><p>The listed models or links float.</p></td>
+</tr>
+<tr class="row-even"><td><p>none</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
+<td><p><strong>None float.</strong> Only marked collisions do. Recommended.</p></td>
+</tr>
+<tr class="row-odd"><td><p>present</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">true</span></code></p></td>
+<td><p>All float; the list changes nothing.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The recommended mode is the one that needs to know nothing about your
+vehicles. The <code class="docutils literal notranslate"><span class="pre">&lt;enable&gt;</span></code> list still works, for a vehicle whose model you can’t
+edit, and takes names as spawned: <code class="docutils literal notranslate"><span class="pre">&lt;enable&gt;blueboat::hull_displacement&lt;/enable&gt;</span></code>.</p>
+<p>This is Gazebo’s own buoyancy system plus the marked-collision change
+(<a class="reference external" href="https://github.com/gazebosim/gz-sim/commit/229ec07e673b6317fec57af50fd652bcd9bde0ed">gz-sim 229ec07e</a>),
+carried by <code class="docutils literal notranslate"><span class="pre">gz_buoyancy</span></code> until a Gazebo release ships it. When it does, the
+plugin line becomes <code class="docutils literal notranslate"><span class="pre">gz-sim-buoyancy-system</span></code> / <code class="docutils literal notranslate"><span class="pre">gz::sim::systems::Buoyancy</span></code>
+and nothing else changes.</p>
+</section>
+<section id="the-world-name">
+<h2>The world name<a class="headerlink" href="#the-world-name" title="Link to this heading"></a></h2>
+<p>The wave service includes the world’s name:
+<code class="docutils literal notranslate"><span class="pre">/world/&lt;name&gt;/wave/set_parameters</span></code>. In <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code> the name is
+<code class="docutils literal notranslate"><span class="pre">default</span></code>. Commands you type yourself have to use your world’s name; the
+launch files don’t care.</p>
+</section>
+<section id="adding-a-seabed">
+<h2>Adding a seabed<a class="headerlink" href="#adding-a-seabed" title="Link to this heading"></a></h2>
+<p>For shallow water, or an underwater vehicle working near the bottom, add a
+static model under the water:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;model</span><span class="w"> </span><span class="na">name=</span><span class="s">"seabed"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;static&gt;</span>true<span class="nt">&lt;/static&gt;</span>
+<span class="w">  </span><span class="nt">&lt;pose&gt;</span>0<span class="w"> </span>0<span class="w"> </span>-20<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="nt">&lt;/pose&gt;</span>
+<span class="w">  </span><span class="nt">&lt;link</span><span class="w"> </span><span class="na">name=</span><span class="s">"link"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;collision</span><span class="w"> </span><span class="na">name=</span><span class="s">"collision"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;geometry&gt;&lt;box&gt;&lt;size&gt;</span>200<span class="w"> </span>200<span class="w"> </span>1<span class="nt">&lt;/size&gt;&lt;/box&gt;&lt;/geometry&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/collision&gt;</span>
+<span class="w">    </span><span class="nt">&lt;visual</span><span class="w"> </span><span class="na">name=</span><span class="s">"visual"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;geometry&gt;&lt;box&gt;&lt;size&gt;</span>200<span class="w"> </span>200<span class="w"> </span>1<span class="nt">&lt;/size&gt;&lt;/box&gt;&lt;/geometry&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/visual&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/link&gt;</span>
+<span class="nt">&lt;/model&gt;</span>
+</pre></div>
+</div>
+<p>It doesn’t float, because nothing marks its collision.</p>
+<p>Next: <a class="reference internal" href="faq.html"><span class="std std-doc">Troubleshooting</span></a>.</p>
 </section>
 </section>
 
@@ -288,8 +394,8 @@ driving.</p></li>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../vehicles/holybro.html" class="btn btn-neutral float-left" title="Holybro X500" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="own-vehicle.html" class="btn btn-neutral float-right" title="Bring your own vehicle" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sensors.html" class="btn btn-neutral float-left" title="Add sensors" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="faq.html" class="btn btn-neutral float-right" title="Troubleshooting" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

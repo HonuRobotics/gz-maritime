@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Getting started &mdash; Gz Maritime lyrical documentation</title>
+  <title>First simulation &mdash; Gz Maritime lyrical documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/honu.css?v=44af46ee" />
@@ -21,8 +21,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Requirements" href="requirements.html" />
-    <link rel="prev" title="Gz Maritime" href="../index.html" /> 
+    <link rel="next" title="Vehicles" href="../vehicles/index.html" />
+    <link rel="prev" title="Installation" href="installation.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -46,7 +46,7 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Getting started</a><ul>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting started</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="requirements.html">Requirements</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="requirements.html#optional">Optional</a></li>
 <li class="toctree-l3"><a class="reference internal" href="requirements.html#docker">Docker</a></li>
@@ -59,14 +59,14 @@
 <li class="toctree-l3"><a class="reference internal" href="installation.html#check">4. Check</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="first-simulation.html">First simulation</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="first-simulation.html#the-ocean-on-its-own">1. The ocean on its own</a></li>
-<li class="toctree-l3"><a class="reference internal" href="first-simulation.html#put-a-boat-on-it">2. Put a boat on it</a></li>
-<li class="toctree-l3"><a class="reference internal" href="first-simulation.html#drive-it">3. Drive it</a></li>
-<li class="toctree-l3"><a class="reference internal" href="first-simulation.html#look-at-it-in-rviz">4. Look at it in RViz</a></li>
-<li class="toctree-l3"><a class="reference internal" href="first-simulation.html#add-a-second-boat">5. Add a second boat</a></li>
-<li class="toctree-l3"><a class="reference internal" href="first-simulation.html#make-waves">6. Make waves</a></li>
-<li class="toctree-l3"><a class="reference internal" href="first-simulation.html#next">Next</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">First simulation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#the-ocean-on-its-own">1. The ocean on its own</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#put-a-boat-on-it">2. Put a boat on it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#drive-it">3. Drive it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#look-at-it-in-rviz">4. Look at it in RViz</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#add-a-second-boat">5. Add a second boat</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#make-waves">6. Make waves</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#next">Next</a></li>
 </ul>
 </li>
 </ul>
@@ -243,9 +243,10 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Getting started</li>
+          <li class="breadcrumb-item"><a href="index.html">Getting started</a></li>
+      <li class="breadcrumb-item active">First simulation</li>
       <li class="wy-breadcrumbs-aside">
-              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/getting-started/index.md" class="fa fa-github"> Edit on GitHub</a>
+              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/getting-started/first-simulation.md" class="fa fa-github"> Edit on GitHub</a>
       </li>
   </ul>
   <hr/>
@@ -253,26 +254,143 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="getting-started">
-<h1>Getting started<a class="headerlink" href="#getting-started" title="Link to this heading"></a></h1>
-<p>Three short pages take you from a fresh machine to driving a boat on the
-ocean:</p>
-<ol class="arabic simple">
-<li><p><a class="reference internal" href="requirements.html"><span class="std std-doc">Requirements</span></a>: what to have installed first.</p></li>
-<li><p><a class="reference internal" href="installation.html"><span class="std std-doc">Installation</span></a>: build the workspace.</p></li>
-<li><p><a class="reference internal" href="first-simulation.html"><span class="std std-doc">First simulation</span></a>: start the ocean, put a boat on
-it, and drive it.</p></li>
-</ol>
-<div class="toctree-wrapper compound">
+  <section id="first-simulation">
+<h1>First simulation<a class="headerlink" href="#first-simulation" title="Link to this heading"></a></h1>
+<p>Start the ocean, put the custom USV on it, and drive it. Run every command
+in a terminal where you sourced <code class="docutils literal notranslate"><span class="pre">~/maritime_ws/install/setup.bash</span></code>.</p>
+<section id="the-ocean-on-its-own">
+<h2>1. The ocean on its own<a class="headerlink" href="#the-ocean-on-its-own" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>simulation.launch.xml
+</pre></div>
 </div>
+<figure class="align-default" id="id1">
+<img alt="A calm, rippled ocean stretching to the horizon under a pale sky, with no vehicles" src="../_images/open-water.jpg" />
+<figcaption>
+<p><span class="caption-text">The <code class="docutils literal notranslate"><span class="pre">open_water</span></code> world at its default, calm sea state.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>Gazebo opens the <code class="docutils literal notranslate"><span class="pre">open_water</span></code> world: a calm sea, a sky and nothing else. No
+vehicle is part of this world; vehicles are added to it. Stop it with
+Ctrl+C before the next step.</p>
+</section>
+<section id="put-a-boat-on-it">
+<h2>2. Put a boat on it<a class="headerlink" href="#put-a-boat-on-it" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_custom_vehicle<span class="w"> </span>sim.launch.xml
+</pre></div>
+</div>
+<figure class="align-default" id="id2">
+<img alt="The custom USV, a twin-hull boat with a grey deck, floating on the ocean" src="../_images/custom-usv.jpg" />
+<figcaption>
+<p><span class="caption-text">The custom USV floating at its waterline.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>The <strong>custom USV</strong> is a 1 m catamaran made for these docs. The world file
+doesn’t mention it: the boat’s own model marks the shapes that float it
+(<a class="reference internal" href="../how-to/own-vehicle.html#how-a-vehicle-floats"><span class="std std-ref">how that works</span></a>).</p>
+<p>Check it from a second terminal:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gz<span class="w"> </span>model<span class="w"> </span>-m<span class="w"> </span>custom_usv<span class="w"> </span>-p<span class="w">          </span><span class="c1"># z close to 0: floating at the waterline</span>
+ros2<span class="w"> </span>topic<span class="w"> </span>list<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>custom_usv<span class="w">  </span><span class="c1"># propeller commands and sensors</span>
+</pre></div>
+</div>
+</section>
+<section id="drive-it">
+<h2>3. Drive it<a class="headerlink" href="#drive-it" title="Link to this heading"></a></h2>
+<p>Each propeller takes a command between -1 and 1: the fraction of its full
+thrust to apply, 1 full ahead, -1 full astern, 0 stop. It keeps the last
+command it got until a new one arrives. Drive with one terminal per
+propeller, both sourced, and start the second right after the first.</p>
+<p>Terminal 1, the port propeller:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>topic<span class="w"> </span>pub<span class="w"> </span>-r<span class="w"> </span><span class="m">5</span><span class="w"> </span>/custom_usv/motor_port/cmd<span class="w"> </span>std_msgs/msg/Float64<span class="w"> </span><span class="s2">"{data: 0.25}"</span>
+</pre></div>
+</div>
+<p>Terminal 2, the starboard propeller:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>topic<span class="w"> </span>pub<span class="w"> </span>-r<span class="w"> </span><span class="m">5</span><span class="w"> </span>/custom_usv/motor_stbd/cmd<span class="w"> </span>std_msgs/msg/Float64<span class="w"> </span><span class="s2">"{data: 0.25}"</span>
+</pre></div>
+</div>
+<p>The boat turns for the moment only one propeller pushes, then moves straight
+ahead. Two different values turn it. To stop, Ctrl+C both, then send <code class="docutils literal notranslate"><span class="pre">0.0</span></code>
+once to each:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>topic<span class="w"> </span>pub<span class="w"> </span>--once<span class="w"> </span>/custom_usv/motor_port/cmd<span class="w"> </span>std_msgs/msg/Float64<span class="w"> </span><span class="s2">"{data: 0.0}"</span>
+ros2<span class="w"> </span>topic<span class="w"> </span>pub<span class="w"> </span>--once<span class="w"> </span>/custom_usv/motor_stbd/cmd<span class="w"> </span>std_msgs/msg/Float64<span class="w"> </span><span class="s2">"{data: 0.0}"</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Commands <strong>latch</strong>: a propeller keeps its last command until it gets a new
+one. Ctrl+C alone does not stop the boat, <code class="docutils literal notranslate"><span class="pre">0.0</span></code> does; and the longer the
+second command waits, the further the boat turns before it goes straight.</p>
+</div>
+</section>
+<section id="look-at-it-in-rviz">
+<h2>4. Look at it in RViz<a class="headerlink" href="#look-at-it-in-rviz" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_custom_vehicle<span class="w"> </span>rviz.launch.xml
+</pre></div>
+</div>
+<figure class="align-default" id="id3">
+<img alt="RViz showing the custom USV as an orange twin-hull model over a grid, with the Displays panel listing a RobotModel whose description topic is /custom_usv/robot_description and whose TF Prefix is custom_usv" src="../_images/custom-usv-rviz.jpg" />
+<figcaption>
+<p><span class="caption-text">The custom USV in RViz, on the config the launch writes for it.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>RViz shows the boat and its frames. In a simulation every frame carries the
+boat’s name (<code class="docutils literal notranslate"><span class="pre">custom_usv/base_link</span></code>) and the description is published in
+the boat’s namespace, so the launch starts RViz on a config pointed at that
+instance, with simulation time. For another boat, pass its name:
+<code class="docutils literal notranslate"><span class="pre">name:=boat_b</span></code>.</p>
+</section>
+<section id="add-a-second-boat">
+<h2>5. Add a second boat<a class="headerlink" href="#add-a-second-boat" title="Link to this heading"></a></h2>
+<p>While the first one runs, put another on the ocean from a new terminal.
+gz-maritime’s spawn launch takes a name and the vehicle’s three files:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>spawn_vehicle.launch.xml<span class="w"> </span>name:<span class="o">=</span>boat_b<span class="w"> </span>y:<span class="o">=</span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>xacro:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/models/custom_usv/model.sdf.xacro<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>bridge:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/config/ros_gz_bridge.yaml.in<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>urdf:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/urdf/custom_usv.urdf.xacro
+</pre></div>
+</div>
+<p>A second, identical boat appears 4 m to the left of the first, and the
+command returns once it is in: its bridge and state publisher run inside
+the simulation’s process. Each boat has its own topics, so the same two
+terminals as in step 3, on <code class="docutils literal notranslate"><span class="pre">boat_b</span></code>’s topics, drive only that boat.
+Terminal 1:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>topic<span class="w"> </span>pub<span class="w"> </span>-r<span class="w"> </span><span class="m">5</span><span class="w"> </span>/boat_b/motor_port/cmd<span class="w"> </span>std_msgs/msg/Float64<span class="w"> </span><span class="s2">"{data: 0.25}"</span>
+</pre></div>
+</div>
+<p>Terminal 2:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>topic<span class="w"> </span>pub<span class="w"> </span>-r<span class="w"> </span><span class="m">5</span><span class="w"> </span>/boat_b/motor_stbd/cmd<span class="w"> </span>std_msgs/msg/Float64<span class="w"> </span><span class="s2">"{data: 0.25}"</span>
+</pre></div>
+</div>
+<p>A third boat is the same spawn command with another name.</p>
+</section>
+<section id="make-waves">
+<h2>6. Make waves<a class="headerlink" href="#make-waves" title="Link to this heading"></a></h2>
+<p>The sea state can change while the simulation runs, from 0 (glassy) to 9:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gz<span class="w"> </span>service<span class="w"> </span>-s<span class="w"> </span>/world/default/wave/set_parameters<span class="w"> </span>--reqtype<span class="w"> </span>gz.msgs.Param<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--reptype<span class="w"> </span>gz.msgs.Boolean<span class="w"> </span>--timeout<span class="w"> </span><span class="m">2000</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--req<span class="w"> </span><span class="s1">'params {key: "sea_state" value {type: INT32 int_value: 3}}'</span>
+</pre></div>
+</div>
+<p>The waves pass through the hulls instead of lifting the boats. That is
+expected for now: the boats float on the flat water level, and the moving
+surface is only drawn. See
+<a class="reference internal" href="../how-to/own-vehicle.html#waves-and-physics-today"><span class="std std-ref">Waves and physics today</span></a>.</p>
+</section>
+<section id="next">
+<h2>Next<a class="headerlink" href="#next" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../vehicles/custom-usv.html"><span class="std std-doc">The custom USV</span></a>: its topics, frames and
+files.</p></li>
+<li><p><a class="reference internal" href="../how-to/own-vehicle.html"><span class="std std-doc">Bring your own vehicle</span></a>: build a vehicle like it.</p></li>
+</ul>
+</section>
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../index.html" class="btn btn-neutral float-left" title="Gz Maritime" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="requirements.html" class="btn btn-neutral float-right" title="Requirements" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../vehicles/index.html" class="btn btn-neutral float-right" title="Vehicles" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

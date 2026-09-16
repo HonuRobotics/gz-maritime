@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>How to guides &mdash; Gz Maritime lyrical documentation</title>
+  <title>Describe the vehicle &mdash; Gz Maritime lyrical documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/honu.css?v=44af46ee" />
@@ -21,8 +21,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Bring your own vehicle" href="own-vehicle.html" />
-    <link rel="prev" title="Holybro X500" href="../vehicles/holybro.html" /> 
+    <link rel="next" title="Compose the Gazebo model" href="gazebo-composition.html" />
+    <link rel="prev" title="Bring your own vehicle" href="own-vehicle.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -94,9 +94,9 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">How to guides</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#bring-your-own-vehicle">Bring your own vehicle</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#more">More</a><ul>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How to guides</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="index.html#bring-your-own-vehicle">Bring your own vehicle</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#more">More</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="own-vehicle.html">Bring your own vehicle</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#who-does-what">Who does what</a></li>
 <li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#the-path">The path</a><ul>
@@ -109,16 +109,16 @@
 <li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#already-have-a-model">Already have a model?</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="vehicle-description.html">Describe the vehicle</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#put-the-origin-on-the-waterline">Put the origin on the waterline</a></li>
-<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#work-out-the-draft">Work out the draft</a></li>
-<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#collision-shapes-are-for-contact">Collision shapes are for contact</a></li>
-<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#mass-and-inertia">Mass and inertia</a></li>
-<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#propellers">Propellers</a></li>
-<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#sensor-frames">Sensor frames</a></li>
-<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#no-instance-name-no-gazebo">No instance name, no Gazebo</a></li>
-<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#check-it">Check it</a></li>
-<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#build-it">Build it</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Describe the vehicle</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#put-the-origin-on-the-waterline">Put the origin on the waterline</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#work-out-the-draft">Work out the draft</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#collision-shapes-are-for-contact">Collision shapes are for contact</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mass-and-inertia">Mass and inertia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#propellers">Propellers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sensor-frames">Sensor frames</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#no-instance-name-no-gazebo">No instance name, no Gazebo</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#check-it">Check it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#build-it">Build it</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="gazebo-composition.html">Compose the Gazebo model</a><ul>
@@ -243,9 +243,10 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">How to guides</li>
+          <li class="breadcrumb-item"><a href="index.html">How to guides</a></li>
+      <li class="breadcrumb-item active">Describe the vehicle</li>
       <li class="wy-breadcrumbs-aside">
-              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/how-to/index.md" class="fa fa-github"> Edit on GitHub</a>
+              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/how-to/vehicle-description.md" class="fa fa-github"> Edit on GitHub</a>
       </li>
   </ul>
   <hr/>
@@ -253,34 +254,184 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="how-to-guides">
-<h1>How to guides<a class="headerlink" href="#how-to-guides" title="Link to this heading"></a></h1>
-<section id="bring-your-own-vehicle">
-<h2>Bring your own vehicle<a class="headerlink" href="#bring-your-own-vehicle" title="Link to this heading"></a></h2>
-<p>Follow these in order the first time. Every step uses the
-<a class="reference internal" href="../vehicles/custom-usv.html"><span class="std std-doc">custom USV</span></a> as the worked example, so there is
-always a real file to look at, and the snippets on these pages are taken
-from its files.</p>
-<ol class="arabic simple">
-<li><p><a class="reference internal" href="own-vehicle.html"><span class="std std-doc">Overview</span></a>: what the world gives you, what your vehicle
-brings, and how a vehicle starts floating.</p></li>
-<li><p><a class="reference internal" href="vehicle-description.html"><span class="std std-doc">Describe the vehicle</span></a>: the URDF, with its frames,
-mass, collision shapes and waterline.</p></li>
-<li><p><a class="reference internal" href="gazebo-composition.html"><span class="std std-doc">Compose the Gazebo model</span></a>: buoyancy registration,
-thrusters, damping and sensors on top of the URDF.</p></li>
-<li><p><a class="reference internal" href="spawn-and-drive.html"><span class="std std-doc">Spawn and drive</span></a>: the spawn launch, the bridge, and
-driving.</p></li>
-<li><p><a class="reference internal" href="sensors.html"><span class="std std-doc">Add sensors</span></a>: IMU, GPS, magnetometer and cameras.</p></li>
-</ol>
+  <section id="describe-the-vehicle">
+<h1>Describe the vehicle<a class="headerlink" href="#describe-the-vehicle" title="Link to this heading"></a></h1>
+<p>Start with a plain URDF. It holds what is true about your vehicle whichever
+simulator runs it, or none: its shape, its mass, how its parts move, and
+where its sensors sit. The custom USV’s is
+<code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle/urdf/custom_usv.urdf.xacro</span></code>, and this page walks through
+it.</p>
+<section id="put-the-origin-on-the-waterline">
+<h2>Put the origin on the waterline<a class="headerlink" href="#put-the-origin-on-the-waterline" title="Link to this heading"></a></h2>
+<figure class="align-default" id="id1">
+<a class="reference internal image-reference" href="../_images/waterline.svg"><img alt="Cross-section of the custom USV seen from the stern. base_link's origin sits on the dashed waterline, the centre of mass is 3.6 cm above it, the two hulls reach 3.9 cm below it, and a buoyancy arrow points up under each hull." src="../_images/waterline.svg" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">The custom USV seen from the stern, to scale.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>Place <code class="docutils literal notranslate"><span class="pre">base_link</span></code>’s origin <strong>on the design waterline</strong>, the level the water
+reaches when the vehicle floats at rest. Point x forward, y to the left and z
+up, as <a class="reference external" href="https://www.ros.org/reps/rep-0103.html">REP 103</a> asks.</p>
+<p>It pays off twice: spawning at z = 0 puts the vehicle straight into its
+resting position, and its z in the world reads directly as how high it rides.</p>
+<p>An underwater vehicle has no waterline. Put its origin somewhere natural
+instead, such as the centre of its buoyant volume.</p>
 </section>
-<section id="more">
-<h2>More<a class="headerlink" href="#more" title="Link to this heading"></a></h2>
-<ul class="simple">
-<li><p><a class="reference internal" href="own-world.html"><span class="std std-doc">Use your own world</span></a></p></li>
-<li><p><a class="reference internal" href="faq.html"><span class="std std-doc">Troubleshooting</span></a></p></li>
-</ul>
-<div class="toctree-wrapper compound">
+<section id="work-out-the-draft">
+<h2>Work out the draft<a class="headerlink" href="#work-out-the-draft" title="Link to this heading"></a></h2>
+<p>A floating vehicle sinks until the water it pushes aside weighs as much as
+the vehicle. For straight-sided hulls, that depth, the <strong>draft</strong>, is:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>draft = mass / (water density × waterplane area)
+</pre></div>
 </div>
+<p>The custom USV weighs 12.1 kg and has two hulls 1.0 m long and 0.15 m wide:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>draft = 12.1 kg / (1025 kg/m³ × 2 × 1.0 m × 0.15 m) ≈ 0.039 m
+</pre></div>
+</div>
+<p>So its hull bottoms sit 3.9 cm below <code class="docutils literal notranslate"><span class="pre">base_link</span></code>. The dimensions live in one
+file, <code class="docutils literal notranslate"><span class="pre">urdf/dimensions.xacro</span></code>, that works the draft out from the mass and
+the hull size, so changing either moves the hulls to match:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">&lt;xacro:property</span><span class="w"> </span><span class="na">name=</span><span class="s">"total_mass"</span><span class="w"> </span><span class="na">value=</span><span class="s">"${base_mass + 2 * prop_mass}"</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;xacro:property</span><span class="w"> </span><span class="na">name=</span><span class="s">"draft"</span>
+<span class="w">                  </span><span class="na">value=</span><span class="s">"${total_mass / (water_density * 2 * hull_length * hull_width)}"</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="cm">&lt;!-- Hull centre height: the hull bottoms sit one draft below base_link,</span>
+<span class="cm">       which puts base_link's origin on the design waterline. --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;xacro:property</span><span class="w"> </span><span class="na">name=</span><span class="s">"hull_z"</span><span class="w"> </span><span class="na">value=</span><span class="s">"${hull_height / 2 - draft}"</span><span class="nt">/&gt;</span>
+</pre></div>
+</div>
+<p>The Gazebo model includes the same file, so the boxes that float the boat
+are the same size and in the same place as the hulls it bumps with. Keep the
+draft well below the hull height. If the hulls can’t push aside enough
+water, the vehicle sinks.</p>
+</section>
+<section id="collision-shapes-are-for-contact">
+<h2>Collision shapes are for contact<a class="headerlink" href="#collision-shapes-are-for-contact" title="Link to this heading"></a></h2>
+<p>The collision shapes in the URDF are what the vehicle bumps into: a quay, the
+seabed, another vehicle. They do <strong>not</strong> float it. gz-maritime’s buoyancy
+floats a link by the collision shapes that are <em>marked</em> as displacement
+volume, and that mark is a Gazebo attribute a URDF collision can’t carry, so
+the floating volume is added in the Gazebo model
+(<a class="reference internal" href="gazebo-composition.html#mark-the-collisions-that-displace"><span class="std std-ref">Mark what displaces</span></a>),
+or, if you want a single file, in a <code class="docutils literal notranslate"><span class="pre">&lt;gazebo&gt;</span></code> block of the URDF
+(<a class="reference internal" href="gazebo-composition.html#marking-from-a-urdf"><span class="std std-ref">Marking from a URDF</span></a>).</p>
+<p>That split is deliberate. A bracket, a mast or a sensor housing needs
+contact geometry and must add no buoyancy; a hull needs both. Give every
+part the contact shape it deserves here, and decide what floats in the
+Gazebo model.</p>
+</section>
+<section id="mass-and-inertia">
+<h2>Mass and inertia<a class="headerlink" href="#mass-and-inertia" title="Link to this heading"></a></h2>
+<p>Give every moving link a mass and an inertia. The custom USV models its
+12 kg as two solid hull boxes: each box’s own inertia, plus a term for its
+distance from the centre line. The xacro computes it from the same dimensions
+as the hulls, so the two stay consistent.</p>
+<p>Rough values are fine, but not wild ones. With too little roll inertia the
+boat twitches; with far too much it barely rolls.</p>
+<p>Mind the centre of mass. On the custom USV it sits 3.6 cm above the
+waterline, which its wide, twin-hull stance easily keeps upright. A narrow
+single hull needs its mass much lower.</p>
+</section>
+<section id="propellers">
+<h2>Propellers<a class="headerlink" href="#propellers" title="Link to this heading"></a></h2>
+<p>A propeller is a link on a <strong>continuous</strong> joint that spins about the direction
+it pushes, +x for driving forward. The custom USV’s macro makes one per side:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">&lt;xacro:macro</span><span class="w"> </span><span class="na">name=</span><span class="s">"propeller"</span><span class="w"> </span><span class="na">params=</span><span class="s">"side y"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;link</span><span class="w"> </span><span class="na">name=</span><span class="s">"motor_${side}"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;inertial&gt;</span>
+<span class="w">        </span><span class="nt">&lt;origin</span><span class="w"> </span><span class="na">xyz=</span><span class="s">"0 0 0"</span><span class="w"> </span><span class="na">rpy=</span><span class="s">"0 0 0"</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;mass</span><span class="w"> </span><span class="na">value=</span><span class="s">"${prop_mass}"</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="cm">&lt;!-- A thin disc spinning about x. --&gt;</span>
+<span class="w">        </span><span class="nt">&lt;inertia</span>
+<span class="w">          </span><span class="na">ixx=</span><span class="s">"${prop_mass * (prop_diameter / 2)**2 / 2}"</span>
+<span class="w">          </span><span class="na">iyy=</span><span class="s">"${prop_mass * (3 * (prop_diameter / 2)**2 + prop_thickness**2) / 12}"</span>
+<span class="w">          </span><span class="na">izz=</span><span class="s">"${prop_mass * (3 * (prop_diameter / 2)**2 + prop_thickness**2) / 12}"</span>
+<span class="w">          </span><span class="na">ixy=</span><span class="s">"0"</span><span class="w"> </span><span class="na">ixz=</span><span class="s">"0"</span><span class="w"> </span><span class="na">iyz=</span><span class="s">"0"</span><span class="nt">/&gt;</span>
+<span class="w">      </span><span class="nt">&lt;/inertial&gt;</span>
+<span class="w">      </span><span class="nt">&lt;visual&gt;</span>
+<span class="w">        </span><span class="cm">&lt;!-- A cylinder's axis is z; pitch it onto x. --&gt;</span>
+<span class="w">        </span><span class="nt">&lt;origin</span><span class="w"> </span><span class="na">xyz=</span><span class="s">"0 0 0"</span><span class="w"> </span><span class="na">rpy=</span><span class="s">"0 ${pi / 2} 0"</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;geometry&gt;</span>
+<span class="w">          </span><span class="nt">&lt;cylinder</span><span class="w"> </span><span class="na">radius=</span><span class="s">"${prop_diameter / 2}"</span><span class="w"> </span><span class="na">length=</span><span class="s">"${prop_thickness}"</span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/geometry&gt;</span>
+<span class="w">        </span><span class="nt">&lt;material</span><span class="w"> </span><span class="na">name=</span><span class="s">"propeller"</span><span class="nt">/&gt;</span>
+<span class="w">      </span><span class="nt">&lt;/visual&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/link&gt;</span>
+<span class="w">    </span><span class="nt">&lt;joint</span><span class="w"> </span><span class="na">name=</span><span class="s">"motor_${side}_joint"</span><span class="w"> </span><span class="na">type=</span><span class="s">"continuous"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;parent</span><span class="w"> </span><span class="na">link=</span><span class="s">"base_link"</span><span class="nt">/&gt;</span>
+<span class="w">      </span><span class="nt">&lt;child</span><span class="w"> </span><span class="na">link=</span><span class="s">"motor_${side}"</span><span class="nt">/&gt;</span>
+<span class="w">      </span><span class="nt">&lt;origin</span><span class="w"> </span><span class="na">xyz=</span><span class="s">"${prop_x} ${y} ${prop_z}"</span><span class="w"> </span><span class="na">rpy=</span><span class="s">"0 0 0"</span><span class="nt">/&gt;</span>
+<span class="w">      </span><span class="nt">&lt;axis</span><span class="w"> </span><span class="na">xyz=</span><span class="s">"1 0 0"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/joint&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/xacro:macro&gt;</span>
+</pre></div>
+</div>
+<p>Give the propeller link a small mass. When Gazebo reads a URDF it drops
+massless links, unless they are attached by a fixed joint. It needs no
+collision shape.</p>
+</section>
+<section id="sensor-frames">
+<h2>Sensor frames<a class="headerlink" href="#sensor-frames" title="Link to this heading"></a></h2>
+<p>Wherever a sensor sits, add a massless link on a fixed joint, such as
+<code class="docutils literal notranslate"><span class="pre">imu_link</span></code> and <code class="docutils literal notranslate"><span class="pre">gps_link</span></code>:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">&lt;link</span><span class="w"> </span><span class="na">name=</span><span class="s">"imu_link"</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;joint</span><span class="w"> </span><span class="na">name=</span><span class="s">"imu_joint"</span><span class="w"> </span><span class="na">type=</span><span class="s">"fixed"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;parent</span><span class="w"> </span><span class="na">link=</span><span class="s">"base_link"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;child</span><span class="w"> </span><span class="na">link=</span><span class="s">"imu_link"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;origin</span><span class="w"> </span><span class="na">xyz=</span><span class="s">"0 0 ${deck_z + deck_thickness / 2}"</span><span class="w"> </span><span class="na">rpy=</span><span class="s">"0 0 0"</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/joint&gt;</span>
+</pre></div>
+</div>
+<p>The URDF only marks the spot; the sensor itself is added in the Gazebo
+model. These frames also reach TF, so sensor messages can say which frame
+they are in.</p>
+<figure class="align-default" id="id2">
+<a class="reference internal image-reference" href="../_images/usv-frames.svg"><img alt="Top view of the custom USV with base_link at the centre, imu_link above it, gps_link towards the stern and the two propeller joints at the stern of each hull" src="../_images/usv-frames.svg" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">The custom USV’s frames, seen from above.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="no-instance-name-no-gazebo">
+<h2>No instance name, no Gazebo<a class="headerlink" href="#no-instance-name-no-gazebo" title="Link to this heading"></a></h2>
+<p>Keep the vehicle’s name out of the URDF: frames are <code class="docutils literal notranslate"><span class="pre">base_link</span></code>, <code class="docutils literal notranslate"><span class="pre">imu_link</span></code>,
+never <code class="docutils literal notranslate"><span class="pre">boat_a/base_link</span></code>. When an instance runs, <code class="docutils literal notranslate"><span class="pre">robot_state_publisher</span></code>
+adds its name as a prefix, so two boats give two separate TF trees from one
+file (<a class="reference internal" href="spawn-and-drive.html#one-name-per-instance"><span class="std std-ref">Spawn and drive</span></a>).</p>
+<p>No <code class="docutils literal notranslate"><span class="pre">&lt;gazebo&gt;</span></code> tags and no plugins either. The same file then works in RViz,
+on the real vehicle’s <code class="docutils literal notranslate"><span class="pre">robot_state_publisher</span></code>, and as the base of the
+simulation model.</p>
+</section>
+<section id="check-it">
+<h2>Check it<a class="headerlink" href="#check-it" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>xacro<span class="w"> </span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/urdf/custom_usv.urdf.xacro<span class="w"> </span>&gt;<span class="w"> </span>/tmp/custom_usv.urdf
+check_urdf<span class="w"> </span>/tmp/custom_usv.urdf
+ros2<span class="w"> </span>launch<span class="w"> </span>kai_custom_vehicle<span class="w"> </span>display.launch.xml
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">check_urdf</span></code> should report <code class="docutils literal notranslate"><span class="pre">root</span> <span class="pre">Link:</span> <span class="pre">base_link</span></code>. In RViz, move the sliders:
+each propeller should spin about the boat’s forward axis.</p>
+</section>
+<section id="build-it">
+<h2>Build it<a class="headerlink" href="#build-it" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">xacro_add_files</span></code> expands the xacro when the package builds and installs the
+resulting URDF next to the Gazebo model, so <code class="docutils literal notranslate"><span class="pre">model://custom_usv</span></code> is complete
+on its own:</p>
+<div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nb">find_package</span><span class="p">(</span><span class="s">xacro</span><span class="w"> </span><span class="s">REQUIRED</span><span class="p">)</span>
+<span class="nb">xacro_add_files</span><span class="p">(</span>
+<span class="w">  </span><span class="s">urdf/custom_usv.urdf.xacro</span>
+<span class="w">  </span><span class="s">models/custom_usv/model.sdf.xacro</span>
+<span class="w">  </span><span class="s">INSTALL</span><span class="w"> </span><span class="s">DESTINATION</span><span class="w"> </span><span class="s">models/custom_usv</span><span class="p">)</span>
+<span class="nb">install</span><span class="p">(</span><span class="s">DIRECTORY</span><span class="w"> </span><span class="s">urdf</span><span class="w"> </span><span class="s">models</span><span class="w"> </span><span class="s">config</span><span class="w"> </span><span class="s">rviz</span><span class="w"> </span><span class="s">launch</span><span class="w"> </span><span class="s">DESTINATION</span><span class="w"> </span><span class="s">share/</span><span class="o">${</span><span class="nv">PROJECT_NAME</span><span class="o">}</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">urdf</span></code> directory is installed as well: the Gazebo model includes
+<code class="docutils literal notranslate"><span class="pre">dimensions.xacro</span></code> from it by relative path, and the spawn launch renders
+the xacro itself for each instance. The custom USV keeps the URDF in the
+same package as its Gazebo model; the Blue Robotics vehicles give it a
+<code class="docutils literal notranslate"><span class="pre">_description</span></code> package of its own. Either way it stays Gazebo-free.</p>
+<p>Next: <a class="reference internal" href="gazebo-composition.html"><span class="std std-doc">Compose the Gazebo model</span></a>.</p>
 </section>
 </section>
 
@@ -288,8 +439,8 @@ driving.</p></li>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../vehicles/holybro.html" class="btn btn-neutral float-left" title="Holybro X500" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="own-vehicle.html" class="btn btn-neutral float-right" title="Bring your own vehicle" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="own-vehicle.html" class="btn btn-neutral float-left" title="Bring your own vehicle" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="gazebo-composition.html" class="btn btn-neutral float-right" title="Compose the Gazebo model" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

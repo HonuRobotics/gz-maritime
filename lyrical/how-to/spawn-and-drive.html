@@ -1,0 +1,1052 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spawn and drive &mdash; Gz Maritime lyrical documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/honu.css?v=44af46ee" />
+
+  
+    <link rel="shortcut icon" href="../_static/honu-robotics-favicon.svg"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=46f74c5b"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script type="module">import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.12.1/dist/mermaid.esm.min.mjs";
+
+
+
+
+
+const initStyles = () => {
+    const defaultStyle = document.createElement('style');
+    defaultStyle.textContent = "pre.mermaid {\n    /* Same as .mermaid-container > pre */\n    display: block;\n    width: 100%;\n}\n\npre.mermaid > svg {\n    /* Same as .mermaid-container > pre > svg */\n    height: 500px;\n    width: 100%;\n    max-width: 100% !important;\n}";
+    document.head.appendChild(defaultStyle);
+
+    const fullscreenStyle = document.createElement('style');
+    fullscreenStyle.textContent = ".mermaid-container {\n    position: relative;\n    display: flex;\n    flex-direction: row;\n    width: 100%;\n}\n\n.mermaid-container > pre {\n    display: block;\n    width: 100%;\n}\n\n.mermaid-container > pre > svg {\n    height: 500px;\n    width: 100%;\n    max-width: 100% !important;\n}\n\n.mermaid-fullscreen-btn {\n    position: absolute;\n    width: 28px;\n    height: 28px;\n    background: rgba(255, 255, 255, 0.95);\n    border: 1px solid rgba(0, 0, 0, 0.3);\n    border-radius: 4px;\n    cursor: pointer;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    transition: all 0.2s;\n    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);\n    font-size: 14px;\n    line-height: 1;\n    padding: 0;\n    color: #333;\n}\n\n.mermaid-fullscreen-btn:hover {\n    opacity: 100% !important;\n    background: rgba(255, 255, 255, 1);\n    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);\n    transform: scale(1.1);\n}\n\n.mermaid-fullscreen-btn.dark-theme {\n    background: rgba(50, 50, 50, 0.95);\n    border: 1px solid rgba(255, 255, 255, 0.3);\n    color: #e0e0e0;\n}\n\n.mermaid-fullscreen-btn.dark-theme:hover {\n    background: rgba(60, 60, 60, 1);\n    box-shadow: 0 3px 10px rgba(255, 255, 255, 0.2);\n}\n\n.mermaid-fullscreen-modal {\n    display: none;\n    position: fixed !important;\n    top: 0 !important;\n    left: 0 !important;\n    width: 95vw;\n    height: 100vh;\n    background: rgba(255, 255, 255, 0.98);\n    z-index: 9999;\n    padding: 20px;\n    overflow: auto;\n}\n\n.mermaid-fullscreen-modal.dark-theme {\n    background: rgba(0, 0, 0, 0.98);\n}\n\n.mermaid-fullscreen-modal.active {\n    display: flex;\n    align-items: center;\n    justify-content: center;\n}\n\n.mermaid-container-fullscreen {\n    position: relative;\n    width: 95vw;\n    height: 90vh;\n    max-width: 95vw;\n    max-height: 90vh;\n    background: white;\n    border-radius: 8px;\n    padding: 20px;\n    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);\n    overflow: auto;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n}\n\n.mermaid-container-fullscreen.dark-theme {\n    background: #1a1a1a;\n    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);\n}\n\n.mermaid-container-fullscreen pre.mermaid {\n    width: 100%;\n    height: 100%;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n}\n\n.mermaid-container-fullscreen .mermaid svg {\n    height: 100% !important;\n    width: 100% !important;\n    cursor: grab;\n}\n\n.mermaid-fullscreen-close {\n    position: fixed !important;\n    top: 20px !important;\n    right: 20px !important;\n    width: 40px;\n    height: 40px;\n    background: rgba(255, 255, 255, 0.95);\n    border: 1px solid rgba(0, 0, 0, 0.2);\n    border-radius: 50%;\n    cursor: pointer;\n    z-index: 10000;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);\n    transition: all 0.2s;\n    font-size: 24px;\n    line-height: 1;\n    color: #333;\n}\n\n.mermaid-fullscreen-close:hover {\n    background: white;\n    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);\n    transform: scale(1.1);\n}\n\n.mermaid-fullscreen-close.dark-theme {\n    background: rgba(50, 50, 50, 0.95);\n    border: 1px solid rgba(255, 255, 255, 0.2);\n    color: #e0e0e0;\n}\n\n.mermaid-fullscreen-close.dark-theme:hover {\n    background: rgba(60, 60, 60, 1);\n    box-shadow: 0 6px 16px rgba(255, 255, 255, 0.2);\n}\n\n.mermaid-fullscreen-modal .mermaid-fullscreen-btn {\n    display: none !important;\n}";
+    document.head.appendChild(fullscreenStyle);
+}
+
+// Detect if page has dark background
+const isDarkTheme = () => {
+    // We use a set of heuristics:
+    // 1. Check for common dark mode classes or attributes
+    // 2. Check computed background color brightness
+    if (document.documentElement.classList.contains('dark') ||
+        document.documentElement.getAttribute('data-theme') === 'dark' ||
+        document.body.classList.contains('dark') ||
+        document.body.getAttribute('data-theme') === 'dark') {
+        // console.log("Dark theme detected via class/attribute");
+        return true;
+    }
+    if (document.documentElement.classList.contains('light') ||
+        document.documentElement.getAttribute('data-theme') === 'light' ||
+        document.body.classList.contains('light') ||
+        document.body.getAttribute('data-theme') === 'light') {
+        // console.log("Light theme detected via class/attribute");
+        return false;
+    }
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        // console.log("Dark theme detected via prefers-color-scheme");
+        return true;
+    }
+    const bgColor = window.getComputedStyle(document.body).backgroundColor;
+    const match = bgColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)/);
+    if (match) {
+        const r = parseInt(match[1]);
+        const g = parseInt(match[2]);
+        const b = parseInt(match[3]);
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        // console.log("Background color brightness:", brightness);
+        return brightness < 128;
+    }
+    // console.log("No dark or light theme detected, defaulting to light theme");
+    return false;
+};
+
+let darkTheme = isDarkTheme();
+let modal = null;
+let modalContent = null;
+let previousScrollOffset = [window.scrollX, window.scrollY];
+let _lazyObserver = null;
+let _renderQueue = Promise.resolve();
+let closeModal = () => {};
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal?.classList.contains('active')) {
+        closeModal();
+    }
+});
+
+// Apply d3 zoom to each SVG. Idempotent: an SVG already wrapped is skipped,
+// so this is safe to call both for the initial batch and for diagrams that
+// render lazily once they become visible.
+const addZoomToSvgs = (svgs) => {
+    svgs.each(function() {
+        if (this.getAttribute('data-zoom-applied') === 'true') return;
+        var svg = d3.select(this);
+        svg.html("<g class='wrapper'>" + svg.html() + "</g>");
+        var inner = svg.select("g");
+        var zoom = d3.zoom().on("zoom", function(event) {
+            inner.attr("transform", event.transform);
+        });
+        svg.call(zoom);
+        this.setAttribute('data-zoom-applied', 'true');
+    });
+};
+
+const runMermaid = async (rerun) => {
+    console.log("Running mermaid diagrams, rerun =", rerun);
+    // clear all existing mermaid charts
+    let all_mermaids = document.querySelectorAll(".mermaid");
+
+    if (rerun) {
+        // Disconnect any previous lazy rendering observer
+        if (_lazyObserver) {
+            _lazyObserver.disconnect();
+            _lazyObserver = null;
+        }
+
+        all_mermaids.forEach((el) => {
+            el.removeAttribute('data-mermaid-deferred');
+            el.removeAttribute('data-mermaid-render-failed');
+            if(!el.hasAttribute("data-original-code")) {
+                // store original code
+                // console.log(`Storing original code for first run: `, el.innerHTML);
+                el.setAttribute('data-original-code', el.innerHTML);
+            }
+            if(el.getAttribute("data-processed") === "true") {
+                // remove and restore original
+                el.removeAttribute("data-processed");
+                // console.log(`Restoring original code for re-run: `, el.getAttribute('data-original-code'));
+                el.innerHTML = el.getAttribute('data-original-code');
+            } else {
+                // store original code
+                // console.log(`Storing original code for re-run: `, el.innerHTML);
+                el.setAttribute('data-original-code', el.innerHTML);
+            }
+        });
+
+        // Separate visible and hidden elements. Mermaid's layout engine measures
+        // text dimensions via the DOM, which fails for elements hidden by a parent
+        // (e.g., Reveal.js non-active slides, sphinx-design unopened tabs),
+        // producing broken SVGs. Render visible elements now, defer hidden ones.
+        const visible = [];
+        const hidden = [];
+        all_mermaids.forEach((el) => {
+            // offsetParent is null for display:none ancestors.
+            // getClientRects().length > 0 catches position:fixed elements
+            // (which also have null offsetParent but are still visible).
+            if (el.offsetParent !== null || el.getClientRects().length > 0) {
+                visible.push(el);
+            } else {
+                hidden.push(el);
+                el.setAttribute('data-mermaid-deferred', 'true');
+            }
+        });
+
+        if (visible.length > 0) {
+            try {
+                await mermaid.run({ nodes: visible });
+            } catch (e) {
+                console.error("Mermaid rendering failed:", e);
+            }
+        }
+
+        // Lazily render hidden elements when they become visible.
+        // Uses a promise chain (_renderQueue) to serialize rendering,
+        // since IntersectionObserver may report multiple entries at once
+        // and mermaid.run() is not safe to call concurrently.
+        if (hidden.length > 0) {
+            if (typeof IntersectionObserver === 'undefined') {
+                console.warn("IntersectionObserver not available; hidden mermaid diagrams will not render.");
+            } else {
+                _renderQueue = Promise.resolve();
+                _lazyObserver = new IntersectionObserver((entries) => {
+                    for (const entry of entries) {
+                        if (entry.isIntersecting && entry.target.getAttribute("data-processed") !== "true") {
+                            _lazyObserver.unobserve(entry.target);
+                            const el = entry.target;
+                            _renderQueue = _renderQueue.then(async () => {
+                                try {
+                                    await mermaid.run({ nodes: [el] });
+                                    el.removeAttribute('data-mermaid-deferred');
+                                    // Apply zoom to the now-rendered diagram, matching
+                                    // the decoration visible diagrams receive.
+                                    if (false) {
+                                        addZoomToSvgs(d3.selectAll("").select(function() {
+                                            return this.querySelector("svg");
+                                        }));
+                                    }
+                                } catch (e) {
+                                    console.error("Mermaid deferred rendering failed:", e);
+                                    el.removeAttribute('data-mermaid-deferred');
+                                    el.setAttribute('data-mermaid-render-failed', 'true');
+                                }
+                            });
+                        }
+                    }
+                });
+                hidden.forEach((el) => _lazyObserver.observe(el));
+            }
+        }
+    }
+
+    all_mermaids = document.querySelectorAll(".mermaid");
+    // Exclude deferred (hidden) and render-failed elements from completion checks
+    const mermaids_active = document.querySelectorAll(".mermaid:not([data-mermaid-deferred]):not([data-mermaid-render-failed])");
+    const mermaids_processed = document.querySelectorAll(".mermaid:not([data-mermaid-deferred]):not([data-mermaid-render-failed])[data-processed='true']");
+
+    if (false) {
+        const mermaids_to_add_zoom = 0 === -1 ? mermaids_active.length : 0;
+        if(mermaids_to_add_zoom > 0) {
+            var svgs = d3.selectAll("").select(function() {
+                return this.querySelector("svg");
+            });
+            // Wait until every active (visible) diagram has rendered. Deferred
+            // diagrams are excluded, so a fixed d3_node_count that counts a
+            // hidden diagram no longer loops forever waiting for its SVG.
+            if(mermaids_active.length !== mermaids_processed.length) {
+                setTimeout(() => runMermaid(false), 200);
+                return;
+            }
+            addZoomToSvgs(svgs);
+        }
+    } else if(mermaids_active.length !== mermaids_processed.length) {
+        // Wait for mermaid to process all diagrams
+        setTimeout(() => runMermaid(false), 200);
+        return;
+    }
+
+    // Stop here if not adding fullscreen capability
+    if (!true) return;
+
+    if (modal !== null ) {
+        // Destroy existing modal
+        modal.remove();
+        modal = null;
+        modalContent = null;
+    }
+
+    modal = document.createElement('div');
+    modal.className = 'mermaid-fullscreen-modal' + (darkTheme ? ' dark-theme' : '');
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Fullscreen diagram viewer');
+    modal.innerHTML = `
+        <button class="mermaid-fullscreen-close${darkTheme ? ' dark-theme' : ''}" aria-label="Close fullscreen">✕</button>
+        <div class="mermaid-container-fullscreen${darkTheme ? ' dark-theme' : ''}"></div>
+    `;
+    document.body.appendChild(modal);
+
+    modalContent = modal.querySelector('.mermaid-container-fullscreen');
+    const closeBtn = modal.querySelector('.mermaid-fullscreen-close');
+
+    closeModal = () => {
+        modal.classList.remove('active');
+        modalContent.innerHTML = '';
+        document.body.style.overflow = ''
+        window.scrollTo({left: previousScrollOffset[0], top: previousScrollOffset[1], behavior: 'instant'});
+    };
+
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+    document.querySelectorAll('.mermaid').forEach((mermaidDiv) => {
+        if (mermaidDiv.parentNode.classList.contains('mermaid-container') ||
+            mermaidDiv.closest('.mermaid-fullscreen-modal')) {
+            // Already processed, adjust button class if needed
+            const existingBtn = mermaidDiv.parentNode.querySelector('.mermaid-fullscreen-btn');
+            if (existingBtn) {
+                existingBtn.className = 'mermaid-fullscreen-btn' + (darkTheme ? ' dark-theme' : '');
+            }
+            return;
+        }
+
+        const container = document.createElement('div');
+        container.className = 'mermaid-container';
+        mermaidDiv.parentNode.insertBefore(container, mermaidDiv);
+        container.appendChild(mermaidDiv);
+
+        const fullscreenBtn = document.createElement('button');
+        fullscreenBtn.className = 'mermaid-fullscreen-btn' + (darkTheme ? ' dark-theme' : '');
+        fullscreenBtn.setAttribute('aria-label', 'View diagram in fullscreen');
+        fullscreenBtn.textContent = "\u26f6";
+        fullscreenBtn.style.opacity = "50%";
+
+        // Calculate dynamic position based on diagram's margin and padding
+        const diagramStyle = window.getComputedStyle(mermaidDiv);
+        const marginTop = parseFloat(diagramStyle.marginTop) || 0;
+        const marginRight = parseFloat(diagramStyle.marginRight) || 0;
+        const paddingTop = parseFloat(diagramStyle.paddingTop) || 0;
+        const paddingRight = parseFloat(diagramStyle.paddingRight) || 0;
+        fullscreenBtn.style.top = `${marginTop + paddingTop + 4}px`;
+        fullscreenBtn.style.right = `${marginRight + paddingRight + 4}px`;
+
+        fullscreenBtn.addEventListener('click', () => {
+            previousScrollOffset = [window.scrollX, window.scrollY];
+            const clone = mermaidDiv.cloneNode(true);
+            modalContent.innerHTML = '';
+            modalContent.appendChild(clone);
+
+            const svg = clone.querySelector('svg');
+            if (svg) {
+                svg.removeAttribute('width');
+                svg.removeAttribute('height');
+                svg.style.width = '100%';
+                svg.style.height = 'auto';
+                svg.style.maxWidth = '100%';
+                svg.style.display = 'block';
+
+                if (false) {
+                    setTimeout(() => {
+                        const g = svg.querySelector('g');
+                        if (g) {
+                            var svgD3 = d3.select(svg);
+                            svgD3.html("<g class='wrapper'>" + svgD3.html() + "</g>");
+                            var inner = svgD3.select("g");
+                            var zoom = d3.zoom().on("zoom", function(event) {
+                                inner.attr("transform", event.transform);
+                            });
+                            svgD3.call(zoom);
+                        }
+                    }, 100);
+                }
+            }
+
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        });
+        container.appendChild(fullscreenBtn);
+    });
+};
+
+
+
+const load = async () => {
+    initStyles();
+
+
+    await runMermaid(true);
+
+    const reRunIfThemeChanges = async () => {
+        const newDarkTheme = isDarkTheme();
+        if (newDarkTheme !== darkTheme) {
+            darkTheme = newDarkTheme;
+            console.log("Theme change detected, re-running mermaid with", darkTheme ? "dark" : "default", "theme");
+            await mermaid.initialize(
+                {...{"startOnLoad": false},
+                ...{ darkMode: darkTheme, theme: darkTheme ? "dark" : "default" },
+                }
+            );
+            await runMermaid(true);
+        }
+    };
+
+    // Update theme classes when theme changes
+    const themeObserver = new MutationObserver(reRunIfThemeChanges);
+    themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class', 'style', 'data-theme']
+    });
+    themeObserver.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class', 'style', 'data-theme']
+    });
+};
+
+
+
+
+
+console.log("Initializing mermaid with", darkTheme ? "dark" : "default", "theme");
+mermaid.initialize(
+    {...{"startOnLoad": false},
+    ...{ darkMode: darkTheme, theme: darkTheme ? "dark" : "default" },
+    }
+);
+
+window.addEventListener("load", load);
+window.runMermaid = runMermaid;</script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Add sensors" href="sensors.html" />
+    <link rel="prev" title="Compose the Gazebo model" href="gazebo-composition.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Gz Maritime
+              <img src="../_static/honu-robotics-white-logo.svg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting-started/index.html">Getting started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/requirements.html">Requirements</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/requirements.html#optional">Optional</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/requirements.html#docker">Docker</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/installation.html">Installation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#clone">1. Clone</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#install-the-dependencies">2. Install the dependencies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#build">3. Build</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#check">4. Check</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/first-simulation.html">First simulation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#the-ocean-on-its-own">1. The ocean on its own</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#put-a-boat-on-it">2. Put a boat on it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#drive-it">3. Drive it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#look-at-it-in-rviz">4. Look at it in RViz</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#add-a-second-boat">5. Add a second boat</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#make-waves">6. Make waves</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#next">Next</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../vehicles/index.html">Vehicles</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../vehicles/custom-usv.html">Custom USV</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/custom-usv.html#run-it">Run it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/custom-usv.html#drive-it">Drive it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/custom-usv.html#topics">Topics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/custom-usv.html#frames">Frames</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/custom-usv.html#what-it-is-made-of">What it is made of</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/custom-usv.html#limitations">Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../vehicles/bluerobotics.html">BlueBoat and BlueROV2</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/bluerobotics.html#blueboat">BlueBoat</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/bluerobotics.html#bluerov2">BlueROV2</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/bluerobotics.html#several-vehicles-on-one-ocean">Several vehicles on one ocean</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../vehicles/holybro.html">Holybro X500</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/holybro.html#run-it">Run it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/holybro.html#on-the-ocean">On the ocean</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How to guides</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="index.html#bring-your-own-vehicle">Bring your own vehicle</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#more">More</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="own-vehicle.html">Bring your own vehicle</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#who-does-what">Who does what</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#the-path">The path</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="own-vehicle.html#why-the-urdf-comes-first">Why the URDF comes first</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#how-a-vehicle-floats">How a vehicle floats</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#what-the-gazebo-maritime-tutorials-cover">What the Gazebo maritime tutorials cover</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#waves-and-physics-today">Waves and physics today</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#already-have-a-model">Already have a model?</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="vehicle-description.html">Describe the vehicle</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#put-the-origin-on-the-waterline">Put the origin on the waterline</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#work-out-the-draft">Work out the draft</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#collision-shapes-are-for-contact">Collision shapes are for contact</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#mass-and-inertia">Mass and inertia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#propellers">Propellers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#sensor-frames">Sensor frames</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#no-instance-name-no-gazebo">No instance name, no Gazebo</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#check-it">Check it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#build-it">Build it</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="gazebo-composition.html">Compose the Gazebo model</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#the-wrapper">The wrapper</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="gazebo-composition.html#what-survives-the-conversion">What survives the conversion</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#mark-the-collisions-that-displace">Mark the collisions that displace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#thrusters">Thrusters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#hydrodynamic-damping">Hydrodynamic damping</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="gazebo-composition.html#added-mass">Added mass</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#sensors">Sensors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#joint-states">Joint states</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#build-it">Build it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#marking-from-a-urdf">Marking from a URDF</a></li>
+</ul>
+</li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Spawn and drive</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#the-simulation-part">The simulation part</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#spawn-an-instance">Spawn an instance</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#your-sim-launch-xml">Your <code class="docutils literal notranslate"><span class="pre">sim.launch.xml</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="#one-name-per-instance">One name per instance</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#what-the-launch-needs-from-a-vehicle">What the launch needs from a vehicle</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#the-bridge-configuration">The bridge configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#drive">Drive</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#change-the-sea-while-it-runs">Change the sea while it runs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#several-vehicles">Several vehicles</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#other-vehicles">Other vehicles</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sensors.html">Add sensors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#what-the-world-provides">What the world provides</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#the-pattern">The pattern</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#a-camera">A camera</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#check-a-sensor">Check a sensor</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="own-world.html">Use your own world</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#what-a-world-needs">What a world needs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#the-buoyancy-system">The buoyancy system</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#the-world-name">The world name</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#adding-a-seabed">Adding a seabed</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="faq.html">Troubleshooting</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#my-vehicle-sinks">My vehicle sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#my-vehicle-bumps-into-things-it-shouldn-t-or-sits-on-the-water-oddly">My vehicle bumps into things it shouldn’t, or sits on the water oddly</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#unsupported-collision-geometry-for-graded-buoyancy">“Unsupported collision geometry for graded buoyancy”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-vehicle-capsizes">The vehicle capsizes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-boat-moves-sideways-or-spins-instead-of-going-forward">The boat moves sideways, or spins, instead of going forward</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-boat-barely-moves-or-a-bigger-command-changes-nothing">The boat barely moves, or a bigger command changes nothing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-spawn-launch-stops-with-invalid-instance-name">The spawn launch stops with “invalid instance name”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-spawn-launch-returns-straight-away">The spawn launch returns straight away</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#two-boats-answer-the-same-command-or-rviz-shows-a-jumping-robot">Two boats answer the same command, or RViz shows a jumping robot</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#a-plugin-can-t-find-a-link">A plugin can’t find a link</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-server-stops-with-ode-internal-error-aabbbound">The server stops with “ODE INTERNAL ERROR … aabbBound”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-boat-falls-very-slowly-when-spawned-high">The boat falls very slowly when spawned high</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#rviz-shows-nothing-or-fixed-frame-does-not-exist">RViz shows nothing, or “Fixed Frame does not exist”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#robot-state-publisher-warns-about-the-root-link-inertia">robot_state_publisher warns about the root link inertia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-ocean-looks-flat-or-white-in-the-gui">The ocean looks flat or white in the GUI</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#camera-images-look-green-or-blue">Camera images look green or blue</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#two-simulations-interfere-with-each-other">Two simulations interfere with each other</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/launch-and-world.html">Launch files, world and services</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#launch-files">Launch files</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-simulation-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">simulation.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-spawn-vehicle-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">spawn_vehicle.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-sim-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">sim.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-rviz-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">rviz.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-display-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">display.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#instantiate-vehicle-py"><code class="docutils literal notranslate"><span class="pre">instantiate_vehicle.py</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#instance-rviz-py"><code class="docutils literal notranslate"><span class="pre">instance_rviz.py</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#the-open-water-sdf-world">The <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code> world</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#buoyancy-markup">Buoyancy markup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#thruster-command">Thruster command</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#services">Services</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#examples">Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#topics">Topics</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../design/index.html">Design</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#the-waves">The waves</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#floating-vehicles-the-world-doesn-t-know">Floating vehicles the world doesn’t know</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#one-name-per-instance">One name per instance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#one-thruster-interface">One thruster interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#buoyancy-that-follows-the-waves">Buoyancy that follows the waves</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#related">Related</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../project/index.html">Project</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Gz Maritime</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">How to guides</a></li>
+      <li class="breadcrumb-item active">Spawn and drive</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/how-to/spawn-and-drive.md" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="spawn-and-drive">
+<h1>Spawn and drive<a class="headerlink" href="#spawn-and-drive" title="Link to this heading"></a></h1>
+<p>A gz-maritime bring-up is two parts. The <strong>simulation part</strong>,
+<code class="docutils literal notranslate"><span class="pre">kai_bringup/launch/simulation.launch.xml</span></code>, starts Gazebo on the ocean, the
+GUI, and a bridge for <code class="docutils literal notranslate"><span class="pre">/clock</span></code>. It names no vehicle. The <strong>spawn part</strong>,
+<code class="docutils literal notranslate"><span class="pre">kai_bringup/launch/spawn_vehicle.launch.xml</span></code>, puts one instance of any
+vehicle in, with its bridge and its TF, given the vehicle’s files and a
+name. Run the first once and the second once per vehicle.</p>
+<pre  class="mermaid">
+        flowchart TB
+  subgraph sim[&quot;kai_bringup simulation.launch.xml (once)&quot;]
+    S[&quot;Gazebo server&lt;br/&gt;&lt;i&gt;open_water.sdf&lt;/i&gt;&quot;]
+    GUI[&quot;Gazebo GUI&quot;]
+    CB[&quot;ros_gz_bridge&lt;br/&gt;&lt;i&gt;/clock&lt;/i&gt;&quot;]
+  end
+  subgraph a[&quot;spawn_vehicle.launch.xml name:=boat_a&quot;]
+    SA[&quot;ros_gz_sim create&lt;br/&gt;&lt;i&gt;boat_a&lt;/i&gt;&quot;]
+    BA[&quot;ros_gz_bridge&lt;br/&gt;&lt;i&gt;/boat_a/...&lt;/i&gt;&quot;]
+    RA[&quot;robot_state_publisher&lt;br/&gt;&lt;i&gt;frame_prefix boat_a/&lt;/i&gt;&quot;]
+  end
+  subgraph b[&quot;spawn_vehicle.launch.xml name:=boat_b&quot;]
+    SB[&quot;ros_gz_sim create&lt;br/&gt;&lt;i&gt;boat_b&lt;/i&gt;&quot;]
+    BB[&quot;ros_gz_bridge&lt;br/&gt;&lt;i&gt;/boat_b/...&lt;/i&gt;&quot;]
+    RB[&quot;robot_state_publisher&lt;br/&gt;&lt;i&gt;frame_prefix boat_b/&lt;/i&gt;&quot;]
+  end
+  SA --&gt; S
+  SB --&gt; S
+  GUI --- S
+  S &lt;--&gt; CB
+  S &lt;--&gt; BA
+  S &lt;--&gt; BB
+  BA --&gt;|/boat_a/joint_states| RA
+  BB --&gt;|/boat_b/joint_states| RB
+    </pre><section id="the-simulation-part">
+<h2>The simulation part<a class="headerlink" href="#the-simulation-part" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Argument</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>What it does</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">world</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code></p></td>
+<td><p>World to load.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gazebo_gui</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">true</span></code></p></td>
+<td><p>Start the Gazebo GUI.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">use_composition</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">true</span></code></p></td>
+<td><p>Run the Gazebo server and the bridges in one process, <code class="docutils literal notranslate"><span class="pre">ros_gz_container</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Run on its own it gives you the ocean and nothing else.</p>
+</section>
+<section id="spawn-an-instance">
+<h2>Spawn an instance<a class="headerlink" href="#spawn-an-instance" title="Link to this heading"></a></h2>
+<p>One command, with the vehicle’s three files:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>spawn_vehicle.launch.xml<span class="w"> </span>name:<span class="o">=</span>boat_a<span class="w"> </span>y:<span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>xacro:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/models/custom_usv/model.sdf.xacro<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>bridge:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/config/ros_gz_bridge.yaml.in<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>urdf:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/urdf/custom_usv.urdf.xacro
+</pre></div>
+</div>
+<p>For one instance, all from the <code class="docutils literal notranslate"><span class="pre">name</span></code>, the launch:</p>
+<ol class="arabic simple">
+<li><p><strong>Renders the files for the name.</strong> The model xacro with <code class="docutils literal notranslate"><span class="pre">name:=boat_a</span></code>,
+the URDF xacro, and the bridge template with <code class="docutils literal notranslate"><span class="pre">&#64;name&#64;</span></code> filled in, minus
+any <code class="docutils literal notranslate"><span class="pre">/clock</span></code> entry, into <code class="docutils literal notranslate"><span class="pre">instance_dir</span></code> (by default
+<code class="docutils literal notranslate"><span class="pre">~/.ros/kai_bringup/boat_a</span></code>). The model xacro gets the rendered URDF as
+<code class="docutils literal notranslate"><span class="pre">urdf_uri:=file://...</span></code> to merge.</p></li>
+<li><p><strong>Spawns the model</strong> under the name, at <code class="docutils literal notranslate"><span class="pre">x</span></code>, <code class="docutils literal notranslate"><span class="pre">y</span></code>, <code class="docutils literal notranslate"><span class="pre">z</span></code>, <code class="docutils literal notranslate"><span class="pre">roll</span></code>, <code class="docutils literal notranslate"><span class="pre">pitch</span></code>
+and <code class="docutils literal notranslate"><span class="pre">yaw</span></code>.</p></li>
+<li><p><strong>Bridges its topics</strong> in the <code class="docutils literal notranslate"><span class="pre">/boat_a</span></code> namespace.</p></li>
+<li><p><strong>Publishes its TF</strong>, every frame prefixed <code class="docutils literal notranslate"><span class="pre">boat_a/</span></code>, from a
+<code class="docutils literal notranslate"><span class="pre">robot_state_publisher</span></code> in the same namespace, on simulation time.</p></li>
+</ol>
+<p>With composition on, the default, the bridge and the state publisher load
+into the simulation’s container, <code class="docutils literal notranslate"><span class="pre">ros_gz_container</span></code>, from wherever the
+command is run, and the command returns once the model is in. The nodes
+stay up in the container and go down with the simulation.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Argument</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>What it does</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">name</span></code></p></td>
+<td><p></p></td>
+<td><p>Instance name: letters, digits and underscores, starting with a letter.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">xacro</span></code>, <code class="docutils literal notranslate"><span class="pre">bridge</span></code>, <code class="docutils literal notranslate"><span class="pre">urdf</span></code></p></td>
+<td><p></p></td>
+<td><p>The vehicle’s model xacro, bridge template and URDF. <code class="docutils literal notranslate"><span class="pre">bridge</span></code> and <code class="docutils literal notranslate"><span class="pre">urdf</span></code> are optional.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">generator</span></code></p></td>
+<td><p></p></td>
+<td><p>Instead of the three files: a command that writes them for a name (<a class="reference internal" href="#other-vehicles">Other vehicles</a>).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">x</span></code>, <code class="docutils literal notranslate"><span class="pre">y</span></code>, <code class="docutils literal notranslate"><span class="pre">z</span></code>, <code class="docutils literal notranslate"><span class="pre">roll</span></code>, <code class="docutils literal notranslate"><span class="pre">pitch</span></code>, <code class="docutils literal notranslate"><span class="pre">yaw</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
+<td><p>Spawn pose; z = 0 is the waterline.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">world</span></code></p></td>
+<td><p>empty</p></td>
+<td><p>Name of the world to spawn into; empty is the one running.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">instance_dir</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">$ROS_HOME/kai_bringup/&lt;name&gt;</span></code></p></td>
+<td><p>Where the rendered files go.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">use_composition</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">true</span></code></p></td>
+<td><p>Load the bridge and state publisher into the simulation’s container.</p></td>
+</tr>
+</tbody>
+</table>
+<section id="your-sim-launch-xml">
+<h3>Your <code class="docutils literal notranslate"><span class="pre">sim.launch.xml</span></code><a class="headerlink" href="#your-sim-launch-xml" title="Link to this heading"></a></h3>
+<p>A vehicle package usually keeps a convenience launch that includes the
+simulation part and one spawn with its own three files.
+<code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle/launch/sim.launch.xml</span></code> is the template; copy it and
+change the three paths:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">&lt;let</span><span class="w"> </span><span class="na">name=</span><span class="s">"share"</span><span class="w"> </span><span class="na">value=</span><span class="s">"$(find-pkg-share kai_custom_vehicle)"</span><span class="nt">/&gt;</span>
+
+<span class="w">  </span><span class="cm">&lt;!-- 1. The simulation: Gazebo on the ocean, the GUI, /clock. --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;include</span><span class="w"> </span><span class="na">file=</span><span class="s">"$(find-pkg-share kai_bringup)/launch/simulation.launch.xml"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"world"</span><span class="w"> </span><span class="na">value=</span><span class="s">"$(var world)"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"gazebo_gui"</span><span class="w"> </span><span class="na">value=</span><span class="s">"$(var gazebo_gui)"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"use_composition"</span><span class="w"> </span><span class="na">value=</span><span class="s">"$(var use_composition)"</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/include&gt;</span>
+
+<span class="w">  </span><span class="cm">&lt;!-- 2. The boat: this vehicle's three files, one instance name. The spawn</span>
+<span class="cm">       launch's `world` is the name of the world to spawn into, empty for</span>
+<span class="cm">       the one running; it is set here so this file's `world`, the SDF file</span>
+<span class="cm">       name, does not leak into it. --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;include</span><span class="w"> </span><span class="na">file=</span><span class="s">"$(find-pkg-share kai_bringup)/launch/spawn_vehicle.launch.xml"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"name"</span><span class="w"> </span><span class="na">value=</span><span class="s">"$(var name)"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"world"</span><span class="w"> </span><span class="na">value=</span><span class="s">""</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"xacro"</span><span class="w"> </span><span class="na">value=</span><span class="s">"$(var share)/models/custom_usv/model.sdf.xacro"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"bridge"</span><span class="w"> </span><span class="na">value=</span><span class="s">"$(var share)/config/ros_gz_bridge.yaml.in"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"urdf"</span><span class="w"> </span><span class="na">value=</span><span class="s">"$(var share)/urdf/custom_usv.urdf.xacro"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"x"</span><span class="w"> </span><span class="na">value=</span><span class="s">"$(var x)"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"y"</span><span class="w"> </span><span class="na">value=</span><span class="s">"$(var y)"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"z"</span><span class="w"> </span><span class="na">value=</span><span class="s">"$(var z)"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"roll"</span><span class="w"> </span><span class="na">value=</span><span class="s">"$(var roll)"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"pitch"</span><span class="w"> </span><span class="na">value=</span><span class="s">"$(var pitch)"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"yaw"</span><span class="w"> </span><span class="na">value=</span><span class="s">"$(var yaw)"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"use_composition"</span><span class="w"> </span><span class="na">value=</span><span class="s">"$(var use_composition)"</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/include&gt;</span>
+<span class="nt">&lt;/launch&gt;</span>
+</pre></div>
+</div>
+<p>Its arguments are the simulation part’s plus <code class="docutils literal notranslate"><span class="pre">name</span></code> and the pose. The spawn
+include is handed an empty <code class="docutils literal notranslate"><span class="pre">world</span></code> on purpose: to the spawn launch <code class="docutils literal notranslate"><span class="pre">world</span></code>
+is the world’s name, while to the simulation launch it is the SDF file, and
+without that line the file name would leak into the include.</p>
+</section>
+<section id="one-name-per-instance">
+<h3>One name per instance<a class="headerlink" href="#one-name-per-instance" title="Link to this heading"></a></h3>
+<p>Everything about an instance follows its <code class="docutils literal notranslate"><span class="pre">name</span></code>:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">name:=boat_a</span></code> gives</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Gazebo model</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">boat_a</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Gazebo and ROS topics</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">/boat_a/motor_port/cmd</span></code>, <code class="docutils literal notranslate"><span class="pre">/boat_a/imu</span></code>, …</p></td>
+</tr>
+<tr class="row-even"><td><p>ROS namespace</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">/boat_a/ros_gz_bridge</span></code>, <code class="docutils literal notranslate"><span class="pre">/boat_a/robot_state_publisher</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>TF frames</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">boat_a/base_link</span></code>, <code class="docutils literal notranslate"><span class="pre">boat_a/imu_link</span></code>, …</p></td>
+</tr>
+<tr class="row-even"><td><p>Sensor <code class="docutils literal notranslate"><span class="pre">frame_id</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">boat_a/imu_link</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>RViz</p></td>
+<td><p>fixed frame <code class="docutils literal notranslate"><span class="pre">boat_a/base_link</span></code>, RobotModel TF Prefix <code class="docutils literal notranslate"><span class="pre">boat_a</span></code>, description on <code class="docutils literal notranslate"><span class="pre">/boat_a/robot_description</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>The model file carries the name in its topics and frame ids (the xacro
+<code class="docutils literal notranslate"><span class="pre">name</span></code> argument), the launch puts the nodes in the namespace,
+<code class="docutils literal notranslate"><span class="pre">robot_state_publisher</span></code>’s <code class="docutils literal notranslate"><span class="pre">frame_prefix</span></code> puts it on the TF frames, and
+<code class="docutils literal notranslate"><span class="pre">rviz.launch.xml</span></code> writes an RViz config that looks the robot up under it.
+The URDF itself never contains it. A name must work as all four at once:
+letters, digits and underscores, starting with a letter.</p>
+</section>
+</section>
+<section id="what-the-launch-needs-from-a-vehicle">
+<h2>What the launch needs from a vehicle<a class="headerlink" href="#what-the-launch-needs-from-a-vehicle" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>A model xacro</strong> with a <code class="docutils literal notranslate"><span class="pre">name</span></code> argument used for the model name and every
+topic and frame id, and a <code class="docutils literal notranslate"><span class="pre">urdf_uri</span></code> argument for the URDF to merge.</p></li>
+<li><p><strong>A bridge template</strong> listing the vehicle’s own topics, with <code class="docutils literal notranslate"><span class="pre">&#64;name&#64;</span></code> where
+the name goes. No <code class="docutils literal notranslate"><span class="pre">/clock</span></code>: the launch drops one anyway, since the
+simulation part bridges it once.</p></li>
+<li><p><strong>A URDF</strong>, xacro or plain, for <code class="docutils literal notranslate"><span class="pre">robot_state_publisher</span></code>; its frames get
+the <code class="docutils literal notranslate"><span class="pre">&lt;name&gt;/</span></code> prefix in TF, so sensor messages should carry the name in
+their <code class="docutils literal notranslate"><span class="pre">frame_id</span></code> too.</p></li>
+<li><p><strong>Absolute or <code class="docutils literal notranslate"><span class="pre">model://</span></code> references</strong> for meshes and files inside the
+model, since the rendered model is written to the instance directory.</p></li>
+</ul>
+<p>A vehicle laid out that way spawns any number of times with nothing else.</p>
+</section>
+<section id="the-bridge-configuration">
+<h2>The bridge configuration<a class="headerlink" href="#the-bridge-configuration" title="Link to this heading"></a></h2>
+<p>Each entry connects one Gazebo topic to one ROS topic. The instance’s
+config is rendered from a template with <code class="docutils literal notranslate"><span class="pre">&#64;name&#64;</span></code> where the name goes:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">ros_topic_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/@name@/motor_port/cmd</span>
+<span class="w">  </span><span class="nt">gz_topic_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/@name@/motor_port/cmd</span>
+<span class="w">  </span><span class="nt">ros_type_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std_msgs/msg/Float64</span>
+<span class="w">  </span><span class="nt">gz_type_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gz.msgs.Double</span>
+<span class="w">  </span><span class="nt">direction</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ROS_TO_GZ</span>
+</pre></div>
+</div>
+<p>The pairs a maritime vehicle usually needs:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>What</p></th>
+<th class="head"><p>ROS type</p></th>
+<th class="head"><p>Gazebo type</p></th>
+<th class="head"><p>Direction</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Propeller command</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">std_msgs/msg/Float64</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">gz.msgs.Double</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ROS_TO_GZ</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Propeller speed</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">std_msgs/msg/Float64</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">gz.msgs.Double</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">GZ_TO_ROS</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Joint states</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sensor_msgs/msg/JointState</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">gz.msgs.Model</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">GZ_TO_ROS</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>IMU</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sensor_msgs/msg/Imu</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">gz.msgs.IMU</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">GZ_TO_ROS</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>GPS</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sensor_msgs/msg/NavSatFix</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">gz.msgs.NavSat</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">GZ_TO_ROS</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Magnetometer</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sensor_msgs/msg/MagneticField</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">gz.msgs.Magnetometer</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">GZ_TO_ROS</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Camera</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sensor_msgs/msg/Image</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">gz.msgs.Image</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">GZ_TO_ROS</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>No <code class="docutils literal notranslate"><span class="pre">/clock</span></code> in a vehicle’s bridge. The simulation part bridges it once;
+a second bridge of the same topic would publish it twice. The spawn launch
+drops a clock entry if it finds one.</p>
+</div>
+</section>
+<section id="drive">
+<h2>Drive<a class="headerlink" href="#drive" title="Link to this heading"></a></h2>
+<p>One terminal per propeller. A command is a fraction of full thrust, from -1
+(full astern) to 1 (full ahead). Terminal 1:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>topic<span class="w"> </span>pub<span class="w"> </span>-r<span class="w"> </span><span class="m">5</span><span class="w"> </span>/custom_usv/motor_port/cmd<span class="w"> </span>std_msgs/msg/Float64<span class="w"> </span><span class="s2">"{data: 0.25}"</span>
+</pre></div>
+</div>
+<p>Terminal 2:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>topic<span class="w"> </span>pub<span class="w"> </span>-r<span class="w"> </span><span class="m">5</span><span class="w"> </span>/custom_usv/motor_stbd/cmd<span class="w"> </span>std_msgs/msg/Float64<span class="w"> </span><span class="s2">"{data: 0.25}"</span>
+</pre></div>
+</div>
+<p>Commands latch until the next one arrives, so start the second right after
+the first, and stop by sending <code class="docutils literal notranslate"><span class="pre">0.0</span></code> to both
+(<a class="reference internal" href="../getting-started/first-simulation.html#drive-it"><span class="std std-ref">First simulation</span></a>).</p>
+</section>
+<section id="change-the-sea-while-it-runs">
+<h2>Change the sea while it runs<a class="headerlink" href="#change-the-sea-while-it-runs" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gz<span class="w"> </span>service<span class="w"> </span>-s<span class="w"> </span>/world/default/wave/set_parameters<span class="w"> </span>--reqtype<span class="w"> </span>gz.msgs.Param<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--reptype<span class="w"> </span>gz.msgs.Boolean<span class="w"> </span>--timeout<span class="w"> </span><span class="m">2000</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--req<span class="w"> </span><span class="s1">'params {key: "sea_state" value {type: INT32 int_value: 3}}'</span>
+</pre></div>
+</div>
+<p>Sea states go from 0 (glassy) to 9. Remember that vehicles float on the flat
+water level, not on the drawn waves
+(<a class="reference internal" href="own-vehicle.html#waves-and-physics-today"><span class="std std-ref">Waves and physics today</span></a>).</p>
+</section>
+<section id="several-vehicles">
+<h2>Several vehicles<a class="headerlink" href="#several-vehicles" title="Link to this heading"></a></h2>
+<p>Run the spawn launch once per instance, each with its own name, after the
+simulation part. Terminal 1, the ocean:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>simulation.launch.xml
+</pre></div>
+</div>
+<p>Terminal 2, the first boat:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>spawn_vehicle.launch.xml<span class="w"> </span>name:<span class="o">=</span>boat_a<span class="w"> </span>y:<span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>xacro:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/models/custom_usv/model.sdf.xacro<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>bridge:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/config/ros_gz_bridge.yaml.in<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>urdf:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/urdf/custom_usv.urdf.xacro
+</pre></div>
+</div>
+<p>Terminal 3, the second:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>spawn_vehicle.launch.xml<span class="w"> </span>name:<span class="o">=</span>boat_b<span class="w"> </span>y:<span class="o">=</span>-2<span class="w"> </span>yaw:<span class="o">=</span><span class="m">1</span>.57<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>xacro:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/models/custom_usv/model.sdf.xacro<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>bridge:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/config/ros_gz_bridge.yaml.in<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>urdf:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/urdf/custom_usv.urdf.xacro
+</pre></div>
+</div>
+<p>Both boats float, because each marks its own displacement; each has its own
+topics, namespace and TF prefix; and <code class="docutils literal notranslate"><span class="pre">/clock</span></code> has one publisher. A boat
+added an hour later joins the same way.</p>
+<section id="other-vehicles">
+<h3>Other vehicles<a class="headerlink" href="#other-vehicles" title="Link to this heading"></a></h3>
+<p>Different vehicles mix the same way: one spawn command each, next to the
+one simulation part. A vehicle that generates its files with a script of
+its own, as the Blue Robotics vehicles do, is given the script instead of
+the three files:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>spawn_vehicle.launch.xml<span class="w"> </span>name:<span class="o">=</span>blueboat<span class="w"> </span>x:<span class="o">=</span><span class="m">6</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>generator:<span class="o">=</span><span class="s2">"</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>blueboat_gazebo<span class="k">)</span><span class="s2">/lib/blueboat_gazebo/configure_vehicle.py --config </span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>blueboat_description<span class="k">)</span><span class="s2">/config/blueboat.yaml"</span>
+</pre></div>
+</div>
+<p>The launch runs the command with <code class="docutils literal notranslate"><span class="pre">--name</span> <span class="pre">&lt;name&gt;</span> <span class="pre">--out-dir</span> <span class="pre">&lt;dir&gt;</span></code> and expects
+<code class="docutils literal notranslate"><span class="pre">model.sdf</span></code>, <code class="docutils literal notranslate"><span class="pre">ros_gz_bridge.yaml</span></code> and a URDF in that directory
+(<a class="reference internal" href="../vehicles/bluerobotics.html"><span class="std std-doc">BlueBoat and BlueROV2</span></a>).</p>
+<p>Next: <a class="reference internal" href="sensors.html"><span class="std std-doc">Add sensors</span></a>.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="gazebo-composition.html" class="btn btn-neutral float-left" title="Compose the Gazebo model" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sensors.html" class="btn btn-neutral float-right" title="Add sensors" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Honu Robotics.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  
+<div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    <span class="fa fa-book"> Other Versions</span>
+    v: lyrical
+    <span class="fa fa-caret-down"></span>
+  </span>
+  <div class="rst-other-versions">
+    <dl id="honu-version-list">
+      <dt>Distributions</dt>
+      <dd><a href="/gz-maritime/lyrical/" data-version="lyrical">Lyrical</a></dd>
+    </dl>
+  </div>
+</div>
+<script>
+  (function () {
+    var current = "lyrical";
+    var base = "/gz-maritime/";
+
+    /* Keep the reader on the same page when switching versions; the
+       version root href stays as the fallback for pages a version lacks. */
+    function wire() {
+      document.querySelectorAll('.rst-other-versions a[data-version]').forEach(function (a) {
+        var target = a.getAttribute('data-version');
+        var path = window.location.pathname;
+        if (target !== current && path.indexOf('/' + current + '/') !== -1) {
+          a.href = path.replace('/' + current + '/', '/' + target + '/');
+        }
+      });
+    }
+
+    if (!window.fetch) { wire(); return; }
+
+    /* The deploy tool maintains versions.json at the site root; reading it
+       at runtime lets builds published before a new distribution existed
+       still offer it in the flyout. Offline or local preview builds fall
+       back to the build time list rendered above. */
+    fetch(base + 'versions.json', {cache: 'no-cache'}).then(function (response) {
+      if (!response.ok) { throw new Error(response.status); }
+      return response.json();
+    }).then(function (entries) {
+      var list = document.getElementById('honu-version-list');
+      if (!list || !entries.length) { return; }
+      list.querySelectorAll('dd').forEach(function (dd) { dd.remove(); });
+      entries.forEach(function (entry) {
+        var a = document.createElement('a');
+        a.href = entry.url;
+        a.setAttribute('data-version', entry.name);
+        a.textContent = entry.name.charAt(0).toUpperCase() + entry.name.slice(1);
+        var dd = document.createElement('dd');
+        dd.appendChild(a);
+        list.appendChild(dd);
+      });
+    }).catch(function () {}).finally(wire);
+  })();
+</script><script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

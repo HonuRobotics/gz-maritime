@@ -1,0 +1,1115 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compose the Gazebo model &mdash; Gz Maritime lyrical documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/honu.css?v=44af46ee" />
+
+  
+    <link rel="shortcut icon" href="../_static/honu-robotics-favicon.svg"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=46f74c5b"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script type="module">import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.12.1/dist/mermaid.esm.min.mjs";
+
+
+
+
+
+const initStyles = () => {
+    const defaultStyle = document.createElement('style');
+    defaultStyle.textContent = "pre.mermaid {\n    /* Same as .mermaid-container > pre */\n    display: block;\n    width: 100%;\n}\n\npre.mermaid > svg {\n    /* Same as .mermaid-container > pre > svg */\n    height: 500px;\n    width: 100%;\n    max-width: 100% !important;\n}";
+    document.head.appendChild(defaultStyle);
+
+    const fullscreenStyle = document.createElement('style');
+    fullscreenStyle.textContent = ".mermaid-container {\n    position: relative;\n    display: flex;\n    flex-direction: row;\n    width: 100%;\n}\n\n.mermaid-container > pre {\n    display: block;\n    width: 100%;\n}\n\n.mermaid-container > pre > svg {\n    height: 500px;\n    width: 100%;\n    max-width: 100% !important;\n}\n\n.mermaid-fullscreen-btn {\n    position: absolute;\n    width: 28px;\n    height: 28px;\n    background: rgba(255, 255, 255, 0.95);\n    border: 1px solid rgba(0, 0, 0, 0.3);\n    border-radius: 4px;\n    cursor: pointer;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    transition: all 0.2s;\n    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);\n    font-size: 14px;\n    line-height: 1;\n    padding: 0;\n    color: #333;\n}\n\n.mermaid-fullscreen-btn:hover {\n    opacity: 100% !important;\n    background: rgba(255, 255, 255, 1);\n    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);\n    transform: scale(1.1);\n}\n\n.mermaid-fullscreen-btn.dark-theme {\n    background: rgba(50, 50, 50, 0.95);\n    border: 1px solid rgba(255, 255, 255, 0.3);\n    color: #e0e0e0;\n}\n\n.mermaid-fullscreen-btn.dark-theme:hover {\n    background: rgba(60, 60, 60, 1);\n    box-shadow: 0 3px 10px rgba(255, 255, 255, 0.2);\n}\n\n.mermaid-fullscreen-modal {\n    display: none;\n    position: fixed !important;\n    top: 0 !important;\n    left: 0 !important;\n    width: 95vw;\n    height: 100vh;\n    background: rgba(255, 255, 255, 0.98);\n    z-index: 9999;\n    padding: 20px;\n    overflow: auto;\n}\n\n.mermaid-fullscreen-modal.dark-theme {\n    background: rgba(0, 0, 0, 0.98);\n}\n\n.mermaid-fullscreen-modal.active {\n    display: flex;\n    align-items: center;\n    justify-content: center;\n}\n\n.mermaid-container-fullscreen {\n    position: relative;\n    width: 95vw;\n    height: 90vh;\n    max-width: 95vw;\n    max-height: 90vh;\n    background: white;\n    border-radius: 8px;\n    padding: 20px;\n    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);\n    overflow: auto;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n}\n\n.mermaid-container-fullscreen.dark-theme {\n    background: #1a1a1a;\n    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);\n}\n\n.mermaid-container-fullscreen pre.mermaid {\n    width: 100%;\n    height: 100%;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n}\n\n.mermaid-container-fullscreen .mermaid svg {\n    height: 100% !important;\n    width: 100% !important;\n    cursor: grab;\n}\n\n.mermaid-fullscreen-close {\n    position: fixed !important;\n    top: 20px !important;\n    right: 20px !important;\n    width: 40px;\n    height: 40px;\n    background: rgba(255, 255, 255, 0.95);\n    border: 1px solid rgba(0, 0, 0, 0.2);\n    border-radius: 50%;\n    cursor: pointer;\n    z-index: 10000;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);\n    transition: all 0.2s;\n    font-size: 24px;\n    line-height: 1;\n    color: #333;\n}\n\n.mermaid-fullscreen-close:hover {\n    background: white;\n    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);\n    transform: scale(1.1);\n}\n\n.mermaid-fullscreen-close.dark-theme {\n    background: rgba(50, 50, 50, 0.95);\n    border: 1px solid rgba(255, 255, 255, 0.2);\n    color: #e0e0e0;\n}\n\n.mermaid-fullscreen-close.dark-theme:hover {\n    background: rgba(60, 60, 60, 1);\n    box-shadow: 0 6px 16px rgba(255, 255, 255, 0.2);\n}\n\n.mermaid-fullscreen-modal .mermaid-fullscreen-btn {\n    display: none !important;\n}";
+    document.head.appendChild(fullscreenStyle);
+}
+
+// Detect if page has dark background
+const isDarkTheme = () => {
+    // We use a set of heuristics:
+    // 1. Check for common dark mode classes or attributes
+    // 2. Check computed background color brightness
+    if (document.documentElement.classList.contains('dark') ||
+        document.documentElement.getAttribute('data-theme') === 'dark' ||
+        document.body.classList.contains('dark') ||
+        document.body.getAttribute('data-theme') === 'dark') {
+        // console.log("Dark theme detected via class/attribute");
+        return true;
+    }
+    if (document.documentElement.classList.contains('light') ||
+        document.documentElement.getAttribute('data-theme') === 'light' ||
+        document.body.classList.contains('light') ||
+        document.body.getAttribute('data-theme') === 'light') {
+        // console.log("Light theme detected via class/attribute");
+        return false;
+    }
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        // console.log("Dark theme detected via prefers-color-scheme");
+        return true;
+    }
+    const bgColor = window.getComputedStyle(document.body).backgroundColor;
+    const match = bgColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)/);
+    if (match) {
+        const r = parseInt(match[1]);
+        const g = parseInt(match[2]);
+        const b = parseInt(match[3]);
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        // console.log("Background color brightness:", brightness);
+        return brightness < 128;
+    }
+    // console.log("No dark or light theme detected, defaulting to light theme");
+    return false;
+};
+
+let darkTheme = isDarkTheme();
+let modal = null;
+let modalContent = null;
+let previousScrollOffset = [window.scrollX, window.scrollY];
+let _lazyObserver = null;
+let _renderQueue = Promise.resolve();
+let closeModal = () => {};
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal?.classList.contains('active')) {
+        closeModal();
+    }
+});
+
+// Apply d3 zoom to each SVG. Idempotent: an SVG already wrapped is skipped,
+// so this is safe to call both for the initial batch and for diagrams that
+// render lazily once they become visible.
+const addZoomToSvgs = (svgs) => {
+    svgs.each(function() {
+        if (this.getAttribute('data-zoom-applied') === 'true') return;
+        var svg = d3.select(this);
+        svg.html("<g class='wrapper'>" + svg.html() + "</g>");
+        var inner = svg.select("g");
+        var zoom = d3.zoom().on("zoom", function(event) {
+            inner.attr("transform", event.transform);
+        });
+        svg.call(zoom);
+        this.setAttribute('data-zoom-applied', 'true');
+    });
+};
+
+const runMermaid = async (rerun) => {
+    console.log("Running mermaid diagrams, rerun =", rerun);
+    // clear all existing mermaid charts
+    let all_mermaids = document.querySelectorAll(".mermaid");
+
+    if (rerun) {
+        // Disconnect any previous lazy rendering observer
+        if (_lazyObserver) {
+            _lazyObserver.disconnect();
+            _lazyObserver = null;
+        }
+
+        all_mermaids.forEach((el) => {
+            el.removeAttribute('data-mermaid-deferred');
+            el.removeAttribute('data-mermaid-render-failed');
+            if(!el.hasAttribute("data-original-code")) {
+                // store original code
+                // console.log(`Storing original code for first run: `, el.innerHTML);
+                el.setAttribute('data-original-code', el.innerHTML);
+            }
+            if(el.getAttribute("data-processed") === "true") {
+                // remove and restore original
+                el.removeAttribute("data-processed");
+                // console.log(`Restoring original code for re-run: `, el.getAttribute('data-original-code'));
+                el.innerHTML = el.getAttribute('data-original-code');
+            } else {
+                // store original code
+                // console.log(`Storing original code for re-run: `, el.innerHTML);
+                el.setAttribute('data-original-code', el.innerHTML);
+            }
+        });
+
+        // Separate visible and hidden elements. Mermaid's layout engine measures
+        // text dimensions via the DOM, which fails for elements hidden by a parent
+        // (e.g., Reveal.js non-active slides, sphinx-design unopened tabs),
+        // producing broken SVGs. Render visible elements now, defer hidden ones.
+        const visible = [];
+        const hidden = [];
+        all_mermaids.forEach((el) => {
+            // offsetParent is null for display:none ancestors.
+            // getClientRects().length > 0 catches position:fixed elements
+            // (which also have null offsetParent but are still visible).
+            if (el.offsetParent !== null || el.getClientRects().length > 0) {
+                visible.push(el);
+            } else {
+                hidden.push(el);
+                el.setAttribute('data-mermaid-deferred', 'true');
+            }
+        });
+
+        if (visible.length > 0) {
+            try {
+                await mermaid.run({ nodes: visible });
+            } catch (e) {
+                console.error("Mermaid rendering failed:", e);
+            }
+        }
+
+        // Lazily render hidden elements when they become visible.
+        // Uses a promise chain (_renderQueue) to serialize rendering,
+        // since IntersectionObserver may report multiple entries at once
+        // and mermaid.run() is not safe to call concurrently.
+        if (hidden.length > 0) {
+            if (typeof IntersectionObserver === 'undefined') {
+                console.warn("IntersectionObserver not available; hidden mermaid diagrams will not render.");
+            } else {
+                _renderQueue = Promise.resolve();
+                _lazyObserver = new IntersectionObserver((entries) => {
+                    for (const entry of entries) {
+                        if (entry.isIntersecting && entry.target.getAttribute("data-processed") !== "true") {
+                            _lazyObserver.unobserve(entry.target);
+                            const el = entry.target;
+                            _renderQueue = _renderQueue.then(async () => {
+                                try {
+                                    await mermaid.run({ nodes: [el] });
+                                    el.removeAttribute('data-mermaid-deferred');
+                                    // Apply zoom to the now-rendered diagram, matching
+                                    // the decoration visible diagrams receive.
+                                    if (false) {
+                                        addZoomToSvgs(d3.selectAll("").select(function() {
+                                            return this.querySelector("svg");
+                                        }));
+                                    }
+                                } catch (e) {
+                                    console.error("Mermaid deferred rendering failed:", e);
+                                    el.removeAttribute('data-mermaid-deferred');
+                                    el.setAttribute('data-mermaid-render-failed', 'true');
+                                }
+                            });
+                        }
+                    }
+                });
+                hidden.forEach((el) => _lazyObserver.observe(el));
+            }
+        }
+    }
+
+    all_mermaids = document.querySelectorAll(".mermaid");
+    // Exclude deferred (hidden) and render-failed elements from completion checks
+    const mermaids_active = document.querySelectorAll(".mermaid:not([data-mermaid-deferred]):not([data-mermaid-render-failed])");
+    const mermaids_processed = document.querySelectorAll(".mermaid:not([data-mermaid-deferred]):not([data-mermaid-render-failed])[data-processed='true']");
+
+    if (false) {
+        const mermaids_to_add_zoom = 0 === -1 ? mermaids_active.length : 0;
+        if(mermaids_to_add_zoom > 0) {
+            var svgs = d3.selectAll("").select(function() {
+                return this.querySelector("svg");
+            });
+            // Wait until every active (visible) diagram has rendered. Deferred
+            // diagrams are excluded, so a fixed d3_node_count that counts a
+            // hidden diagram no longer loops forever waiting for its SVG.
+            if(mermaids_active.length !== mermaids_processed.length) {
+                setTimeout(() => runMermaid(false), 200);
+                return;
+            }
+            addZoomToSvgs(svgs);
+        }
+    } else if(mermaids_active.length !== mermaids_processed.length) {
+        // Wait for mermaid to process all diagrams
+        setTimeout(() => runMermaid(false), 200);
+        return;
+    }
+
+    // Stop here if not adding fullscreen capability
+    if (!true) return;
+
+    if (modal !== null ) {
+        // Destroy existing modal
+        modal.remove();
+        modal = null;
+        modalContent = null;
+    }
+
+    modal = document.createElement('div');
+    modal.className = 'mermaid-fullscreen-modal' + (darkTheme ? ' dark-theme' : '');
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Fullscreen diagram viewer');
+    modal.innerHTML = `
+        <button class="mermaid-fullscreen-close${darkTheme ? ' dark-theme' : ''}" aria-label="Close fullscreen">✕</button>
+        <div class="mermaid-container-fullscreen${darkTheme ? ' dark-theme' : ''}"></div>
+    `;
+    document.body.appendChild(modal);
+
+    modalContent = modal.querySelector('.mermaid-container-fullscreen');
+    const closeBtn = modal.querySelector('.mermaid-fullscreen-close');
+
+    closeModal = () => {
+        modal.classList.remove('active');
+        modalContent.innerHTML = '';
+        document.body.style.overflow = ''
+        window.scrollTo({left: previousScrollOffset[0], top: previousScrollOffset[1], behavior: 'instant'});
+    };
+
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+    document.querySelectorAll('.mermaid').forEach((mermaidDiv) => {
+        if (mermaidDiv.parentNode.classList.contains('mermaid-container') ||
+            mermaidDiv.closest('.mermaid-fullscreen-modal')) {
+            // Already processed, adjust button class if needed
+            const existingBtn = mermaidDiv.parentNode.querySelector('.mermaid-fullscreen-btn');
+            if (existingBtn) {
+                existingBtn.className = 'mermaid-fullscreen-btn' + (darkTheme ? ' dark-theme' : '');
+            }
+            return;
+        }
+
+        const container = document.createElement('div');
+        container.className = 'mermaid-container';
+        mermaidDiv.parentNode.insertBefore(container, mermaidDiv);
+        container.appendChild(mermaidDiv);
+
+        const fullscreenBtn = document.createElement('button');
+        fullscreenBtn.className = 'mermaid-fullscreen-btn' + (darkTheme ? ' dark-theme' : '');
+        fullscreenBtn.setAttribute('aria-label', 'View diagram in fullscreen');
+        fullscreenBtn.textContent = "\u26f6";
+        fullscreenBtn.style.opacity = "50%";
+
+        // Calculate dynamic position based on diagram's margin and padding
+        const diagramStyle = window.getComputedStyle(mermaidDiv);
+        const marginTop = parseFloat(diagramStyle.marginTop) || 0;
+        const marginRight = parseFloat(diagramStyle.marginRight) || 0;
+        const paddingTop = parseFloat(diagramStyle.paddingTop) || 0;
+        const paddingRight = parseFloat(diagramStyle.paddingRight) || 0;
+        fullscreenBtn.style.top = `${marginTop + paddingTop + 4}px`;
+        fullscreenBtn.style.right = `${marginRight + paddingRight + 4}px`;
+
+        fullscreenBtn.addEventListener('click', () => {
+            previousScrollOffset = [window.scrollX, window.scrollY];
+            const clone = mermaidDiv.cloneNode(true);
+            modalContent.innerHTML = '';
+            modalContent.appendChild(clone);
+
+            const svg = clone.querySelector('svg');
+            if (svg) {
+                svg.removeAttribute('width');
+                svg.removeAttribute('height');
+                svg.style.width = '100%';
+                svg.style.height = 'auto';
+                svg.style.maxWidth = '100%';
+                svg.style.display = 'block';
+
+                if (false) {
+                    setTimeout(() => {
+                        const g = svg.querySelector('g');
+                        if (g) {
+                            var svgD3 = d3.select(svg);
+                            svgD3.html("<g class='wrapper'>" + svgD3.html() + "</g>");
+                            var inner = svgD3.select("g");
+                            var zoom = d3.zoom().on("zoom", function(event) {
+                                inner.attr("transform", event.transform);
+                            });
+                            svgD3.call(zoom);
+                        }
+                    }, 100);
+                }
+            }
+
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        });
+        container.appendChild(fullscreenBtn);
+    });
+};
+
+
+
+const load = async () => {
+    initStyles();
+
+
+    await runMermaid(true);
+
+    const reRunIfThemeChanges = async () => {
+        const newDarkTheme = isDarkTheme();
+        if (newDarkTheme !== darkTheme) {
+            darkTheme = newDarkTheme;
+            console.log("Theme change detected, re-running mermaid with", darkTheme ? "dark" : "default", "theme");
+            await mermaid.initialize(
+                {...{"startOnLoad": false},
+                ...{ darkMode: darkTheme, theme: darkTheme ? "dark" : "default" },
+                }
+            );
+            await runMermaid(true);
+        }
+    };
+
+    // Update theme classes when theme changes
+    const themeObserver = new MutationObserver(reRunIfThemeChanges);
+    themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class', 'style', 'data-theme']
+    });
+    themeObserver.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class', 'style', 'data-theme']
+    });
+};
+
+
+
+
+
+console.log("Initializing mermaid with", darkTheme ? "dark" : "default", "theme");
+mermaid.initialize(
+    {...{"startOnLoad": false},
+    ...{ darkMode: darkTheme, theme: darkTheme ? "dark" : "default" },
+    }
+);
+
+window.addEventListener("load", load);
+window.runMermaid = runMermaid;</script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Spawn and drive" href="spawn-and-drive.html" />
+    <link rel="prev" title="Describe the vehicle" href="vehicle-description.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Gz Maritime
+              <img src="../_static/honu-robotics-white-logo.svg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting-started/index.html">Getting started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/requirements.html">Requirements</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/requirements.html#optional">Optional</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/requirements.html#docker">Docker</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/installation.html">Installation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#clone">1. Clone</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#install-the-dependencies">2. Install the dependencies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#build">3. Build</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#check">4. Check</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/first-simulation.html">First simulation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#the-ocean-on-its-own">1. The ocean on its own</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#put-a-boat-on-it">2. Put a boat on it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#drive-it">3. Drive it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#look-at-it-in-rviz">4. Look at it in RViz</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#add-a-second-boat">5. Add a second boat</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#make-waves">6. Make waves</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#next">Next</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../vehicles/index.html">Vehicles</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../vehicles/custom-usv.html">Custom USV</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/custom-usv.html#run-it">Run it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/custom-usv.html#drive-it">Drive it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/custom-usv.html#topics">Topics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/custom-usv.html#frames">Frames</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/custom-usv.html#what-it-is-made-of">What it is made of</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/custom-usv.html#limitations">Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../vehicles/bluerobotics.html">BlueBoat and BlueROV2</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/bluerobotics.html#blueboat">BlueBoat</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/bluerobotics.html#bluerov2">BlueROV2</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/bluerobotics.html#several-vehicles-on-one-ocean">Several vehicles on one ocean</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../vehicles/holybro.html">Holybro X500</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/holybro.html#run-it">Run it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/holybro.html#on-the-ocean">On the ocean</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How to guides</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="index.html#bring-your-own-vehicle">Bring your own vehicle</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#more">More</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="own-vehicle.html">Bring your own vehicle</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#who-does-what">Who does what</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#the-path">The path</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="own-vehicle.html#why-the-urdf-comes-first">Why the URDF comes first</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#how-a-vehicle-floats">How a vehicle floats</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#what-the-gazebo-maritime-tutorials-cover">What the Gazebo maritime tutorials cover</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#waves-and-physics-today">Waves and physics today</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#already-have-a-model">Already have a model?</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="vehicle-description.html">Describe the vehicle</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#put-the-origin-on-the-waterline">Put the origin on the waterline</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#work-out-the-draft">Work out the draft</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#collision-shapes-are-for-contact">Collision shapes are for contact</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#mass-and-inertia">Mass and inertia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#propellers">Propellers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#sensor-frames">Sensor frames</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#no-instance-name-no-gazebo">No instance name, no Gazebo</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#check-it">Check it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#build-it">Build it</a></li>
+</ul>
+</li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Compose the Gazebo model</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#the-wrapper">The wrapper</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#what-survives-the-conversion">What survives the conversion</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#mark-the-collisions-that-displace">Mark the collisions that displace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#thrusters">Thrusters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#hydrodynamic-damping">Hydrodynamic damping</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#added-mass">Added mass</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#sensors">Sensors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#joint-states">Joint states</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#build-it">Build it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#marking-from-a-urdf">Marking from a URDF</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="spawn-and-drive.html">Spawn and drive</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#the-simulation-part">The simulation part</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#spawn-an-instance">Spawn an instance</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="spawn-and-drive.html#your-sim-launch-xml">Your <code class="docutils literal notranslate"><span class="pre">sim.launch.xml</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="spawn-and-drive.html#one-name-per-instance">One name per instance</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#what-the-launch-needs-from-a-vehicle">What the launch needs from a vehicle</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#the-bridge-configuration">The bridge configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#drive">Drive</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#change-the-sea-while-it-runs">Change the sea while it runs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#several-vehicles">Several vehicles</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="spawn-and-drive.html#other-vehicles">Other vehicles</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sensors.html">Add sensors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#what-the-world-provides">What the world provides</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#the-pattern">The pattern</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#a-camera">A camera</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#check-a-sensor">Check a sensor</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="own-world.html">Use your own world</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#what-a-world-needs">What a world needs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#the-buoyancy-system">The buoyancy system</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#the-world-name">The world name</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#adding-a-seabed">Adding a seabed</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="faq.html">Troubleshooting</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#my-vehicle-sinks">My vehicle sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#my-vehicle-bumps-into-things-it-shouldn-t-or-sits-on-the-water-oddly">My vehicle bumps into things it shouldn’t, or sits on the water oddly</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#unsupported-collision-geometry-for-graded-buoyancy">“Unsupported collision geometry for graded buoyancy”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-vehicle-capsizes">The vehicle capsizes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-boat-moves-sideways-or-spins-instead-of-going-forward">The boat moves sideways, or spins, instead of going forward</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-boat-barely-moves-or-a-bigger-command-changes-nothing">The boat barely moves, or a bigger command changes nothing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-spawn-launch-stops-with-invalid-instance-name">The spawn launch stops with “invalid instance name”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-spawn-launch-returns-straight-away">The spawn launch returns straight away</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#two-boats-answer-the-same-command-or-rviz-shows-a-jumping-robot">Two boats answer the same command, or RViz shows a jumping robot</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#a-plugin-can-t-find-a-link">A plugin can’t find a link</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-server-stops-with-ode-internal-error-aabbbound">The server stops with “ODE INTERNAL ERROR … aabbBound”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-boat-falls-very-slowly-when-spawned-high">The boat falls very slowly when spawned high</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#rviz-shows-nothing-or-fixed-frame-does-not-exist">RViz shows nothing, or “Fixed Frame does not exist”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#robot-state-publisher-warns-about-the-root-link-inertia">robot_state_publisher warns about the root link inertia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-ocean-looks-flat-or-white-in-the-gui">The ocean looks flat or white in the GUI</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#camera-images-look-green-or-blue">Camera images look green or blue</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#two-simulations-interfere-with-each-other">Two simulations interfere with each other</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/launch-and-world.html">Launch files, world and services</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#launch-files">Launch files</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-simulation-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">simulation.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-spawn-vehicle-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">spawn_vehicle.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-sim-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">sim.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-rviz-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">rviz.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-display-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">display.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#instantiate-vehicle-py"><code class="docutils literal notranslate"><span class="pre">instantiate_vehicle.py</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#instance-rviz-py"><code class="docutils literal notranslate"><span class="pre">instance_rviz.py</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#the-open-water-sdf-world">The <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code> world</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#buoyancy-markup">Buoyancy markup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#thruster-command">Thruster command</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#services">Services</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#examples">Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#topics">Topics</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../design/index.html">Design</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#the-waves">The waves</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#floating-vehicles-the-world-doesn-t-know">Floating vehicles the world doesn’t know</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#one-name-per-instance">One name per instance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#one-thruster-interface">One thruster interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#buoyancy-that-follows-the-waves">Buoyancy that follows the waves</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#related">Related</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../project/index.html">Project</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Gz Maritime</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">How to guides</a></li>
+      <li class="breadcrumb-item active">Compose the Gazebo model</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/how-to/gazebo-composition.md" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="compose-the-gazebo-model">
+<h1>Compose the Gazebo model<a class="headerlink" href="#compose-the-gazebo-model" title="Link to this heading"></a></h1>
+<p>The URDF says what the vehicle <strong>is</strong>. The Gazebo model adds how it is
+<strong>simulated</strong>: what floats it, what drives it, how the water slows it down,
+and what it senses. It is one short file, <code class="docutils literal notranslate"><span class="pre">model.sdf.xacro</span></code>, that includes
+your URDF and adds the rest. The custom USV’s is
+<code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle/models/custom_usv/model.sdf.xacro</span></code>, and every snippet
+on this page is taken from it.</p>
+<pre  class="mermaid">
+        flowchart LR
+  U[&quot;&lt;b&gt;custom_usv.urdf&lt;/b&gt;&lt;br/&gt;links, joints, mass,&lt;br/&gt;contact shapes, frames&quot;]
+  M[&quot;&lt;b&gt;model.sdf&lt;/b&gt;&lt;br/&gt;the URDF, plus:&lt;br/&gt;marked displacement volume&lt;br/&gt;Thruster × 2: propulsion&lt;br/&gt;Hydrodynamics: damping&lt;br/&gt;IMU, magnetometer, GPS&lt;br/&gt;JointStatePublisher&quot;]
+  U --&gt;|merged into| M
+    </pre><section id="the-wrapper">
+<h2>The wrapper<a class="headerlink" href="#the-wrapper" title="Link to this heading"></a></h2>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;sdf</span><span class="w"> </span><span class="na">version=</span><span class="s">"1.12"</span><span class="w"> </span><span class="na">xmlns:xacro=</span><span class="s">"http://ros.org/wiki/xacro"</span>
+<span class="w">     </span><span class="na">xmlns:gz=</span><span class="s">"http://gazebosim.org/schema"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;xacro:arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"name"</span><span class="w"> </span><span class="na">default=</span><span class="s">"custom_usv"</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;xacro:arg</span><span class="w"> </span><span class="na">name=</span><span class="s">"urdf_uri"</span><span class="w"> </span><span class="na">default=</span><span class="s">"model://custom_usv/custom_usv.urdf"</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;xacro:property</span><span class="w"> </span><span class="na">name=</span><span class="s">"name"</span><span class="w"> </span><span class="na">value=</span><span class="s">"$(arg name)"</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;xacro:include</span><span class="w"> </span><span class="na">filename=</span><span class="s">"../../urdf/dimensions.xacro"</span><span class="nt">/&gt;</span>
+
+<span class="w">  </span><span class="nt">&lt;model</span><span class="w"> </span><span class="na">name=</span><span class="s">"${name}"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;include</span><span class="w"> </span><span class="na">merge=</span><span class="s">"true"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;uri&gt;</span>$(arg<span class="w"> </span>urdf_uri)<span class="nt">&lt;/uri&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/include&gt;</span>
+<span class="w">    </span><span class="cm">&lt;!-- displacement, plugins and sensors go here --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/model&gt;</span>
+<span class="nt">&lt;/sdf&gt;</span>
+</pre></div>
+</div>
+<p>Three things to notice:</p>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">merge=&quot;true&quot;</span></code></strong> puts the URDF’s links and joints directly into this
+model, so what follows can refer to them by name: <code class="docutils literal notranslate"><span class="pre">base_link</span></code>,
+<code class="docutils literal notranslate"><span class="pre">motor_port_joint</span></code> and so on.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">xmlns:gz</span></code></strong> on the root declares the namespace the displacement mark
+below uses. Without it the file doesn’t parse.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">name</span></code></strong> is the instance name. It becomes the model name, the prefix of
+every topic and the prefix of every sensor frame, so one file serves any
+number of boats. The spawn launch passes it, together with a <code class="docutils literal notranslate"><span class="pre">urdf_uri</span></code>
+pointing at the URDF it rendered for the same name
+(<a class="reference internal" href="spawn-and-drive.html#one-name-per-instance"><span class="std std-ref">One name per instance</span></a>).</p></li>
+</ul>
+<p>The include of <code class="docutils literal notranslate"><span class="pre">dimensions.xacro</span></code>, by a path relative to this file, gives it
+the same hull sizes the URDF was built from, so the displacement boxes below
+cannot drift from the hulls.</p>
+<section id="what-survives-the-conversion">
+<h3>What survives the conversion<a class="headerlink" href="#what-survives-the-conversion" title="Link to this heading"></a></h3>
+<p>Gazebo converts the URDF when it loads it, and in doing so <strong>merges every
+link attached by a fixed joint into its parent</strong>. On the custom USV,
+<code class="docutils literal notranslate"><span class="pre">imu_link</span></code> and <code class="docutils literal notranslate"><span class="pre">gps_link</span></code> stop being links, but survive as <strong>frames</strong> with the
+same names. That has two consequences:</p>
+<ul class="simple">
+<li><p>A plugin that needs a <em>link</em> must name one that survives: here <code class="docutils literal notranslate"><span class="pre">base_link</span></code>
+or a propeller.</p></li>
+<li><p>A sensor can still be placed at <code class="docutils literal notranslate"><span class="pre">imu_link</span></code>, because poses can be given
+relative to a frame.</p></li>
+</ul>
+<p>To see exactly what survives, print the converted model:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">SDF_PATH</span><span class="o">=</span><span class="nv">$GZ_SIM_RESOURCE_PATH</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>gz<span class="w"> </span>sdf<span class="w"> </span>-p<span class="w"> </span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/models/custom_usv/model.sdf
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">gz</span> <span class="pre">sdf</span></code> looks for <code class="docutils literal notranslate"><span class="pre">model://</span></code> URIs in <code class="docutils literal notranslate"><span class="pre">SDF_PATH</span></code>, not in
+<code class="docutils literal notranslate"><span class="pre">GZ_SIM_RESOURCE_PATH</span></code>, hence the variable.</p>
+</section>
+</section>
+<section id="mark-the-collisions-that-displace">
+<h2>Mark the collisions that displace<a class="headerlink" href="#mark-the-collisions-that-displace" title="Link to this heading"></a></h2>
+<p>Every gz-maritime vehicle needs this step. Add a link fixed to <code class="docutils literal notranslate"><span class="pre">base_link</span></code>
+whose collision shapes are the volume that floats the vehicle, and mark each
+of them with <code class="docutils literal notranslate"><span class="pre">gz:buoyancy=&quot;true&quot;</span></code>. The custom USV’s macro makes one box per
+hull:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">&lt;xacro:macro</span><span class="w"> </span><span class="na">name=</span><span class="s">"pontoon"</span><span class="w"> </span><span class="na">params=</span><span class="s">"side y"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;collision</span><span class="w"> </span><span class="na">name=</span><span class="s">"pontoon_${side}"</span><span class="w"> </span><span class="na">gz:buoyancy=</span><span class="s">"true"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;pose&gt;</span>0<span class="w"> </span>${y}<span class="w"> </span>${hull_z}<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="nt">&lt;/pose&gt;</span>
+<span class="w">      </span><span class="nt">&lt;geometry&gt;</span>
+<span class="w">        </span><span class="nt">&lt;box&gt;&lt;size&gt;</span>${hull_length}<span class="w"> </span>${hull_width}<span class="w"> </span>${hull_height}<span class="nt">&lt;/size&gt;&lt;/box&gt;</span>
+<span class="w">      </span><span class="nt">&lt;/geometry&gt;</span>
+<span class="w">      </span><span class="nt">&lt;surface&gt;</span>
+<span class="w">        </span><span class="nt">&lt;contact&gt;&lt;collide_bitmask&gt;</span>0x00<span class="nt">&lt;/collide_bitmask&gt;&lt;/contact&gt;</span>
+<span class="w">      </span><span class="nt">&lt;/surface&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/collision&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/xacro:macro&gt;</span>
+</pre></div>
+</div>
+<p>and puts the two on a link of their own:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="nt">&lt;link</span><span class="w"> </span><span class="na">name=</span><span class="s">"hull_displacement"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;pose</span><span class="w"> </span><span class="na">relative_to=</span><span class="s">"base_link"</span><span class="nt">&gt;</span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="nt">&lt;/pose&gt;</span>
+<span class="w">      </span><span class="nt">&lt;inertial&gt;</span>
+<span class="w">        </span><span class="nt">&lt;mass&gt;</span>1e-5<span class="nt">&lt;/mass&gt;</span>
+<span class="w">        </span><span class="nt">&lt;inertia&gt;</span>
+<span class="w">          </span><span class="nt">&lt;ixx&gt;</span>1e-8<span class="nt">&lt;/ixx&gt;&lt;ixy&gt;</span>0<span class="nt">&lt;/ixy&gt;&lt;ixz&gt;</span>0<span class="nt">&lt;/ixz&gt;</span>
+<span class="w">          </span><span class="nt">&lt;iyy&gt;</span>1e-8<span class="nt">&lt;/iyy&gt;&lt;iyz&gt;</span>0<span class="nt">&lt;/iyz&gt;&lt;izz&gt;</span>1e-8<span class="nt">&lt;/izz&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/inertia&gt;</span>
+<span class="w">      </span><span class="nt">&lt;/inertial&gt;</span>
+<span class="w">      </span><span class="nt">&lt;xacro:pontoon</span><span class="w"> </span><span class="na">side=</span><span class="s">"port"</span><span class="w"> </span><span class="na">y=</span><span class="s">"${hull_spacing / 2}"</span><span class="nt">/&gt;</span>
+<span class="w">      </span><span class="nt">&lt;xacro:pontoon</span><span class="w"> </span><span class="na">side=</span><span class="s">"stbd"</span><span class="w"> </span><span class="na">y=</span><span class="s">"${-hull_spacing / 2}"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/link&gt;</span>
+<span class="w">    </span><span class="nt">&lt;joint</span><span class="w"> </span><span class="na">name=</span><span class="s">"hull_displacement_joint"</span><span class="w"> </span><span class="na">type=</span><span class="s">"fixed"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;parent&gt;</span>base_link<span class="nt">&lt;/parent&gt;</span>
+<span class="w">      </span><span class="nt">&lt;child&gt;</span>hull_displacement<span class="nt">&lt;/child&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/joint&gt;</span>
+</pre></div>
+</div>
+<p>The rules:</p>
+<ul class="simple">
+<li><p><strong>A marked collision floats; an unmarked one doesn’t.</strong> The world floats
+nothing it isn’t told about, and this is how it is told. A link that marks
+any of its collisions floats by those alone; its other collisions stay
+contact geometry.</p></li>
+<li><p><strong>Use shapes buoyancy can slice:</strong> box, sphere, cylinder, capsule,
+ellipsoid and cone. Meshes and planes are skipped, with a warning. A box
+per hull is a good start; the custom USV’s are the same size and place as
+the URDF’s hulls, from the shared <code class="docutils literal notranslate"><span class="pre">dimensions.xacro</span></code>.</p></li>
+<li><p><strong>Give a mark a zero <code class="docutils literal notranslate"><span class="pre">collide_bitmask</span></code>.</strong> A marked collision is still a
+collision to the physics engine. With the bitmask it touches nothing, and
+the URDF’s hulls do the bumping.</p></li>
+<li><p><strong>Put the marks on their own link.</strong> They could sit on <code class="docutils literal notranslate"><span class="pre">base_link</span></code> too, but
+<code class="docutils literal notranslate"><span class="pre">base_link</span></code> comes from the URDF, and a merged include can’t add elements
+to it. A separate link, fixed-jointed, is one rigid body to physics and
+keeps contact and displacement visibly apart.</p></li>
+<li><p><strong>Get the centre of buoyancy above the centre of mass</strong>, or at least the
+waterplane wide, or the vehicle capsizes. The custom USV floats its 12 kg
+on two boxes centred 3.6 cm above the waterline, well above its centre of
+mass.</p></li>
+</ul>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>Without a marked collision your vehicle sinks. The mark is a plain SDF
+attribute, so it travels with the model file: nothing in the world and
+nothing in a launch file refers to it.</p>
+</div>
+</section>
+<section id="thrusters">
+<h2>Thrusters<a class="headerlink" href="#thrusters" title="Link to this heading"></a></h2>
+<p>Add one Thruster plugin per propeller joint. It is gz-maritime’s thruster
+system, <code class="docutils literal notranslate"><span class="pre">gz_thruster</span></code>: Gazebo’s own with a <strong>normalized command</strong> mode, the
+interface every vehicle here is driven with:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">&lt;xacro:macro</span><span class="w"> </span><span class="na">name=</span><span class="s">"thruster"</span><span class="w"> </span><span class="na">params=</span><span class="s">"side coefficient"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;plugin</span><span class="w"> </span><span class="na">filename=</span><span class="s">"gz-maritime-thruster-system"</span>
+<span class="w">            </span><span class="na">name=</span><span class="s">"gz::sim::maritime::Thruster"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;joint_name&gt;</span>motor_${side}_joint<span class="nt">&lt;/joint_name&gt;</span>
+<span class="w">      </span><span class="nt">&lt;namespace&gt;&lt;/namespace&gt;</span>
+<span class="w">      </span><span class="nt">&lt;topic&gt;</span>${name}/motor_${side}/cmd<span class="nt">&lt;/topic&gt;</span>
+<span class="w">      </span><span class="nt">&lt;use_normalized_cmd&gt;</span>true<span class="nt">&lt;/use_normalized_cmd&gt;</span>
+<span class="w">      </span><span class="nt">&lt;thrust_coefficient&gt;</span>${coefficient}<span class="nt">&lt;/thrust_coefficient&gt;</span>
+<span class="w">      </span><span class="nt">&lt;fluid_density&gt;</span>${water_density}<span class="nt">&lt;/fluid_density&gt;</span>
+<span class="w">      </span><span class="nt">&lt;propeller_diameter&gt;</span>${prop_diameter}<span class="nt">&lt;/propeller_diameter&gt;</span>
+<span class="w">      </span><span class="nt">&lt;velocity_control&gt;</span>true<span class="nt">&lt;/velocity_control&gt;</span>
+<span class="w">      </span><span class="cm">&lt;!-- The thrust limits [N]: what +1 and -1 command. --&gt;</span>
+<span class="w">      </span><span class="nt">&lt;max_thrust_cmd&gt;</span>20.0<span class="nt">&lt;/max_thrust_cmd&gt;</span>
+<span class="w">      </span><span class="nt">&lt;min_thrust_cmd&gt;</span>-15.0<span class="nt">&lt;/min_thrust_cmd&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/plugin&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/xacro:macro&gt;</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><strong>Commands are a fraction of full thrust</strong>, in [-1, 1], on the topic: 1
+gives <code class="docutils literal notranslate"><span class="pre">max_thrust_cmd</span></code> ahead, -1 gives <code class="docutils literal notranslate"><span class="pre">min_thrust_cmd</span></code> astern, 0 stops.
+Those two limits, in newtons, are the only place a force appears. That is
+how a real thruster is driven: an autopilot or a controller produces a
+normalized output and the ESC maps it onto the motor, so a controller
+written against this boat drives the BlueBoat unchanged. The propeller
+speed comes back on the same topic followed by <code class="docutils literal notranslate"><span class="pre">/ang_vel</span></code>.</p></li>
+<li><p><strong>Leave <code class="docutils literal notranslate"><span class="pre">&lt;namespace&gt;</span></code> empty and put the name in the topic yourself.</strong>
+Otherwise the plugin prefixes the topic with the model name on its own,
+and the bridge configuration can’t know what to expect.</p></li>
+<li><p><strong>Counter-rotating propellers get opposite signs</strong> of <code class="docutils literal notranslate"><span class="pre">thrust_coefficient</span></code>:
+the macro is called with <code class="docutils literal notranslate"><span class="pre">0.02</span></code> for port and <code class="docutils literal notranslate"><span class="pre">-0.02</span></code> for starboard.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">fluid_density</span></code> is seawater</strong>, and <code class="docutils literal notranslate"><span class="pre">propeller_diameter</span></code> comes from the
+shared dimensions, so it matches the propeller in the URDF.</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">gz_thruster</span></code> is on its way upstream. When a Gazebo release carries the
+mode, only the plugin’s filename and name change.</p>
+</section>
+<section id="hydrodynamic-damping">
+<h2>Hydrodynamic damping<a class="headerlink" href="#hydrodynamic-damping" title="Link to this heading"></a></h2>
+<p>Water resists motion. The Hydrodynamics plugin applies that resistance to
+one link:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="nt">&lt;plugin</span><span class="w"> </span><span class="na">filename=</span><span class="s">"gz-sim-hydrodynamics-system"</span>
+<span class="w">            </span><span class="na">name=</span><span class="s">"gz::sim::systems::Hydrodynamics"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;link_name&gt;</span>base_link<span class="nt">&lt;/link_name&gt;</span>
+<span class="w">      </span><span class="nt">&lt;water_density&gt;</span>${water_density}<span class="nt">&lt;/water_density&gt;</span>
+<span class="w">      </span><span class="nt">&lt;xU&gt;</span>-20<span class="nt">&lt;/xU&gt;</span><span class="w">    </span><span class="nt">&lt;yV&gt;</span>-40<span class="nt">&lt;/yV&gt;</span><span class="w">    </span><span class="nt">&lt;zW&gt;</span>-30<span class="nt">&lt;/zW&gt;</span>
+<span class="w">      </span><span class="nt">&lt;kP&gt;</span>-20<span class="nt">&lt;/kP&gt;</span><span class="w">    </span><span class="nt">&lt;mQ&gt;</span>-20<span class="nt">&lt;/mQ&gt;</span><span class="w">    </span><span class="nt">&lt;nR&gt;</span>-15<span class="nt">&lt;/nR&gt;</span>
+<span class="w">      </span><span class="nt">&lt;xUabsU&gt;</span>-30<span class="nt">&lt;/xUabsU&gt;</span>
+<span class="w">      </span><span class="nt">&lt;yVabsV&gt;</span>-90<span class="nt">&lt;/yVabsV&gt;</span>
+<span class="w">      </span><span class="nt">&lt;zWabsW&gt;</span>-100<span class="nt">&lt;/zWabsW&gt;</span>
+<span class="w">      </span><span class="nt">&lt;kPabsP&gt;</span>-40<span class="nt">&lt;/kPabsP&gt;</span>
+<span class="w">      </span><span class="nt">&lt;mQabsQ&gt;</span>-40<span class="nt">&lt;/mQabsQ&gt;</span>
+<span class="w">      </span><span class="nt">&lt;nRabsR&gt;</span>-30<span class="nt">&lt;/nRabsR&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/plugin&gt;</span>
+</pre></div>
+</div>
+<p>Each pair of coefficients resists one kind of motion:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Coefficients</p></th>
+<th class="head"><p>Motion</p></th>
+<th class="head"><p></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">xU</span></code>, <code class="docutils literal notranslate"><span class="pre">xUabsU</span></code></p></td>
+<td><p>Surge</p></td>
+<td><p>forwards and backwards</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">yV</span></code>, <code class="docutils literal notranslate"><span class="pre">yVabsV</span></code></p></td>
+<td><p>Sway</p></td>
+<td><p>sideways</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">zW</span></code>, <code class="docutils literal notranslate"><span class="pre">zWabsW</span></code></p></td>
+<td><p>Heave</p></td>
+<td><p>up and down</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">kP</span></code>, <code class="docutils literal notranslate"><span class="pre">kPabsP</span></code></p></td>
+<td><p>Roll</p></td>
+<td><p>tipping to the side</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mQ</span></code>, <code class="docutils literal notranslate"><span class="pre">mQabsQ</span></code></p></td>
+<td><p>Pitch</p></td>
+<td><p>nose up and down</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nR</span></code>, <code class="docutils literal notranslate"><span class="pre">nRabsR</span></code></p></td>
+<td><p>Yaw</p></td>
+<td><p>turning</p></td>
+</tr>
+</tbody>
+</table>
+<p>The first of each pair grows with speed, the <code class="docutils literal notranslate"><span class="pre">abs</span></code> one with speed squared. A
+boat should resist sideways motion much more than forward motion, or it
+slides out of its turns. The custom USV’s values are placeholders borrowed
+from the BlueBoat; tune them for your vehicle.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The damping acts in the air too, so a boat spawned well above the water falls
+slowly. Spawn it at the waterline.</p>
+</div>
+<section id="added-mass">
+<h3>Added mass<a class="headerlink" href="#added-mass" title="Link to this heading"></a></h3>
+<p>When a hull speeds up it also drags some water along, which makes it feel
+heavier than it is. Gazebo models this with <code class="docutils literal notranslate"><span class="pre">&lt;fluid_added_mass&gt;</span></code> inside a
+link’s <code class="docutils literal notranslate"><span class="pre">&lt;inertial&gt;</span></code>. A URDF can’t express that element, and a merged include
+can’t add it to a link that comes from the URDF. For a small, slow boat it is
+safe to leave out.</p>
+</section>
+</section>
+<section id="sensors">
+<h2>Sensors<a class="headerlink" href="#sensors" title="Link to this heading"></a></h2>
+<p>Each sensor sits on a tiny link fixed to <code class="docutils literal notranslate"><span class="pre">base_link</span></code>, placed at a frame the
+URDF declared. The custom USV’s macro builds the link and the joint and
+takes the <code class="docutils literal notranslate"><span class="pre">&lt;sensor&gt;</span></code> as a block:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">&lt;xacro:macro</span><span class="w"> </span><span class="na">name=</span><span class="s">"sensor_link"</span><span class="w"> </span><span class="na">params=</span><span class="s">"sensor_name frame *sensor"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;link</span><span class="w"> </span><span class="na">name=</span><span class="s">"${sensor_name}_sensor"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;pose</span><span class="w"> </span><span class="na">relative_to=</span><span class="s">"${frame}"</span><span class="nt">&gt;</span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="nt">&lt;/pose&gt;</span>
+<span class="w">      </span><span class="nt">&lt;inertial&gt;</span>
+<span class="w">        </span><span class="nt">&lt;mass&gt;</span>1e-5<span class="nt">&lt;/mass&gt;</span>
+<span class="w">        </span><span class="nt">&lt;inertia&gt;</span>
+<span class="w">          </span><span class="nt">&lt;ixx&gt;</span>1e-8<span class="nt">&lt;/ixx&gt;&lt;ixy&gt;</span>0<span class="nt">&lt;/ixy&gt;&lt;ixz&gt;</span>0<span class="nt">&lt;/ixz&gt;</span>
+<span class="w">          </span><span class="nt">&lt;iyy&gt;</span>1e-8<span class="nt">&lt;/iyy&gt;&lt;iyz&gt;</span>0<span class="nt">&lt;/iyz&gt;&lt;izz&gt;</span>1e-8<span class="nt">&lt;/izz&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/inertia&gt;</span>
+<span class="w">      </span><span class="nt">&lt;/inertial&gt;</span>
+<span class="w">      </span><span class="nt">&lt;xacro:insert_block</span><span class="w"> </span><span class="na">name=</span><span class="s">"sensor"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/link&gt;</span>
+<span class="w">    </span><span class="nt">&lt;joint</span><span class="w"> </span><span class="na">name=</span><span class="s">"${sensor_name}_sensor_joint"</span><span class="w"> </span><span class="na">type=</span><span class="s">"fixed"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;parent&gt;</span>base_link<span class="nt">&lt;/parent&gt;</span>
+<span class="w">      </span><span class="nt">&lt;child&gt;</span>${sensor_name}_sensor<span class="nt">&lt;/child&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/joint&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/xacro:macro&gt;</span>
+</pre></div>
+</div>
+<p>The IMU is then:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="nt">&lt;xacro:sensor_link</span><span class="w"> </span><span class="na">sensor_name=</span><span class="s">"imu"</span><span class="w"> </span><span class="na">frame=</span><span class="s">"imu_link"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;sensor</span><span class="w"> </span><span class="na">name=</span><span class="s">"imu"</span><span class="w"> </span><span class="na">type=</span><span class="s">"imu"</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;frame_id&gt;</span>${name}/imu_link<span class="nt">&lt;/frame_id&gt;</span>
+<span class="w">        </span><span class="nt">&lt;topic&gt;</span>${name}/imu<span class="nt">&lt;/topic&gt;</span>
+<span class="w">        </span><span class="nt">&lt;update_rate&gt;</span>50<span class="nt">&lt;/update_rate&gt;</span>
+<span class="w">        </span><span class="nt">&lt;always_on&gt;</span>true<span class="nt">&lt;/always_on&gt;</span>
+<span class="w">      </span><span class="nt">&lt;/sensor&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/xacro:sensor_link&gt;</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><strong>Why a separate link:</strong> <code class="docutils literal notranslate"><span class="pre">base_link</span></code> comes from the URDF, and a merged
+include can’t add a sensor inside it.</p></li>
+<li><p><strong>Why <code class="docutils literal notranslate"><span class="pre">frame_id</span></code> carries the name:</strong> messages then say they are in
+<code class="docutils literal notranslate"><span class="pre">boat_a/imu_link</span></code>, which is the frame <code class="docutils literal notranslate"><span class="pre">robot_state_publisher</span></code> publishes for
+the instance <code class="docutils literal notranslate"><span class="pre">boat_a</span></code> (<a class="reference internal" href="spawn-and-drive.html#one-name-per-instance"><span class="std std-ref">Spawn and drive</span></a>).</p></li>
+</ul>
+<p><a class="reference internal" href="sensors.html"><span class="std std-doc">Add sensors</span></a> covers the other sensor types.</p>
+</section>
+<section id="joint-states">
+<h2>Joint states<a class="headerlink" href="#joint-states" title="Link to this heading"></a></h2>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="nt">&lt;plugin</span><span class="w"> </span><span class="na">filename=</span><span class="s">"gz-sim-joint-state-publisher-system"</span>
+<span class="w">            </span><span class="na">name=</span><span class="s">"gz::sim::systems::JointStatePublisher"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;topic&gt;</span>${name}/joint_states<span class="nt">&lt;/topic&gt;</span>
+<span class="w">      </span><span class="nt">&lt;joint_name&gt;</span>motor_port_joint<span class="nt">&lt;/joint_name&gt;</span>
+<span class="w">      </span><span class="nt">&lt;joint_name&gt;</span>motor_stbd_joint<span class="nt">&lt;/joint_name&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/plugin&gt;</span>
+</pre></div>
+</div>
+<p>The bridge turns this into <code class="docutils literal notranslate"><span class="pre">/&lt;name&gt;/joint_states</span></code>, which the instance’s
+<code class="docutils literal notranslate"><span class="pre">robot_state_publisher</span></code> reads to spin the propellers in RViz.</p>
+</section>
+<section id="build-it">
+<h2>Build it<a class="headerlink" href="#build-it" title="Link to this heading"></a></h2>
+<p>The package looks like this:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>kai_custom_vehicle/
+├── CMakeLists.txt
+├── package.xml
+├── urdf/custom_usv.urdf.xacro, dimensions.xacro
+├── models/custom_usv/model.sdf.xacro, model.config
+├── config/ros_gz_bridge.yaml.in
+├── rviz/custom_usv.rviz
+├── launch/sim.launch.xml, rviz.launch.xml, display.launch.xml
+├── scripts/instance_rviz.py
+└── hooks/resource_paths.dsv.in, resource_paths.sh.in
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code> expands the URDF and the model for the default instance,
+installs them with a rendered bridge config and <code class="docutils literal notranslate"><span class="pre">model.config</span></code>, and adds
+the models directory to Gazebo’s resource path, so that <code class="docutils literal notranslate"><span class="pre">model://custom_usv</span></code>
+resolves:</p>
+<div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="c"># Put the models directory on GZ_SIM_RESOURCE_PATH so model://custom_usv</span>
+<span class="c"># resolves. The model is deliberately not named after the package: Gazebo</span>
+<span class="c"># tries model:// names relative to the current directory first, and a source</span>
+<span class="c"># checkout has a directory called kai_custom_vehicle.</span>
+<span class="nb">ament_environment_hooks</span><span class="p">(</span><span class="s2">"hooks/resource_paths.dsv.in"</span><span class="p">)</span>
+<span class="nb">ament_environment_hooks</span><span class="p">(</span><span class="s2">"hooks/resource_paths.sh.in"</span><span class="p">)</span>
+
+<span class="c"># The default instance, model://custom_usv, for plain `gz sim` and for world</span>
+<span class="c"># files: the URDF and the model expanded with the default name, the bridge</span>
+<span class="c"># config rendered from its template, and model.config. kai_bringup's</span>
+<span class="c"># spawn_vehicle.launch.xml renders the same three sources for any other name.</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">model_dir</span><span class="w"> </span><span class="s">models/custom_usv</span><span class="p">)</span>
+<span class="nb">xacro_add_files</span><span class="p">(</span>
+<span class="w">  </span><span class="s">urdf/custom_usv.urdf.xacro</span>
+<span class="w">  </span><span class="o">${</span><span class="nv">model_dir</span><span class="o">}</span><span class="s">/model.sdf.xacro</span>
+<span class="w">  </span><span class="s">INSTALL</span><span class="w"> </span><span class="s">DESTINATION</span><span class="w"> </span><span class="o">${</span><span class="nv">model_dir</span><span class="o">}</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">name</span><span class="w"> </span><span class="s">custom_usv</span><span class="p">)</span>
+<span class="nb">configure_file</span><span class="p">(</span><span class="s">config/ros_gz_bridge.yaml.in</span>
+<span class="w">  </span><span class="o">${</span><span class="nv">CMAKE_CURRENT_BINARY_DIR</span><span class="o">}</span><span class="s">/ros_gz_bridge.yaml</span><span class="w"> </span><span class="s">@ONLY</span><span class="p">)</span>
+<span class="nb">install</span><span class="p">(</span><span class="s">FILES</span><span class="w"> </span><span class="o">${</span><span class="nv">CMAKE_CURRENT_BINARY_DIR</span><span class="o">}</span><span class="s">/ros_gz_bridge.yaml</span>
+<span class="w">  </span><span class="s">DESTINATION</span><span class="w"> </span><span class="s">share/</span><span class="o">${</span><span class="nv">PROJECT_NAME</span><span class="o">}</span><span class="s">/</span><span class="o">${</span><span class="nv">model_dir</span><span class="o">}</span><span class="p">)</span>
+
+<span class="nb">install</span><span class="p">(</span><span class="s">DIRECTORY</span><span class="w"> </span><span class="s">urdf</span><span class="w"> </span><span class="s">models</span><span class="w"> </span><span class="s">config</span><span class="w"> </span><span class="s">rviz</span><span class="w"> </span><span class="s">launch</span>
+<span class="w">  </span><span class="s">DESTINATION</span><span class="w"> </span><span class="s">share/</span><span class="o">${</span><span class="nv">PROJECT_NAME</span><span class="o">}</span><span class="p">)</span>
+<span class="nb">install</span><span class="p">(</span><span class="s">PROGRAMS</span><span class="w"> </span><span class="s">scripts/instance_rviz.py</span><span class="w"> </span><span class="s">DESTINATION</span><span class="w"> </span><span class="s">lib/</span><span class="o">${</span><span class="nv">PROJECT_NAME</span><span class="o">}</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Any other instance is rendered on demand by the spawn launch, which runs the
+same xacros with another name and fills the same bridge template
+(<a class="reference internal" href="spawn-and-drive.html"><span class="std std-doc">Spawn and drive</span></a>). You can run that step yourself:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>run<span class="w"> </span>kai_bringup<span class="w"> </span>instantiate_vehicle.py<span class="w"> </span>--name<span class="w"> </span>boat_b<span class="w"> </span>--out-dir<span class="w"> </span>~/boat_b<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--xacro<span class="w"> </span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/models/custom_usv/model.sdf.xacro<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--bridge<span class="w"> </span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/config/ros_gz_bridge.yaml.in<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--urdf<span class="w"> </span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/urdf/custom_usv.urdf.xacro
+</pre></div>
+</div>
+<p>That writes <code class="docutils literal notranslate"><span class="pre">model.sdf</span></code>, <code class="docutils literal notranslate"><span class="pre">robot.urdf</span></code> and <code class="docutils literal notranslate"><span class="pre">ros_gz_bridge.yaml</span></code> for <code class="docutils literal notranslate"><span class="pre">boat_b</span></code>.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Don’t name the model directory after the package. Gazebo first looks for
+<code class="docutils literal notranslate"><span class="pre">model://</span></code> names relative to the current directory, and a source checkout
+contains a directory called <code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code>. Hence <code class="docutils literal notranslate"><span class="pre">models/custom_usv</span></code>.</p>
+</div>
+</section>
+<section id="marking-from-a-urdf">
+<h2>Marking from a URDF<a class="headerlink" href="#marking-from-a-urdf" title="Link to this heading"></a></h2>
+<p>If you would rather not keep a separate SDF file, the mark can travel in the
+URDF, but only one way. Gazebo converts a URDF when it loads it, and the
+conversion rebuilds every <code class="docutils literal notranslate"><span class="pre">&lt;collision&gt;</span></code> from the parsed geometry, so an
+attribute on a URDF collision is lost, and so is one inside a
+<code class="docutils literal notranslate"><span class="pre">&lt;gazebo</span> <span class="pre">reference=&quot;...&quot;&gt;</span></code> block. What does come through unchanged is a
+model-level <code class="docutils literal notranslate"><span class="pre">&lt;gazebo&gt;</span></code> block: everything inside it is copied into the
+converted model as-is. Put the displacement link and its joint there, in SDF:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;robot</span><span class="w"> </span><span class="na">name=</span><span class="s">"my_boat"</span><span class="w"> </span><span class="na">xmlns:gz=</span><span class="s">"http://gazebosim.org/schema"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;link</span><span class="w"> </span><span class="na">name=</span><span class="s">"base_link"</span><span class="nt">&gt;</span><span class="w"> </span>...<span class="w"> </span>contact<span class="w"> </span>shapes<span class="w"> </span>...<span class="w"> </span><span class="nt">&lt;/link&gt;</span>
+
+<span class="w">  </span><span class="nt">&lt;gazebo&gt;</span>
+<span class="w">    </span><span class="nt">&lt;link</span><span class="w"> </span><span class="na">name=</span><span class="s">"hull_displacement"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;pose</span><span class="w"> </span><span class="na">relative_to=</span><span class="s">"base_link"</span><span class="nt">&gt;</span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="nt">&lt;/pose&gt;</span>
+<span class="w">      </span><span class="nt">&lt;inertial&gt;</span>
+<span class="w">        </span><span class="nt">&lt;mass&gt;</span>1e-5<span class="nt">&lt;/mass&gt;</span>
+<span class="w">        </span><span class="nt">&lt;inertia&gt;&lt;ixx&gt;</span>1e-8<span class="nt">&lt;/ixx&gt;&lt;iyy&gt;</span>1e-8<span class="nt">&lt;/iyy&gt;&lt;izz&gt;</span>1e-8<span class="nt">&lt;/izz&gt;&lt;/inertia&gt;</span>
+<span class="w">      </span><span class="nt">&lt;/inertial&gt;</span>
+<span class="w">      </span><span class="nt">&lt;collision</span><span class="w"> </span><span class="na">name=</span><span class="s">"pontoon_port"</span><span class="w"> </span><span class="na">gz:buoyancy=</span><span class="s">"true"</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;pose&gt;</span>0<span class="w"> </span>0.25<span class="w"> </span>0.036<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="nt">&lt;/pose&gt;</span>
+<span class="w">        </span><span class="nt">&lt;geometry&gt;&lt;box&gt;&lt;size&gt;</span>1.0<span class="w"> </span>0.15<span class="w"> </span>0.15<span class="nt">&lt;/size&gt;&lt;/box&gt;&lt;/geometry&gt;</span>
+<span class="w">        </span><span class="nt">&lt;surface&gt;&lt;contact&gt;&lt;collide_bitmask&gt;</span>0x00<span class="nt">&lt;/collide_bitmask&gt;&lt;/contact&gt;&lt;/surface&gt;</span>
+<span class="w">      </span><span class="nt">&lt;/collision&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/link&gt;</span>
+<span class="w">    </span><span class="nt">&lt;joint</span><span class="w"> </span><span class="na">name=</span><span class="s">"hull_displacement_joint"</span><span class="w"> </span><span class="na">type=</span><span class="s">"fixed"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;parent&gt;</span>base_link<span class="nt">&lt;/parent&gt;</span>
+<span class="w">      </span><span class="nt">&lt;child&gt;</span>hull_displacement<span class="nt">&lt;/child&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/joint&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/gazebo&gt;</span>
+<span class="nt">&lt;/robot&gt;</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">xmlns:gz</span></code> declaration goes on <code class="docutils literal notranslate"><span class="pre">&lt;robot&gt;</span></code>. Thrusters, damping and sensors
+can sit in the same block as <code class="docutils literal notranslate"><span class="pre">&lt;plugin&gt;</span></code> and <code class="docutils literal notranslate"><span class="pre">&lt;sensor&gt;</span></code> elements, and the file
+spawns directly, with <code class="docutils literal notranslate"><span class="pre">ros_gz_sim</span> <span class="pre">create</span> <span class="pre">-file</span> <span class="pre">my_boat.urdf</span></code> or from the
+<code class="docutils literal notranslate"><span class="pre">robot_description</span></code> topic. <code class="docutils literal notranslate"><span class="pre">check_urdf</span></code> and RViz ignore the block.</p>
+<p>It is quicker to start with, but it ties the URDF to Gazebo, and the block
+is SDF inside a URDF, with no xacro sharing of the hull dimensions. The
+separate model file above scales better, which is why the custom USV uses
+it.</p>
+<p>Next: <a class="reference internal" href="spawn-and-drive.html"><span class="std std-doc">Spawn and drive</span></a>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="vehicle-description.html" class="btn btn-neutral float-left" title="Describe the vehicle" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="spawn-and-drive.html" class="btn btn-neutral float-right" title="Spawn and drive" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Honu Robotics.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  
+<div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    <span class="fa fa-book"> Other Versions</span>
+    v: lyrical
+    <span class="fa fa-caret-down"></span>
+  </span>
+  <div class="rst-other-versions">
+    <dl id="honu-version-list">
+      <dt>Distributions</dt>
+      <dd><a href="/gz-maritime/lyrical/" data-version="lyrical">Lyrical</a></dd>
+    </dl>
+  </div>
+</div>
+<script>
+  (function () {
+    var current = "lyrical";
+    var base = "/gz-maritime/";
+
+    /* Keep the reader on the same page when switching versions; the
+       version root href stays as the fallback for pages a version lacks. */
+    function wire() {
+      document.querySelectorAll('.rst-other-versions a[data-version]').forEach(function (a) {
+        var target = a.getAttribute('data-version');
+        var path = window.location.pathname;
+        if (target !== current && path.indexOf('/' + current + '/') !== -1) {
+          a.href = path.replace('/' + current + '/', '/' + target + '/');
+        }
+      });
+    }
+
+    if (!window.fetch) { wire(); return; }
+
+    /* The deploy tool maintains versions.json at the site root; reading it
+       at runtime lets builds published before a new distribution existed
+       still offer it in the flyout. Offline or local preview builds fall
+       back to the build time list rendered above. */
+    fetch(base + 'versions.json', {cache: 'no-cache'}).then(function (response) {
+      if (!response.ok) { throw new Error(response.status); }
+      return response.json();
+    }).then(function (entries) {
+      var list = document.getElementById('honu-version-list');
+      if (!list || !entries.length) { return; }
+      list.querySelectorAll('dd').forEach(function (dd) { dd.remove(); });
+      entries.forEach(function (entry) {
+        var a = document.createElement('a');
+        a.href = entry.url;
+        a.setAttribute('data-version', entry.name);
+        a.textContent = entry.name.charAt(0).toUpperCase() + entry.name.slice(1);
+        var dd = document.createElement('dd');
+        dd.appendChild(a);
+        list.appendChild(dd);
+      });
+    }).catch(function () {}).finally(wire);
+  })();
+</script><script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

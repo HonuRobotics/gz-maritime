@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>How to guides &mdash; Gz Maritime lyrical documentation</title>
+  <title>Add sensors &mdash; Gz Maritime lyrical documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/honu.css?v=44af46ee" />
@@ -21,8 +21,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Bring your own vehicle" href="own-vehicle.html" />
-    <link rel="prev" title="Holybro X500" href="../vehicles/holybro.html" /> 
+    <link rel="next" title="Use your own world" href="own-world.html" />
+    <link rel="prev" title="Spawn and drive" href="spawn-and-drive.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -94,9 +94,9 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">How to guides</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#bring-your-own-vehicle">Bring your own vehicle</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#more">More</a><ul>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How to guides</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="index.html#bring-your-own-vehicle">Bring your own vehicle</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#more">More</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="own-vehicle.html">Bring your own vehicle</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#who-does-what">Who does what</a></li>
 <li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#the-path">The path</a><ul>
@@ -155,11 +155,11 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="sensors.html">Add sensors</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="sensors.html#what-the-world-provides">What the world provides</a></li>
-<li class="toctree-l4"><a class="reference internal" href="sensors.html#the-pattern">The pattern</a></li>
-<li class="toctree-l4"><a class="reference internal" href="sensors.html#a-camera">A camera</a></li>
-<li class="toctree-l4"><a class="reference internal" href="sensors.html#check-a-sensor">Check a sensor</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Add sensors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#what-the-world-provides">What the world provides</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#the-pattern">The pattern</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#a-camera">A camera</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#check-a-sensor">Check a sensor</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="own-world.html">Use your own world</a><ul>
@@ -243,9 +243,10 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">How to guides</li>
+          <li class="breadcrumb-item"><a href="index.html">How to guides</a></li>
+      <li class="breadcrumb-item active">Add sensors</li>
       <li class="wy-breadcrumbs-aside">
-              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/how-to/index.md" class="fa fa-github"> Edit on GitHub</a>
+              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/how-to/sensors.md" class="fa fa-github"> Edit on GitHub</a>
       </li>
   </ul>
   <hr/>
@@ -253,34 +254,124 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="how-to-guides">
-<h1>How to guides<a class="headerlink" href="#how-to-guides" title="Link to this heading"></a></h1>
-<section id="bring-your-own-vehicle">
-<h2>Bring your own vehicle<a class="headerlink" href="#bring-your-own-vehicle" title="Link to this heading"></a></h2>
-<p>Follow these in order the first time. Every step uses the
-<a class="reference internal" href="../vehicles/custom-usv.html"><span class="std std-doc">custom USV</span></a> as the worked example, so there is
-always a real file to look at, and the snippets on these pages are taken
-from its files.</p>
-<ol class="arabic simple">
-<li><p><a class="reference internal" href="own-vehicle.html"><span class="std std-doc">Overview</span></a>: what the world gives you, what your vehicle
-brings, and how a vehicle starts floating.</p></li>
-<li><p><a class="reference internal" href="vehicle-description.html"><span class="std std-doc">Describe the vehicle</span></a>: the URDF, with its frames,
-mass, collision shapes and waterline.</p></li>
-<li><p><a class="reference internal" href="gazebo-composition.html"><span class="std std-doc">Compose the Gazebo model</span></a>: buoyancy registration,
-thrusters, damping and sensors on top of the URDF.</p></li>
-<li><p><a class="reference internal" href="spawn-and-drive.html"><span class="std std-doc">Spawn and drive</span></a>: the spawn launch, the bridge, and
-driving.</p></li>
-<li><p><a class="reference internal" href="sensors.html"><span class="std std-doc">Add sensors</span></a>: IMU, GPS, magnetometer and cameras.</p></li>
-</ol>
+  <section id="add-sensors">
+<h1>Add sensors<a class="headerlink" href="#add-sensors" title="Link to this heading"></a></h1>
+<p>A sensor in Gazebo has two halves. A <strong>world system</strong> does the simulating, and
+your <strong>model</strong> says where the sensor is and what to publish. The world
+already has its half; this page is about yours.</p>
+<section id="what-the-world-provides">
+<h2>What the world provides<a class="headerlink" href="#what-the-world-provides" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>World system in <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code></p></th>
+<th class="head"><p>Simulates</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-imu-system</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">imu</span></code> sensors</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-magnetometer-system</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">magnetometer</span></code> sensors</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-navsat-system</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">navsat</span></code> (GPS) sensors</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-sensors-system</span></code></p></td>
+<td><p>Rendered sensors: <code class="docutils literal notranslate"><span class="pre">camera</span></code>, <code class="docutils literal notranslate"><span class="pre">depth_camera</span></code>, <code class="docutils literal notranslate"><span class="pre">gpu_lidar</span></code> and so on. These need a GPU.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The world also sets <code class="docutils literal notranslate"><span class="pre">&lt;spherical_coordinates&gt;</span></code>: where on Earth the origin is
+(Portuguese Ledge, Monterey Bay). The GPS reports positions relative to that
+spot, and the magnetometer computes Earth’s magnetic field there.</p>
 </section>
-<section id="more">
-<h2>More<a class="headerlink" href="#more" title="Link to this heading"></a></h2>
-<ul class="simple">
-<li><p><a class="reference internal" href="own-world.html"><span class="std std-doc">Use your own world</span></a></p></li>
-<li><p><a class="reference internal" href="faq.html"><span class="std std-doc">Troubleshooting</span></a></p></li>
-</ul>
-<div class="toctree-wrapper compound">
+<section id="the-pattern">
+<h2>The pattern<a class="headerlink" href="#the-pattern" title="Link to this heading"></a></h2>
+<p>Every sensor follows the same four steps:</p>
+<ol class="arabic simple">
+<li><p><strong>A frame in the URDF</strong> where the sensor sits, such as <code class="docutils literal notranslate"><span class="pre">imu_link</span></code>
+(<a class="reference internal" href="vehicle-description.html#sensor-frames"><span class="std std-ref">Sensor frames</span></a>).</p></li>
+<li><p><strong>A tiny link in the Gazebo model</strong>, placed at that frame and fixed to
+<code class="docutils literal notranslate"><span class="pre">base_link</span></code>, holding the <code class="docutils literal notranslate"><span class="pre">&lt;sensor&gt;</span></code>
+(<a class="reference internal" href="gazebo-composition.html#sensors"><span class="std std-ref">Sensors</span></a>).</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">&lt;frame_id&gt;</span></code> set to <code class="docutils literal notranslate"><span class="pre">${name}/</span></code> plus the URDF frame</strong>, so the messages
+name the frame <code class="docutils literal notranslate"><span class="pre">robot_state_publisher</span></code> publishes for this instance.</p></li>
+<li><p><strong>A bridge entry</strong> for its topic
+(<a class="reference internal" href="spawn-and-drive.html#the-bridge-configuration"><span class="std std-ref">The bridge configuration</span></a>).</p></li>
+</ol>
+<p>The IMU is shown in <a class="reference internal" href="gazebo-composition.html#sensors"><span class="std std-ref">Compose the Gazebo model</span></a>.
+The other two sensors on the custom USV differ only in their <code class="docutils literal notranslate"><span class="pre">&lt;sensor&gt;</span></code>
+element:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="nt">&lt;xacro:sensor_link</span><span class="w"> </span><span class="na">sensor_name=</span><span class="s">"magnetometer"</span><span class="w"> </span><span class="na">frame=</span><span class="s">"imu_link"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;sensor</span><span class="w"> </span><span class="na">name=</span><span class="s">"magnetometer"</span><span class="w"> </span><span class="na">type=</span><span class="s">"magnetometer"</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;frame_id&gt;</span>${name}/imu_link<span class="nt">&lt;/frame_id&gt;</span>
+<span class="w">        </span><span class="nt">&lt;topic&gt;</span>${name}/magnetometer<span class="nt">&lt;/topic&gt;</span>
+<span class="w">        </span><span class="nt">&lt;update_rate&gt;</span>50<span class="nt">&lt;/update_rate&gt;</span>
+<span class="w">        </span><span class="nt">&lt;always_on&gt;</span>true<span class="nt">&lt;/always_on&gt;</span>
+<span class="w">      </span><span class="nt">&lt;/sensor&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/xacro:sensor_link&gt;</span>
+</pre></div>
 </div>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="nt">&lt;xacro:sensor_link</span><span class="w"> </span><span class="na">sensor_name=</span><span class="s">"navsat"</span><span class="w"> </span><span class="na">frame=</span><span class="s">"gps_link"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;sensor</span><span class="w"> </span><span class="na">name=</span><span class="s">"navsat"</span><span class="w"> </span><span class="na">type=</span><span class="s">"navsat"</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;frame_id&gt;</span>${name}/gps_link<span class="nt">&lt;/frame_id&gt;</span>
+<span class="w">        </span><span class="nt">&lt;topic&gt;</span>${name}/navsat<span class="nt">&lt;/topic&gt;</span>
+<span class="w">        </span><span class="nt">&lt;update_rate&gt;</span>5<span class="nt">&lt;/update_rate&gt;</span>
+<span class="w">        </span><span class="nt">&lt;always_on&gt;</span>true<span class="nt">&lt;/always_on&gt;</span>
+<span class="w">      </span><span class="nt">&lt;/sensor&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/xacro:sensor_link&gt;</span>
+</pre></div>
+</div>
+</section>
+<section id="a-camera">
+<h2>A camera<a class="headerlink" href="#a-camera" title="Link to this heading"></a></h2>
+<p>The custom USV has no camera, but adding one follows the same pattern. With
+a <code class="docutils literal notranslate"><span class="pre">camera_link</span></code> frame in your URDF:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;link</span><span class="w"> </span><span class="na">name=</span><span class="s">"camera_sensor"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;pose</span><span class="w"> </span><span class="na">relative_to=</span><span class="s">"camera_link"</span><span class="nt">&gt;</span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="nt">&lt;/pose&gt;</span>
+<span class="w">  </span><span class="nt">&lt;inertial&gt;</span>
+<span class="w">    </span><span class="nt">&lt;mass&gt;</span>1e-5<span class="nt">&lt;/mass&gt;</span>
+<span class="w">    </span><span class="nt">&lt;inertia&gt;&lt;ixx&gt;</span>1e-8<span class="nt">&lt;/ixx&gt;&lt;iyy&gt;</span>1e-8<span class="nt">&lt;/iyy&gt;&lt;izz&gt;</span>1e-8<span class="nt">&lt;/izz&gt;&lt;/inertia&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/inertial&gt;</span>
+<span class="w">  </span><span class="nt">&lt;sensor</span><span class="w"> </span><span class="na">name=</span><span class="s">"camera"</span><span class="w"> </span><span class="na">type=</span><span class="s">"camera"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;frame_id&gt;</span>${name}/camera_link<span class="nt">&lt;/frame_id&gt;</span>
+<span class="w">    </span><span class="nt">&lt;topic&gt;</span>${name}/camera/image<span class="nt">&lt;/topic&gt;</span>
+<span class="w">    </span><span class="nt">&lt;update_rate&gt;</span>15<span class="nt">&lt;/update_rate&gt;</span>
+<span class="w">    </span><span class="nt">&lt;always_on&gt;</span>true<span class="nt">&lt;/always_on&gt;</span>
+<span class="w">    </span><span class="nt">&lt;camera&gt;</span>
+<span class="w">      </span><span class="nt">&lt;horizontal_fov&gt;</span>1.2<span class="nt">&lt;/horizontal_fov&gt;</span>
+<span class="w">      </span><span class="nt">&lt;image&gt;&lt;width&gt;</span>640<span class="nt">&lt;/width&gt;&lt;height&gt;</span>480<span class="nt">&lt;/height&gt;&lt;/image&gt;</span>
+<span class="w">      </span><span class="nt">&lt;clip&gt;&lt;near&gt;</span>0.05<span class="nt">&lt;/near&gt;&lt;far&gt;</span>200<span class="nt">&lt;/far&gt;&lt;/clip&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/camera&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/sensor&gt;</span>
+<span class="nt">&lt;/link&gt;</span>
+<span class="nt">&lt;joint</span><span class="w"> </span><span class="na">name=</span><span class="s">"camera_sensor_joint"</span><span class="w"> </span><span class="na">type=</span><span class="s">"fixed"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;parent&gt;</span>base_link<span class="nt">&lt;/parent&gt;</span>
+<span class="w">  </span><span class="nt">&lt;child&gt;</span>camera_sensor<span class="nt">&lt;/child&gt;</span>
+<span class="nt">&lt;/joint&gt;</span>
+</pre></div>
+</div>
+<p>Bridge it as <code class="docutils literal notranslate"><span class="pre">sensor_msgs/msg/Image</span></code> to <code class="docutils literal notranslate"><span class="pre">gz.msgs.Image</span></code>, from Gazebo to ROS.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code> lights its scene with a cyan ambient light
+(<code class="docutils literal notranslate"><span class="pre">&lt;scene&gt;&lt;ambient&gt;0.0</span> <span class="pre">1.0</span> <span class="pre">1.0&lt;/ambient&gt;</span></code>) for its deep-ocean look. Camera
+sensors render with that light, so objects look green and blue in their
+images. The Gazebo GUI uses its own light and isn’t affected. If colours
+matter to you, use a copy of the world with a neutral ambient light, such as
+<code class="docutils literal notranslate"><span class="pre">0.4</span> <span class="pre">0.4</span> <span class="pre">0.4</span></code> (<a class="reference internal" href="own-world.html"><span class="std std-doc">Use your own world</span></a>).</p>
+</div>
+</section>
+<section id="check-a-sensor">
+<h2>Check a sensor<a class="headerlink" href="#check-a-sensor" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>topic<span class="w"> </span><span class="nb">echo</span><span class="w"> </span>/custom_usv/imu<span class="w"> </span>--once
+</pre></div>
+</div>
+<p>Look for <code class="docutils literal notranslate"><span class="pre">frame_id:</span> <span class="pre">custom_usv/imu_link</span></code> in the header. If the command
+waits forever, check the bridge entry and that the world runs the matching
+system.</p>
+<p>Next: <a class="reference internal" href="own-world.html"><span class="std std-doc">Use your own world</span></a>.</p>
 </section>
 </section>
 
@@ -288,8 +379,8 @@ driving.</p></li>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../vehicles/holybro.html" class="btn btn-neutral float-left" title="Holybro X500" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="own-vehicle.html" class="btn btn-neutral float-right" title="Bring your own vehicle" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="spawn-and-drive.html" class="btn btn-neutral float-left" title="Spawn and drive" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="own-world.html" class="btn btn-neutral float-right" title="Use your own world" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
