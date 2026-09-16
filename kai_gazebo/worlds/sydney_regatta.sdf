@@ -2,7 +2,8 @@
 <!--
   Sydney International Regatta Centre: the Virtual RobotX (VRX) 2022 to 2024
   venue: a rowing lake with its pontoon, shore and buildings, from the Fuel
-  model the VRX worlds use.
+  model the VRX worlds use, plus a landing pad off the start point for the
+  multi vehicle demo.
 
   The water is a lake: the man made rowing course at Penrith Lakes, fresh,
   flat and sheltered, so keep the sea state between 0 and 2 (wind ripples
@@ -408,6 +409,15 @@
     <include>
       <pose>100 200 0 0 0 0</pose>
       <uri>model://water_surface</uri>
+    </include>
+
+    <!-- A landing pad for aerial vehicles, a static deck 1 m above the
+         water just off the start point, where the multi vehicle demo puts
+         its X500. Nothing marks its collision, so it does not float; it is
+         held up by being static. Spawn a quad on it at z = 1.25. -->
+    <include>
+      <uri>model://landing_pad</uri>
+      <pose>-540 168 0 0 0 0</pose>
     </include>
 
   </world>

@@ -134,6 +134,19 @@ FIGURES = {
         'fov': SITE_FOV,
         'at': [10],
     },
+    # The multi vehicle demo at Sydney: the boat off the start point, the
+    # ROV under the surface ahead of it, the X500 on the pad.
+    'several-vehicles': {
+        'out': DOCS / 'how-to' / 'images' / 'several-vehicles.jpg',
+        'world': 'sydney_regatta',
+        'vehicles': [('model://blueboat', 'blueboat', '-532 162 0.05 0 0 1'),
+                     ('model://bluerov2', 'bluerov2', '-528.8 167 -1 0 0 1'),
+                     ('model://x500', 'x500', '-540 168 1.25 0 0 0')],
+        'sea_state': 1,
+        'camera': '-522 152 4 0 0.2 2.35',
+        'fov': 1.0,
+        'at': [10],
+    },
     'la-spezia': {
         'out': DOCS / 'how-to' / 'images' / 'la-spezia.jpg',
         'world': 'la_spezia',

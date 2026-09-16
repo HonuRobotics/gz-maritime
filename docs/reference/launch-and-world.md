@@ -34,13 +34,19 @@ the simulation runs.
 | `use_composition` | `true` | Load the bridge and state publisher into `container_name`. |
 | `container_name` | `ros_gz_container` | The simulation launch's container. |
 
-### `kai_bringup` `multi_vehicle_demo.launch.xml`
+### `kai_bringup` `multi_vehicle_demo.launch.py`
 
 The simulation part plus one vehicle of each type through their own
-generators: a BlueBoat at the origin, a BlueROV2 six metres ahead and one
-metre down, an X500 on the landing pad of the open water world, the world
-it is written for. Needs bluerobotics_models and holybro_models in the
-workspace. Takes `gazebo_gui` and `use_composition`.
+generators: a BlueBoat, a BlueROV2 six metres ahead and one metre down, an
+X500 on the landing pad. Needs bluerobotics_models and holybro_models in
+the workspace. [Several vehicles on one ocean](../how-to/several-vehicles.md)
+walks through it.
+
+| Argument | Default | Description |
+|---|---|---|
+| `site` | `sydney_regatta` | The world and where the vehicles go in it: `sydney_regatta` (off the start point) or `open_water` (around the origin). |
+| `gazebo_gui` | `true` | Start the Gazebo GUI. |
+| `use_composition` | `true` | Run Gazebo, the bridges and the state publishers in one container. |
 
 ### `kai_custom_vehicle` `sim.launch.xml`
 
