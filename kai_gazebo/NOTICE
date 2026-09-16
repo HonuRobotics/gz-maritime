@@ -6,7 +6,8 @@ under the Apache License, Version 2.0:
   (https://app.gazebosim.org/openrobotics) at run time.
 - Sand Island: the VRX 2019 terrain mesh and texture (osrf/vrx,
   gazebo_classic branch, vrx_gazebo/models/sandisland), fetched at build
-  time from a pinned commit.
+  time from a pinned commit; its shore camp (post, antenna, ground_station
+  with tent, foldable_table and foldable_chair) from Fuel at run time.
 - La Spezia marina: the Virtual Ocean Robotics Challenge terrain mesh and
   texture (osrf/vorc, vorc_gazebo/models/marina), fetched at build time
   from a pinned commit.

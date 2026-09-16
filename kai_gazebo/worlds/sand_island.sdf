@@ -1,6 +1,8 @@
 <?xml version="1.0"?>
 <!--
-  Sand Island: the RobotX 2018 venue in Honolulu, Hawaii, from the VRX 2019 world: the island shore with its mooring posts and the ground station tents, on a terrain mesh fetched at build time from the VRX repository.
+  Sand Island: the RobotX 2018 venue in Honolulu, Hawaii, from the VRX 2019
+  world: the island shore with its mooring posts and the ground station
+  tents, on a terrain mesh fetched at build time from the VRX repository.
 
   The same world contract as open_water.sdf (the systems every vehicle
   needs, gz-maritime's buoyancy reading marked collisions, the waterline at
@@ -216,9 +218,7 @@
         <scene>scene</scene>
         <ambient_light>0.4 0.4 0.4</ambient_light>
         <background_color>0.0 0.7 0.8</background_color>
-        <!-- Matches asv_wave_sim's reference camera_pose for fair
-             side-by-side visual comparison: 6m east of origin, 6m
-             above water, pitched ~29° down. -->
+        <!-- The VRX 2019 world's own default view of the site. -->
         <camera_pose>175.544 123.61 4.70958 0 0.168 -2.40718</camera_pose>
         <camera_clip>
           <near>0.1</near>

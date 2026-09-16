@@ -15,14 +15,14 @@
 The worlds are well formed, pass the SDF check and run headless.
 
 Every world is parsed and checked for the contract the docs state: the
-systems every vehicle needs, gz-maritime's buoyancy naming nobody, a wave
-source and the drawn sea. The worlds whose terrain is local, the open sea
-and the two whose meshes the build fetched, also pass the SDF checker with
-every include resolved, and the two with terrain run for a few hundred
-steps without rendering, so a broken mesh path or a plugin that fails to
-load shows up here rather than at the first launch. The Fuel backed worlds
-are not run: their terrain is a download of a few hundred megabytes on
-first use, which has no place in a unit test.
+name every command relies on, the systems every vehicle needs, gz-maritime's
+buoyancy naming nobody, a wave source and the drawn sea. The worlds with no
+Fuel model in them, the open sea and La Spezia, also pass the SDF checker
+with every include resolved, and La Spezia runs for a few hundred steps
+without rendering, so a broken mesh path or a plugin that fails to load
+shows up here rather than at the first launch. The other three need Fuel
+(the Sydney and Benderson Park terrains, the Sand Island shore camp), a
+download on first use that has no place in a unit test.
 """
 
 import os
@@ -58,7 +58,7 @@ def sdf_env():
 
 @pytest.mark.parametrize('world', ALL)
 def test_world_keeps_the_contract(world):
-    """Named after its file, with every system a vehicle needs, buoyancy naming nobody, a sea."""
+    """Named default, with every system a vehicle needs, buoyancy naming nobody, a sea."""
     root = ET.parse(WORLDS / f'{world}.sdf').getroot()
     w = root.find('world')
     # Every world is named 'default' so /world/default/... commands work on all.

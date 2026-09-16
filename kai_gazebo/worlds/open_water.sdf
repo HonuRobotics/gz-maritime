@@ -370,7 +370,8 @@
       </plugin>
     </gui>
 
-    <!-- Water surface visual (wave-displaced mesh). -->
+    <!-- Water surface visual (wave-displaced mesh): one include draws a
+         3 km square of tiles around the origin. -->
     <include>
       <uri>model://water_surface</uri>
     </include>
