@@ -96,6 +96,13 @@
       name="gz::sim::systems::NavSat">
     </plugin>
 
+    <!-- Barometers: the air pressure system, for aerial vehicles such as the
+         X500 that carry an air_pressure sensor. -->
+    <plugin
+      filename="gz-sim-air-pressure-system"
+      name="gz::sim::systems::AirPressure">
+    </plugin>
+
     <!-- Buoyancy (gz_buoyancy): graded, seawater (1025 kg/m^3) below z = 0
          and air (1 kg/m^3) above. The interface is the FLAT z = 0 plane, not
          the wave surface: for vehicle physics the waves are visual only.

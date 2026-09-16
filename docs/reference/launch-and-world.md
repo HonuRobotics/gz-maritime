@@ -92,6 +92,28 @@ ros2 run kai_custom_vehicle instance_rviz.py --name NAME --config BASE.rviz --ou
 It writes the base RViz config pointed at the instance (fixed frame,
 description topic, TF Prefix) to `FILE` and prints the path.
 
+## Worlds
+
+Five worlds share one contract: the systems every vehicle needs, the
+gz-maritime buoyancy reading marked collisions, the waterline at z = 0 and
+the wave field for the drawn sea. Pass any of them to the simulation launch
+as `world:=<name>.sdf`; the spawn launch then puts vehicles into it by name.
+
+| World | Site | Terrain | Where to start |
+|---|---|---|---|
+| `open_water.sdf` | Open sea, Monterey Bay coordinates | None; a landing pad at (8, -8) | Spawn anywhere |
+| `sydney_regatta.sdf` | Sydney International Regatta Centre, VRX 2022 to 2024 | Fuel, fetched on first use (about 140 MB) | around x -530, y 170; start at x -532, y 162 |
+| `benderson_park.sdf` | Nathan Benderson Park, Sarasota, RobotX 2022 | Fuel, fetched on first use (about 220 MB) | the lake runs along y; start at the origin, heading 1.57 |
+| `sand_island.sdf` | Sand Island, Honolulu, RobotX 2018 and VRX 2019 | VRX mesh, fetched by the build | start at x 158, y 108 |
+| `la_spezia.sdf` | La Spezia marina, VORC 2020 | VORC mesh, fetched by the build | start at x 10, y -372 |
+
+The site worlds draw the water as tiles of the water surface model, one
+per 200 m cell of water measured from the terrain: the whole lake at Sydney
+and Benderson Park, the sea near the shore at Sand Island and La Spezia,
+where flat strips carry the sea on to the horizon. Buoyancy does not depend
+on any of that. The terrain models are Apache 2.0 assets from VRX and VORC,
+credited in `kai_gazebo/NOTICE`.
+
 ## The `open_water.sdf` world
 
 World name: `default`.
