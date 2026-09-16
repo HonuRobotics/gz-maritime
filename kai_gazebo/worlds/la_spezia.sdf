@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <!--
-  La Spezia marina: the VORC 2020 venue in the Gulf of La Spezia, Italy: the
-  marina with its breakwaters and quays, on a terrain mesh fetched at build
-  time from the VORC repository.
+  La Spezia marina: the Virtual Ocean Robotics Challenge (VORC) 2020 venue
+  in the Gulf of La Spezia, Italy: the marina with its breakwaters and
+  quays, on a terrain mesh fetched at build time from the VORC repository.
 
   The same world contract as open_water.sdf (the systems every vehicle
   needs, gz-maritime's buoyancy reading marked collisions, the waterline at
@@ -34,12 +34,13 @@
       <heading_deg>0</heading_deg>
     </spherical_coordinates>
 
-    <!-- Scene: neutral white ambient, as in the VRX worlds, so the terrain
-         textures keep their colours (open water uses a cyan ambient tuned for
-         the sea alone, which turns sand green), plus a procedural sky: the
-         <sky> element tells gz-rendering to draw its built-in sky cube (sun,
-         horizon transition) so the water has something to reflect and the
-         background isn't a flat colour. -->
+    <!-- Scene: neutral white ambient, as in the Virtual RobotX (VRX)
+         worlds, so the terrain textures keep their colours (open
+         water uses a cyan ambient tuned for the sea alone, which
+         turns sand green), plus a procedural sky: the <sky> element
+         tells gz-rendering to draw its built-in sky cube (sun,
+         horizon transition) so the water has something to reflect and
+         the background isn't a flat colour. -->
     <scene>
       <ambient>1.0 1.0 1.0</ambient>
       <background>0.0 0.7 0.8</background>

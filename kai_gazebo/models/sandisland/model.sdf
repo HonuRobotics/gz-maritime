@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <!--
-  Sand Island terrain from VRX 2019 (osrf/vrx, gazebo_classic branch,
-  vrx_gazebo/models/sandisland). The mesh and its texture are not in this
-  repository: kai_gazebo's build downloads them, checksummed, into
-  meshes/ next to this file. Static; the mesh is both the visual and the
-  collision, so vehicles ground on the shore.
+  Sand Island terrain from Virtual RobotX (VRX) 2019 (osrf/vrx,
+  gazebo_classic branch, vrx_gazebo/models/sandisland). The mesh and its
+  texture are not in this repository: kai_gazebo's build downloads them,
+  checksummed, into meshes/ next to this file. Static; the mesh is both the
+  visual and the collision, so vehicles ground on the shore.
 -->
 <sdf version="1.12">
   <model name="sandisland">

@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <!--
   Nathan Benderson Park: the RobotX 2022 venue in Sarasota, Florida: a
-  rowing lake with its grandstand and island, from the Fuel model the VRX
-  worlds use.
+  rowing lake with its grandstand and island, from the Fuel model the
+  Virtual RobotX (VRX) competition worlds use.
 
   The same world contract as open_water.sdf (the systems every vehicle
   needs, gz-maritime's buoyancy reading marked collisions, the waterline at

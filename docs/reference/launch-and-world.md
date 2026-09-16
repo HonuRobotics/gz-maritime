@@ -98,6 +98,8 @@ Five worlds share one contract: the systems every vehicle needs, the
 gz-maritime buoyancy reading marked collisions, the waterline at z = 0 and
 the wave field for the drawn sea. Pass any of them to the simulation launch
 as `world:=<name>.sdf`; the spawn launch then puts vehicles into it by name.
+Four of them are venues of the Virtual RobotX competition (VRX) and the
+Virtual Ocean Robotics Challenge (VORC).
 All of them are named `default` inside, so the services below work on
 every one.
 

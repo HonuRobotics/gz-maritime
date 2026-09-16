@@ -1,8 +1,9 @@
 <?xml version="1.0"?>
 <!--
-  Sand Island: the RobotX 2018 venue in Honolulu, Hawaii, from the VRX 2019
-  world: the island shore with its mooring posts and the ground station
-  tents, on a terrain mesh fetched at build time from the VRX repository.
+  Sand Island: the RobotX 2018 venue in Honolulu, Hawaii, from the Virtual
+  RobotX (VRX) 2019 world: the island shore with its mooring posts and the
+  ground station tents, on a terrain mesh fetched at build time from the VRX
+  repository.
 
   The same world contract as open_water.sdf (the systems every vehicle
   needs, gz-maritime's buoyancy reading marked collisions, the waterline at

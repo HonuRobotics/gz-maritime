@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <!--
-  Sydney International Regatta Centre: the VRX 2022 to 2024 venue: a rowing
-  lake with its pontoon, shore and buildings, from the Fuel model the VRX
-  worlds use.
+  Sydney International Regatta Centre: the Virtual RobotX (VRX) 2022 to 2024
+  venue: a rowing lake with its pontoon, shore and buildings, from the Fuel
+  model the VRX worlds use.
 
   The same world contract as open_water.sdf (the systems every vehicle
   needs, gz-maritime's buoyancy reading marked collisions, the waterline at

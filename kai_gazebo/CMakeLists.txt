@@ -20,11 +20,12 @@ install(DIRECTORY
   models
   DESTINATION share/${PROJECT_NAME})
 
-# Terrain meshes of the Sand Island and La Spezia worlds. They are VRX and
-# VORC assets (Apache 2.0), tens of megabytes each, so they are not kept in
-# this repository: the build fetches them from pinned commits, checks their
-# hashes and installs them next to the models that reference them. The
-# Sydney Regatta and Benderson Park terrains come from Fuel at run time.
+# Terrain meshes of the Sand Island and La Spezia worlds. They are Virtual
+# RobotX (VRX) and Virtual Ocean Robotics Challenge (VORC) assets (Apache
+# 2.0), tens of megabytes each, so they are not kept in this repository: the
+# build fetches them from pinned commits, checks their hashes and installs
+# them next to the models that reference them. The Sydney Regatta and
+# Benderson Park terrains come from Fuel at run time.
 function(kai_fetch_asset url sha256 destination)
   get_filename_component(dir ${destination} DIRECTORY)
   file(MAKE_DIRECTORY ${dir})
