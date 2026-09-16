@@ -41,14 +41,22 @@ ros2 launch x500_gazebo sim.launch.xml \
   world:=$(ros2 pkg prefix --share kai_gazebo)/worlds/open_water.sdf z:=1.0
 ```
 
-What to expect: it appears 1 m above the water, and with no flight
-controller its rotors don't spin, so it drops, and it sinks. It isn't a
-floating vehicle: none of its collision shapes are marked as displacement
+What to expect: it appears 1 m above the water at the origin, and with no
+flight controller its rotors don't spin, so it drops, and it sinks. It isn't
+a floating vehicle: none of its collision shapes are marked as displacement
 volume, and they shouldn't be, because they are the airframe, battery and
-landing gear, sized for contact with the ground. It has no water damping
-either, so it falls fast.
+landing gear, sized for contact with the ground. Its place on this world is
+the landing pad, a static deck 1 m above the water at (8, -8); spawned
+there it drops onto its landing gear and stays:
 
-Its bridge comes up with it (`/x500/imu`, `/x500/mag`, `/x500/gps/fix`,
-`/joint_states`); the sensor topics are bridged lazily, so they appear in
-`ros2 topic list` once something subscribes. The barometer stays silent on
-this world, which runs no air-pressure system.
+```bash
+ros2 launch kai_bringup spawn_vehicle.launch.xml name:=x500 x:=8 y:=-8 z:=1.25 \
+  generator:="$(ros2 pkg prefix x500_gazebo)/lib/x500_gazebo/configure_vehicle.py --config $(ros2 pkg prefix --share x500_description)/config/x500.yaml"
+```
+
+That is how the multi vehicle demo, `kai_bringup`'s
+`multi_vehicle_demo.launch.xml`, puts it next to the boats. Its bridge
+comes up with it (`/x500/imu`, `/x500/mag`, `/x500/air_pressure`,
+`/x500/gps/fix`, `/x500/joint_states`); the sensor topics are bridged
+lazily, so they appear in `ros2 topic list` once something subscribes. The
+world runs the air pressure system, so the barometer reports.
