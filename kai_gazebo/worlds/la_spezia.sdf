@@ -219,8 +219,9 @@
         <scene>scene</scene>
         <ambient_light>0.4 0.4 0.4</ambient_light>
         <background_color>0.0 0.7 0.8</background_color>
-        <!-- The VORC world's own default view of the site. -->
-        <camera_pose>27.826445 -347.787354 5.134725 0 0.028 -2.279183</camera_pose>
+        <!-- From over the sea towards the marina: a pier below, the
+             quays and the hills behind. -->
+        <camera_pose>200 -480 55 0 0.55 -2.65</camera_pose>
         <camera_clip>
           <near>0.1</near>
           <far>50000</far>

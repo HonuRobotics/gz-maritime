@@ -219,8 +219,9 @@
         <scene>scene</scene>
         <ambient_light>0.4 0.4 0.4</ambient_light>
         <background_color>0.0 0.7 0.8</background_color>
-        <!-- The VRX 2019 world's own default view of the site. -->
-        <camera_pose>175.544 123.61 4.70958 0 0.168 -2.40718</camera_pose>
+        <!-- Along the shore camp: the tents on the left, the mooring
+             posts and the water on the right. -->
+        <camera_pose>173 122 4 0 0.22 -1.2</camera_pose>
         <camera_clip>
           <near>0.1</near>
           <far>50000</far>
