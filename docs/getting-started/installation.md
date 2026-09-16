@@ -40,10 +40,10 @@ Gazebo where to find the worlds, models and plugins.
 ## 4. Check
 
 ```bash
-ros2 pkg list | grep -E "kai_|gz_buoyancy|tutorial_usv"
+ros2 pkg list | grep -E "kai_|gz_buoyancy|gz_thruster"
 ```
 
-You should see `gz_buoyancy`, `kai_bringup`, `kai_gazebo`,
-`tutorial_usv_description` and `tutorial_usv_gazebo`.
+You should see `gz_buoyancy`, `gz_thruster`, `kai_bringup`,
+`kai_custom_vehicle` and `kai_gazebo`.
 
 Next: [First simulation](first-simulation.md).

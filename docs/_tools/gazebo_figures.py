@@ -72,8 +72,8 @@ FIGURES = {
         'at': [10],
     },
     'first-simulation': {
-        'out': DOCS / 'getting-started' / 'images' / 'tutorial-usv.jpg',
-        'vehicles': [('model://tutorial_usv', 'tutorial_usv')],
+        'out': DOCS / 'getting-started' / 'images' / 'custom-usv.jpg',
+        'vehicles': [('model://custom_usv', 'custom_usv')],
         'sea_state': 1,
         'camera': '1.85 -1.5 0.85 0 0.33 2.46',
         'fov': 0.75,
@@ -81,7 +81,7 @@ FIGURES = {
     },
     'waves-through-hulls': {
         'out': DOCS / 'how-to' / 'images' / 'waves-through-hulls.jpg',
-        'vehicles': [('model://tutorial_usv', 'tutorial_usv')],
+        'vehicles': [('model://custom_usv', 'custom_usv')],
         'sea_state': 3,
         'camera': '1.85 -1.5 1.05 0 0.40 2.46',
         'fov': 0.8,

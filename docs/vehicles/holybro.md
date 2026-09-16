@@ -7,8 +7,10 @@ vehicle, so it runs in its own worlds rather than on this ocean.
 It is listed here because it is built the same way as the vehicles in these
 docs: a description package with the URDF (`x500_description`), a Gazebo
 package with the simulation model, bridge configuration and launch file
-(`x500_gazebo`), and a shared library of parts (`holybro_parts`). It is a
-good second example to read when you structure your own vehicle.
+(`x500_gazebo`), and a shared library of parts (`holybro_parts`). Where
+the custom USV keeps its URDF and its Gazebo model in one package, the
+Holybro and Blue Robotics vehicles split them in two. It is a good second
+example to read when you structure your own vehicle.
 
 ## Run it
 

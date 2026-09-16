@@ -55,14 +55,37 @@ geometry.
 - **Both propellers turn the same way.** Counter-rotating propellers need
   opposite signs of `thrust_coefficient`.
 
+## The boat barely moves, or a bigger command changes nothing
+
+Propeller commands are a fraction of full thrust, in [-1, 1]: `1.0` is
+already full ahead, and the thruster clips anything beyond it. A value that
+would have been a modest force in newtons, such as `5.0`, is full thrust
+here. The limits themselves are `<max_thrust_cmd>` and `<min_thrust_cmd>`
+in the model ([Thrusters](gazebo-composition.md#thrusters)).
+
+## The spawn launch stops with "invalid instance name"
+
+A name is a Gazebo model name, a topic prefix, a ROS namespace and a TF
+prefix at once, so it is held to the strictest of those: letters, digits
+and underscores, starting with a letter. `boat-b` and `2nd_boat` are out;
+`boat_b` is fine.
+
+## The spawn launch returns straight away
+
+That is expected. With composition on, its bridge and state publisher load
+into the simulation's container and the launch has nothing left to run.
+`ros2 node list` shows `/<name>/ros_gz_bridge` and
+`/<name>/robot_state_publisher`, and they go down with the simulation.
+
 ## Two boats answer the same command, or RViz shows a jumping robot
 
 Both instances share a name somewhere. Every instance needs its own `name`,
 which must reach the model's topics and frame ids, the ROS namespace and
 `robot_state_publisher`'s `frame_prefix`
 ([One name per instance](spawn-and-drive.md#one-name-per-instance)). If you
-spawned the installed default model twice, generate an instance per boat
-with `configure_vehicle.py --name` instead.
+spawned the installed default model twice by hand, spawn each boat through
+`spawn_vehicle.launch.xml name:=` instead, which renders the model for its
+name.
 
 ## A plugin can't find a link
 
@@ -91,11 +114,11 @@ waterline).
 ## RViz shows nothing, or "Fixed Frame does not exist"
 
 In a simulation every frame carries the instance name: the fixed frame is
-`tutorial_usv/base_link`, not `base_link`, the description is on
-`/tutorial_usv/robot_description`, and the RobotModel display only finds
+`custom_usv/base_link`, not `base_link`, the description is on
+`/custom_usv/robot_description`, and the RobotModel display only finds
 the links if its **TF Prefix** property is the instance name; without it
-the display reports "No transform from [base_link] to [tutorial_usv/base_link]"
-and draws nothing. `ros2 launch tutorial_usv_gazebo rviz.launch.xml name:=<name>`
+the display reports "No transform from [base_link] to [custom_usv/base_link]"
+and draws nothing. `ros2 launch kai_custom_vehicle rviz.launch.xml name:=<name>`
 starts RViz on a config with all three set
 ([Look at it in RViz](../getting-started/first-simulation.md#4-look-at-it-in-rviz)).
 For your own vehicle, set the same three things in your RViz config.

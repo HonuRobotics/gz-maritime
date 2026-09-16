@@ -4,10 +4,10 @@ Maritime simulation for **Gazebo** and **ROS 2**: a moving ocean, an open
 water world, and everything you need to put your own boat or underwater
 vehicle on it.
 
-```{figure} getting-started/images/tutorial-usv.jpg
-:alt: A small twin-hull boat, the tutorial USV, floating on a calm simulated ocean
+```{figure} getting-started/images/custom-usv.jpg
+:alt: A small twin-hull boat, the custom USV, floating on a calm simulated ocean
 
-The tutorial USV on the open water world.
+The custom USV on the open water world.
 ```
 
 What you get:
@@ -20,8 +20,9 @@ What you get:
 - **Your own vehicles.** A vehicle marks which of its shapes float, so the
   world never has to know about it in advance, and several can share one
   simulation. A small example boat shows every step.
-- **ROS 2 bring-up.** One launch file starts Gazebo, and one per vehicle
-  spawns it and connects its topics to ROS 2.
+- **ROS 2 bring-up.** One launch file starts Gazebo, and one puts any
+  vehicle on it, as many times as you like, with its topics bridged to
+  ROS 2.
 
 ## Quick start
 
@@ -33,7 +34,7 @@ cd ~/maritime_ws
 rosdep update && rosdep install --from-paths src --ignore-src -y
 colcon build --merge-install
 source install/setup.bash
-ros2 launch tutorial_usv_gazebo sim.launch.xml
+ros2 launch kai_custom_vehicle sim.launch.xml
 ```
 
 A small catamaran appears on the ocean and floats at its waterline.

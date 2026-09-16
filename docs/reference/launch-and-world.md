@@ -13,29 +13,35 @@ The simulation part: Gazebo on the ocean, the GUI, and a bridge for
 | `gazebo_gui` | `true` | Start the Gazebo GUI. |
 | `use_composition` | `true` | Run the Gazebo server and the bridge as composable nodes in `ros_gz_container`. |
 
-### `tutorial_usv_gazebo` `spawn.launch.xml`
+### `kai_bringup` `spawn_vehicle.launch.xml`
 
-The spawn part for one instance of the tutorial USV: generates its model
-and bridge config, spawns it, bridges its topics in its namespace and runs
-its `robot_state_publisher` with its frame prefix. Include once per boat.
+The spawn part for one instance of any vehicle: renders its files for the
+name, spawns it, bridges its topics in its namespace and runs its
+`robot_state_publisher` with its frame prefix. Run once per instance while
+the simulation runs.
 
 | Argument | Default | Description |
 |---|---|---|
-| `name` | `tutorial_usv` | Instance name: model name, topic prefix, ROS namespace and TF prefix. Letters, digits and underscores. |
+| `name` | | Instance name: model name, topic prefix, ROS namespace and TF prefix. Letters, digits and underscores, starting with a letter. |
+| `xacro` | | Model xacro, rendered with `name:=<name>` and, when a URDF is given, `urdf_uri:=file://<rendered URDF>`. A plain SDF file is copied as it is. |
+| `bridge` | | Bridge config template with `@name@` where the name goes; a `/clock` entry is dropped. Optional. |
+| `urdf` | | URDF, xacro or plain, for `robot_state_publisher`. Optional. |
+| `generator` | | Instead of `xacro`: a command run as `<command> --name <name> --out-dir <dir>` that writes `model.sdf`, `ros_gz_bridge.yaml` and a URDF there. |
 | `x`, `y`, `z` | `0` | Spawn position [m]; z = 0 is the waterline. |
-| `yaw` | `0` | Spawn heading [rad]. |
-| `use_composition` | `true` | Load the bridge and state publisher into `ros_gz_container`. `false` when spawning into a simulation started by another `ros2 launch`. |
+| `roll`, `pitch`, `yaw` | `0` | Spawn orientation [rad]. |
+| `world` | empty | Name of the world to spawn into; empty picks the one running. |
+| `instance_dir` | `$ROS_HOME/kai_bringup/<name>` | Where the instance's files are written; `~/.ros/kai_bringup/<name>` by default. |
+| `use_composition` | `true` | Load the bridge and state publisher into `container_name`. |
+| `container_name` | `ros_gz_container` | The simulation launch's container. |
 
-### `tutorial_usv_gazebo` `sim.launch.xml`
+### `kai_custom_vehicle` `sim.launch.xml`
 
-The simulation part plus one spawn. Takes the union of the arguments above.
+The simulation part plus one spawn of the custom USV, from the package's
+own model xacro, bridge template and URDF. Takes the simulation part's
+arguments, `name` (default `custom_usv`) and `x`, `y`, `z`, `roll`, `pitch`,
+`yaw`.
 
-### `tutorial_usv_gazebo` `two_usvs.launch.xml`
-
-The simulation part plus two spawns, `boat_a` at y = 2 and `boat_b` at
-y = -2. Takes the simulation part's arguments.
-
-### `tutorial_usv_gazebo` `rviz.launch.xml`
+### `kai_custom_vehicle` `rviz.launch.xml`
 
 RViz on one instance in a running simulation: the fixed frame, the
 description topic and the RobotModel display's TF Prefix all set to the
@@ -43,27 +49,41 @@ instance, with simulation time.
 
 | Argument | Default | Description |
 |---|---|---|
-| `name` | `tutorial_usv` | Instance to look at. |
+| `name` | `custom_usv` | Instance to look at. |
+| `instance_dir` | `$ROS_HOME/kai_bringup/<name>` | Where the config is written, next to the instance's other files. |
 
-### `tutorial_usv_description` `display.launch.xml`
+### `kai_custom_vehicle` `display.launch.xml`
 
-Shows the tutorial USV's URDF in RViz, with no Gazebo and no frame prefix.
+Shows the custom USV's URDF in RViz, with no Gazebo and no frame prefix.
 
 | Argument | Default | Description |
 |---|---|---|
 | `gui` | `true` | Start `joint_state_publisher_gui` to move the propellers. |
 
-### `configure_vehicle.py`
+### `instantiate_vehicle.py`
 
-What the spawn launch runs. You can also run it on its own:
+What the spawn launch runs to produce an instance's files. You can also run
+it on its own:
 
 ```bash
-ros2 run tutorial_usv_gazebo configure_vehicle.py --name NAME (--out-dir DIR | --cache)
+ros2 run kai_bringup instantiate_vehicle.py --name NAME --out-dir DIR \
+  --xacro FILE [--bridge FILE] [--urdf FILE]
+ros2 run kai_bringup instantiate_vehicle.py --name NAME --out-dir DIR --generator CMD
 ```
 
-It writes `model.sdf`, `model.config`, `tutorial_usv.urdf`,
-`ros_gz_bridge.yaml` and `tutorial_usv.rviz` for the instance `NAME`. With `--cache` the directory
-is `$ROS_HOME/tutorial_usv_gazebo/NAME` and its path is printed.
+It writes `model.sdf` and, when given, `ros_gz_bridge.yaml` (without
+`/clock`) and `robot.urdf` for the instance `NAME` into `DIR`.
+
+### `instance_rviz.py`
+
+What `rviz.launch.xml` runs:
+
+```bash
+ros2 run kai_custom_vehicle instance_rviz.py --name NAME --config BASE.rviz --out FILE
+```
+
+It writes the base RViz config pointed at the instance (fixed frame,
+description topic, TF Prefix) to `FILE` and prints the path.
 
 ## The `open_water.sdf` world
 
@@ -92,6 +112,16 @@ What a model says to the buoyancy system, and what a world says to it.
 | The same `<collision>` | `<surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>` | The shape touches nothing; recommended for every mark. |
 | The world plugin | `<enable_by_default>false</enable_by_default>` | Unmarked collisions never float. Defaults to `true` with no `<enable>` list and `false` with one. |
 | The world plugin | `<enable>model</enable>`, `<enable>model::link</enable>` | Unmarked collisions of the named model or link float. Names as spawned. |
+
+## Thruster command
+
+What a vehicle's Thruster plugins expect, with `gz-maritime-thruster-system`
+in normalized mode (`<use_normalized_cmd>true</use_normalized_cmd>`).
+
+| Topic | Type | Meaning |
+|---|---|---|
+| `/<name>/motor_<side>/cmd` | `gz.msgs.Double` (`std_msgs/msg/Float64` over the bridge) | A fraction of full thrust in [-1, 1]: 1 is `<max_thrust_cmd>` ahead, -1 is `<min_thrust_cmd>` astern, 0 stops. Latches. |
+| `/<name>/motor_<side>/cmd/ang_vel` | `gz.msgs.Double` | Propeller speed [rad/s]. |
 
 ## Services
 
@@ -129,5 +159,5 @@ gz service -s /world/default/set_pose --reqtype gz.msgs.Pose \
 
 ## Topics
 
-The tutorial USV's topics are listed on its
-[vehicle page](../vehicles/tutorial-usv.md#topics).
+The custom USV's topics are listed on its
+[vehicle page](../vehicles/custom-usv.md#topics).

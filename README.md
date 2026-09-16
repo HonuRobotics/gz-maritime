@@ -26,10 +26,10 @@ This repository continues the `vrx4` rewrite of
   [`gz_thruster/PROVENANCE.md`](gz_thruster/PROVENANCE.md).
 - [`kai_gazebo`](kai_gazebo/): the simulation worlds.
 - [`kai_bringup`](kai_bringup/): the simulation launch (Gazebo on the ocean, the
-  GUI, `/clock`) that every vehicle's spawn launch sits next to.
-- [`tutorial_usv_description`](tutorial_usv_description/) and
-  [`tutorial_usv_gazebo`](tutorial_usv_gazebo/): a small example catamaran, the
-  worked example for bringing your own vehicle.
+  GUI, `/clock`) and the spawn launch that puts any vehicle on it, under a
+  name, as often as needed.
+- [`kai_custom_vehicle`](kai_custom_vehicle/): the custom USV, a small example
+  catamaran, the worked example for bringing your own vehicle.
 
 See [WAVES_DESIGN.md](WAVES_DESIGN.md) for the architecture behind these packages.
 

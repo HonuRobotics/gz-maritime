@@ -63,23 +63,39 @@ applied, plus a workaround for a gz-math bug that crashed the simulation
 when a box hull floated almost level
 ([gazebosim/gz-math#847](https://github.com/gazebosim/gz-math/pull/847)).
 When the release arrives, worlds switch the plugin name back to
-`gz-sim-buoyancy-system` and no vehicle changes; `gz_buoyancy/PROVENANCE.md`
-records the details.
+`gz-sim-buoyancy-system` and no vehicle changes.
 
 ## One name per instance
 
 Several vehicles in one simulation need separate topics, ROS names and TF
 trees. The [multi-vehicle plan](https://github.com/HonuRobotics/gz-maritime/blob/lyrical/MULTI_VEHICLE_PLAN.md)
-lays the rules out; the tutorial USV follows them:
+lays the rules out; `kai_bringup` and the custom USV follow them:
 
 - the **simulation part** of a launch (server, GUI, `/clock`) is separate
   from the **spawn part** (one instance: model, bridge, state publisher),
   so the first runs once and the second once per vehicle;
+- the spawn part is **one generic launch**, `spawn_vehicle.launch.xml`, that
+  renders a vehicle's model xacro, bridge template and URDF for a name, or
+  runs the vehicle's own generator; a vehicle ships files, not launch
+  machinery, and a second copy of it is the same command with another name;
 - one **name** per instance drives the model name, every topic, the ROS
   namespace and `robot_state_publisher`'s `frame_prefix`; the URDF carries
   no name, so one description serves every instance;
 - a vehicle's bridge carries **no `/clock`**; the simulation part bridges it
   once.
+
+## One thruster interface
+
+Every vehicle here drives its propellers through `gz_thruster`, Gazebo's
+thruster system with a **normalized command** mode: a command in [-1, 1]
+is scaled onto the plugin's thrust limits, 1 to `max_thrust_cmd` and -1 to
+`min_thrust_cmd`. Thrust in newtons is not something a real driver can
+honour, since it depends on battery voltage and propeller state; an
+autopilot or a controller produces a normalized output and the ESC maps it
+onto the motor. With one interface, a controller written against the custom
+USV drives the BlueBoat unchanged, and an autopilot's servo outputs map onto
+it directly. The mode is on its way upstream; when a Gazebo release carries
+it, vehicles switch the plugin's filename and name and nothing else.
 
 ## Buoyancy that follows the waves
 

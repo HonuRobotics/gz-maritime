@@ -15,8 +15,8 @@
 """
 Regenerate the RViz screenshot used in the documentation.
 
-Runs the tutorial USV simulation headless, starts RViz on it through
-tutorial_usv_gazebo's rviz.launch.xml on a virtual X display (Xvfb, software
+Runs the custom USV simulation headless, starts RViz on it through
+kai_custom_vehicle's rviz.launch.xml on a virtual X display (Xvfb, software
 GL), and photographs the RViz window with xwd. The virtual display is what
 makes the picture reproducible: nothing else is on it, so the window is
 captured whole, panels included, whatever is on the real screen.
@@ -39,7 +39,7 @@ import uuid
 from PIL import Image
 
 DOCS = Path(__file__).resolve().parent.parent
-OUT = DOCS / 'getting-started' / 'images' / 'tutorial-usv-rviz.jpg'
+OUT = DOCS / 'getting-started' / 'images' / 'custom-usv-rviz.jpg'
 DISPLAY = ':99'
 SIM_SETTLE = 20      # seconds for Gazebo, the bridge and TF to come up
 RVIZ_SETTLE = 40     # seconds for RViz to start and render under software GL
@@ -84,11 +84,11 @@ def main():
             open(Path(tmp) / 'log.txt', 'w') as log:
         xvfb = subprocess.Popen(['Xvfb', DISPLAY, '-screen', '0', '1280x900x24'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        sim = start(['ros2', 'launch', 'tutorial_usv_gazebo', 'sim.launch.xml',
+        sim = start(['ros2', 'launch', 'kai_custom_vehicle', 'sim.launch.xml',
                      'gazebo_gui:=false'], env, log)
         try:
             time.sleep(SIM_SETTLE)
-            rviz = start(['ros2', 'launch', 'tutorial_usv_gazebo', 'rviz.launch.xml'],
+            rviz = start(['ros2', 'launch', 'kai_custom_vehicle', 'rviz.launch.xml'],
                          vdisplay, log)
             try:
                 time.sleep(RVIZ_SETTLE)

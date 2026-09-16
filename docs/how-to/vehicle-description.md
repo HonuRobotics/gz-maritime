@@ -2,17 +2,17 @@
 
 Start with a plain URDF. It holds what is true about your vehicle whichever
 simulator runs it, or none: its shape, its mass, how its parts move, and
-where its sensors sit. The tutorial USV's is
-`tutorial_usv_description/urdf/tutorial_usv.urdf.xacro`, and this page walks
-through it.
+where its sensors sit. The custom USV's is
+`kai_custom_vehicle/urdf/custom_usv.urdf.xacro`, and this page walks through
+it.
 
 ## Put the origin on the waterline
 
 ```{figure} images/waterline.svg
-:alt: Cross-section of the tutorial USV seen from the stern. base_link's origin sits on the dashed waterline, the centre of mass is 3.6 cm above it, the two hulls reach 3.9 cm below it, and a buoyancy arrow points up under each hull.
+:alt: Cross-section of the custom USV seen from the stern. base_link's origin sits on the dashed waterline, the centre of mass is 3.6 cm above it, the two hulls reach 3.9 cm below it, and a buoyancy arrow points up under each hull.
 :width: 100%
 
-The tutorial USV seen from the stern, to scale.
+The custom USV seen from the stern, to scale.
 ```
 
 Place `base_link`'s origin **on the design waterline**, the level the water
@@ -34,7 +34,7 @@ the vehicle. For straight-sided hulls, that depth, the **draft**, is:
 draft = mass / (water density × waterplane area)
 ```
 
-The tutorial USV weighs 12.1 kg and has two hulls 1.0 m long and 0.15 m wide:
+The custom USV weighs 12.1 kg and has two hulls 1.0 m long and 0.15 m wide:
 
 ```text
 draft = 12.1 kg / (1025 kg/m³ × 2 × 1.0 m × 0.15 m) ≈ 0.039 m
@@ -44,11 +44,10 @@ So its hull bottoms sit 3.9 cm below `base_link`. The dimensions live in one
 file, `urdf/dimensions.xacro`, that works the draft out from the mass and
 the hull size, so changing either moves the hulls to match:
 
-```xml
-<xacro:property name="draft"
-                value="${total_mass / (water_density * 2 * hull_length * hull_width)}"/>
-<!-- Hull centre height: the hull bottoms sit one draft below base_link. -->
-<xacro:property name="hull_z" value="${hull_height / 2 - draft}"/>
+```{literalinclude} ../../kai_custom_vehicle/urdf/dimensions.xacro
+:language: xml
+:start-at: <xacro:property name="total_mass"
+:end-at: name="hull_z"
 ```
 
 The Gazebo model includes the same file, so the boxes that float the boat
@@ -74,7 +73,7 @@ Gazebo model.
 
 ## Mass and inertia
 
-Give every moving link a mass and an inertia. The tutorial USV models its
+Give every moving link a mass and an inertia. The custom USV models its
 12 kg as two solid hull boxes: each box's own inertia, plus a term for its
 distance from the centre line. The xacro computes it from the same dimensions
 as the hulls, so the two stay consistent.
@@ -82,22 +81,19 @@ as the hulls, so the two stay consistent.
 Rough values are fine, but not wild ones. With too little roll inertia the
 boat twitches; with far too much it barely rolls.
 
-Mind the centre of mass. On the tutorial USV it sits 3.6 cm above the
+Mind the centre of mass. On the custom USV it sits 3.6 cm above the
 waterline, which its wide, twin-hull stance easily keeps upright. A narrow
 single hull needs its mass much lower.
 
 ## Propellers
 
 A propeller is a link on a **continuous** joint that spins about the direction
-it pushes, +x for driving forward:
+it pushes, +x for driving forward. The custom USV's macro makes one per side:
 
-```xml
-<joint name="motor_port_joint" type="continuous">
-  <parent link="base_link"/>
-  <child link="motor_port"/>
-  <origin xyz="-0.5 0.25 -0.079" rpy="0 0 0"/>
-  <axis xyz="1 0 0"/>
-</joint>
+```{literalinclude} ../../kai_custom_vehicle/urdf/custom_usv.urdf.xacro
+:language: xml
+:start-at: <xacro:macro name="propeller"
+:end-at: </xacro:macro>
 ```
 
 Give the propeller link a small mass. When Gazebo reads a URDF it drops
@@ -107,15 +103,23 @@ collision shape.
 ## Sensor frames
 
 Wherever a sensor sits, add a massless link on a fixed joint, such as
-`imu_link` and `gps_link`. The URDF only marks the spot; the sensor itself is
-added in the Gazebo model. These frames also reach TF, so sensor messages can
-say which frame they are in.
+`imu_link` and `gps_link`:
+
+```{literalinclude} ../../kai_custom_vehicle/urdf/custom_usv.urdf.xacro
+:language: xml
+:start-at: <link name="imu_link"/>
+:end-at: </joint>
+```
+
+The URDF only marks the spot; the sensor itself is added in the Gazebo
+model. These frames also reach TF, so sensor messages can say which frame
+they are in.
 
 ```{figure} images/usv-frames.svg
-:alt: Top view of the tutorial USV with base_link at the centre, imu_link above it, gps_link towards the stern and the two propeller joints at the stern of each hull
+:alt: Top view of the custom USV with base_link at the centre, imu_link above it, gps_link towards the stern and the two propeller joints at the stern of each hull
 :width: 100%
 
-The tutorial USV's frames, seen from above.
+The custom USV's frames, seen from above.
 ```
 
 ## No instance name, no Gazebo
@@ -132,9 +136,9 @@ simulation model.
 ## Check it
 
 ```bash
-xacro $(ros2 pkg prefix --share tutorial_usv_description)/urdf/tutorial_usv.urdf.xacro > /tmp/tutorial_usv.urdf
-check_urdf /tmp/tutorial_usv.urdf
-ros2 launch tutorial_usv_description display.launch.xml
+xacro $(ros2 pkg prefix --share kai_custom_vehicle)/urdf/custom_usv.urdf.xacro > /tmp/custom_usv.urdf
+check_urdf /tmp/custom_usv.urdf
+ros2 launch kai_custom_vehicle display.launch.xml
 ```
 
 `check_urdf` should report `root Link: base_link`. In RViz, move the sliders:
@@ -143,15 +147,22 @@ each propeller should spin about the boat's forward axis.
 ## Build it
 
 `xacro_add_files` expands the xacro when the package builds and installs the
-resulting URDF, so other packages can use it without running xacro:
+resulting URDF next to the Gazebo model, so `model://custom_usv` is complete
+on its own:
 
 ```cmake
 find_package(xacro REQUIRED)
-xacro_add_files(urdf/tutorial_usv.urdf.xacro INSTALL DESTINATION urdf)
-install(DIRECTORY urdf rviz launch DESTINATION share/${PROJECT_NAME})
+xacro_add_files(
+  urdf/custom_usv.urdf.xacro
+  models/custom_usv/model.sdf.xacro
+  INSTALL DESTINATION models/custom_usv)
+install(DIRECTORY urdf models config rviz launch DESTINATION share/${PROJECT_NAME})
 ```
 
-The `urdf` directory is installed too, so the Gazebo package can include
-`dimensions.xacro` from it.
+The `urdf` directory is installed as well: the Gazebo model includes
+`dimensions.xacro` from it by relative path, and the spawn launch renders
+the xacro itself for each instance. The custom USV keeps the URDF in the
+same package as its Gazebo model; the Blue Robotics vehicles give it a
+`_description` package of its own. Either way it stays Gazebo-free.
 
 Next: [Compose the Gazebo model](gazebo-composition.md).

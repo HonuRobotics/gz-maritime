@@ -32,30 +32,24 @@ Every sensor follows the same four steps:
    ([The bridge configuration](spawn-and-drive.md#the-bridge-configuration)).
 
 The IMU is shown in [Compose the Gazebo model](gazebo-composition.md#sensors).
-The other two sensors on the tutorial USV differ only in their `<sensor>`
+The other two sensors on the custom USV differ only in their `<sensor>`
 element:
 
-```xml
-<sensor name="magnetometer" type="magnetometer">
-  <frame_id>${name}/imu_link</frame_id>
-  <topic>${name}/magnetometer</topic>
-  <update_rate>50</update_rate>
-  <always_on>true</always_on>
-</sensor>
+```{literalinclude} ../../kai_custom_vehicle/models/custom_usv/model.sdf.xacro
+:language: xml
+:start-at: <xacro:sensor_link sensor_name="magnetometer"
+:end-at: </xacro:sensor_link>
 ```
 
-```xml
-<sensor name="navsat" type="navsat">
-  <frame_id>${name}/gps_link</frame_id>
-  <topic>${name}/navsat</topic>
-  <update_rate>5</update_rate>
-  <always_on>true</always_on>
-</sensor>
+```{literalinclude} ../../kai_custom_vehicle/models/custom_usv/model.sdf.xacro
+:language: xml
+:start-at: <xacro:sensor_link sensor_name="navsat"
+:end-at: </xacro:sensor_link>
 ```
 
 ## A camera
 
-The tutorial USV has no camera, but adding one follows the same pattern. With
+The custom USV has no camera, but adding one follows the same pattern. With
 a `camera_link` frame in your URDF:
 
 ```xml
@@ -97,10 +91,10 @@ matter to you, use a copy of the world with a neutral ambient light, such as
 ## Check a sensor
 
 ```bash
-ros2 topic echo /tutorial_usv/imu --once
+ros2 topic echo /custom_usv/imu --once
 ```
 
-Look for `frame_id: tutorial_usv/imu_link` in the header. If the command
+Look for `frame_id: custom_usv/imu_link` in the header. If the command
 waits forever, check the bridge entry and that the world runs the matching
 system.
 

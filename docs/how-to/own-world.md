@@ -4,7 +4,7 @@ Any launch file here takes `world:=`, with a file name found on Gazebo's
 resource path or a full path:
 
 ```bash
-ros2 launch tutorial_usv_gazebo sim.launch.xml world:=/path/to/my_world.sdf
+ros2 launch kai_custom_vehicle sim.launch.xml world:=/path/to/my_world.sdf
 ```
 
 The easiest start is a copy of `open_water.sdf`:

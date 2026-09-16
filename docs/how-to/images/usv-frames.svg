@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" width="1000" height="600" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="16">
-  <!-- Tutorial USV from above, to scale: 1 m = 500 px, base_link origin at (470, 300). -->
+  <!-- Custom USV from above, to scale: 1 m = 500 px, base_link origin at (470, 300). -->
   <defs>
     <marker id="head-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/>

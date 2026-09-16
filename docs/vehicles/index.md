@@ -2,7 +2,7 @@
 
 | Vehicle | What it is | Where it comes from |
 |---|---|---|
-| [Tutorial USV](tutorial-usv.md) | A 1 m catamaran, the worked example of the how-to guides | This repository |
+| [Custom USV](custom-usv.md) | A 1 m catamaran, the worked example of the how-to guides | This repository |
 | [BlueBoat and BlueROV2](bluerobotics.md) | Blue Robotics' surface boat and underwater ROV | [bluerobotics_models](https://github.com/HonuRobotics/bluerobotics_models) |
 | [Holybro X500](holybro.md) | A quadcopter drone, with its own world: not a maritime vehicle, but built the same way | [holybro_models](https://github.com/HonuRobotics/holybro_models) |
 
@@ -13,7 +13,7 @@ shows how.
 :hidden:
 :maxdepth: 1
 
-tutorial-usv
+custom-usv
 bluerobotics
 holybro
 ```

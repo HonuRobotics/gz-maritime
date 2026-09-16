@@ -63,7 +63,9 @@ def main(argv=None):
                  'digits and underscores, starting with a letter')
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(instance_config(args.config.read_text(), args.name))
-    print(args.out)
+    # The path and nothing else, no newline: rviz.launch.xml reads it through
+    # a $(command) substitution and hands it to rviz2 as it is.
+    sys.stdout.write(str(args.out))
 
 
 if __name__ == '__main__':

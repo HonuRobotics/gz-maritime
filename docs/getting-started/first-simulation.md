@@ -1,6 +1,6 @@
 # First simulation
 
-Start the ocean, put the tutorial boat on it, and drive it. Run every command
+Start the ocean, put the custom USV on it, and drive it. Run every command
 in a terminal where you sourced `~/maritime_ws/install/setup.bash`.
 
 ## 1. The ocean on its own
@@ -22,42 +22,43 @@ Ctrl+C before the next step.
 ## 2. Put a boat on it
 
 ```bash
-ros2 launch tutorial_usv_gazebo sim.launch.xml
+ros2 launch kai_custom_vehicle sim.launch.xml
 ```
 
-```{figure} images/tutorial-usv.jpg
-:alt: The tutorial USV, a twin-hull boat with a grey deck, floating on the ocean
+```{figure} images/custom-usv.jpg
+:alt: The custom USV, a twin-hull boat with a grey deck, floating on the ocean
 
-The tutorial USV floating at its waterline.
+The custom USV floating at its waterline.
 ```
 
-The **tutorial USV** is a 1 m catamaran made for these docs. The world file
+The **custom USV** is a 1 m catamaran made for these docs. The world file
 doesn't mention it: the boat's own model marks the shapes that float it
 ([how that works](../how-to/own-vehicle.md#how-a-vehicle-floats)).
 
 Check it from a second terminal:
 
 ```bash
-gz model -m tutorial_usv -p          # z close to 0: floating at the waterline
-ros2 topic list | grep tutorial_usv  # thrust commands and sensors
+gz model -m custom_usv -p          # z close to 0: floating at the waterline
+ros2 topic list | grep custom_usv  # propeller commands and sensors
 ```
 
 ## 3. Drive it
 
-Each propeller takes a thrust command in newtons and keeps the last one it
-got until a new one arrives. Drive with one terminal per propeller, both
-sourced, and start the second right after the first.
+Each propeller takes a command between -1 and 1: the fraction of its full
+thrust to apply, 1 full ahead, -1 full astern, 0 stop. It keeps the last
+command it got until a new one arrives. Drive with one terminal per
+propeller, both sourced, and start the second right after the first.
 
 Terminal 1, the port propeller:
 
 ```bash
-ros2 topic pub -r 5 /tutorial_usv/motor_port/thrust std_msgs/msg/Float64 "{data: 5.0}"
+ros2 topic pub -r 5 /custom_usv/motor_port/cmd std_msgs/msg/Float64 "{data: 0.25}"
 ```
 
 Terminal 2, the starboard propeller:
 
 ```bash
-ros2 topic pub -r 5 /tutorial_usv/motor_stbd/thrust std_msgs/msg/Float64 "{data: 5.0}"
+ros2 topic pub -r 5 /custom_usv/motor_stbd/cmd std_msgs/msg/Float64 "{data: 0.25}"
 ```
 
 The boat turns for the moment only one propeller pushes, then moves straight
@@ -65,61 +66,63 @@ ahead. Two different values turn it. To stop, Ctrl+C both, then send `0.0`
 once to each:
 
 ```bash
-ros2 topic pub --once /tutorial_usv/motor_port/thrust std_msgs/msg/Float64 "{data: 0.0}"
-ros2 topic pub --once /tutorial_usv/motor_stbd/thrust std_msgs/msg/Float64 "{data: 0.0}"
+ros2 topic pub --once /custom_usv/motor_port/cmd std_msgs/msg/Float64 "{data: 0.0}"
+ros2 topic pub --once /custom_usv/motor_stbd/cmd std_msgs/msg/Float64 "{data: 0.0}"
 ```
 
 ```{warning}
-Thrust commands **latch**: a propeller keeps its last command until it gets a
-new one. Ctrl+C alone does not stop the boat, `0.0` does; and the longer the
+Commands **latch**: a propeller keeps its last command until it gets a new
+one. Ctrl+C alone does not stop the boat, `0.0` does; and the longer the
 second command waits, the further the boat turns before it goes straight.
 ```
 
 ## 4. Look at it in RViz
 
 ```bash
-ros2 launch tutorial_usv_gazebo rviz.launch.xml
+ros2 launch kai_custom_vehicle rviz.launch.xml
 ```
 
-```{figure} images/tutorial-usv-rviz.jpg
-:alt: RViz showing the tutorial USV as an orange twin-hull model over a grid, with the Displays panel listing a RobotModel whose description topic is /tutorial_usv/robot_description and whose TF Prefix is tutorial_usv
+```{figure} images/custom-usv-rviz.jpg
+:alt: RViz showing the custom USV as an orange twin-hull model over a grid, with the Displays panel listing a RobotModel whose description topic is /custom_usv/robot_description and whose TF Prefix is custom_usv
 
-The tutorial USV in RViz, on the config the launch generates for it.
+The custom USV in RViz, on the config the launch writes for it.
 ```
 
 RViz shows the boat and its frames. In a simulation every frame carries the
-boat's name (`tutorial_usv/base_link`) and the description is published in
+boat's name (`custom_usv/base_link`) and the description is published in
 the boat's namespace, so the launch starts RViz on a config pointed at that
 instance, with simulation time. For another boat, pass its name:
-`name:=boat_a`.
+`name:=boat_b`.
 
 ## 5. Add a second boat
 
-Stop the simulation and start it with two boats:
+While the first one runs, put another on the ocean from a new terminal.
+gz-maritime's spawn launch takes a name and the vehicle's three files:
 
 ```bash
-ros2 launch tutorial_usv_gazebo two_usvs.launch.xml
+ros2 launch kai_bringup spawn_vehicle.launch.xml name:=boat_b y:=4 \
+  xacro:=$(ros2 pkg prefix --share kai_custom_vehicle)/models/custom_usv/model.sdf.xacro \
+  bridge:=$(ros2 pkg prefix --share kai_custom_vehicle)/config/ros_gz_bridge.yaml.in \
+  urdf:=$(ros2 pkg prefix --share kai_custom_vehicle)/urdf/custom_usv.urdf.xacro
 ```
 
-Two identical boats, `boat_a` and `boat_b`, float 4 m apart. Each has its own
-topics, so the same two terminals as in step 3, on `boat_a`'s topics, drive
-only that boat. Terminal 1:
+A second, identical boat appears 4 m to the left of the first, and the
+command returns once it is in: its bridge and state publisher run inside
+the simulation's process. Each boat has its own topics, so the same two
+terminals as in step 3, on `boat_b`'s topics, drive only that boat.
+Terminal 1:
 
 ```bash
-ros2 topic pub -r 5 /boat_a/motor_port/thrust std_msgs/msg/Float64 "{data: 5.0}"
+ros2 topic pub -r 5 /boat_b/motor_port/cmd std_msgs/msg/Float64 "{data: 0.25}"
 ```
 
 Terminal 2:
 
 ```bash
-ros2 topic pub -r 5 /boat_a/motor_stbd/thrust std_msgs/msg/Float64 "{data: 5.0}"
+ros2 topic pub -r 5 /boat_b/motor_stbd/cmd std_msgs/msg/Float64 "{data: 0.25}"
 ```
 
-A third one can join a running simulation:
-
-```bash
-ros2 launch tutorial_usv_gazebo spawn.launch.xml name:=boat_c y:=-6 use_composition:=false
-```
+A third boat is the same spawn command with another name.
 
 ## 6. Make waves
 
@@ -138,6 +141,6 @@ surface is only drawn. See
 
 ## Next
 
-- [The tutorial USV](../vehicles/tutorial-usv.md): its topics, frames and
+- [The custom USV](../vehicles/custom-usv.md): its topics, frames and
   files.
 - [Bring your own vehicle](../how-to/own-vehicle.md): build a vehicle like it.

@@ -3,12 +3,13 @@
 The URDF says what the vehicle **is**. The Gazebo model adds how it is
 **simulated**: what floats it, what drives it, how the water slows it down,
 and what it senses. It is one short file, `model.sdf.xacro`, that includes
-your URDF and adds the rest. The tutorial USV's is
-`tutorial_usv_gazebo/model.sdf.xacro`.
+your URDF and adds the rest. The custom USV's is
+`kai_custom_vehicle/models/custom_usv/model.sdf.xacro`, and every snippet
+on this page is taken from it.
 
 ```{mermaid}
 flowchart LR
-  U["<b>tutorial_usv.urdf</b><br/>links, joints, mass,<br/>contact shapes, frames"]
+  U["<b>custom_usv.urdf</b><br/>links, joints, mass,<br/>contact shapes, frames"]
   M["<b>model.sdf</b><br/>the URDF, plus:<br/>marked displacement volume<br/>Thruster × 2: propulsion<br/>Hydrodynamics: damping<br/>IMU, magnetometer, GPS<br/>JointStatePublisher"]
   U -->|merged into| M
 ```
@@ -18,10 +19,10 @@ flowchart LR
 ```xml
 <sdf version="1.12" xmlns:xacro="http://ros.org/wiki/xacro"
      xmlns:gz="http://gazebosim.org/schema">
-  <xacro:arg name="name" default="tutorial_usv"/>
-  <xacro:arg name="urdf_uri" default="model://tutorial_usv/tutorial_usv.urdf"/>
+  <xacro:arg name="name" default="custom_usv"/>
+  <xacro:arg name="urdf_uri" default="model://custom_usv/custom_usv.urdf"/>
   <xacro:property name="name" value="$(arg name)"/>
-  <xacro:include filename="$(find tutorial_usv_description)/urdf/dimensions.xacro"/>
+  <xacro:include filename="../../urdf/dimensions.xacro"/>
 
   <model name="${name}">
     <include merge="true">
@@ -41,16 +42,18 @@ Three things to notice:
   below uses. Without it the file doesn't parse.
 - **`name`** is the instance name. It becomes the model name, the prefix of
   every topic and the prefix of every sensor frame, so one file serves any
-  number of boats ([One name per instance](spawn-and-drive.md#one-name-per-instance)).
+  number of boats. The spawn launch passes it, together with a `urdf_uri`
+  pointing at the URDF it rendered for the same name
+  ([One name per instance](spawn-and-drive.md#one-name-per-instance)).
 
-The include of `dimensions.xacro` gives this file the same hull sizes the
-URDF was built from, so the displacement boxes below cannot drift from the
-hulls.
+The include of `dimensions.xacro`, by a path relative to this file, gives it
+the same hull sizes the URDF was built from, so the displacement boxes below
+cannot drift from the hulls.
 
 ### What survives the conversion
 
 Gazebo converts the URDF when it loads it, and in doing so **merges every
-link attached by a fixed joint into its parent**. On the tutorial USV,
+link attached by a fixed joint into its parent**. On the custom USV,
 `imu_link` and `gps_link` stop being links, but survive as **frames** with the
 same names. That has two consequences:
 
@@ -63,7 +66,7 @@ To see exactly what survives, print the converted model:
 
 ```bash
 SDF_PATH=$GZ_SIM_RESOURCE_PATH \
-  gz sdf -p $(ros2 pkg prefix --share tutorial_usv_gazebo)/models/tutorial_usv/model.sdf
+  gz sdf -p $(ros2 pkg prefix --share kai_custom_vehicle)/models/custom_usv/model.sdf
 ```
 
 `gz sdf` looks for `model://` URIs in `SDF_PATH`, not in
@@ -73,28 +76,21 @@ SDF_PATH=$GZ_SIM_RESOURCE_PATH \
 
 Every gz-maritime vehicle needs this step. Add a link fixed to `base_link`
 whose collision shapes are the volume that floats the vehicle, and mark each
-of them with `gz:buoyancy="true"`:
+of them with `gz:buoyancy="true"`. The custom USV's macro makes one box per
+hull:
 
-```xml
-<link name="hull_displacement">
-  <pose relative_to="base_link">0 0 0 0 0 0</pose>
-  <inertial>
-    <mass>1e-5</mass>
-    <inertia><ixx>1e-8</ixx><iyy>1e-8</iyy><izz>1e-8</izz></inertia>
-  </inertial>
-  <collision name="pontoon_port" gz:buoyancy="true">
-    <pose>0 0.25 0.036 0 0 0</pose>
-    <geometry><box><size>1.0 0.15 0.15</size></box></geometry>
-    <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
-  </collision>
-  <collision name="pontoon_stbd" gz:buoyancy="true">
-    ...
-  </collision>
-</link>
-<joint name="hull_displacement_joint" type="fixed">
-  <parent>base_link</parent>
-  <child>hull_displacement</child>
-</joint>
+```{literalinclude} ../../kai_custom_vehicle/models/custom_usv/model.sdf.xacro
+:language: xml
+:start-at: <xacro:macro name="pontoon"
+:end-at: </xacro:macro>
+```
+
+and puts the two on a link of their own:
+
+```{literalinclude} ../../kai_custom_vehicle/models/custom_usv/model.sdf.xacro
+:language: xml
+:start-at: <link name="hull_displacement">
+:end-at: </joint>
 ```
 
 The rules:
@@ -105,7 +101,7 @@ The rules:
   contact geometry.
 - **Use shapes buoyancy can slice:** box, sphere, cylinder, capsule,
   ellipsoid and cone. Meshes and planes are skipped, with a warning. A box
-  per hull is a good start; the tutorial's are the same size and place as
+  per hull is a good start; the custom USV's are the same size and place as
   the URDF's hulls, from the shared `dimensions.xacro`.
 - **Give a mark a zero `collide_bitmask`.** A marked collision is still a
   collision to the physics engine. With the bitmask it touches nothing, and
@@ -115,7 +111,7 @@ The rules:
   to it. A separate link, fixed-jointed, is one rigid body to physics and
   keeps contact and displacement visibly apart.
 - **Get the centre of buoyancy above the centre of mass**, or at least the
-  waterplane wide, or the vehicle capsizes. The tutorial USV floats its 12 kg
+  waterplane wide, or the vehicle capsizes. The custom USV floats its 12 kg
   on two boxes centred 3.6 cm above the waterline, well above its centre of
   mass.
 
@@ -127,47 +123,43 @@ nothing in a launch file refers to it.
 
 ## Thrusters
 
-Add one Thruster plugin per propeller joint:
+Add one Thruster plugin per propeller joint. It is gz-maritime's thruster
+system, `gz_thruster`: Gazebo's own with a **normalized command** mode, the
+interface every vehicle here is driven with:
 
-```xml
-<plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
-  <joint_name>motor_port_joint</joint_name>
-  <namespace></namespace>
-  <topic>${name}/motor_port/thrust</topic>
-  <thrust_coefficient>0.02</thrust_coefficient>
-  <fluid_density>1025.0</fluid_density>
-  <propeller_diameter>0.08</propeller_diameter>
-  <velocity_control>true</velocity_control>
-  <max_thrust_cmd>20.0</max_thrust_cmd>
-  <min_thrust_cmd>-15.0</min_thrust_cmd>
-</plugin>
+```{literalinclude} ../../kai_custom_vehicle/models/custom_usv/model.sdf.xacro
+:language: xml
+:start-at: <xacro:macro name="thruster"
+:end-at: </xacro:macro>
 ```
 
-- **Commands are thrust in newtons** on the topic. The propeller speed comes
-  back on the same topic followed by `/ang_vel`.
+- **Commands are a fraction of full thrust**, in [-1, 1], on the topic: 1
+  gives `max_thrust_cmd` ahead, -1 gives `min_thrust_cmd` astern, 0 stops.
+  Those two limits, in newtons, are the only place a force appears. That is
+  how a real thruster is driven: an autopilot or a controller produces a
+  normalized output and the ESC maps it onto the motor, so a controller
+  written against this boat drives the BlueBoat unchanged. The propeller
+  speed comes back on the same topic followed by `/ang_vel`.
 - **Leave `<namespace>` empty and put the name in the topic yourself.**
   Otherwise the plugin prefixes the topic with the model name on its own,
   and the bridge configuration can't know what to expect.
 - **Counter-rotating propellers get opposite signs** of `thrust_coefficient`:
-  the starboard one uses `-0.02`.
+  the macro is called with `0.02` for port and `-0.02` for starboard.
 - **`fluid_density` is seawater**, and `propeller_diameter` comes from the
   shared dimensions, so it matches the propeller in the URDF.
+
+`gz_thruster` is on its way upstream. When a Gazebo release carries the
+mode, only the plugin's filename and name change.
 
 ## Hydrodynamic damping
 
 Water resists motion. The Hydrodynamics plugin applies that resistance to
 one link:
 
-```xml
-<plugin filename="gz-sim-hydrodynamics-system"
-        name="gz::sim::systems::Hydrodynamics">
-  <link_name>base_link</link_name>
-  <water_density>1025.0</water_density>
-  <xU>-20</xU>  <yV>-40</yV>  <zW>-30</zW>
-  <kP>-20</kP>  <mQ>-20</mQ>  <nR>-15</nR>
-  <xUabsU>-30</xUabsU>  <yVabsV>-90</yVabsV>  <zWabsW>-100</zWabsW>
-  <kPabsP>-40</kPabsP>  <mQabsQ>-40</mQabsQ>  <nRabsR>-30</nRabsR>
-</plugin>
+```{literalinclude} ../../kai_custom_vehicle/models/custom_usv/model.sdf.xacro
+:language: xml
+:start-at: <plugin filename="gz-sim-hydrodynamics-system"
+:end-at: </plugin>
 ```
 
 Each pair of coefficients resists one kind of motion:
@@ -183,8 +175,8 @@ Each pair of coefficients resists one kind of motion:
 
 The first of each pair grows with speed, the `abs` one with speed squared. A
 boat should resist sideways motion much more than forward motion, or it
-slides out of its turns. The tutorial's values are placeholders borrowed from
-the BlueBoat; tune them for your vehicle.
+slides out of its turns. The custom USV's values are placeholders borrowed
+from the BlueBoat; tune them for your vehicle.
 
 ```{note}
 The damping acts in the air too, so a boat spawned well above the water falls
@@ -202,26 +194,21 @@ safe to leave out.
 ## Sensors
 
 Each sensor sits on a tiny link fixed to `base_link`, placed at a frame the
-URDF declared:
+URDF declared. The custom USV's macro builds the link and the joint and
+takes the `<sensor>` as a block:
 
-```xml
-<link name="imu_sensor">
-  <pose relative_to="imu_link">0 0 0 0 0 0</pose>
-  <inertial>
-    <mass>1e-5</mass>
-    <inertia><ixx>1e-8</ixx><iyy>1e-8</iyy><izz>1e-8</izz></inertia>
-  </inertial>
-  <sensor name="imu" type="imu">
-    <frame_id>${name}/imu_link</frame_id>
-    <topic>${name}/imu</topic>
-    <update_rate>50</update_rate>
-    <always_on>true</always_on>
-  </sensor>
-</link>
-<joint name="imu_sensor_joint" type="fixed">
-  <parent>base_link</parent>
-  <child>imu_sensor</child>
-</joint>
+```{literalinclude} ../../kai_custom_vehicle/models/custom_usv/model.sdf.xacro
+:language: xml
+:start-at: <xacro:macro name="sensor_link"
+:end-at: </xacro:macro>
+```
+
+The IMU is then:
+
+```{literalinclude} ../../kai_custom_vehicle/models/custom_usv/model.sdf.xacro
+:language: xml
+:start-at: <xacro:sensor_link sensor_name="imu"
+:end-at: </xacro:sensor_link>
 ```
 
 - **Why a separate link:** `base_link` comes from the URDF, and a merged
@@ -234,13 +221,10 @@ URDF declared:
 
 ## Joint states
 
-```xml
-<plugin filename="gz-sim-joint-state-publisher-system"
-        name="gz::sim::systems::JointStatePublisher">
-  <topic>${name}/joint_states</topic>
-  <joint_name>motor_port_joint</joint_name>
-  <joint_name>motor_stbd_joint</joint_name>
-</plugin>
+```{literalinclude} ../../kai_custom_vehicle/models/custom_usv/model.sdf.xacro
+:language: xml
+:start-at: <plugin filename="gz-sim-joint-state-publisher-system"
+:end-at: </plugin>
 ```
 
 The bridge turns this into `/<name>/joint_states`, which the instance's
@@ -251,55 +235,46 @@ The bridge turns this into `/<name>/joint_states`, which the instance's
 The package looks like this:
 
 ```text
-tutorial_usv_gazebo/
+kai_custom_vehicle/
 ├── CMakeLists.txt
 ├── package.xml
-├── model.sdf.xacro
-├── models/tutorial_usv/model.config
+├── urdf/custom_usv.urdf.xacro, dimensions.xacro
+├── models/custom_usv/model.sdf.xacro, model.config
 ├── config/ros_gz_bridge.yaml.in
-├── scripts/configure_vehicle.py
-├── launch/spawn.launch.xml, sim.launch.xml, two_usvs.launch.xml
+├── rviz/custom_usv.rviz
+├── launch/sim.launch.xml, rviz.launch.xml, display.launch.xml
+├── scripts/instance_rviz.py
 └── hooks/resource_paths.dsv.in, resource_paths.sh.in
 ```
 
-`CMakeLists.txt` expands the model for the default instance, installs it
-next to a copy of the URDF and a rendered bridge config, and adds the models
-directory to Gazebo's resource path, so that `model://tutorial_usv`
+`CMakeLists.txt` expands the URDF and the model for the default instance,
+installs them with a rendered bridge config and `model.config`, and adds
+the models directory to Gazebo's resource path, so that `model://custom_usv`
 resolves:
 
-```cmake
-find_package(xacro REQUIRED)
-find_package(tutorial_usv_description REQUIRED)
-
-ament_environment_hooks("hooks/resource_paths.dsv.in")
-ament_environment_hooks("hooks/resource_paths.sh.in")
-
-xacro_add_files(model.sdf.xacro INSTALL DESTINATION models/tutorial_usv)
-install(FILES
-  models/tutorial_usv/model.config
-  ${tutorial_usv_description_DIR}/../urdf/tutorial_usv.urdf
-  DESTINATION share/${PROJECT_NAME}/models/tutorial_usv)
-
-set(name tutorial_usv)
-configure_file(config/ros_gz_bridge.yaml.in
-  ${CMAKE_CURRENT_BINARY_DIR}/ros_gz_bridge.yaml @ONLY)
+```{literalinclude} ../../kai_custom_vehicle/CMakeLists.txt
+:language: cmake
+:start-after: find_package(xacro REQUIRED)
+:end-before: if(BUILD_TESTING)
 ```
 
-Any other instance is generated on demand by `configure_vehicle.py`, which
-runs the same xacro with another name and fills the same bridge template:
+Any other instance is rendered on demand by the spawn launch, which runs the
+same xacros with another name and fills the same bridge template
+([Spawn and drive](spawn-and-drive.md)). You can run that step yourself:
 
 ```bash
-ros2 run tutorial_usv_gazebo configure_vehicle.py --name boat_a --out-dir ~/boat_a
+ros2 run kai_bringup instantiate_vehicle.py --name boat_b --out-dir ~/boat_b \
+  --xacro $(ros2 pkg prefix --share kai_custom_vehicle)/models/custom_usv/model.sdf.xacro \
+  --bridge $(ros2 pkg prefix --share kai_custom_vehicle)/config/ros_gz_bridge.yaml.in \
+  --urdf $(ros2 pkg prefix --share kai_custom_vehicle)/urdf/custom_usv.urdf.xacro
 ```
 
-That writes `model.sdf`, `model.config`, `tutorial_usv.urdf`,
-`ros_gz_bridge.yaml` and an RViz config for `boat_a`; the launch files call
-it for you.
+That writes `model.sdf`, `robot.urdf` and `ros_gz_bridge.yaml` for `boat_b`.
 
 ```{tip}
 Don't name the model directory after the package. Gazebo first looks for
 `model://` names relative to the current directory, and a source checkout
-contains a directory called `tutorial_usv_gazebo`. Hence `models/tutorial_usv`.
+contains a directory called `kai_custom_vehicle`. Hence `models/custom_usv`.
 ```
 
 ## Marking from a URDF
@@ -344,7 +319,7 @@ spawns directly, with `ros_gz_sim create -file my_boat.urdf` or from the
 
 It is quicker to start with, but it ties the URDF to Gazebo, and the block
 is SDF inside a URDF, with no xacro sharing of the hull dimensions. The
-two-package layout above scales better, which is why the tutorial USV uses
+separate model file above scales better, which is why the custom USV uses
 it.
 
 Next: [Spawn and drive](spawn-and-drive.md).

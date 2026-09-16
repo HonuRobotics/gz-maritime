@@ -2,7 +2,7 @@
 
 You have a boat or an underwater vehicle that isn't a BlueBoat or a BlueROV2,
 and you want it on the gz-maritime ocean, driven from ROS 2. This series
-shows how. The [tutorial USV](../vehicles/tutorial-usv.md) was built exactly
+shows how. The [custom USV](../vehicles/custom-usv.md) was built exactly
 this way, so each step points at a real file you can copy.
 
 ## Who does what
@@ -15,7 +15,7 @@ The world and the vehicle split the work:
 | Gravity and physics | Links, joints, mass and inertia |
 | A moving sea to look at, changeable at runtime | Thrusters and hydrodynamic damping |
 | The systems that simulate IMU, magnetometer and GPS, and a GPS origin | The sensors themselves, placed on its frames |
-| A service to spawn models, and `/clock` bridged once | A spawn launch file with its bridge configuration |
+| A service to spawn models, `/clock` bridged once, and a spawn launch for any vehicle | A model xacro, a bridge template and a URDF, which the spawn launch renders for each instance |
 
 The world never names a vehicle, so the same world serves every vehicle,
 including ones spawned while it runs, and several copies of the same one.
@@ -26,7 +26,7 @@ including ones spawned while it runs, and several copies of the same one.
 flowchart LR
   A["<b>1. Describe</b><br/>URDF / xacro<br/><i>what the vehicle is</i>"]
   B["<b>2. Compose</b><br/>model.sdf.xacro<br/><i>how it is simulated</i>"]
-  C["<b>3. Spawn</b><br/>spawn.launch.xml<br/><i>how an instance is started</i>"]
+  C["<b>3. Spawn</b><br/>spawn_vehicle.launch.xml<br/><i>how an instance is started</i>"]
   G["Gazebo<br/>open_water world"]
   R["ROS 2<br/>topics and TF"]
   A --> B --> C
@@ -41,9 +41,9 @@ flowchart LR
 2. **Compose** the simulation model: a short SDF file that merges your URDF
    and adds what Gazebo needs, starting with the marked displacement volume.
    [Compose the Gazebo model](gazebo-composition.md)
-3. **Spawn** it from a launch file that sits next to gz-maritime's simulation
-   launch, once per instance, with its bridge and its TF.
-   [Spawn and drive](spawn-and-drive.md)
+3. **Spawn** it with gz-maritime's spawn launch, once per instance, from
+   those files: it puts the model in under a name, with its bridge and its
+   TF. [Spawn and drive](spawn-and-drive.md)
 
 ### Why the URDF comes first
 
@@ -51,8 +51,10 @@ ROS tools (RViz, `robot_state_publisher`, navigation and manipulation stacks)
 read URDF, and Gazebo can read it too. With one URDF describing the vehicle,
 the robot you see in RViz and the one Gazebo simulates can't drift apart.
 Everything that only matters to the simulator (the displacement volume,
-plugins, sensors) lives in the separate simulation model. The Blue Robotics
-and Holybro vehicles are built the same way.
+plugins, sensors) lives in the separate simulation model. The custom USV
+keeps both files in one package; the Blue Robotics and Holybro vehicles
+split them into a description package and a Gazebo package. Either way the
+URDF stays on its own.
 
 ## How a vehicle floats
 
@@ -124,9 +126,9 @@ tutorial, and buoyancy and waves from this series.
 ## Waves and physics today
 
 ```{figure} images/waves-through-hulls.jpg
-:alt: Two views of the tutorial USV in a moderate sea. Left, over a wave trough, the hulls are completely out of the drawn water. Right, under a crest, the drawn water covers the hulls.
+:alt: Two views of the custom USV in a moderate sea. Left, over a wave trough, the hulls are completely out of the drawn water. Right, under a crest, the drawn water covers the hulls.
 
-The tutorial USV at sea state 3. The drawn sea rises and falls around the
+The custom USV at sea state 3. The drawn sea rises and falls around the
 boat, but the boat stays on the flat water level.
 ```
 
@@ -138,7 +140,7 @@ that follows the waves is planned.
 
 ## Already have a model?
 
-You don't need the two-package layout to try your vehicle out. Mark the
+You don't need the custom USV's layout to try your vehicle out. Mark the
 collision that should float it, as above, then start the ocean in one
 terminal:
 
@@ -152,10 +154,13 @@ and spawn the file into it from another:
 ros2 run ros_gz_sim create -name my_boat -file /path/to/model.sdf -z 0
 ```
 
-That works for an SDF model as it is. For a URDF, the mark has to sit in a
-model-level `<gazebo>` block, because the conversion drops attributes on
-URDF collisions ([Marking from a URDF](gazebo-composition.md#marking-from-a-urdf)).
-The next page explains why the split into a description and a Gazebo model
+That works for an SDF model as it is; the spawn launch takes a plain file
+too (`spawn_vehicle.launch.xml name:=my_boat xacro:=/path/to/model.sdf`)
+and adds the bridge and the TF only when you give it a bridge template and
+a URDF. For a URDF, the mark has to sit in a model-level `<gazebo>` block,
+because the conversion drops attributes on URDF collisions
+([Marking from a URDF](gazebo-composition.md#marking-from-a-urdf)). The next
+page explains why keeping the description apart from the simulation model
 is still worth it once you go further.
 
 Next: [Describe the vehicle](vehicle-description.md).
