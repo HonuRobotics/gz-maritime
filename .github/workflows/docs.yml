@@ -16,7 +16,7 @@ on:
 
 jobs:
   docs:
-    uses: HonuRobotics/honu-docs/.github/workflows/docs.yml@v0.1.0
+    uses: HonuRobotics/honu-docs/.github/workflows/docs.yml@v0.2.0
     permissions:
       contents: write
     with:
