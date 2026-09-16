@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!--
+  Look at the custom USV description in RViz, without Gazebo:
+  robot_state_publisher on the expanded xacro, joint_state_publisher_gui
+  (sliders to spin the propellers) and RViz with the packaged config.
+
+      ros2 launch kai_custom_vehicle display.launch.xml
+
+  For an instance in a running simulation use rviz.launch.xml instead: there
+  the frames and the description carry the instance name.
+-->
+<launch>
+  <arg name="gui" default="true"
+       description="Start joint_state_publisher_gui to drive the propeller joints."/>
+
+  <node pkg="robot_state_publisher" exec="robot_state_publisher"
+        name="robot_state_publisher">
+    <!-- type="str": keep launch from running yaml type inference over the URDF. -->
+    <param name="robot_description"
+           value="$(command 'xacro $(find-pkg-share kai_custom_vehicle)/urdf/custom_usv.urdf.xacro')"
+           type="str"/>
+  </node>
+
+  <node pkg="joint_state_publisher_gui" exec="joint_state_publisher_gui"
+        name="joint_state_publisher_gui" if="$(var gui)"/>
+
+  <node pkg="rviz2" exec="rviz2" name="rviz2"
+        args="-d $(find-pkg-share kai_custom_vehicle)/rviz/custom_usv.rviz"/>
+</launch>

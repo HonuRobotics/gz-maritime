@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<!--
+  Bring up the gz-maritime ocean with one custom USV on it.
+
+  Two includes from kai_bringup: the simulation (Gazebo on the ocean, the
+  GUI, /clock), which names no vehicle, and one spawn of this vehicle under
+  one name, rendered from this package's model xacro, bridge template and
+  URDF xacro. Another boat joins while this runs by running the spawn launch
+  again with another name and the same three files.
+
+      ros2 launch kai_custom_vehicle sim.launch.xml
+      ros2 launch kai_custom_vehicle sim.launch.xml gazebo_gui:=false
+      ros2 launch kai_custom_vehicle sim.launch.xml name:=boat_a y:=2
+-->
+<launch>
+  <arg name="world" default="open_water.sdf"
+       description="World SDF file name (resolved via GZ_SIM_RESOURCE_PATH)"/>
+  <arg name="gazebo_gui" default="true" description="Launch the Gazebo GUI"/>
+  <arg name="use_composition" default="true"
+       description="Run gz_server, the bridge and robot_state_publisher in one container"/>
+  <arg name="name" default="custom_usv"
+       description="Instance name: model name, topic prefix, ROS namespace and TF prefix"/>
+  <arg name="x" default="0" description="Spawn position x [m]"/>
+  <arg name="y" default="0" description="Spawn position y [m]"/>
+  <arg name="z" default="0" description="Spawn position z [m]; 0 is the waterline"/>
+  <arg name="roll" default="0" description="Spawn roll [rad]"/>
+  <arg name="pitch" default="0" description="Spawn pitch [rad]"/>
+  <arg name="yaw" default="0" description="Spawn heading [rad]"/>
+
+  <let name="share" value="$(find-pkg-share kai_custom_vehicle)"/>
+
+  <!-- 1. The simulation: Gazebo on the ocean, the GUI, /clock. -->
+  <include file="$(find-pkg-share kai_bringup)/launch/simulation.launch.xml">
+    <arg name="world" value="$(var world)"/>
+    <arg name="gazebo_gui" value="$(var gazebo_gui)"/>
+    <arg name="use_composition" value="$(var use_composition)"/>
+  </include>
+
+  <!-- 2. The boat: this vehicle's three files, one instance name. The spawn
+       launch's `world` is the name of the world to spawn into, empty for
+       the one running; it is set here so this file's `world`, the SDF file
+       name, does not leak into it. -->
+  <include file="$(find-pkg-share kai_bringup)/launch/spawn_vehicle.launch.xml">
+    <arg name="name" value="$(var name)"/>
+    <arg name="world" value=""/>
+    <arg name="xacro" value="$(var share)/models/custom_usv/model.sdf.xacro"/>
+    <arg name="bridge" value="$(var share)/config/ros_gz_bridge.yaml.in"/>
+    <arg name="urdf" value="$(var share)/urdf/custom_usv.urdf.xacro"/>
+    <arg name="x" value="$(var x)"/>
+    <arg name="y" value="$(var y)"/>
+    <arg name="z" value="$(var z)"/>
+    <arg name="roll" value="$(var roll)"/>
+    <arg name="pitch" value="$(var pitch)"/>
+    <arg name="yaw" value="$(var yaw)"/>
+    <arg name="use_composition" value="$(var use_composition)"/>
+  </include>
+</launch>

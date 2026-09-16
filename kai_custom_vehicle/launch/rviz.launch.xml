@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!--
+  RViz on one custom USV instance in a running simulation.
+
+  In a simulation every TF frame carries the instance name and the
+  description is published in its namespace, so RViz needs a config pointed
+  at that instance: fixed frame <name>/base_link, description topic
+  /<name>/robot_description and the RobotModel display's TF Prefix, none of
+  which can be given on the command line. instance_rviz.py writes that
+  config from rviz/custom_usv.rviz next to the instance's other files; this
+  launch starts RViz on it with simulation time.
+
+      ros2 launch kai_custom_vehicle rviz.launch.xml
+      ros2 launch kai_custom_vehicle rviz.launch.xml name:=boat_a
+-->
+<launch>
+  <arg name="name" default="custom_usv"
+       description="Instance to look at: its TF prefix, namespace and topics"/>
+  <arg name="instance_dir"
+       default="$(env ROS_HOME $(env HOME)/.ros)/kai_bringup/$(var name)"
+       description="Where the instance's files are: the spawn launch's default"/>
+
+  <let name="config"
+       value="$(command '$(find-pkg-prefix kai_custom_vehicle)/lib/kai_custom_vehicle/instance_rviz.py --name $(var name) --config $(find-pkg-share kai_custom_vehicle)/rviz/custom_usv.rviz --out $(var instance_dir)/custom_usv.rviz')"/>
+
+  <node pkg="rviz2" exec="rviz2" name="rviz2" namespace="$(var name)"
+        output="screen" args="-d $(var config)">
+    <param name="use_sim_time" value="true" type="bool"/>
+  </node>
+</launch>
