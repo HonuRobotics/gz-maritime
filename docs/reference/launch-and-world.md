@@ -107,11 +107,10 @@ as `world:=<name>.sdf`; the spawn launch then puts vehicles into it by name.
 | `sand_island.sdf` | Sand Island, Honolulu, RobotX 2018 and VRX 2019 | VRX mesh, fetched by the build | start at x 158, y 108 |
 | `la_spezia.sdf` | La Spezia marina, VORC 2020 | VORC mesh, fetched by the build | start at x 10, y -372 |
 
-The site worlds draw the water as tiles of the water surface model, one
-per 200 m cell of water measured from the terrain: the whole lake at Sydney
-and Benderson Park, the sea near the shore at Sand Island and La Spezia,
-where flat strips carry the sea on to the horizon. Buoyancy does not depend
-on any of that. The terrain models are Apache 2.0 assets from VRX and VORC,
+The site worlds place the water surface model once, at the centre of their
+water: it draws a 3 km square of wave tiles around itself, and the terrain
+hides it wherever there is land. Buoyancy does not depend on any of that.
+The terrain models are Apache 2.0 assets from VRX and VORC,
 credited in `kai_gazebo/NOTICE`.
 
 ## The `open_water.sdf` world
