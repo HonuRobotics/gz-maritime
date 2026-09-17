@@ -1,4 +1,23 @@
 <?xml version="1.0"?>
+<!--
+  Sand Island: the RobotX 2018 venue in Honolulu, Hawaii, from the Virtual
+  RobotX (VRX) 2019 world: the island shore with its mooring posts and the
+  ground station tents, on a terrain mesh fetched at build time from the VRX
+  repository.
+
+  The water is Keehi Lagoon, the sheltered harbour water between the island
+  and the reef, so sea states 0 to 3 fit (ripples to a slight sea of about
+  0.9 m); the ocean swell stays outside the reef.
+
+  The same world contract as open_water.sdf (the systems every vehicle
+  needs, gz-maritime's buoyancy reading marked collisions, the waterline at
+  z = 0, the wave field for the drawn sea), with this site's terrain and
+  coordinates. Vehicles are spawned into it by name; a good start point is
+  158 108 0.1 0 0 -2.76:
+
+      ros2 launch kai_bringup simulation.launch.xml world:=sand_island.sdf
+      ros2 launch kai_bringup spawn_vehicle.launch.xml name:=boat_a x:=158 y:=108 ...
+-->
 <sdf version="1.12">
   <world name="default">
 
@@ -8,25 +27,26 @@
       <!-- <real_time_factor>0</real_time_factor> -->
     </physics>
 
-    <!-- Spherical coordinates for Portuguese Ledge, Monterey Bay.
-         Required by the magnetometer system, which computes the magnetic field
-         from the World Magnetic Model (WMM) at the given lat/lon, and by the
-         NavSat system, which reports fixes relative to this origin. -->
+    <!-- Spherical coordinates of the site, required by the magnetometer
+         system (World Magnetic Model at this lat/lon) and by the NavSat
+         system (fixes relative to this origin). -->
     <spherical_coordinates>
       <surface_model>EARTH_WGS84</surface_model>
       <world_frame_orientation>ENU</world_frame_orientation>
-      <latitude_deg>36.693509</latitude_deg>
-      <longitude_deg>-121.936568</longitude_deg>
+      <latitude_deg>21.30996</latitude_deg>
+      <longitude_deg>-157.8901</longitude_deg>
       <elevation>0</elevation>
       <heading_deg>0</heading_deg>
     </spherical_coordinates>
 
-    <!-- Scene: deep ocean ambient + procedural sky. The <sky> element
-         tells gz-rendering to draw its built-in procedural sky cube
-         (sun, horizon transition) so the water has something to
-         reflect and the background isn't a flat colour. -->
+    <!-- Scene: neutral white ambient, as in the VRX worlds, so the terrain
+         textures keep their colours (open water uses a cyan ambient tuned for
+         the sea alone, which turns sand green), plus a procedural sky: the
+         <sky> element tells gz-rendering to draw its built-in sky cube (sun,
+         horizon transition) so the water has something to reflect and the
+         background isn't a flat colour. -->
     <scene>
-      <ambient>0.0 1.0 1.0</ambient>
+      <ambient>1.0 1.0 1.0</ambient>
       <background>0.0 0.7 0.8</background>
       <sky></sky>
       <grid>false</grid>
@@ -148,6 +168,10 @@
              0 = glassy). For a hand-tuned sea, comment <sea_state> and uncomment
              the advanced block (delete the two comment markers wrapping it). -->
         <sea_state>1</sea_state>
+        <!-- How far the sea is drawn around the water surface model, in
+             200 m tiles: 7 is a 3 km square. Open water leaves it at the
+             model's own 2, a 1 km square. -->
+        <tiles_radius>7</tiles_radius>
 
         <!-- Advanced / manual setup (a working configuration). <period> sets
              wind speed; <gain> is the amplitude multiplier (9.5 = dramatic and
@@ -203,10 +227,9 @@
         <scene>scene</scene>
         <ambient_light>0.4 0.4 0.4</ambient_light>
         <background_color>0.0 0.7 0.8</background_color>
-        <!-- Matches asv_wave_sim's reference camera_pose for fair
-             side-by-side visual comparison: 6m east of origin, 6m
-             above water, pitched ~29° down. -->
-        <camera_pose>-6 0 6 0 0.5 0</camera_pose>
+        <!-- Along the shore camp: the tents on the left, the mooring
+             posts and the water on the right. -->
+        <camera_pose>173 122 4 0 0.22 -1.2</camera_pose>
         <camera_clip>
           <near>0.1</near>
           <far>50000</far>
@@ -370,24 +393,88 @@
       </plugin>
     </gui>
 
-    <!-- Water surface visual (wave-displaced mesh): one include draws a
-         1 km square of tiles around the origin. -->
+    <!-- Terrain: the VRX 2019 Sand Island mesh (kai_gazebo/models/sandisland,
+         fetched at build time from the VRX gazebo_classic branch). Static;
+         its collision is the island. -->
     <include>
+      <pose>0 0 0 0 0 0</pose>
+      <uri>model://sandisland</uri>
+    </include>
+
+    <!-- The shore camp from the VRX 2019 world, at its original poses:
+         three mooring posts for the boat, the antenna of the ground station
+         and eight tents with their tables and chairs. All Fuel models,
+         fetched on first use and cached. -->
+    <include>
+      <name>post_0</name>
+      <pose>169.22 112.06 0.47 0.046 -0.157 0</pose>
+      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/post</uri>
+    </include>
+    <include>
+      <name>post_1</name>
+      <pose>173.558 100.809 0.42 0.046 -0.157 0</pose>
+      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/post</uri>
+    </include>
+    <include>
+      <name>post_2</name>
+      <pose>177.64 90.86 0.3 0.046 -0.157 0</pose>
+      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/post</uri>
+    </include>
+    <include>
+      <pose>175.69 114.29 1.37 0 0 2.00</pose>
+      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/antenna</uri>
+    </include>
+    <include>
+      <name>ground_station_0</name>
+      <pose>177.61 117.2 1.55 0 0 3.54</pose>
+      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/ground_station</uri>
+    </include>
+    <include>
+      <name>ground_station_1</name>
+      <pose>179.16 113.73 1.55 0 0 3.54</pose>
+      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/ground_station</uri>
+    </include>
+    <include>
+      <name>ground_station_2</name>
+      <pose>180.61 110.31 1.55 0 0 3.54</pose>
+      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/ground_station</uri>
+    </include>
+    <include>
+      <name>ground_station_3</name>
+      <pose>182.05 106.83 1.55 0 0 3.54</pose>
+      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/ground_station</uri>
+    </include>
+    <include>
+      <name>ground_station_4</name>
+      <pose>183.71 103.14 1.55 0 0 3.54</pose>
+      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/ground_station</uri>
+    </include>
+    <include>
+      <name>ground_station_5</name>
+      <pose>185.28 99.51 1.55 0 0 3.54</pose>
+      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/ground_station</uri>
+    </include>
+    <include>
+      <name>ground_station_6</name>
+      <pose>186.8 96.02 1.55 0 0 3.54</pose>
+      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/ground_station</uri>
+    </include>
+    <include>
+      <name>ground_station_7</name>
+      <pose>188.17 92.45 1.55 0 0 3.54</pose>
+      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/ground_station</uri>
+    </include>
+
+    <!-- The drawn sea: one include of the water surface model at the
+         centre of the water. The wave source's <tiles_radius> above
+         makes it draw a 3 km square, the lagoon and the sea beyond
+         it, and the terrain hides it wherever there is land. Buoyancy
+         does not depend on this: it is the flat z = 0 plane
+         everywhere. -->
+    <include>
+      <pose>0 0 0 0 0 0</pose>
       <uri>model://water_surface</uri>
     </include>
-
-    <!-- A landing pad for aerial vehicles: a static deck 1 m above the
-         water at (8, -8), the only solid ground in this world. Nothing
-         marks its collision, so it does not float; it is held up by being
-         static. Spawn a quad on it at z = 1.25. -->
-    <include>
-      <uri>model://landing_pad</uri>
-      <pose>8 -8 0 0 0 0</pose>
-    </include>
-
-    <!-- No vehicles here: every platform shares this world, so vehicles are
-         spawned into it (ros_gz_sim create, or the /world/default/create
-         service) and float by the collisions they mark. -->
 
   </world>
 </sdf>

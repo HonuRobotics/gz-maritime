@@ -1,0 +1,62 @@
+<?xml version="1.0"?>
+<!--
+  Landing pad: a static 4 x 4 m deck whose top sits 1 m above the water,
+  on four pylons that reach down into the water. Static, so it never moves
+  and nothing about it needs buoyancy; its collision is the deck alone, so
+  a vehicle can stand on it and a boat can pass under the deck between the
+  pylons. Include it in a world at the water level:
+
+      <include>
+        <uri>model://landing_pad</uri>
+        <pose>8 -8 0 0 0 0</pose>
+      </include>
+
+  A quad spawned at z = 1.25 over the pad drops onto its landing gear.
+-->
+<sdf version="1.12">
+  <model name="landing_pad">
+    <static>true</static>
+    <link name="deck">
+      <collision name="deck_collision">
+        <pose>0 0 0.9 0 0 0</pose>
+        <geometry><box><size>4 4 0.2</size></box></geometry>
+      </collision>
+      <visual name="deck_visual">
+        <pose>0 0 0.9 0 0 0</pose>
+        <geometry><box><size>4 4 0.2</size></box></geometry>
+        <material>
+          <ambient>0.35 0.35 0.38 1</ambient>
+          <diffuse>0.35 0.35 0.38 1</diffuse>
+        </material>
+      </visual>
+      <visual name="marking">
+        <pose>0 0 1.001 0 0 0</pose>
+        <geometry><box><size>3 3 0.002</size></box></geometry>
+        <material>
+          <ambient>0.95 0.75 0.1 1</ambient>
+          <diffuse>0.95 0.75 0.1 1</diffuse>
+        </material>
+      </visual>
+      <visual name="pylon_0">
+        <pose>1.7 1.7 -0.6 0 0 0</pose>
+        <geometry><cylinder><radius>0.15</radius><length>2.8</length></cylinder></geometry>
+        <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material>
+      </visual>
+      <visual name="pylon_1">
+        <pose>-1.7 1.7 -0.6 0 0 0</pose>
+        <geometry><cylinder><radius>0.15</radius><length>2.8</length></cylinder></geometry>
+        <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material>
+      </visual>
+      <visual name="pylon_2">
+        <pose>1.7 -1.7 -0.6 0 0 0</pose>
+        <geometry><cylinder><radius>0.15</radius><length>2.8</length></cylinder></geometry>
+        <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material>
+      </visual>
+      <visual name="pylon_3">
+        <pose>-1.7 -1.7 -0.6 0 0 0</pose>
+        <geometry><cylinder><radius>0.15</radius><length>2.8</length></cylinder></geometry>
+        <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+</sdf>

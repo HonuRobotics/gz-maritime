@@ -16,6 +16,10 @@ if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(test_instantiate_vehicle test/test_instantiate_vehicle.py
     TIMEOUT 120)
+  # The demo needs the vehicle packages; the module skips itself without them.
+  # NOCAPTURE so the launch output printed at teardown reaches the test logs.
+  ament_add_pytest_test(test_multi_vehicle_demo test/test_multi_vehicle_demo.py
+    TIMEOUT 420 NOCAPTURE)
 endif()
 
 ament_package()

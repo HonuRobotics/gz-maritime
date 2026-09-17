@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!--
+  La Spezia marina terrain from the Virtual Ocean Robotics Challenge (VORC)
+  (osrf/vorc, vorc_gazebo/models/marina). The mesh and its texture are not
+  in this repository: kai_gazebo's build downloads them, checksummed, into
+  meshes/ next to this file. The mesh is Y up, hence the roll of the link.
+  Static; the mesh is both the visual and the collision, so vehicles ground
+  on the quays.
+-->
+<sdf version="1.12">
+  <model name="la_spezia">
+    <static>true</static>
+    <link name="link">
+      <pose>0 0 0 1.570796 0 0</pose>
+      <visual name="visual">
+        <geometry><mesh><uri>meshes/terrain.dae</uri></mesh></geometry>
+      </visual>
+      <collision name="collision">
+        <geometry><mesh><uri>meshes/terrain.dae</uri></mesh></geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

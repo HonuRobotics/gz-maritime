@@ -49,6 +49,8 @@ namespace gz::sim::systems
   ///   - `<textures>/<bumpMap>` (path): normal-perturbation texture.
   ///   - `<textures>/<cubeMap>` (path): reflection cubemap.
   ///   - `<tiles_radius>` (int, 2): render the tile at (2r+1)^2 offsets; 0 disables.
+  ///     A `<tiles_radius>` in the world's wave source overrides it, so a
+  ///     world sizes its drawn sea without a model of its own.
   ///   - `<tile_mesh_size>` (double [m], 200.0): per-tile mesh extent.
   ///
   /// \verbatim

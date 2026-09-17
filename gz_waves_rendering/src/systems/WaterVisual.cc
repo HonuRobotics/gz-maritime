@@ -774,6 +774,12 @@ void WaterVisual::PreUpdate(
     this->dataPtr->cachedGridSize = static_cast<int>(f->n);
   }
   this->dataPtr->cachedTau = static_cast<float>(data->params.tau);
+  // The world's <tiles_radius>, when it sets one, wins over this visual's:
+  // how far the sea is drawn is a property of the site, and worlds include
+  // the water model by URI, with no way to override its own setting. The
+  // tiles are spawned with the material, which waits for this recipe.
+  if (data->params.tilesRadius > 0)
+    this->dataPtr->tilesRadius = data->params.tilesRadius;
   this->dataPtr->haveWavefield = true;
   this->dataPtr->cachedGeneration = data->generation;
 }
