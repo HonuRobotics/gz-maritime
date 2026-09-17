@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>How to guides &mdash; Gz Maritime lyrical documentation</title>
+  <title>Sail the competition sites &mdash; Gz Maritime lyrical documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/honu.css?v=44af46ee" />
@@ -21,8 +21,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Bring your own vehicle" href="own-vehicle.html" />
-    <link rel="prev" title="Holybro X500" href="../vehicles/holybro.html" /> 
+    <link rel="next" title="Use your own world" href="own-world.html" />
+    <link rel="prev" title="Add sensors" href="sensors.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -94,9 +94,9 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">How to guides</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#bring-your-own-vehicle">Bring your own vehicle</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#more">More</a><ul>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How to guides</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="index.html#bring-your-own-vehicle">Bring your own vehicle</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#more">More</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="own-vehicle.html">Bring your own vehicle</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#who-does-what">Who does what</a></li>
 <li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#the-path">The path</a><ul>
@@ -162,12 +162,12 @@
 <li class="toctree-l4"><a class="reference internal" href="sensors.html#check-a-sensor">Check a sensor</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="site-worlds.html">Sail the competition sites</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#sydney-international-regatta-centre">Sydney International Regatta Centre</a></li>
-<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#nathan-benderson-park">Nathan Benderson Park</a></li>
-<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#sand-island">Sand Island</a></li>
-<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#la-spezia">La Spezia</a></li>
-<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#what-to-know">What to know</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Sail the competition sites</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#sydney-international-regatta-centre">Sydney International Regatta Centre</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#nathan-benderson-park">Nathan Benderson Park</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sand-island">Sand Island</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#la-spezia">La Spezia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#what-to-know">What to know</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="own-world.html">Use your own world</a><ul>
@@ -253,9 +253,10 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">How to guides</li>
+          <li class="breadcrumb-item"><a href="index.html">How to guides</a></li>
+      <li class="breadcrumb-item active">Sail the competition sites</li>
       <li class="wy-breadcrumbs-aside">
-              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/how-to/index.md" class="fa fa-github"> Edit on GitHub</a>
+              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/how-to/site-worlds.md" class="fa fa-github"> Edit on GitHub</a>
       </li>
   </ul>
   <hr/>
@@ -263,35 +264,196 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="how-to-guides">
-<h1>How to guides<a class="headerlink" href="#how-to-guides" title="Link to this heading"></a></h1>
-<section id="bring-your-own-vehicle">
-<h2>Bring your own vehicle<a class="headerlink" href="#bring-your-own-vehicle" title="Link to this heading"></a></h2>
-<p>Follow these in order the first time. Every step uses the
-<a class="reference internal" href="../vehicles/custom-usv.html"><span class="std std-doc">custom USV</span></a> as the worked example, so there is
-always a real file to look at, and the snippets on these pages are taken
-from its files.</p>
-<ol class="arabic simple">
-<li><p><a class="reference internal" href="own-vehicle.html"><span class="std std-doc">Overview</span></a>: what the world gives you, what your vehicle
-brings, and how a vehicle starts floating.</p></li>
-<li><p><a class="reference internal" href="vehicle-description.html"><span class="std std-doc">Describe the vehicle</span></a>: the URDF, with its frames,
-mass, collision shapes and waterline.</p></li>
-<li><p><a class="reference internal" href="gazebo-composition.html"><span class="std std-doc">Compose the Gazebo model</span></a>: buoyancy registration,
-thrusters, damping and sensors on top of the URDF.</p></li>
-<li><p><a class="reference internal" href="spawn-and-drive.html"><span class="std std-doc">Spawn and drive</span></a>: the spawn launch, the bridge, and
-driving.</p></li>
-<li><p><a class="reference internal" href="sensors.html"><span class="std std-doc">Add sensors</span></a>: IMU, GPS, magnetometer and cameras.</p></li>
-</ol>
-</section>
-<section id="more">
-<h2>More<a class="headerlink" href="#more" title="Link to this heading"></a></h2>
-<ul class="simple">
-<li><p><a class="reference internal" href="site-worlds.html"><span class="std std-doc">Sail the competition sites</span></a></p></li>
-<li><p><a class="reference internal" href="own-world.html"><span class="std std-doc">Use your own world</span></a></p></li>
-<li><p><a class="reference internal" href="faq.html"><span class="std std-doc">Troubleshooting</span></a></p></li>
-</ul>
-<div class="toctree-wrapper compound">
+  <section id="sail-the-competition-sites">
+<h1>Sail the competition sites<a class="headerlink" href="#sail-the-competition-sites" title="Link to this heading"></a></h1>
+<p>Besides the open water world, gz-maritime ships four real venues: the three
+sites of the Virtual RobotX competition (VRX) and the one of the Virtual
+Ocean Robotics Challenge (VORC), adapted to this ocean. They keep the same
+world contract as <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code>, so every launch file, spawn command and
+service works on them unchanged. Pass one to the simulation launch and
+spawn a vehicle at the start point the site recommends:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>simulation.launch.xml<span class="w"> </span>world:<span class="o">=</span>sand_island.sdf
+</pre></div>
 </div>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>spawn_vehicle.launch.xml<span class="w"> </span>name:<span class="o">=</span>boat_a<span class="w"> </span>x:<span class="o">=</span><span class="m">158</span><span class="w"> </span>y:<span class="o">=</span><span class="m">108</span><span class="w"> </span>yaw:<span class="o">=</span>-2.76<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>xacro:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/models/custom_usv/model.sdf.xacro<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>bridge:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/config/ros_gz_bridge.yaml.in<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>urdf:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_custom_vehicle<span class="k">)</span>/urdf/custom_usv.urdf.xacro
+</pre></div>
+</div>
+<p>The custom USV’s own launch does both in one go: <code class="docutils literal notranslate"><span class="pre">ros2</span> <span class="pre">launch</span> <span class="pre">kai_custom_vehicle</span> <span class="pre">sim.launch.xml</span> <span class="pre">world:=sand_island.sdf</span> <span class="pre">x:=158</span> <span class="pre">y:=108</span> <span class="pre">yaw:=-2.76</span></code>. Any other vehicle spawns the same way, see
+<a class="reference internal" href="spawn-and-drive.html"><span class="std std-doc">Spawn and drive</span></a>.</p>
+<p>Every world is named <code class="docutils literal notranslate"><span class="pre">default</span></code> inside, whatever its file is called, so the
+wave service and the other world services take the same path everywhere:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gz<span class="w"> </span>service<span class="w"> </span>-s<span class="w"> </span>/world/default/wave/set_parameters<span class="w"> </span>--reqtype<span class="w"> </span>gz.msgs.Param<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--reptype<span class="w"> </span>gz.msgs.Boolean<span class="w"> </span>--timeout<span class="w"> </span><span class="m">2000</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--req<span class="w"> </span><span class="s1">'params {key: "sea_state" value {type: INT32 int_value: 2}}'</span>
+</pre></div>
+</div>
+<p>The sea state goes from 0 (glassy) to 9, and each site says below which
+range fits its water. A rowing lake never sees more than wind chop, and a
+lagoon or a gulf at most a slight sea; higher codes are open sea and look
+wrong between shores.</p>
+<section id="sydney-international-regatta-centre">
+<h2>Sydney International Regatta Centre<a class="headerlink" href="#sydney-international-regatta-centre" title="Link to this heading"></a></h2>
+<figure class="align-default" id="id1">
+<img alt="A rowing lake seen from its shore, with trees and a boathouse on the far bank and the custom USV on the water" src="../_images/sydney-regatta.jpg" />
+<figcaption>
+<p><span class="caption-text">The Sydney Regatta world at its opening view.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>The VRX venue from 2022 to 2024: the man made rowing course at Penrith
+Lakes, near Sydney, with its pontoon, shore and buildings. The terrain is
+the VRX model from Fuel, about 140 MB, downloaded the first time the world
+loads and cached under <code class="docutils literal notranslate"><span class="pre">~/.gz/fuel</span></code>.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p></p></th>
+<th class="head"><p></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Launch</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ros2</span> <span class="pre">launch</span> <span class="pre">kai_bringup</span> <span class="pre">simulation.launch.xml</span> <span class="pre">world:=sydney_regatta.sdf</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Start point</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">x:=-532</span> <span class="pre">y:=162</span> <span class="pre">yaw:=1</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Water</p></td>
+<td><p>A freshwater lake, flat and sheltered</p></td>
+</tr>
+<tr class="row-odd"><td><p>Sea states</p></td>
+<td><p>0 to 2</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="nathan-benderson-park">
+<h2>Nathan Benderson Park<a class="headerlink" href="#nathan-benderson-park" title="Link to this heading"></a></h2>
+<figure class="align-default" id="id2">
+<img alt="A long rowing lake lined with trees, with a grandstand building on its shore, seen from above the north bank" src="../_images/benderson-park.jpg" />
+<figcaption>
+<p><span class="caption-text">The Benderson Park world at its opening view.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>The RobotX 2022 venue in Sarasota, Florida: a man made rowing lake with
+its grandstand and island. The terrain is the VRX model from Fuel, about
+220 MB, downloaded on first use like Sydney’s. The lake runs along y, so a
+vehicle at the origin heading 1.57 looks down the course.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p></p></th>
+<th class="head"><p></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Launch</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ros2</span> <span class="pre">launch</span> <span class="pre">kai_bringup</span> <span class="pre">simulation.launch.xml</span> <span class="pre">world:=benderson_park.sdf</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Start point</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">x:=0</span> <span class="pre">y:=0</span> <span class="pre">yaw:=1.57</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Water</p></td>
+<td><p>A freshwater lake, flat and sheltered</p></td>
+</tr>
+<tr class="row-odd"><td><p>Sea states</p></td>
+<td><p>0 to 2</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="sand-island">
+<h2>Sand Island<a class="headerlink" href="#sand-island" title="Link to this heading"></a></h2>
+<figure class="align-default" id="id3">
+<img alt="A sandy shore with a row of green tents, mooring posts at the water's edge and the custom USV just offshore" src="../_images/sand-island.jpg" />
+<figcaption>
+<p><span class="caption-text">The Sand Island world at its opening view, from behind the shore camp.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>The RobotX 2018 venue in Honolulu, Hawaii, as VRX 2019 modelled it: the
+island shore on Keehi Lagoon, with the shore camp of the original world:
+three mooring posts, the antenna and eight tents with their tables and
+chairs. The terrain mesh comes from the VRX repository and is fetched by
+the build, so it is there after <code class="docutils literal notranslate"><span class="pre">colcon</span> <span class="pre">build</span></code>; the camp models come from
+Fuel on first use, a few megabytes.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p></p></th>
+<th class="head"><p></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Launch</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ros2</span> <span class="pre">launch</span> <span class="pre">kai_bringup</span> <span class="pre">simulation.launch.xml</span> <span class="pre">world:=sand_island.sdf</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Start point</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">x:=158</span> <span class="pre">y:=108</span> <span class="pre">yaw:=-2.76</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Water</p></td>
+<td><p>A lagoon sheltered by the reef and the harbour</p></td>
+</tr>
+<tr class="row-odd"><td><p>Sea states</p></td>
+<td><p>0 to 3</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="la-spezia">
+<h2>La Spezia<a class="headerlink" href="#la-spezia" title="Link to this heading"></a></h2>
+<figure class="align-default" id="id4">
+<img alt="A marina seen from over the sea, a pier pointing at the viewer, quays and a town behind it and hills above" src="../_images/la-spezia.jpg" />
+<figcaption>
+<p><span class="caption-text">The La Spezia world at its opening view, from over the gulf.</span><a class="headerlink" href="#id4" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>The VORC 2020 venue: the marina in the Gulf of La Spezia, Italy, with its
+breakwaters and quays. The terrain mesh comes from the VORC repository and
+is fetched by the build. Inside the breakwaters the water is calm; the gulf
+beyond them sees a slight sea at most.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p></p></th>
+<th class="head"><p></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Launch</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ros2</span> <span class="pre">launch</span> <span class="pre">kai_bringup</span> <span class="pre">simulation.launch.xml</span> <span class="pre">world:=la_spezia.sdf</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Start point</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">x:=10</span> <span class="pre">y:=-372</span> <span class="pre">yaw:=0.3816</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Water</p></td>
+<td><p>The marina and the gulf</p></td>
+</tr>
+<tr class="row-odd"><td><p>Sea states</p></td>
+<td><p>0 to 2 in the marina, up to 3 in the gulf</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="what-to-know">
+<h2>What to know<a class="headerlink" href="#what-to-know" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Terrain is solid.</strong> Every site’s terrain mesh is its collision too, so a
+vehicle driven into the shore grounds on it. The water has no floor: a
+sinking vehicle keeps sinking, as on open water.</p></li>
+<li><p><strong>The water is one model.</strong> Each site includes the water surface once, at
+the centre of its water, and sets <code class="docutils literal notranslate"><span class="pre">&lt;tiles_radius&gt;</span></code> in its wave source to
+say how far the sea is drawn around it, in 200 m tiles; the terrain hides
+it wherever there is land. Buoyancy does not depend on the drawn water:
+vehicles float on the flat z = 0 plane everywhere.</p></li>
+<li><p><strong>First use needs the network.</strong> The Sydney and Benderson Park terrains
+and the Sand Island camp come from Fuel the first time they load; after
+that they are cached. The Sand Island and La Spezia meshes are fetched by
+the build, so building gz-maritime needs the network once too.</p></li>
+<li><p><strong>Credits.</strong> The terrain models are Apache 2.0 assets from VRX and VORC,
+credited in <code class="docutils literal notranslate"><span class="pre">kai_gazebo/NOTICE</span></code>.</p></li>
+</ul>
+<p>The worlds table in the
+<a class="reference internal" href="../reference/launch-and-world.html#worlds"><span class="std std-ref">reference</span></a> has the same facts in
+one place, and <a class="reference internal" href="own-world.html"><span class="std std-doc">Use your own world</span></a> explains the contract
+they share if you want to build a site of your own.</p>
 </section>
 </section>
 
@@ -299,8 +461,8 @@ driving.</p></li>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../vehicles/holybro.html" class="btn btn-neutral float-left" title="Holybro X500" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="own-vehicle.html" class="btn btn-neutral float-right" title="Bring your own vehicle" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sensors.html" class="btn btn-neutral float-left" title="Add sensors" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="own-world.html" class="btn btn-neutral float-right" title="Use your own world" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

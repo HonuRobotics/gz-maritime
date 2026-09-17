@@ -7,7 +7,8 @@ resource path or a full path:
 ros2 launch kai_custom_vehicle sim.launch.xml world:=/path/to/my_world.sdf
 ```
 
-The easiest start is a copy of `open_water.sdf`:
+The easiest start is a copy of `open_water.sdf`, or of one of the four
+[site worlds](site-worlds.md), which add a terrain to the same contract:
 
 ```bash
 cp $(ros2 pkg prefix --share kai_gazebo)/worlds/open_water.sdf my_world.sdf
@@ -19,7 +20,7 @@ cp $(ros2 pkg prefix --share kai_gazebo)/worlds/open_water.sdf my_world.sdf
 |---|---|---|
 | Physics, user commands and scene broadcaster systems | Physics, spawning models, and the GUI view | `gz-sim-physics-system`, `gz-sim-user-commands-system`, `gz-sim-scene-broadcaster-system` |
 | **The gz-maritime buoyancy system** | Floats the collisions vehicles mark | `gz-maritime-buoyancy-system` |
-| A wave source | The moving sea: its state, and the `set_parameters` service | `gz-sim-waves-fft-system` (or `gz-sim-waves-gerstner-system`) |
+| A wave source | The moving sea: its state, the `set_parameters` service, and `<tiles_radius>` for how far the sea is drawn | `gz-sim-waves-fft-system` (or `gz-sim-waves-gerstner-system`) |
 | The `water_surface` model | Draws the sea | `<include><uri>model://water_surface</uri></include>` |
 | Sensor systems | IMU, magnetometer, GPS and rendered sensors | see [Add sensors](sensors.md#what-the-world-provides) |
 | `<spherical_coordinates>` | GPS origin and magnetic field location | Portuguese Ledge, Monterey Bay |
@@ -71,9 +72,11 @@ and nothing else changes.
 ## The world name
 
 The wave service includes the world's name:
-`/world/<name>/wave/set_parameters`. In `open_water.sdf` the name is
-`default`. Commands you type yourself have to use your world's name; the
-launch files don't care.
+`/world/<name>/wave/set_parameters`. Every world shipped here is named
+`default`, whatever its file is called, so the commands in these docs work
+on all of them. Keep that name in your own world and they will work there
+too; if you pick another, commands you type yourself have to use it. The
+launch files don't care either way.
 
 ## Adding a seabed
 

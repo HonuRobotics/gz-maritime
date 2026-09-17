@@ -162,6 +162,14 @@
 <li class="toctree-l4"><a class="reference internal" href="../how-to/sensors.html#check-a-sensor">Check a sensor</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/site-worlds.html">Sail the competition sites</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/site-worlds.html#sydney-international-regatta-centre">Sydney International Regatta Centre</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/site-worlds.html#nathan-benderson-park">Nathan Benderson Park</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/site-worlds.html#sand-island">Sand Island</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/site-worlds.html#la-spezia">La Spezia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/site-worlds.html#what-to-know">What to know</a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="../how-to/own-world.html">Use your own world</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/own-world.html#what-a-world-needs">What a world needs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/own-world.html#the-buoyancy-system">The buoyancy system</a></li>
@@ -198,6 +206,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#launch-files">Launch files</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-simulation-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">simulation.launch.xml</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-spawn-vehicle-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">spawn_vehicle.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-multi-vehicle-demo-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">multi_vehicle_demo.launch.xml</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-sim-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">sim.launch.xml</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-rviz-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">rviz.launch.xml</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-display-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">display.launch.xml</span></code></a></li>
@@ -205,6 +214,7 @@
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#instance-rviz-py"><code class="docutils literal notranslate"><span class="pre">instance_rviz.py</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#worlds">Worlds</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#the-open-water-sdf-world">The <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code> world</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#buoyancy-markup">Buoyancy markup</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#thruster-command">Thruster command</a></li>
@@ -291,16 +301,23 @@ gz-maritime’s world in one command:</p>
 <span class="w">  </span>world:<span class="o">=</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_gazebo<span class="k">)</span>/worlds/open_water.sdf<span class="w"> </span>z:<span class="o">=</span><span class="m">1</span>.0
 </pre></div>
 </div>
-<p>What to expect: it appears 1 m above the water, and with no flight
-controller its rotors don’t spin, so it drops, and it sinks. It isn’t a
-floating vehicle: none of its collision shapes are marked as displacement
+<p>What to expect: it appears 1 m above the water at the origin, and with no
+flight controller its rotors don’t spin, so it drops, and it sinks. It isn’t
+a floating vehicle: none of its collision shapes are marked as displacement
 volume, and they shouldn’t be, because they are the airframe, battery and
-landing gear, sized for contact with the ground. It has no water damping
-either, so it falls fast.</p>
-<p>Its bridge comes up with it (<code class="docutils literal notranslate"><span class="pre">/x500/imu</span></code>, <code class="docutils literal notranslate"><span class="pre">/x500/mag</span></code>, <code class="docutils literal notranslate"><span class="pre">/x500/gps/fix</span></code>,
-<code class="docutils literal notranslate"><span class="pre">/joint_states</span></code>); the sensor topics are bridged lazily, so they appear in
-<code class="docutils literal notranslate"><span class="pre">ros2</span> <span class="pre">topic</span> <span class="pre">list</span></code> once something subscribes. The barometer stays silent on
-this world, which runs no air-pressure system.</p>
+landing gear, sized for contact with the ground. Its place on this world is
+the landing pad, a static deck 1 m above the water at (8, -8); spawned
+there it drops onto its landing gear and stays:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>spawn_vehicle.launch.xml<span class="w"> </span>name:<span class="o">=</span>x500<span class="w"> </span>x:<span class="o">=</span><span class="m">8</span><span class="w"> </span>y:<span class="o">=</span>-8<span class="w"> </span>z:<span class="o">=</span><span class="m">1</span>.25<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>generator:<span class="o">=</span><span class="s2">"</span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>x500_gazebo<span class="k">)</span><span class="s2">/lib/x500_gazebo/configure_vehicle.py --config </span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>x500_description<span class="k">)</span><span class="s2">/config/x500.yaml"</span>
+</pre></div>
+</div>
+<p>That is how the multi vehicle demo, <code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code>’s
+<code class="docutils literal notranslate"><span class="pre">multi_vehicle_demo.launch.xml</span></code>, puts it next to the boats. Its bridge
+comes up with it (<code class="docutils literal notranslate"><span class="pre">/x500/imu</span></code>, <code class="docutils literal notranslate"><span class="pre">/x500/mag</span></code>, <code class="docutils literal notranslate"><span class="pre">/x500/air_pressure</span></code>,
+<code class="docutils literal notranslate"><span class="pre">/x500/gps/fix</span></code>, <code class="docutils literal notranslate"><span class="pre">/x500/joint_states</span></code>); the sensor topics are bridged
+lazily, so they appear in <code class="docutils literal notranslate"><span class="pre">ros2</span> <span class="pre">topic</span> <span class="pre">list</span></code> once something subscribes. The
+world runs the air pressure system, so the barometer reports.</p>
 </section>
 </section>
 

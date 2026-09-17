@@ -19,6 +19,7 @@ from its files.
 
 ## More
 
+- [Sail the competition sites](site-worlds.md)
 - [Use your own world](own-world.md)
 - [Troubleshooting](faq.md)
 
@@ -31,6 +32,7 @@ vehicle-description
 gazebo-composition
 spawn-and-drive
 sensors
+site-worlds
 own-world
 faq
 ```

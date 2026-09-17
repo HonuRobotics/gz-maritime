@@ -141,6 +141,8 @@ surface is only drawn. See
 
 ## Next
 
+- [Sail the competition sites](../how-to/site-worlds.md): the same boat on
+  four real venues, from a rowing lake to a marina.
 - [The custom USV](../vehicles/custom-usv.md): its topics, frames and
   files.
 - [Bring your own vehicle](../how-to/own-vehicle.md): build a vehicle like it.

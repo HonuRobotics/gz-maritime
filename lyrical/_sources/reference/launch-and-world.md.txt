@@ -34,6 +34,14 @@ the simulation runs.
 | `use_composition` | `true` | Load the bridge and state publisher into `container_name`. |
 | `container_name` | `ros_gz_container` | The simulation launch's container. |
 
+### `kai_bringup` `multi_vehicle_demo.launch.xml`
+
+The simulation part plus one vehicle of each type through their own
+generators: a BlueBoat at the origin, a BlueROV2 six metres ahead and one
+metre down, an X500 on the landing pad of the open water world, the world
+it is written for. Needs bluerobotics_models and holybro_models in the
+workspace. Takes `gazebo_gui` and `use_composition`.
+
 ### `kai_custom_vehicle` `sim.launch.xml`
 
 The simulation part plus one spawn of the custom USV, from the package's
@@ -85,6 +93,40 @@ ros2 run kai_custom_vehicle instance_rviz.py --name NAME --config BASE.rviz --ou
 It writes the base RViz config pointed at the instance (fixed frame,
 description topic, TF Prefix) to `FILE` and prints the path.
 
+## Worlds
+
+Five worlds share one contract: the systems every vehicle needs, the
+gz-maritime buoyancy reading marked collisions, the waterline at z = 0 and
+the wave field for the drawn sea. Pass any of them to the simulation launch
+as `world:=<name>.sdf`; the spawn launch then puts vehicles into it by name.
+Four of them are venues of the Virtual RobotX competition (VRX) and the
+Virtual Ocean Robotics Challenge (VORC).
+All of them are named `default` inside, so the services below work on
+every one.
+
+| World | Site | Terrain | Where to start | Water and sea states |
+|---|---|---|---|---|
+| `open_water.sdf` | Open sea, Monterey Bay coordinates | None; a landing pad at (8, -8) | Spawn anywhere | Open sea, any |
+| `sydney_regatta.sdf` | Sydney International Regatta Centre, VRX 2022 to 2024 | Fuel, fetched on first use (about 140 MB) | around x -530, y 170; start at x -532, y 162 | Rowing lake, 0 to 2 |
+| `benderson_park.sdf` | Nathan Benderson Park, Sarasota, RobotX 2022 | Fuel, fetched on first use (about 220 MB) | the lake runs along y; start at the origin, heading 1.57 | Rowing lake, 0 to 2 |
+| `sand_island.sdf` | Sand Island, Honolulu, RobotX 2018 and VRX 2019 | VRX mesh, fetched by the build; the shore camp from Fuel | start at x 158, y 108 | Sheltered lagoon, 0 to 3 |
+| `la_spezia.sdf` | La Spezia marina, VORC 2020 | VORC mesh, fetched by the build | start at x 10, y -372 | Marina and gulf, 0 to 3 |
+
+Every world starts at sea state 1 and takes any of the ten codes, but the
+last column says what fits the site: a rowing lake never sees more than
+wind chop (code 2 is 0.3 m waves), a sheltered lagoon or gulf at most a
+slight sea (code 3 is about 0.9 m), and the open water world takes them
+all. Change it with the wave service below.
+
+The site worlds place the water surface model once, at the centre of their
+water, and size the drawn sea with `<tiles_radius>` in their wave source:
+the model draws that many 200 m tiles around itself in every direction,
+sharing one wave field, and the terrain hides them wherever there is land.
+Open water keeps the model's own radius, a 1 km square. Buoyancy does not
+depend on any of that.
+The terrain models are Apache 2.0 assets from VRX and VORC,
+credited in `kai_gazebo/NOTICE`.
+
 ## The `open_water.sdf` world
 
 World name: `default`.
@@ -95,10 +137,11 @@ World name: `default`.
 | `gz-sim-user-commands-system` | Spawning, moving and removing models |
 | `gz-sim-scene-broadcaster-system` | Scene for the GUI |
 | `gz-sim-sensors-system` | Rendered sensors (ogre2) |
-| `gz-sim-imu-system`, `gz-sim-magnetometer-system`, `gz-sim-navsat-system` | IMU, magnetometer and GPS sensors |
+| `gz-sim-imu-system`, `gz-sim-magnetometer-system`, `gz-sim-navsat-system`, `gz-sim-air-pressure-system` | IMU, magnetometer, GPS and barometer sensors |
 | `gz-maritime-buoyancy-system` | Seawater 1025 kg/m³ below z = 0, air 1 kg/m³ above; `<enable_by_default>false</enable_by_default>`, no `<enable>` list |
 | `gz-sim-waves-fft-system` | Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out) |
 | `model://water_surface` | Draws the sea |
+| `model://landing_pad` at (8, -8) | A static 4 m deck 1 m above the water, the only solid ground; spawn a quad on it at z = 1.25 |
 | `<spherical_coordinates>` | 36.693509° N, 121.936568° W, elevation 0, ENU |
 
 ## Buoyancy markup

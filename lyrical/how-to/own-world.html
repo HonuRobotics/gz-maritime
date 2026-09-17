@@ -22,7 +22,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Troubleshooting" href="faq.html" />
-    <link rel="prev" title="Add sensors" href="sensors.html" /> 
+    <link rel="prev" title="Sail the competition sites" href="site-worlds.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -162,6 +162,14 @@
 <li class="toctree-l4"><a class="reference internal" href="sensors.html#check-a-sensor">Check a sensor</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="site-worlds.html">Sail the competition sites</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#sydney-international-regatta-centre">Sydney International Regatta Centre</a></li>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#nathan-benderson-park">Nathan Benderson Park</a></li>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#sand-island">Sand Island</a></li>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#la-spezia">La Spezia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#what-to-know">What to know</a></li>
+</ul>
+</li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Use your own world</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#what-a-world-needs">What a world needs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#the-buoyancy-system">The buoyancy system</a></li>
@@ -198,6 +206,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#launch-files">Launch files</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-simulation-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">simulation.launch.xml</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-spawn-vehicle-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">spawn_vehicle.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-multi-vehicle-demo-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">multi_vehicle_demo.launch.xml</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-sim-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">sim.launch.xml</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-rviz-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">rviz.launch.xml</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-display-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">display.launch.xml</span></code></a></li>
@@ -205,6 +214,7 @@
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#instance-rviz-py"><code class="docutils literal notranslate"><span class="pre">instance_rviz.py</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#worlds">Worlds</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#the-open-water-sdf-world">The <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code> world</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#buoyancy-markup">Buoyancy markup</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#thruster-command">Thruster command</a></li>
@@ -261,7 +271,8 @@ resource path or a full path:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_custom_vehicle<span class="w"> </span>sim.launch.xml<span class="w"> </span>world:<span class="o">=</span>/path/to/my_world.sdf
 </pre></div>
 </div>
-<p>The easiest start is a copy of <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code>:</p>
+<p>The easiest start is a copy of <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code>, or of one of the four
+<a class="reference internal" href="site-worlds.html"><span class="std std-doc">site worlds</span></a>, which add a terrain to the same contract:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cp<span class="w"> </span><span class="k">$(</span>ros2<span class="w"> </span>pkg<span class="w"> </span>prefix<span class="w"> </span>--share<span class="w"> </span>kai_gazebo<span class="k">)</span>/worlds/open_water.sdf<span class="w"> </span>my_world.sdf
 </pre></div>
 </div>
@@ -284,7 +295,7 @@ resource path or a full path:</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">gz-maritime-buoyancy-system</span></code></p></td>
 </tr>
 <tr class="row-even"><td><p>A wave source</p></td>
-<td><p>The moving sea: its state, and the <code class="docutils literal notranslate"><span class="pre">set_parameters</span></code> service</p></td>
+<td><p>The moving sea: its state, the <code class="docutils literal notranslate"><span class="pre">set_parameters</span></code> service, and <code class="docutils literal notranslate"><span class="pre">&lt;tiles_radius&gt;</span></code> for how far the sea is drawn</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-waves-fft-system</span></code> (or <code class="docutils literal notranslate"><span class="pre">gz-sim-waves-gerstner-system</span></code>)</p></td>
 </tr>
 <tr class="row-odd"><td><p>The <code class="docutils literal notranslate"><span class="pre">water_surface</span></code> model</p></td>
@@ -363,9 +374,11 @@ and nothing else changes.</p>
 <section id="the-world-name">
 <h2>The world name<a class="headerlink" href="#the-world-name" title="Link to this heading"></a></h2>
 <p>The wave service includes the world’s name:
-<code class="docutils literal notranslate"><span class="pre">/world/&lt;name&gt;/wave/set_parameters</span></code>. In <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code> the name is
-<code class="docutils literal notranslate"><span class="pre">default</span></code>. Commands you type yourself have to use your world’s name; the
-launch files don’t care.</p>
+<code class="docutils literal notranslate"><span class="pre">/world/&lt;name&gt;/wave/set_parameters</span></code>. Every world shipped here is named
+<code class="docutils literal notranslate"><span class="pre">default</span></code>, whatever its file is called, so the commands in these docs work
+on all of them. Keep that name in your own world and they will work there
+too; if you pick another, commands you type yourself have to use it. The
+launch files don’t care either way.</p>
 </section>
 <section id="adding-a-seabed">
 <h2>Adding a seabed<a class="headerlink" href="#adding-a-seabed" title="Link to this heading"></a></h2>
@@ -394,7 +407,7 @@ static model under the water:</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="sensors.html" class="btn btn-neutral float-left" title="Add sensors" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="site-worlds.html" class="btn btn-neutral float-left" title="Sail the competition sites" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="faq.html" class="btn btn-neutral float-right" title="Troubleshooting" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
