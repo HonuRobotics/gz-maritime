@@ -57,6 +57,9 @@ loads and cached under `~/.gz/fuel`.
 | Water | A freshwater lake, flat and sheltered |
 | Sea states | 0 to 2 |
 
+A landing pad sits off the start point, for the X500 of the
+[multi vehicle demo](several-vehicles.md), which runs here by default.
+
 ## Nathan Benderson Park
 
 ```{figure} images/benderson-park.jpg

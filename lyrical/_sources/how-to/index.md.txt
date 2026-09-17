@@ -19,6 +19,7 @@ from its files.
 
 ## More
 
+- [Several vehicles on one ocean](several-vehicles.md)
 - [Sail the competition sites](site-worlds.md)
 - [Use your own world](own-world.md)
 - [Troubleshooting](faq.md)
@@ -32,6 +33,7 @@ vehicle-description
 gazebo-composition
 spawn-and-drive
 sensors
+several-vehicles
 site-worlds
 own-world
 faq
