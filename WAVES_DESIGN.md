@@ -206,7 +206,9 @@ engine reads the subset it understands.
 
 *Shared:* `model{"PMS"}`, `number{3}`, `period{5.0}`, `direction{0.0}`,
 `angle{0.4}`, `scale{1.1}`, `steepness{0.0}`, `phase{0.0}`, `tau{2.0}`,
-`gain{1.0}`, `gravity{9.8}` (populated from world `<gravity>`), `seaState{-1}`.
+`gain{1.0}`, `gravity{9.8}` (populated from world `<gravity>`), `seaState{-1}`,
+`tilesRadius{0}` (how far WaterVisual draws the sea around each water model, in
+200 m tiles; 0 leaves the visual's own setting).
 *Gerstner-only:* `amplitude{0.0}` (CWR model).
 *FFT-only:* `tileSize{200.0}`, `gridSize{128}`, `seed{0}`, `choppiness{-1.0}`,
 `spectrum{"tma"}`, `spreading{"hasselmann"}`, `dispersion{"capillary"}`,

@@ -259,6 +259,7 @@ TEST(Serialization, RoundTripsEveryFieldAndDropsEngine)
   p.filterMin = 0.135792468013579;
   p.filterInvert = true;
   p.seaState = 6;
+  p.tilesRadius = 7;
   p.gravity = 9.806649999999999;
   in.simulation = std::make_shared<StubWaveField>();  // must NOT serialize
 
@@ -299,6 +300,7 @@ TEST(Serialization, RoundTripsEveryFieldAndDropsEngine)
   EXPECT_DOUBLE_EQ(q.filterMin, p.filterMin);
   EXPECT_TRUE(q.filterInvert);
   EXPECT_EQ(q.seaState, p.seaState);
+  EXPECT_EQ(q.tilesRadius, p.tilesRadius);
   EXPECT_DOUBLE_EQ(q.gravity, p.gravity);
   EXPECT_EQ(out.simulation, nullptr);  // recipe-only: engine is rebuilt later
 }

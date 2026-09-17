@@ -125,10 +125,10 @@ beyond them sees a slight sea at most.
   vehicle driven into the shore grounds on it. The water has no floor: a
   sinking vehicle keeps sinking, as on open water.
 - **The water is one model.** Each site includes the water surface once, at
-  the centre of its water, and the model draws a 3 km square of wave tiles
-  around itself; the terrain hides it wherever there is land. Buoyancy does
-  not depend on the drawn water: vehicles float on the flat z = 0 plane
-  everywhere.
+  the centre of its water, and sets `<tiles_radius>` in its wave source to
+  say how far the sea is drawn around it, in 200 m tiles; the terrain hides
+  it wherever there is land. Buoyancy does not depend on the drawn water:
+  vehicles float on the flat z = 0 plane everywhere.
 - **First use needs the network.** The Sydney and Benderson Park terrains
   and the Sand Island camp come from Fuel the first time they load; after
   that they are cached. The Sand Island and La Spezia meshes are fetched by

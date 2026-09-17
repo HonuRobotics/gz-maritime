@@ -38,8 +38,9 @@ the simulation runs.
 
 The simulation part plus one vehicle of each type through their own
 generators: a BlueBoat at the origin, a BlueROV2 six metres ahead and one
-metre down, an X500 on the landing pad. Needs bluerobotics_models and
-holybro_models in the workspace. Takes the simulation part's arguments.
+metre down, an X500 on the landing pad of the open water world, the world
+it is written for. Needs bluerobotics_models and holybro_models in the
+workspace. Takes `gazebo_gui` and `use_composition`.
 
 ### `kai_custom_vehicle` `sim.launch.xml`
 
@@ -118,8 +119,11 @@ slight sea (code 3 is about 0.9 m), and the open water world takes them
 all. Change it with the wave service below.
 
 The site worlds place the water surface model once, at the centre of their
-water: it draws a 3 km square of wave tiles around itself, and the terrain
-hides it wherever there is land. Buoyancy does not depend on any of that.
+water, and size the drawn sea with `<tiles_radius>` in their wave source:
+the model draws that many 200 m tiles around itself in every direction,
+sharing one wave field, and the terrain hides them wherever there is land.
+Open water keeps the model's own radius, a 1 km square. Buoyancy does not
+depend on any of that.
 The terrain models are Apache 2.0 assets from VRX and VORC,
 credited in `kai_gazebo/NOTICE`.
 

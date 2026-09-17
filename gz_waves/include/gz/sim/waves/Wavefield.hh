@@ -136,6 +136,12 @@ struct WaveParameters
   /// explicit period/gain above instead.
   int seaState{-1};
 
+  /// \brief How far the drawn sea extends around each water surface model, in
+  /// tiles: the visual draws (2r+1)^2 copies of its 200 m tile. A world sets
+  /// it for its size (a lake needs less than a gulf); 0 (default) leaves the
+  /// visual's own setting, 2, a 1 km square. Read when the sea is first drawn.
+  int tilesRadius{0};
+
   /// \brief Gravitational acceleration magnitude [m/s²] driving the wave
   /// physics (dispersion, spectrum, sea-state period). Read from the world via
   /// the `gz::sim::World::Gravity` API in `WavesSystemBase::Configure` (not
@@ -182,7 +188,8 @@ struct WaveParameters
   X(filterSoftWidth,     "filter_soft",    DBL)  \
   X(filterMin,           "filter_min",     DBL)  \
   X(filterInvert,        "filter_invert",  BOOL) \
-  X(seaState,            "sea_state",      INT)
+  X(seaState,            "sea_state",      INT)  \
+  X(tilesRadius,         "tiles_radius",   INT)
 
 /// \brief Canonical sea-state descriptor: significant wave height, peak period,
 /// and the fully-developed wind speed that produces them.

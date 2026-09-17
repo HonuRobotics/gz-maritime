@@ -35,12 +35,6 @@
             <bumpMap>textures/wave_normals.dds</bumpMap>
             <cubeMap>textures/skybox_lowres.dds</cubeMap>
           </textures>
-          <!-- One include draws a square of (2r+1)^2 copies of the 200 m
-               tile around the model, sharing one height map, so a world
-               places the water once at the centre of its sea. Radius 7 is
-               a 3 km square, enough for the largest site world; the copies
-               are extra draw calls of one mesh, not extra wave fields. -->
-          <tiles_radius>7</tiles_radius>
         </plugin>
 
         <!-- Per-engine GUI registrars. They must sit in the same <visual> as
