@@ -65,7 +65,9 @@ where it stopped.
 
 ## Several vehicles on one ocean
 
-Each of those launch files starts its own Gazebo, so they can't be
+[Several vehicles on one ocean](../how-to/several-vehicles.md) walks through
+the demo that puts both of them next to the X500. The mechanism, in short:
+each of those launch files starts its own Gazebo, so they can't be
 combined. To share one ocean, start the simulation part once, then add each
 vehicle with gz-maritime's spawn launch
 ([Spawn and drive](../how-to/spawn-and-drive.md)). The Blue Robotics

@@ -14,7 +14,7 @@
 """
 The multi vehicle demo, end to end: one ocean, one vehicle of each type.
 
-multi_vehicle_demo.launch.xml brings the simulation up with a BlueBoat, a
+multi_vehicle_demo.launch.py brings the simulation up with a BlueBoat, a
 BlueROV2 and an X500 on the landing pad. Each vehicle sits where it belongs
 (the boat at the waterline, the ROV under it, the quad on the pad), each has
 its own nodes, topics and TF prefix under its name, the clock has one
@@ -115,8 +115,8 @@ def sim(request):
                ROS_DOMAIN_ID=str(int(uuid.uuid4().hex[:2], 16) % 100 + 1),
                ROS_HOME=tempfile.mkdtemp(prefix='kai_multi_vehicle_'))
     launch_sim(request, 'demo launch',
-               ['ros2', 'launch', 'kai_bringup', 'multi_vehicle_demo.launch.xml',
-                'gazebo_gui:=false'],
+               ['ros2', 'launch', 'kai_bringup', 'multi_vehicle_demo.launch.py',
+                'world:=open_water.sdf', 'gazebo_gui:=false'],
                env, ready=lambda e: all(f'/{v}/robot_state_publisher' in nodes(e)
                                         for v in VEHICLES), stop=stop)
     poll_until(lambda: all(v in gz(env, 'model', '--list')[1] for v in VEHICLES), 60,

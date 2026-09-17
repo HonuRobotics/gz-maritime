@@ -55,7 +55,8 @@ ros2 launch kai_bringup spawn_vehicle.launch.xml name:=x500 x:=8 y:=-8 z:=1.25 \
 ```
 
 That is how the multi vehicle demo, `kai_bringup`'s
-`multi_vehicle_demo.launch.xml`, puts it next to the boats. Its bridge
+`multi_vehicle_demo.launch.py`, puts it next to the boats
+([Several vehicles on one ocean](../how-to/several-vehicles.md)). Its bridge
 comes up with it (`/x500/imu`, `/x500/mag`, `/x500/air_pressure`,
 `/x500/gps/fix`, `/x500/joint_states`); the sensor topics are bridged
 lazily, so they appear in `ros2 topic list` once something subscribes. The
