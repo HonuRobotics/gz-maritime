@@ -27,19 +27,35 @@ install(DIRECTORY
 # them next to the models that reference them. The Sydney Regatta and
 # Benderson Park terrains come from Fuel at run time.
 function(kai_fetch_asset url sha256 destination)
+  # A file already there is trusted only if its hash matches: a partial or
+  # stale download, or a bumped pin, triggers a new download.
+  if(EXISTS ${destination})
+    file(SHA256 ${destination} found)
+    if(found STREQUAL sha256)
+      return()
+    endif()
+    message(STATUS "Refetching ${destination}: hash ${found} is not the pinned one")
+    file(REMOVE ${destination})
+  endif()
   get_filename_component(dir ${destination} DIRECTORY)
   file(MAKE_DIRECTORY ${dir})
-  if(NOT EXISTS ${destination})
-    message(STATUS "Fetching ${url}")
-    file(DOWNLOAD ${url} ${destination} EXPECTED_HASH SHA256=${sha256}
-      STATUS status)
-    list(GET status 0 code)
-    if(NOT code EQUAL 0)
-      list(GET status 1 reason)
-      file(REMOVE ${destination})
-      message(FATAL_ERROR "Could not fetch ${url}: ${reason}")
-    endif()
+  message(STATUS "Fetching ${url}")
+  # Downloaded to a temporary name and checked by hand, so that neither a
+  # failed transfer nor a wrong hash ever leaves a file at the destination.
+  set(partial ${destination}.part)
+  file(DOWNLOAD ${url} ${partial} STATUS status TLS_VERIFY ON)
+  list(GET status 0 code)
+  if(NOT code EQUAL 0)
+    list(GET status 1 reason)
+    file(REMOVE ${partial})
+    message(FATAL_ERROR "Could not fetch ${url}: ${reason}")
   endif()
+  file(SHA256 ${partial} found)
+  if(NOT found STREQUAL sha256)
+    file(REMOVE ${partial})
+    message(FATAL_ERROR "${url} has SHA256 ${found}, not the pinned ${sha256}")
+  endif()
+  file(RENAME ${partial} ${destination})
 endfunction()
 
 set(vrx_classic https://raw.githubusercontent.com/osrf/vrx/c9b9388/vrx_gazebo/models/sandisland)
