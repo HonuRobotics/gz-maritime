@@ -45,6 +45,7 @@ REQUIRED_SYSTEMS = (
     'gz-sim-scene-broadcaster-system', 'gz-sim-sensors-system',
     'gz-sim-imu-system', 'gz-sim-magnetometer-system', 'gz-sim-navsat-system',
     'gz-sim-air-pressure-system', 'gz-maritime-buoyancy-system',
+    'gz-maritime-wind-system',
 )
 
 

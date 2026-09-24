@@ -32,6 +32,8 @@ site under
   buoyancy and thruster systems with the changes vehicles here rely on,
   marked collisions and a normalized command, carried until a Gazebo release
   ships them.
+- [`gz_wind`](gz_wind/): windage on the collisions a vehicle marks
+  `gz:wind="true"`, from the world's wind, on the part above the waterline.
 - [`kai_gazebo`](kai_gazebo/), [`kai_bringup`](kai_bringup/) and
   [`kai_custom_vehicle`](kai_custom_vehicle/): the worlds, the simulation
   and spawn launches, and the example vehicle.

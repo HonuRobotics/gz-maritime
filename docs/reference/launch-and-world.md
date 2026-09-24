@@ -145,6 +145,7 @@ World name: `default`.
 | `gz-sim-sensors-system` | Rendered sensors (ogre2) |
 | `gz-sim-imu-system`, `gz-sim-magnetometer-system`, `gz-sim-navsat-system`, `gz-sim-air-pressure-system` | IMU, magnetometer, GPS and barometer sensors |
 | `gz-maritime-buoyancy-system` | Seawater 1025 kg/m³ below z = 0, air 1 kg/m³ above; `<enable_by_default>false</enable_by_default>`, no `<enable>` list |
+| `gz-maritime-wind-system` | Air 1.225 kg/m³ above z = 0, drag coefficient 1 unless a shape sets its own; pushes only marked collisions, with the world's `<wind>` (still by default) |
 | `gz-sim-waves-fft-system` | Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out) |
 | `model://water_surface` | Draws the sea |
 | `model://landing_pad` at (8, -8) | A static 4 m deck 1 m above the water, the only solid ground; spawn a quad on it at z = 1.25 |
@@ -161,6 +162,17 @@ What a model says to the buoyancy system, and what a world says to it.
 | The same `<collision>` | `<surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>` | The shape touches nothing; recommended for every mark. |
 | The world plugin | `<enable_by_default>false</enable_by_default>` | Unmarked collisions never float. Defaults to `true` with no `<enable>` list and `false` with one. |
 | The world plugin | `<enable>model</enable>`, `<enable>model::link</enable>` | Unmarked collisions of the named model or link float. Names as spawned. |
+
+## Wind markup
+
+What a model says to the wind system, and what a world says to it.
+
+| Where | Markup | Meaning |
+|---|---|---|
+| A `<collision>` in a model | `gz:wind="true"` (same `xmlns:gz` root attribute) | The wind pushes on this shape, by the part of it above the waterline, with quadratic drag on its projected area per axis. A buoyancy box can carry both marks. |
+| The same `<collision>` | `gz:wind_cd="1.2"` | Its drag coefficient; the plugin's `<default_drag_coefficient>` otherwise. |
+| The world | `<wind><linear_velocity>x y z</linear_velocity></wind>` | The wind, in m/s in the world frame. Absent, the air is still. Any system that writes Gazebo's wind entity works too. |
+| The world plugin | `<air_density>`, `<water_level>`, `<default_drag_coefficient>` | 1.225 kg/m³, z = 0 and 1 by default. |
 
 ## Thruster command
 

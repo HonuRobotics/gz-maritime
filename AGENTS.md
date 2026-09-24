@@ -19,6 +19,7 @@ subsystems will be added over time.
 | `gz_waves_rendering/` | Engine-agnostic **renderer** (`WaterVisual`) + the Ogre2 C-ABI bridge + the `water_surface` model. |
 | `gz_waves_buoyancy/` | Planned, not in the tree yet: a wave-field **consumer** (`WaveBuoyancy`). |
 | `gz_buoyancy/` | gz-sim's Buoyancy system, vendored with the upstream marked-collision change (`gz:buoyancy="true"`, `<enable_by_default>`); a bridge until a Gazebo release ships it. |
+| `gz_wind/` | Windage on marked collisions (`gz:wind="true"`, optional `gz:wind_cd`): quadratic drag from the world's wind on the part of each marked shape above the waterline. Reads the wind entity gz-sim already keeps, so any wind source works. |
 | `gz_thruster/` | gz-sim's Thruster system, vendored with a normalized command mode (`<use_normalized_cmd>`: a command in [-1, 1] scaled onto the thrust limits), the interface every vehicle here is driven with; intended to go upstream. |
 | `kai_gazebo/` | Worlds (`open_water.sdf` and the four VRX/VORC sites: `sydney_regatta`, `benderson_park`, `sand_island`, `la_spezia`; every world is named `default`), the landing pad and terrain models (Sand Island and La Spezia meshes fetched by the build, see `NOTICE`), resource-path hooks and the world tests. |
 | `kai_bringup/` | ROS 2 launch + `ros_gz_bridge` config. `simulation.launch.xml` is the simulation part only (server, GUI, `/clock`); `spawn_vehicle.launch.xml` puts one instance of any vehicle in, from its model xacro, bridge template and URDF (or its own generator), through `instantiate_vehicle.py`. Neither names a vehicle. |
@@ -133,6 +134,11 @@ the full rationale (section refs below).
   and keeps its contact geometry unmarked. `gz_buoyancy` carries only the
   upstream change plus a gz-math workaround; add nothing else to it, and retire
   it when a Gazebo release with gz-sim 229ec07e reaches ROS.
+- **The wind works the same way.** `open_water.sdf` runs
+  `gz-maritime-wind-system`; a model marks the shapes the wind sees with
+  `gz:wind="true"` (a marked buoyancy box can carry both marks) and never
+  needs Gazebo's mass based `enable_wind`. The wind itself is the world's
+  `<wind><linear_velocity>`, or whatever writes the wind entity.
 - **No instance name in a URDF, no `/clock` in a vehicle bridge.** The
   simulation launch bridges the clock once; a vehicle's `name` reaches its
   model topics and frame ids through xacro, its nodes through the namespace,
