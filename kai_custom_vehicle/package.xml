@@ -21,9 +21,10 @@
        xacros for an instance name. -->
   <exec_depend>kai_bringup</exec_depend>
   <exec_depend>kai_gazebo</exec_depend>
-  <!-- The buoyancy system that reads the model's marked collisions, and the
-       thruster system with the normalized command. -->
+  <!-- The buoyancy and wind systems that read the model's marked collisions,
+       and the thruster system with the normalized command. -->
   <exec_depend>gz_buoyancy</exec_depend>
+  <exec_depend>gz_wind</exec_depend>
   <exec_depend>gz_thruster</exec_depend>
   <exec_depend>xacro</exec_depend>
   <exec_depend>ros_gz_sim</exec_depend>
