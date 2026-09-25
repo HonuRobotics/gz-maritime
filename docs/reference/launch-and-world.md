@@ -145,7 +145,7 @@ World name: `default`.
 | `gz-sim-sensors-system` | Rendered sensors (ogre2) |
 | `gz-sim-imu-system`, `gz-sim-magnetometer-system`, `gz-sim-navsat-system`, `gz-sim-air-pressure-system` | IMU, magnetometer, GPS and barometer sensors |
 | `gz-maritime-buoyancy-system` | Seawater 1025 kg/m³ below z = 0, air 1 kg/m³ above; `<enable_by_default>false</enable_by_default>`, no `<enable>` list |
-| `gz-maritime-wind-system` | Still air by default (`<speed>0</speed>`), changed at run time with the wind service; air 1.225 kg/m³ above z = 0, drag coefficient 1 unless a shape sets its own; pushes only marked collisions |
+| `gz-maritime-wind-system` | Still air by default (`<speed>0</speed>`) at a 10 m reference height, falling off towards the water with a 0.0002 m roughness length, changed at run time on the wind topic; air 1.225 kg/m³ above z = 0, drag coefficient 1 unless a shape sets its own; pushes only marked collisions |
 | `gz-sim-waves-fft-system` | Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out) |
 | `model://water_surface` | Draws the sea |
 | `model://landing_pad` at (8, -8) | A static 4 m deck 1 m above the water, the only solid ground; spawn a quad on it at z = 1.25 |
@@ -172,6 +172,7 @@ What a model says to the wind system, and what a world says to it.
 | A `<collision>` in a model | `gz:wind="true"` (same `xmlns:gz` root attribute) | The wind pushes on this shape, by the part of it above the waterline, with quadratic drag on its projected area per axis. A buoyancy box can carry both marks. |
 | The same `<collision>` | `gz:wind_cd="1.2"` | Its drag coefficient; the plugin's `<default_drag_coefficient>` otherwise. |
 | The world plugin | `<speed>`, `<direction>` | The wind: m/s, and the direction it comes from in degrees clockwise from north (270, from the west, blows towards +x). |
+| The world plugin | `<reference_height>`, `<roughness_length>` | The height `<speed>` is given at, 10 m by default, and the surface roughness of a logarithmic wind profile, 0.0002 m over open sea; 0 is a uniform wind. The windage takes the wind at each shape's height; Gazebo's rotor and wing systems see the reference height wind. |
 | The world plugin | `<speed_gust>`, `<speed_gust_time>`, `<direction_gust>`, `<direction_gust_time>`, `<seed>` | Gusts: standing deviation (m/s, degrees) and correlation time (s, 2 and 10 by default) of the speed and the direction; 0 is steady. The same seed repeats them; 0 draws a new one each run. |
 | The world | `<wind><linear_velocity>x y z</linear_velocity></wind>` | Used as the starting wind when the plugin sets neither `<speed>` nor `<direction>`. |
 | The world plugin | `<air_density>`, `<water_level>`, `<default_drag_coefficient>`, `<publish_rate>` | 1.225 kg/m³, z = 0, 1 and 10 Hz by default. |

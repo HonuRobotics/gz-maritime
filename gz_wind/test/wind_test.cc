@@ -636,3 +636,57 @@ TEST(WindGusts, TurnedOnAndOffOnTheTopic)
   EXPECT_NEAR(0.0, Stats(speed).second, 1e-9) << "steady again";
   EXPECT_NEAR(5.0, speed.back(), 1e-9) << "back to the mean";
 }
+
+/////////////////////////////////////////////////
+/// With a roughness length the wind falls off towards the water: a shape at
+/// the 10 m reference height sees the whole wind, one at 1 m sees
+/// ln(1 / z0) / ln(10 / z0) of it and so that squared of the force. The wind
+/// entity keeps the reference height wind.
+TEST(WindProfile, WeakerNearTheWater)
+{
+  TestFixture fixture(World("profile.sdf"));
+
+  math::Vector3d wind;
+  BoxState high;
+  BoxState low;
+  fixture.OnPostUpdate([&](const UpdateInfo &,
+      const EntityComponentManager &_ecm)
+  {
+    wind = ReadWind(_ecm);
+    high = ReadBox(_ecm, "high_box");
+    low = ReadBox(_ecm, "low_box");
+  });
+  fixture.Finalize();
+  ASSERT_TRUE(fixture.Server()->Run(true, 500, false));
+
+  EXPECT_NEAR(5.0, wind.X(), 1e-9) << "the entity holds the reference wind";
+  ASSERT_TRUE(high.found);
+  ASSERT_TRUE(low.found);
+  EXPECT_NEAR(kSpeedAfterOneSecond, high.vel.X(), 0.01);
+  const double k = std::log(1.0 / 0.0002) / std::log(10.0 / 0.0002);
+  EXPECT_NEAR(k * k, low.vel.X() / high.vel.X(), 0.03);
+}
+
+/////////////////////////////////////////////////
+/// A zero roughness length, here sent on the topic, is a uniform wind: both
+/// heights take the same force.
+TEST(WindProfile, ZeroRoughnessIsUniform)
+{
+  TestFixture fixture(World("profile.sdf"));
+
+  BoxState high;
+  BoxState low;
+  fixture.OnPostUpdate([&](const UpdateInfo &,
+      const EntityComponentManager &_ecm)
+  {
+    high = ReadBox(_ecm, "high_box");
+    low = ReadBox(_ecm, "low_box");
+  });
+  fixture.Finalize();
+  auto server = fixture.Server();
+  ASSERT_TRUE(server->Run(true, 1, false));
+  ASSERT_TRUE(SetWind("profile", "roughness_length", 0.0));
+  ASSERT_TRUE(server->Run(true, 500, false));
+
+  EXPECT_NEAR(high.vel.X(), low.vel.X(), 1e-3);
+}

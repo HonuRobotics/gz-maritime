@@ -155,6 +155,11 @@
       name="gz::sim::maritime::Wind">
       <speed>0</speed>
       <direction>0</direction>
+      <!-- The speed is at 10 m, as in weather reports; over the sea the wind
+           falls off towards the water with this roughness length, so a
+           boat's freeboard sees about half of it. -->
+      <reference_height>10</reference_height>
+      <roughness_length>0.0002</roughness_length>
       <air_density>1.225</air_density>
       <water_level>0</water_level>
       <default_drag_coefficient>1</default_drag_coefficient>
