@@ -40,15 +40,28 @@ not run in the same world, since both would write the wind.
 |-----------|---------|---------|
 | `<speed>` | the world's `<wind>` | m/s. |
 | `<direction>` | the world's `<wind>` | Degrees clockwise from north the wind comes from: 270 is from the west, blowing towards +x. |
+| `<speed_gust>` | 0 | Standing deviation of the speed gusts, m/s; 0 is a steady speed. |
+| `<speed_gust_time>` | 2 | Their correlation time, s. |
+| `<direction_gust>` | 0 | Standing deviation of the direction gusts, degrees. |
+| `<direction_gust_time>` | 10 | Their correlation time, s. |
+| `<seed>` | 0 | Seed of the gusts; 0 draws a new one each run. A reset replays them. |
 | `<publish_rate>` | 10 | Hz of simulation time for `wind_info`. |
 | `<air_density>` | 1.225 | kg/m^3. |
 | `<water_level>` | 0 | World z of the waterline; the part of a shape below it is not in the wind. |
 | `<default_drag_coefficient>` | 1 | Cd for shapes without `gz:wind_cd`. |
 
+## Gusts
+
+Each gust is a first order Gauss Markov process, the one VRX uses on the
+speed, here on the direction too: it wanders around zero with the standing
+deviation asked for, and forgets itself over the correlation time. The
+update is exact, `x' = a x + sigma sqrt(1 - a^2) n` with `a = exp(-dt / T)`,
+so the spread does not depend on the step size, unlike VRX's Euler step.
+
 ## Run time
 
-A `gz.msgs.Param` on `/world/<world>/wind/set` with `speed`, `direction` or
-both changes the wind. From ROS, bridge it as
+A `gz.msgs.Param` on `/world/<world>/wind/set` with any of the parameter
+names above as keys changes them, the rest keep their values. From ROS, bridge it as
 `ros_gz_interfaces/msg/ParamVec`, each key a double parameter.
 
 ```bash

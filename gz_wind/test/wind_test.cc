@@ -27,6 +27,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <gz/common/Filesystem.hh>
 #include <gz/math/Vector3.hh>
@@ -132,6 +133,76 @@ bool SetWind(const std::string &_world, const std::string &_key,
   // Delivery is asynchronous; give the subscriber a moment to queue it.
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
   return sent;
+}
+
+/// \brief Speed and the direction it comes from, degrees clockwise from north.
+struct Reading
+{
+  /// \brief m/s.
+  public: double speed{0.0};
+
+  /// \brief Degrees.
+  public: double direction{0.0};
+};
+
+/// \brief Read a wind velocity back as speed and direction.
+/// \param[in] _wind Wind velocity, world frame.
+/// \return Its horizontal speed and the direction it comes from.
+Reading AsReading(const math::Vector3d &_wind)
+{
+  Reading r;
+  r.speed = std::hypot(_wind.X(), _wind.Y());
+  r.direction = GZ_RTOD(std::atan2(-_wind.X(), -_wind.Y()));
+  if (r.direction < 0.0)
+    r.direction += 360.0;
+  return r;
+}
+
+/// \brief Mean and standing deviation of a series.
+/// \param[in] _v The series.
+/// \return Mean first, standing deviation second.
+std::pair<double, double> Stats(const std::vector<double> &_v)
+{
+  double mean{0.0};
+  for (const double x : _v)
+    mean += x;
+  mean /= static_cast<double>(_v.size());
+  double var{0.0};
+  for (const double x : _v)
+    var += (x - mean) * (x - mean);
+  return {mean, std::sqrt(var / static_cast<double>(_v.size()))};
+}
+
+/// \brief Autocorrelation of a series at a lag.
+/// \param[in] _v The series.
+/// \param[in] _lag Lag in samples.
+/// \return The correlation, 1 at lag 0.
+double Autocorrelation(const std::vector<double> &_v, std::size_t _lag)
+{
+  const auto [mean, sd] = Stats(_v);
+  double sum{0.0};
+  for (std::size_t i = 0; i + _lag < _v.size(); ++i)
+    sum += (_v[i] - mean) * (_v[i + _lag] - mean);
+  return sum / static_cast<double>(_v.size() - _lag) / (sd * sd);
+}
+
+/// \brief Run a world and record the wind every step.
+/// \param[in] _file World file.
+/// \param[in] _steps Steps to run.
+/// \return The wind velocity after each step.
+std::vector<math::Vector3d> RecordWind(const std::string &_file,
+    std::size_t _steps)
+{
+  std::vector<math::Vector3d> series;
+  TestFixture fixture(common::joinPaths(TEST_WORLD_DIR, _file));
+  fixture.OnPostUpdate([&](const UpdateInfo &,
+      const EntityComponentManager &_ecm)
+  {
+    series.push_back(ReadWind(_ecm));
+  });
+  fixture.Finalize();
+  fixture.Server()->Run(true, _steps, false);
+  return series;
 }
 
 /// \brief Path to one of the test worlds.
@@ -469,4 +540,99 @@ TEST(WindField, GroundTruthIsPublished)
   ASSERT_TRUE(received.has_value());
   EXPECT_NEAR(5.0, received->linear_velocity().x(), 1e-9);
   EXPECT_NEAR(0.0, received->linear_velocity().y(), 1e-9);
+}
+
+/////////////////////////////////////////////////
+/// Over a minute of gusts the speed and the direction keep their means, with
+/// the standing deviations asked for, and forget themselves over one
+/// correlation time: about 1/e after 0.2 s.
+TEST(WindGusts, StatisticsMatchTheParameters)
+{
+  // 60 s at 2 ms: 300 correlation times, so the estimates settle.
+  const auto series = RecordWind("gusts.sdf", 30000);
+  ASSERT_EQ(30000u, series.size());
+
+  std::vector<double> speed;
+  std::vector<double> direction;
+  for (const auto &w : series)
+  {
+    const Reading r = AsReading(w);
+    speed.push_back(r.speed);
+    direction.push_back(r.direction);
+  }
+  const auto [speedMean, speedSd] = Stats(speed);
+  const auto [dirMean, dirSd] = Stats(direction);
+  EXPECT_NEAR(5.0, speedMean, 0.2);
+  EXPECT_NEAR(1.0, speedSd, 0.1);
+  EXPECT_NEAR(270.0, dirMean, 2.0);
+  EXPECT_NEAR(10.0, dirSd, 1.0);
+  // Lag of one correlation time: 0.2 s is 100 steps of 2 ms.
+  EXPECT_NEAR(std::exp(-1.0), Autocorrelation(speed, 100), 0.1);
+  EXPECT_NEAR(std::exp(-1.0), Autocorrelation(direction, 100), 0.1);
+}
+
+/////////////////////////////////////////////////
+/// The same seed gives the same gusts, run after run.
+TEST(WindGusts, SeedRepeatsTheSeries)
+{
+  const auto first = RecordWind("gusts.sdf", 1000);
+  const auto second = RecordWind("gusts.sdf", 1000);
+  ASSERT_EQ(first.size(), second.size());
+  for (std::size_t i = 0; i < first.size(); ++i)
+    ASSERT_EQ(first[i], second[i]) << "step " << i;
+}
+
+/////////////////////////////////////////////////
+/// A reset replays the gusts from their seed.
+TEST(WindGusts, ResetReplaysTheGusts)
+{
+  std::vector<math::Vector3d> series;
+  TestFixture fixture(World("gusts.sdf"));
+  fixture.OnPostUpdate([&](const UpdateInfo &,
+      const EntityComponentManager &_ecm)
+  {
+    series.push_back(ReadWind(_ecm));
+  });
+  fixture.Finalize();
+  auto server = fixture.Server();
+  ASSERT_TRUE(server->Run(true, 500, false));
+  const std::vector<math::Vector3d> before = series;
+  series.clear();
+  server->ResetAll();
+  ASSERT_TRUE(server->Run(true, 500, false));
+  // The first iteration after a reset is the reset itself, which still
+  // reports the wind as it was; the replay starts on the next one.
+  ASSERT_GT(series.size(), 400u);
+  for (std::size_t i = 1; i < series.size(); ++i)
+    ASSERT_EQ(before[i - 1], series[i]) << "step " << i;
+}
+
+/////////////////////////////////////////////////
+/// The topic turns gusts on in a world that has none, and off again.
+TEST(WindGusts, TurnedOnAndOffOnTheTopic)
+{
+  std::vector<double> speed;
+  TestFixture fixture(World("windfield.sdf"));
+  fixture.OnPostUpdate([&](const UpdateInfo &,
+      const EntityComponentManager &_ecm)
+  {
+    speed.push_back(AsReading(ReadWind(_ecm)).speed);
+  });
+  fixture.Finalize();
+  auto server = fixture.Server();
+
+  ASSERT_TRUE(server->Run(true, 200, false));
+  EXPECT_NEAR(0.0, Stats(speed).second, 1e-9) << "steady before";
+
+  ASSERT_TRUE(SetWind("windfield", "speed_gust", 1.0));
+  speed.clear();
+  ASSERT_TRUE(server->Run(true, 5000, false));
+  EXPECT_GT(Stats(speed).second, 0.3) << "gusting after";
+
+  ASSERT_TRUE(SetWind("windfield", "speed_gust", 0.0));
+  ASSERT_TRUE(server->Run(true, 2, false));
+  speed.clear();
+  ASSERT_TRUE(server->Run(true, 200, false));
+  EXPECT_NEAR(0.0, Stats(speed).second, 1e-9) << "steady again";
+  EXPECT_NEAR(5.0, speed.back(), 1e-9) << "back to the mean";
 }

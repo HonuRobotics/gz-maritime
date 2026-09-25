@@ -147,7 +147,9 @@
          system writes it where Gazebo's rotor, wing and air speed systems
          read it, publishes it on /world/default/wind_info, and pushes on the
          collisions a vehicle marks gz:wind="true", by the part of each shape
-         above z = 0. Like buoyancy, the world names no vehicle. -->
+         above z = 0. Like buoyancy, the world names no vehicle. Gusts on
+         the speed and the direction (<speed_gust>, <direction_gust> and
+         their times, <seed>) are listed in the reference docs. -->
     <plugin
       filename="gz-maritime-wind-system"
       name="gz::sim::maritime::Wind">

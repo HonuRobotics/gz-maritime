@@ -21,8 +21,10 @@
 #include <cmath>
 #include <mutex>
 #include <optional>
+#include <random>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <gz/msgs/param.pb.h>
@@ -155,18 +157,64 @@ class gz::sim::maritime::WindPrivate
   public: bool rescan{true};
 
   /// \brief Handler of the wind topic, on a transport thread.
-  /// \param[in] _msg Keys `speed` and `direction`, either or both.
+  /// \param[in] _msg Any of the keys Apply takes.
   public: void OnSet(const msgs::Param &_msg);
+
+  /// \brief Apply one wind parameter, from the world file or the topic.
+  /// \param[in] _key speed, direction, speed_gust, speed_gust_time,
+  /// direction_gust, direction_gust_time or seed.
+  /// \param[in] _value Its value.
+  /// \return False if the key is unknown or the value out of range.
+  public: bool Apply(const std::string &_key, double _value);
+
+  /// \brief (Re)start the gusts from their seed, calm.
+  public: void Reseed();
+
+  /// \brief Advance the gusts by one step: a first order Gauss Markov
+  /// (Ornstein Uhlenbeck) process on the speed and one on the direction,
+  /// with the exact discrete update, so their spread does not depend on the
+  /// step size.
+  /// \param[in] _dt Step, seconds.
+  public: void StepGusts(double _dt);
+
+  /// \brief Whether either gust is active.
+  /// \return True if a gust has a positive standing deviation.
+  public: bool Gusting() const;
 
   /// \brief Write the wind into the wind entity.
   /// \param[in] _ecm The entity component manager.
   public: void WriteWind(EntityComponentManager &_ecm);
 
-  /// \brief Wind speed, m/s.
+  /// \brief Mean wind speed, m/s.
   public: double speed{0.0};
 
-  /// \brief Direction the wind comes from, degrees clockwise from north.
+  /// \brief Mean direction the wind comes from, degrees clockwise from
+  /// north.
   public: double direction{0.0};
+
+  /// \brief Standing deviation of the speed gusts, m/s.
+  public: double speedGust{0.0};
+
+  /// \brief Correlation time of the speed gusts, seconds.
+  public: double speedGustTime{2.0};
+
+  /// \brief Standing deviation of the direction gusts, degrees.
+  public: double directionGust{0.0};
+
+  /// \brief Correlation time of the direction gusts, seconds.
+  public: double directionGustTime{10.0};
+
+  /// \brief Seed of the gusts; 0 draws one from the system.
+  public: unsigned int seed{0};
+
+  /// \brief Current speed gust, m/s, added to the mean speed.
+  public: double speedGustState{0.0};
+
+  /// \brief Current direction gust, degrees, added to the mean direction.
+  public: double directionGustState{0.0};
+
+  /// \brief The gusts' random numbers.
+  public: std::mt19937 random;
 
   /// \brief Vertical component, m/s, kept from the world's <wind>.
   public: double vertical{0.0};
@@ -174,11 +222,11 @@ class gz::sim::maritime::WindPrivate
   /// \brief Whether the wind changed and must be written.
   public: bool dirty{false};
 
-  /// \brief A speed queued by the topic.
-  public: std::optional<double> pendingSpeed;
+  /// \brief Parameters queued by the topic, applied at the next step.
+  public: std::vector<std::pair<std::string, double>> pending;
 
-  /// \brief A direction queued by the topic.
-  public: std::optional<double> pendingDirection;
+  /// \brief Whether a new seed was queued, which restarts the gusts.
+  public: bool reseed{false};
 
   /// \brief Guards the pending values across the transport and ECM threads.
   public: std::mutex mutex;
@@ -209,13 +257,77 @@ void WindPrivate::OnSet(const msgs::Param &_msg)
       gzwarn << "Wind: key '" << key << "' is not a number, ignored\n";
       continue;
     }
-    if (key == "speed" && d >= 0.0)
-      this->pendingSpeed = d;
-    else if (key == "direction")
-      this->pendingDirection = d;
-    else
-      gzwarn << "Wind: key '" << key << "' is unknown or out of range, ignored\n";
+    this->pending.emplace_back(key, d);
   }
+}
+
+//////////////////////////////////////////////////
+bool WindPrivate::Apply(const std::string &_key, double _value)
+{
+  if (_key == "speed" && _value >= 0.0)
+    this->speed = _value;
+  else if (_key == "direction")
+    this->direction = _value;
+  else if (_key == "speed_gust" && _value >= 0.0)
+    this->speedGust = _value;
+  else if (_key == "speed_gust_time" && _value > 0.0)
+    this->speedGustTime = _value;
+  else if (_key == "direction_gust" && _value >= 0.0)
+    this->directionGust = _value;
+  else if (_key == "direction_gust_time" && _value > 0.0)
+    this->directionGustTime = _value;
+  else if (_key == "seed" && _value >= 0.0)
+  {
+    this->seed = static_cast<unsigned int>(_value);
+    this->reseed = true;
+  }
+  else
+  {
+    gzwarn << "Wind: key '" << _key << "' is unknown or out of range, "
+           << "ignored\n";
+    return false;
+  }
+  // A gust switched off leaves no offset behind.
+  if (this->speedGust <= 0.0)
+    this->speedGustState = 0.0;
+  if (this->directionGust <= 0.0)
+    this->directionGustState = 0.0;
+  this->dirty = true;
+  return true;
+}
+
+//////////////////////////////////////////////////
+void WindPrivate::Reseed()
+{
+  this->random.seed(0 == this->seed ? std::random_device{}() : this->seed);
+  this->speedGustState = 0.0;
+  this->directionGustState = 0.0;
+  this->reseed = false;
+}
+
+//////////////////////////////////////////////////
+bool WindPrivate::Gusting() const
+{
+  return this->speedGust > 0.0 || this->directionGust > 0.0;
+}
+
+//////////////////////////////////////////////////
+void WindPrivate::StepGusts(double _dt)
+{
+  // x' = a x + sigma sqrt(1 - a^2) n, a = exp(-dt / T), n ~ N(0, 1): the
+  // exact update of dx = -x / T dt + sigma sqrt(2 / T) dW. Its standing
+  // deviation is sigma and its correlation time T, whatever the step.
+  // The speed draws first, then the direction, so a seed repeats the series.
+  std::normal_distribution<double> normal(0.0, 1.0);
+  auto step = [&](double &_state, double _sigma, double _time)
+  {
+    if (_sigma <= 0.0)
+      return;
+    const double a = std::exp(-_dt / _time);
+    _state = a * _state + _sigma * std::sqrt(1.0 - a * a) * normal(this->random);
+  };
+  step(this->speedGustState, this->speedGust, this->speedGustTime);
+  step(this->directionGustState, this->directionGust, this->directionGustTime);
 }
 
 //////////////////////////////////////////////////
@@ -223,8 +335,10 @@ void WindPrivate::WriteWind(EntityComponentManager &_ecm)
 {
   if (kNullEntity == this->windEntity)
     return;
-  const math::Vector3d vel = Velocity(this->speed, this->direction,
-      this->vertical);
+  // The mean plus the gusts; a gust never makes the speed negative.
+  const math::Vector3d vel = Velocity(
+      std::max(0.0, this->speed + this->speedGustState),
+      this->direction + this->directionGustState, this->vertical);
   auto *comp = _ecm.Component<components::WorldLinearVelocity>(
       this->windEntity);
   if (nullptr == comp)
@@ -431,16 +545,15 @@ void Wind::Configure(const Entity &_entity,
   this->dataPtr->speed = std::hypot(start.X(), start.Y());
   this->dataPtr->direction = this->dataPtr->speed > 0.0 ?
       GZ_RTOD(std::atan2(-start.X(), -start.Y())) : 0.0;
-  if (_sdf->HasElement("speed"))
+  // The same keys as the topic, so the world file and a message speak one
+  // vocabulary.
+  for (const char *key : {"speed", "direction", "speed_gust",
+      "speed_gust_time", "direction_gust", "direction_gust_time", "seed"})
   {
-    this->dataPtr->speed = std::max(0.0, _sdf->Get<double>("speed"));
-    this->dataPtr->dirty = true;
+    if (_sdf->HasElement(key))
+      this->dataPtr->Apply(key, _sdf->Get<double>(key));
   }
-  if (_sdf->HasElement("direction"))
-  {
-    this->dataPtr->direction = _sdf->Get<double>("direction");
-    this->dataPtr->dirty = true;
-  }
+  this->dataPtr->Reseed();
   const double rate = _sdf->Get<double>("publish_rate", 10.0).first;
   if (rate > 0.0)
   {
@@ -468,22 +581,21 @@ void Wind::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
 {
   this->dataPtr->FindShapes(_ecm);
 
-  // Apply what the topic queued, then write the wind where Gazebo's rotor,
-  // wing and air speed systems read it.
+  // Apply what the topic queued, advance the gusts, then write the wind
+  // where Gazebo's rotor, wing and air speed systems read it.
   {
     const std::lock_guard<std::mutex> lock(this->dataPtr->mutex);
-    if (this->dataPtr->pendingSpeed)
-    {
-      this->dataPtr->speed = *this->dataPtr->pendingSpeed;
-      this->dataPtr->dirty = true;
-    }
-    if (this->dataPtr->pendingDirection)
-    {
-      this->dataPtr->direction = *this->dataPtr->pendingDirection;
-      this->dataPtr->dirty = true;
-    }
-    this->dataPtr->pendingSpeed.reset();
-    this->dataPtr->pendingDirection.reset();
+    for (const auto &[key, value] : this->dataPtr->pending)
+      this->dataPtr->Apply(key, value);
+    this->dataPtr->pending.clear();
+  }
+  if (this->dataPtr->reseed)
+    this->dataPtr->Reseed();
+  const double dt = std::chrono::duration<double>(_info.dt).count();
+  if (!_info.paused && dt > 0.0 && this->dataPtr->Gusting())
+  {
+    this->dataPtr->StepGusts(dt);
+    this->dataPtr->dirty = true;
   }
   if (this->dataPtr->dirty)
   {
@@ -586,6 +698,9 @@ void Wind::Reset(const UpdateInfo &, EntityComponentManager &)
 {
   this->dataPtr->links.clear();
   this->dataPtr->rescan = true;
+  // A reset replays the same gusts from the same seed.
+  this->dataPtr->Reseed();
+  this->dataPtr->dirty = true;
 }
 
 GZ_ADD_PLUGIN(Wind,

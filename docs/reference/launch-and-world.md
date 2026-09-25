@@ -172,6 +172,7 @@ What a model says to the wind system, and what a world says to it.
 | A `<collision>` in a model | `gz:wind="true"` (same `xmlns:gz` root attribute) | The wind pushes on this shape, by the part of it above the waterline, with quadratic drag on its projected area per axis. A buoyancy box can carry both marks. |
 | The same `<collision>` | `gz:wind_cd="1.2"` | Its drag coefficient; the plugin's `<default_drag_coefficient>` otherwise. |
 | The world plugin | `<speed>`, `<direction>` | The wind: m/s, and the direction it comes from in degrees clockwise from north (270, from the west, blows towards +x). |
+| The world plugin | `<speed_gust>`, `<speed_gust_time>`, `<direction_gust>`, `<direction_gust_time>`, `<seed>` | Gusts: standing deviation (m/s, degrees) and correlation time (s, 2 and 10 by default) of the speed and the direction; 0 is steady. The same seed repeats them; 0 draws a new one each run. |
 | The world | `<wind><linear_velocity>x y z</linear_velocity></wind>` | Used as the starting wind when the plugin sets neither `<speed>` nor `<direction>`. |
 | The world plugin | `<air_density>`, `<water_level>`, `<default_drag_coefficient>`, `<publish_rate>` | 1.225 kg/m³, z = 0, 1 and 10 Hz by default. |
 
@@ -222,9 +223,9 @@ gz service -s /world/default/set_pose --reqtype gz.msgs.Pose \
 ## Wind
 
 The wind changes while the simulation runs on the topic
-`/world/default/wind/set`: a `gz.msgs.Param` with `speed` (m/s) and
-`direction` (degrees the wind comes from, clockwise from north), either or
-both. The simulation launch bridges it from ROS as
+`/world/default/wind/set`: a `gz.msgs.Param` with `speed` (m/s),
+`direction` (degrees the wind comes from, clockwise from north), or any of
+the gust parameters, in any combination. The simulation launch bridges it from ROS as
 `ros_gz_interfaces/msg/ParamVec`, with each key a double parameter. The
 current wind is published on `/world/default/wind_info` as `gz.msgs.Wind`.
 
@@ -233,6 +234,13 @@ A 6 m/s wind from the west, from ROS:
 ```bash
 ros2 topic pub --once /world/default/wind/set ros_gz_interfaces/msg/ParamVec \
   "{params: [{name: speed, value: {type: 3, double_value: 6.0}}, {name: direction, value: {type: 3, double_value: 270.0}}]}"
+```
+
+Gusts of 1.5 m/s that last about 3 s, from ROS:
+
+```bash
+ros2 topic pub --once /world/default/wind/set ros_gz_interfaces/msg/ParamVec \
+  "{params: [{name: speed_gust, value: {type: 3, double_value: 1.5}}, {name: speed_gust_time, value: {type: 3, double_value: 3.0}}]}"
 ```
 
 From Gazebo, turning it to come from the south, and reading it back:

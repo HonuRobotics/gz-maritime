@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!--
+  A gusty wind and nothing else: 5 m/s from the west with speed gusts of
+  1 m/s and direction gusts of 10 degrees, both with a 0.2 s correlation
+  time, seeded, stepped every 2 ms. The test reads the wind back from the
+  wind entity every step and checks its statistics.
+-->
+<sdf version="1.9">
+  <world name="gusts">
+    <gravity>0 0 0</gravity>
+    <physics name="fast" type="dart">
+      <max_step_size>0.002</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-maritime-wind-system"
+            name="gz::sim::maritime::Wind">
+      <speed>5</speed>
+      <direction>270</direction>
+      <speed_gust>1</speed_gust>
+      <speed_gust_time>0.2</speed_gust_time>
+      <direction_gust>10</direction_gust>
+      <direction_gust_time>0.2</direction_gust_time>
+      <seed>42</seed>
+    </plugin>
+  </world>
+</sdf>
