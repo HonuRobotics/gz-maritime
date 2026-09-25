@@ -18,8 +18,15 @@
 
 #include <gz/msgs/boolean.pb.h>
 #include <gz/msgs/entity_factory.pb.h>
+#include <gz/msgs/param.pb.h>
+#include <gz/msgs/wind.pb.h>
 
+#include <chrono>
+#include <functional>
+#include <mutex>
+#include <optional>
 #include <string>
+#include <thread>
 
 #include <gz/common/Filesystem.hh>
 #include <gz/math/Vector3.hh>
@@ -32,6 +39,7 @@
 #include <gz/sim/components/Model.hh>
 #include <gz/sim/components/Name.hh>
 #include <gz/sim/components/ParentEntity.hh>
+#include <gz/sim/components/Wind.hh>
 #include <gz/sim/EntityComponentManager.hh>
 #include <gz/sim/TestFixture.hh>
 #include <gz/sim/Util.hh>
@@ -90,6 +98,40 @@ BoxState ReadBox(const EntityComponentManager &_ecm, const std::string &_model)
     state.angVel = ang->Data();
 
   return state;
+}
+
+/// \brief The wind the wind entity holds this iteration.
+/// \param[in] _ecm Entity component manager.
+/// \return Its linear velocity, zero if there is none.
+math::Vector3d ReadWind(const EntityComponentManager &_ecm)
+{
+  const Entity wind = _ecm.EntityByComponents(components::Wind());
+  const auto *vel = _ecm.Component<components::WorldLinearVelocity>(wind);
+  return nullptr == vel ? math::Vector3d::Zero : vel->Data();
+}
+
+/// \brief Ask the wind system to change the wind, on its topic.
+/// \param[in] _world World name.
+/// \param[in] _key Parameter, speed or direction.
+/// \param[in] _value Its new value.
+/// \return True once the message was sent to a subscriber.
+bool SetWind(const std::string &_world, const std::string &_key,
+             double _value)
+{
+  static transport::Node node;
+  auto pub = node.Advertise<msgs::Param>("/world/" + _world + "/wind/set");
+  for (int i = 0; i < 100 && !pub.HasConnections(); ++i)
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  if (!pub.HasConnections())
+    return false;
+  msgs::Param msg;
+  auto &any = (*msg.mutable_params())[_key];
+  any.set_type(msgs::Any::DOUBLE);
+  any.set_double_value(_value);
+  const bool sent = pub.Publish(msg);
+  // Delivery is asynchronous; give the subscriber a moment to queue it.
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  return sent;
 }
 
 /// \brief Path to one of the test worlds.
@@ -311,4 +353,120 @@ TEST(Windage, MomentFromTheShapePosition)
   ASSERT_TRUE(com.tracked);
   EXPECT_GT(com.vel.X(), 0.1) << "it is pushed";
   EXPECT_NEAR(0.0, com.angVel.Y(), 1e-3) << "but not turned";
+}
+
+/////////////////////////////////////////////////
+/// A world that only sets <wind> keeps it: the wind system starts from it.
+TEST(WindField, WorldWindKeptWithoutParameters)
+{
+  TestFixture fixture(World("windage.sdf"));
+
+  math::Vector3d wind;
+  fixture.OnPostUpdate([&](const UpdateInfo &,
+      const EntityComponentManager &_ecm)
+  {
+    wind = ReadWind(_ecm);
+  });
+  fixture.Finalize();
+
+  ASSERT_TRUE(fixture.Server()->Run(true, 10, false));
+  EXPECT_NEAR(5.0, wind.X(), 1e-9);
+  EXPECT_NEAR(0.0, wind.Y(), 1e-9);
+}
+
+/////////////////////////////////////////////////
+/// <speed> and <direction> set the wind: 270, a wind from the west, blows
+/// towards +x, and pushes the marked box that way.
+TEST(WindField, SpeedAndDirectionFromTheWorld)
+{
+  TestFixture fixture(World("windfield.sdf"));
+
+  math::Vector3d wind;
+  BoxState box;
+  fixture.OnPostUpdate([&](const UpdateInfo &,
+      const EntityComponentManager &_ecm)
+  {
+    wind = ReadWind(_ecm);
+    box = ReadBox(_ecm, "marked_box");
+  });
+  fixture.Finalize();
+
+  ASSERT_TRUE(fixture.Server()->Run(true, 500, false));
+  EXPECT_NEAR(5.0, wind.X(), 1e-9);
+  EXPECT_NEAR(0.0, wind.Y(), 1e-9);
+  ASSERT_TRUE(box.found);
+  EXPECT_NEAR(kSpeedAfterOneSecond, box.vel.X(), 0.01);
+  EXPECT_NEAR(0.0, box.vel.Y(), 1e-6);
+}
+
+/////////////////////////////////////////////////
+/// The topic changes the wind while the world runs: a wind from the south
+/// pushes the box north, and after a zero speed the still air only brakes it.
+TEST(WindField, ChangedAtRunTimeOnItsTopic)
+{
+  TestFixture fixture(World("windfield.sdf"));
+
+  math::Vector3d wind;
+  BoxState box;
+  fixture.OnPostUpdate([&](const UpdateInfo &,
+      const EntityComponentManager &_ecm)
+  {
+    wind = ReadWind(_ecm);
+    box = ReadBox(_ecm, "marked_box");
+  });
+  fixture.Finalize();
+
+  auto server = fixture.Server();
+  ASSERT_TRUE(server->Run(true, 1, false));
+  ASSERT_TRUE(SetWind("windfield", "direction", 180.0));
+  ASSERT_TRUE(server->Run(true, 500, false));
+  EXPECT_NEAR(0.0, wind.X(), 1e-9);
+  EXPECT_NEAR(5.0, wind.Y(), 1e-9);
+  EXPECT_GT(box.vel.Y(), 0.1) << "a wind from the south pushes north";
+
+  ASSERT_TRUE(SetWind("windfield", "speed", 0.0));
+  ASSERT_TRUE(server->Run(true, 2, false));
+  const math::Vector3d still = box.vel;
+  ASSERT_TRUE(server->Run(true, 200, false));
+  EXPECT_NEAR(0.0, wind.Length(), 1e-9);
+  EXPECT_LT(box.vel.Y(), still.Y()) << "still air brakes a moving box";
+  EXPECT_GT(box.vel.Y(), 0.0) << "but never pushes it back";
+
+  ASSERT_TRUE(SetWind("windfield", "gust", 3.0));
+  ASSERT_TRUE(server->Run(true, 2, false));
+  EXPECT_NEAR(0.0, wind.Length(), 1e-9) << "an unknown key changes nothing";
+}
+
+/////////////////////////////////////////////////
+/// The wind is published as ground truth on /world/<world>/wind_info.
+TEST(WindField, GroundTruthIsPublished)
+{
+  std::mutex mutex;
+  std::optional<msgs::Wind> received;
+  transport::Node node;
+  ASSERT_TRUE(node.Subscribe("/world/windfield/wind_info",
+      std::function<void(const msgs::Wind &)>(
+      [&](const msgs::Wind &_msg)
+      {
+        const std::lock_guard<std::mutex> lock(mutex);
+        received = _msg;
+      })));
+
+  TestFixture fixture(World("windfield.sdf"));
+  fixture.Finalize();
+  ASSERT_TRUE(fixture.Server()->Run(true, 200, false));
+
+  for (int i = 0; i < 50; ++i)
+  {
+    {
+      const std::lock_guard<std::mutex> lock(mutex);
+      if (received)
+        break;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  const std::lock_guard<std::mutex> lock(mutex);
+  ASSERT_TRUE(received.has_value());
+  EXPECT_NEAR(5.0, received->linear_velocity().x(), 1e-9);
+  EXPECT_NEAR(0.0, received->linear_velocity().y(), 1e-9);
 }

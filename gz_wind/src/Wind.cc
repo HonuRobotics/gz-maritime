@@ -17,10 +17,16 @@
 #include "Wind.hh"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include <gz/msgs/param.pb.h>
+#include <gz/msgs/wind.pb.h>
 
 #include <gz/common/Console.hh>
 #include <gz/common/Mesh.hh>
@@ -29,6 +35,7 @@
 #include <gz/math/Pose3.hh>
 #include <gz/math/Vector3.hh>
 #include <gz/plugin/Register.hh>
+#include <gz/transport/Node.hh>
 #include <sdf/Box.hh>
 #include <sdf/Capsule.hh>
 #include <sdf/Collision.hh>
@@ -45,7 +52,9 @@
 #include <gz/sim/components/Link.hh>
 #include <gz/sim/components/LinearVelocity.hh>
 #include <gz/sim/components/Pose.hh>
+#include <gz/sim/components/Name.hh>
 #include <gz/sim/components/Wind.hh>
+#include <gz/sim/Conversions.hh>
 
 using namespace gz;
 using namespace sim;
@@ -59,6 +68,33 @@ namespace
 
   /// \brief The optional per shape drag coefficient attribute.
   const std::string kCdMark{"gz:wind_cd"};
+
+  /// \brief Read a numeric Any as a double.
+  /// \param[in] _v The value.
+  /// \param[out] _out The number, when there is one.
+  /// \return True if the value is numeric.
+  bool ReadDouble(const msgs::Any &_v, double &_out)
+  {
+    switch (_v.type())
+    {
+      case msgs::Any::DOUBLE: _out = _v.double_value(); return true;
+      case msgs::Any::INT32: _out = _v.int_value(); return true;
+      default: return false;
+    }
+  }
+
+  /// \brief The wind velocity, in the world frame (ENU), of a wind that
+  /// blows from a direction.
+  /// \param[in] _speed Speed, m/s.
+  /// \param[in] _from Direction the wind comes from, degrees clockwise from
+  /// north, as in weather reports.
+  /// \param[in] _vertical Vertical component, m/s.
+  /// \return The velocity the air moves with.
+  math::Vector3d Velocity(double _speed, double _from, double _vertical)
+  {
+    const double a = GZ_DTOR(_from);
+    return {-_speed * std::sin(a), -_speed * std::cos(a), _vertical};
+  }
 
   /// \brief Projected area of a box along each of its axes.
   /// \param[in] _size Box size.
@@ -117,7 +153,90 @@ class gz::sim::maritime::WindPrivate
 
   /// \brief Scan every link instead of only the new ones on the next update.
   public: bool rescan{true};
+
+  /// \brief Handler of the wind topic, on a transport thread.
+  /// \param[in] _msg Keys `speed` and `direction`, either or both.
+  public: void OnSet(const msgs::Param &_msg);
+
+  /// \brief Write the wind into the wind entity.
+  /// \param[in] _ecm The entity component manager.
+  public: void WriteWind(EntityComponentManager &_ecm);
+
+  /// \brief Wind speed, m/s.
+  public: double speed{0.0};
+
+  /// \brief Direction the wind comes from, degrees clockwise from north.
+  public: double direction{0.0};
+
+  /// \brief Vertical component, m/s, kept from the world's <wind>.
+  public: double vertical{0.0};
+
+  /// \brief Whether the wind changed and must be written.
+  public: bool dirty{false};
+
+  /// \brief A speed queued by the topic.
+  public: std::optional<double> pendingSpeed;
+
+  /// \brief A direction queued by the topic.
+  public: std::optional<double> pendingDirection;
+
+  /// \brief Guards the pending values across the transport and ECM threads.
+  public: std::mutex mutex;
+
+  /// \brief Transport node for the wind topic and the ground truth.
+  public: transport::Node node;
+
+  /// \brief Ground truth publisher.
+  public: transport::Node::Publisher windPub;
+
+  /// \brief Ground truth publication period, simulation time.
+  public: std::chrono::steady_clock::duration publishPeriod{
+      std::chrono::milliseconds(100)};
+
+  /// \brief Simulation time of the last publication.
+  public: std::optional<std::chrono::steady_clock::duration> lastPublish;
 };
+
+//////////////////////////////////////////////////
+void WindPrivate::OnSet(const msgs::Param &_msg)
+{
+  const std::lock_guard<std::mutex> lock(this->mutex);
+  for (const auto &[key, value] : _msg.params())
+  {
+    double d{0.0};
+    if (!ReadDouble(value, d))
+    {
+      gzwarn << "Wind: key '" << key << "' is not a number, ignored\n";
+      continue;
+    }
+    if (key == "speed" && d >= 0.0)
+      this->pendingSpeed = d;
+    else if (key == "direction")
+      this->pendingDirection = d;
+    else
+      gzwarn << "Wind: key '" << key << "' is unknown or out of range, ignored\n";
+  }
+}
+
+//////////////////////////////////////////////////
+void WindPrivate::WriteWind(EntityComponentManager &_ecm)
+{
+  if (kNullEntity == this->windEntity)
+    return;
+  const math::Vector3d vel = Velocity(this->speed, this->direction,
+      this->vertical);
+  auto *comp = _ecm.Component<components::WorldLinearVelocity>(
+      this->windEntity);
+  if (nullptr == comp)
+  {
+    _ecm.CreateComponent(this->windEntity,
+        components::WorldLinearVelocity(vel));
+  }
+  else
+  {
+    comp->Data() = vel;
+  }
+}
 
 //////////////////////////////////////////////////
 bool WindPrivate::Resolve(const EntityComponentManager &_ecm,
@@ -274,7 +393,7 @@ Wind::Wind()
 Wind::~Wind() = default;
 
 //////////////////////////////////////////////////
-void Wind::Configure(const Entity &/*_entity*/,
+void Wind::Configure(const Entity &_entity,
     const std::shared_ptr<const sdf::Element> &_sdf,
     EntityComponentManager &_ecm,
     EventManager &/*_eventMgr*/)
@@ -294,13 +413,83 @@ void Wind::Configure(const Entity &/*_entity*/,
 
   this->dataPtr->windEntity = _ecm.EntityByComponents(components::Wind());
   if (kNullEntity == this->dataPtr->windEntity)
+  {
     gzwarn << "Wind: the world has no wind entity, nothing will be pushed\n";
+    return;
+  }
+
+  // The world's <wind> is the starting point; <speed> and <direction>
+  // override it. Without either, the wind is the world's until the topic
+  // changes it.
+  math::Vector3d start = math::Vector3d::Zero;
+  if (const auto *vel = _ecm.Component<components::WorldLinearVelocity>(
+      this->dataPtr->windEntity))
+  {
+    start = vel->Data();
+  }
+  this->dataPtr->vertical = start.Z();
+  this->dataPtr->speed = std::hypot(start.X(), start.Y());
+  this->dataPtr->direction = this->dataPtr->speed > 0.0 ?
+      GZ_RTOD(std::atan2(-start.X(), -start.Y())) : 0.0;
+  if (_sdf->HasElement("speed"))
+  {
+    this->dataPtr->speed = std::max(0.0, _sdf->Get<double>("speed"));
+    this->dataPtr->dirty = true;
+  }
+  if (_sdf->HasElement("direction"))
+  {
+    this->dataPtr->direction = _sdf->Get<double>("direction");
+    this->dataPtr->dirty = true;
+  }
+  const double rate = _sdf->Get<double>("publish_rate", 10.0).first;
+  if (rate > 0.0)
+  {
+    this->dataPtr->publishPeriod =
+        std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+        std::chrono::duration<double>(1.0 / rate));
+  }
+
+  // The world's name scopes the wind topic and the ground truth.
+  std::string worldName{"default"};
+  if (const auto *name = _ecm.Component<components::Name>(_entity))
+    worldName = name->Data();
+  const std::string prefix = "/world/" + worldName + "/wind";
+  if (!this->dataPtr->node.Subscribe(prefix + "/set",
+      &WindPrivate::OnSet, this->dataPtr.get()))
+  {
+    gzerr << "Wind: cannot subscribe to " << prefix << "/set\n";
+  }
+  this->dataPtr->windPub =
+      this->dataPtr->node.Advertise<msgs::Wind>(prefix + "_info");
 }
 
 //////////////////////////////////////////////////
 void Wind::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
 {
   this->dataPtr->FindShapes(_ecm);
+
+  // Apply what the topic queued, then write the wind where Gazebo's rotor,
+  // wing and air speed systems read it.
+  {
+    const std::lock_guard<std::mutex> lock(this->dataPtr->mutex);
+    if (this->dataPtr->pendingSpeed)
+    {
+      this->dataPtr->speed = *this->dataPtr->pendingSpeed;
+      this->dataPtr->dirty = true;
+    }
+    if (this->dataPtr->pendingDirection)
+    {
+      this->dataPtr->direction = *this->dataPtr->pendingDirection;
+      this->dataPtr->dirty = true;
+    }
+    this->dataPtr->pendingSpeed.reset();
+    this->dataPtr->pendingDirection.reset();
+  }
+  if (this->dataPtr->dirty)
+  {
+    this->dataPtr->WriteWind(_ecm);
+    this->dataPtr->dirty = false;
+  }
 
   if (_info.paused)
     return;
@@ -310,6 +499,20 @@ void Wind::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
       this->dataPtr->windEntity))
   {
     wind = vel->Data();
+  }
+
+  // Ground truth, at the publish rate in simulation time.
+  if (!this->dataPtr->lastPublish ||
+      _info.simTime - *this->dataPtr->lastPublish >=
+      this->dataPtr->publishPeriod)
+  {
+    msgs::Wind msg;
+    msg.mutable_header()->mutable_stamp()->CopyFrom(
+        convert<msgs::Time>(_info.simTime));
+    msgs::Set(msg.mutable_linear_velocity(), wind);
+    msg.set_enable_wind(true);
+    this->dataPtr->windPub.Publish(msg);
+    this->dataPtr->lastPublish = _info.simTime;
   }
 
   for (auto it = this->dataPtr->links.begin();
