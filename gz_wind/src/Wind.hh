@@ -28,9 +28,11 @@ namespace gz::sim::maritime
   /// \brief The wind of a world, and windage on marked collisions.
   ///
   /// A world system with two halves. The field: it owns the world's wind, a
-  /// speed and the direction it comes from, changes it at run time through
-  /// `/world/<world>/wind/set_parameters` (gz.msgs.Param with keys `speed`
-  /// and `direction`), writes it into the wind entity every Gazebo world
+  /// speed and the direction it comes from, changes it at run time on
+  /// the topic `/world/<world>/wind/set` (gz.msgs.Param with keys `speed`
+  /// and `direction`, either or both; ROS reaches it through ros_gz_bridge as
+  /// ros_gz_interfaces/msg/ParamVec), writes it into the wind entity every
+  /// Gazebo world
   /// carries, where the rotor, wing and air speed systems read it, and
   /// publishes it as ground truth on `/world/<world>/wind_info`
   /// (gz.msgs.Wind). The load: it pushes on the shapes the wind sees. A vehicle marks

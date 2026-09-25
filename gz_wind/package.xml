@@ -13,7 +13,7 @@
   <depend>gz_plugin_vendor</depend>
   <depend>gz_math_vendor</depend>
   <depend>gz_common_vendor</depend>
-  <!-- The set_parameters service and the ground truth topic. -->
+  <!-- The wind topic and the ground truth topic. -->
   <depend>gz_transport_vendor</depend>
   <depend>gz_msgs_vendor</depend>
 

@@ -25,7 +25,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include <gz/msgs/boolean.pb.h>
 #include <gz/msgs/param.pb.h>
 #include <gz/msgs/wind.pb.h>
 
@@ -155,11 +154,9 @@ class gz::sim::maritime::WindPrivate
   /// \brief Scan every link instead of only the new ones on the next update.
   public: bool rescan{true};
 
-  /// \brief set_parameters service handler, on a transport thread.
-  /// \param[in] _req Keys `speed` and `direction`, either or both.
-  /// \param[out] _rep True if a key was applied.
-  /// \return True, the service always answers.
-  public: bool OnSetParameters(const msgs::Param &_req, msgs::Boolean &_rep);
+  /// \brief Handler of the wind topic, on a transport thread.
+  /// \param[in] _msg Keys `speed` and `direction`, either or both.
+  public: void OnSet(const msgs::Param &_msg);
 
   /// \brief Write the wind into the wind entity.
   /// \param[in] _ecm The entity component manager.
@@ -177,16 +174,16 @@ class gz::sim::maritime::WindPrivate
   /// \brief Whether the wind changed and must be written.
   public: bool dirty{false};
 
-  /// \brief A speed queued by the service.
+  /// \brief A speed queued by the topic.
   public: std::optional<double> pendingSpeed;
 
-  /// \brief A direction queued by the service.
+  /// \brief A direction queued by the topic.
   public: std::optional<double> pendingDirection;
 
   /// \brief Guards the pending values across the transport and ECM threads.
   public: std::mutex mutex;
 
-  /// \brief Transport node for the service and the ground truth.
+  /// \brief Transport node for the wind topic and the ground truth.
   public: transport::Node node;
 
   /// \brief Ground truth publisher.
@@ -201,40 +198,24 @@ class gz::sim::maritime::WindPrivate
 };
 
 //////////////////////////////////////////////////
-bool WindPrivate::OnSetParameters(const msgs::Param &_req,
-    msgs::Boolean &_rep)
+void WindPrivate::OnSet(const msgs::Param &_msg)
 {
-  bool matched{false};
+  const std::lock_guard<std::mutex> lock(this->mutex);
+  for (const auto &[key, value] : _msg.params())
   {
-    const std::lock_guard<std::mutex> lock(this->mutex);
-    for (const auto &[key, value] : _req.params())
+    double d{0.0};
+    if (!ReadDouble(value, d))
     {
-      double d{0.0};
-      if (!ReadDouble(value, d))
-      {
-        gzwarn << "Wind: set_parameters key '" << key
-               << "' is not a number, ignored\n";
-        continue;
-      }
-      if (key == "speed" && d >= 0.0)
-      {
-        this->pendingSpeed = d;
-        matched = true;
-      }
-      else if (key == "direction")
-      {
-        this->pendingDirection = d;
-        matched = true;
-      }
-      else
-      {
-        gzwarn << "Wind: set_parameters key '" << key
-               << "' is unknown or out of range, ignored\n";
-      }
+      gzwarn << "Wind: key '" << key << "' is not a number, ignored\n";
+      continue;
     }
+    if (key == "speed" && d >= 0.0)
+      this->pendingSpeed = d;
+    else if (key == "direction")
+      this->pendingDirection = d;
+    else
+      gzwarn << "Wind: key '" << key << "' is unknown or out of range, ignored\n";
   }
-  _rep.set_data(matched);
-  return true;
 }
 
 //////////////////////////////////////////////////
@@ -438,7 +419,7 @@ void Wind::Configure(const Entity &_entity,
   }
 
   // The world's <wind> is the starting point; <speed> and <direction>
-  // override it. Without either, the wind is the world's until the service
+  // override it. Without either, the wind is the world's until the topic
   // changes it.
   math::Vector3d start = math::Vector3d::Zero;
   if (const auto *vel = _ecm.Component<components::WorldLinearVelocity>(
@@ -468,16 +449,15 @@ void Wind::Configure(const Entity &_entity,
         std::chrono::duration<double>(1.0 / rate));
   }
 
-  // The world's name scopes the service and the ground truth, like the
-  // waves' set_parameters.
+  // The world's name scopes the wind topic and the ground truth.
   std::string worldName{"default"};
   if (const auto *name = _ecm.Component<components::Name>(_entity))
     worldName = name->Data();
   const std::string prefix = "/world/" + worldName + "/wind";
-  if (!this->dataPtr->node.Advertise(prefix + "/set_parameters",
-      &WindPrivate::OnSetParameters, this->dataPtr.get()))
+  if (!this->dataPtr->node.Subscribe(prefix + "/set",
+      &WindPrivate::OnSet, this->dataPtr.get()))
   {
-    gzerr << "Wind: cannot advertise " << prefix << "/set_parameters\n";
+    gzerr << "Wind: cannot subscribe to " << prefix << "/set\n";
   }
   this->dataPtr->windPub =
       this->dataPtr->node.Advertise<msgs::Wind>(prefix + "_info");
@@ -488,7 +468,7 @@ void Wind::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
 {
   this->dataPtr->FindShapes(_ecm);
 
-  // Apply what the service queued, then write the wind where Gazebo's rotor,
+  // Apply what the topic queued, then write the wind where Gazebo's rotor,
   // wing and air speed systems read it.
   {
     const std::lock_guard<std::mutex> lock(this->dataPtr->mutex);

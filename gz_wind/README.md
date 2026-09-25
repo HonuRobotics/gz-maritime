@@ -4,7 +4,7 @@ The wind of a world for Gazebo Sim, and windage on marked collisions, the
 wind counterpart of `gz_buoyancy`'s marked displacement.
 
 The world owns the wind: a speed and the direction it comes from, in the
-world file and changed at run time on `/world/<world>/wind/set_parameters`.
+world file and changed at run time on the topic `/world/<world>/wind/set`.
 The system writes it into the wind entity every Gazebo world carries, where
 the rotor, wing and air speed systems read it, and publishes it on
 `/world/<world>/wind_info` as `gz.msgs.Wind`.
@@ -47,10 +47,13 @@ not run in the same world, since both would write the wind.
 
 ## Run time
 
+A `gz.msgs.Param` on `/world/<world>/wind/set` with `speed`, `direction` or
+both changes the wind. From ROS, bridge it as
+`ros_gz_interfaces/msg/ParamVec`, each key a double parameter.
+
 ```bash
-gz service -s /world/default/wind/set_parameters --reqtype gz.msgs.Param \
-  --reptype gz.msgs.Boolean --timeout 2000 \
-  --req 'params {key: "speed" value {type: DOUBLE double_value: 6}}'
+gz topic -t /world/default/wind/set -m gz.msgs.Param \
+  -p 'params {key: "speed" value {type: DOUBLE double_value: 6}}'
 ```
 
 ## Collision attributes

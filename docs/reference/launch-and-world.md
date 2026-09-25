@@ -192,7 +192,6 @@ All take and return Gazebo messages; call them with `gz service`.
 | Service | Request | Reply | What it does |
 |---|---|---|---|
 | `/world/default/wave/set_parameters` | `gz.msgs.Param` | `gz.msgs.Boolean` | Change wave parameters while running. |
-| `/world/default/wind/set_parameters` | `gz.msgs.Param` | `gz.msgs.Boolean` | Change the wind while running: `speed` (m/s) and `direction` (degrees the wind comes from, clockwise from north). |
 | `/world/default/create` | `gz.msgs.EntityFactory` | `gz.msgs.Boolean` | Spawn a model. |
 | `/world/default/set_pose` | `gz.msgs.Pose` | `gz.msgs.Boolean` | Move a model. |
 
@@ -204,15 +203,6 @@ Change the sea state (0 to 9):
 gz service -s /world/default/wave/set_parameters --reqtype gz.msgs.Param \
   --reptype gz.msgs.Boolean --timeout 2000 \
   --req 'params {key: "sea_state" value {type: INT32 int_value: 3}}'
-```
-
-Set a 6 m/s wind from the west, and read it back:
-
-```bash
-gz service -s /world/default/wind/set_parameters --reqtype gz.msgs.Param \
-  --reptype gz.msgs.Boolean --timeout 2000 \
-  --req 'params {key: "speed" value {type: DOUBLE double_value: 6}} params {key: "direction" value {type: DOUBLE double_value: 270}}'
-gz topic -e -t /world/default/wind_info -n 1
 ```
 
 The other wave parameters are listed in the
@@ -227,6 +217,30 @@ gz service -s /world/default/create --reqtype gz.msgs.EntityFactory \
 gz service -s /world/default/set_pose --reqtype gz.msgs.Pose \
   --reptype gz.msgs.Boolean --timeout 2000 \
   --req 'name: "my_boat", position: {x: 5, y: 0, z: 0}, orientation: {w: 1}'
+```
+
+## Wind
+
+The wind changes while the simulation runs on the topic
+`/world/default/wind/set`: a `gz.msgs.Param` with `speed` (m/s) and
+`direction` (degrees the wind comes from, clockwise from north), either or
+both. The simulation launch bridges it from ROS as
+`ros_gz_interfaces/msg/ParamVec`, with each key a double parameter. The
+current wind is published on `/world/default/wind_info` as `gz.msgs.Wind`.
+
+A 6 m/s wind from the west, from ROS:
+
+```bash
+ros2 topic pub --once /world/default/wind/set ros_gz_interfaces/msg/ParamVec \
+  "{params: [{name: speed, value: {type: 3, double_value: 6.0}}, {name: direction, value: {type: 3, double_value: 270.0}}]}"
+```
+
+From Gazebo, turning it to come from the south, and reading it back:
+
+```bash
+gz topic -t /world/default/wind/set -m gz.msgs.Param \
+  -p 'params {key: "direction" value {type: DOUBLE double_value: 180}}'
+gz topic -e -t /world/default/wind_info -n 1
 ```
 
 ## Topics

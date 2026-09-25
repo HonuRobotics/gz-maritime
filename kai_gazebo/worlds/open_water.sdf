@@ -122,8 +122,9 @@
 
     <!-- Wind (gz_wind). The world owns the wind: <speed> in m/s and the
          <direction> it comes from, in degrees clockwise from north (270 is a
-         wind from the west). Change it while running with
-         /world/default/wind/set_parameters (keys speed and direction). The
+         wind from the west). Change it while running on the topic
+         /world/default/wind/set (keys speed and direction), bridged to
+         ROS by the simulation launch. The
          system writes it where Gazebo's rotor, wing and air speed systems
          read it, publishes it on /world/default/wind_info, and pushes on the
          collisions a vehicle marks gz:wind="true", by the part of each shape

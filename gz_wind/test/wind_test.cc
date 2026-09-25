@@ -110,23 +110,28 @@ math::Vector3d ReadWind(const EntityComponentManager &_ecm)
   return nullptr == vel ? math::Vector3d::Zero : vel->Data();
 }
 
-/// \brief Ask the wind system to change the wind.
+/// \brief Ask the wind system to change the wind, on its topic.
 /// \param[in] _world World name.
 /// \param[in] _key Parameter, speed or direction.
 /// \param[in] _value Its new value.
-/// \return The service's answer.
+/// \return True once the message was sent to a subscriber.
 bool SetWind(const std::string &_world, const std::string &_key,
              double _value)
 {
-  msgs::Param req;
-  auto &any = (*req.mutable_params())[_key];
+  static transport::Node node;
+  auto pub = node.Advertise<msgs::Param>("/world/" + _world + "/wind/set");
+  for (int i = 0; i < 100 && !pub.HasConnections(); ++i)
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  if (!pub.HasConnections())
+    return false;
+  msgs::Param msg;
+  auto &any = (*msg.mutable_params())[_key];
   any.set_type(msgs::Any::DOUBLE);
   any.set_double_value(_value);
-  transport::Node node;
-  msgs::Boolean rep;
-  bool result{false};
-  return node.Request("/world/" + _world + "/wind/set_parameters", req,
-      5000, rep, result) && result && rep.data();
+  const bool sent = pub.Publish(msg);
+  // Delivery is asynchronous; give the subscriber a moment to queue it.
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  return sent;
 }
 
 /// \brief Path to one of the test worlds.
@@ -395,9 +400,9 @@ TEST(WindField, SpeedAndDirectionFromTheWorld)
 }
 
 /////////////////////////////////////////////////
-/// The service changes the wind while the world runs: a wind from the south
+/// The topic changes the wind while the world runs: a wind from the south
 /// pushes the box north, and after a zero speed the still air only brakes it.
-TEST(WindField, SetParametersAtRunTime)
+TEST(WindField, ChangedAtRunTimeOnItsTopic)
 {
   TestFixture fixture(World("windfield.sdf"));
 
@@ -427,7 +432,9 @@ TEST(WindField, SetParametersAtRunTime)
   EXPECT_LT(box.vel.Y(), still.Y()) << "still air brakes a moving box";
   EXPECT_GT(box.vel.Y(), 0.0) << "but never pushes it back";
 
-  EXPECT_FALSE(SetWind("windfield", "gust", 3.0)) << "unknown keys are refused";
+  ASSERT_TRUE(SetWind("windfield", "gust", 3.0));
+  ASSERT_TRUE(server->Run(true, 2, false));
+  EXPECT_NEAR(0.0, wind.Length(), 1e-9) << "an unknown key changes nothing";
 }
 
 /////////////////////////////////////////////////

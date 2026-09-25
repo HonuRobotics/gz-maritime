@@ -1,7 +1,8 @@
 <!--
   The simulation part of a gz-maritime bring-up: the Gazebo server on the
-  ocean world, the GUI, and a bridge for /clock. Nothing else, and no
-  vehicle: this file names none, so one simulation can carry any number.
+  ocean world, the GUI, and a bridge for /clock and the wind. Nothing
+  else, and no vehicle: this file names none, so one simulation can carry
+  any number.
 
   A vehicle package includes this once and spawn_vehicle.launch.xml once per
   instance; kai_custom_vehicle/launch/sim.launch.xml is the template. The
@@ -30,7 +31,8 @@
   <!-- 2. Gazebo GUI (separate process) -->
   <executable cmd="gz sim -g" output="screen" if="$(var gazebo_gui)"/>
 
-  <!-- 3. ROS-Gazebo bridge for the world's own topics: /clock, once. -->
+  <!-- 3. ROS-Gazebo bridge for the world's own topics: /clock, once, and
+       the wind topic, so ROS can change the wind. -->
   <ros_gz_bridge
       bridge_name="ros_gz_bridge"
       config_file="$(find-pkg-share kai_bringup)/config/ros_gz_bridge.yaml"

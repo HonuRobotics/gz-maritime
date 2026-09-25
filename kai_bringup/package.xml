@@ -13,6 +13,8 @@
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>ros_gz_sim</exec_depend>
   <exec_depend>ros_gz_bridge</exec_depend>
+  <!-- The wind topic's ROS type, bridged by the simulation launch. -->
+  <exec_depend>ros_gz_interfaces</exec_depend>
   <exec_depend>kai_gazebo</exec_depend>
   <!-- spawn_vehicle.launch.xml: the instance files and robot_state_publisher. -->
   <exec_depend>ament_index_python</exec_depend>
