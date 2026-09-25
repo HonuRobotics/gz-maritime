@@ -44,6 +44,8 @@ not run in the same world, since both would write the wind.
 | `<speed_gust_time>` | 2 | Their correlation time, s. |
 | `<direction_gust>` | 0 | Standing deviation of the direction gusts, degrees. |
 | `<direction_gust_time>` | 10 | Their correlation time, s. |
+| `<reference_height>` | 10 | m, the height `<speed>` is given at. |
+| `<roughness_length>` | 0 | m, the surface roughness of a logarithmic profile, about 0.0002 over open sea; 0 is a uniform wind. |
 | `<seed>` | 0 | Seed of the gusts; 0 draws a new one each run. A reset replays them. |
 | `<publish_rate>` | 10 | Hz of simulation time for `wind_info`. |
 | `<air_density>` | 1.225 | kg/m^3. |
@@ -57,6 +59,15 @@ speed, here on the direction too: it wanders around zero with the standing
 deviation asked for, and forgets itself over the correlation time. The
 update is exact, `x' = a x + sigma sqrt(1 - a^2) n` with `a = exp(-dt / T)`,
 so the spread does not depend on the step size, unlike VRX's Euler step.
+
+## Wind with height
+
+With a roughness length `z0`, the wind at a height `h` above the water is
+the reference wind times `ln(h / z0) / ln(h_ref / z0)`: over the sea, about
+half of the 10 m wind at a small boat's freeboard, and none below `z0`. The
+windage evaluates it at the centre of each marked shape's exposed part. The
+wind entity holds the reference height wind, so Gazebo's rotor, wing and
+air speed systems, which read that single value, do not see the profile.
 
 ## Run time
 

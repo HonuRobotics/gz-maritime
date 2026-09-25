@@ -61,6 +61,15 @@ namespace gz::sim::maritime
   ///   (degrees) and correlation time (s, default 10) of the gusts on the
   ///   direction. Each gust is a first order Gauss Markov process, the one
   ///   VRX uses, with its exact discrete update; zero turns it off.
+  /// * `<roughness_length>`: m, the roughness of the surface for a
+  ///   logarithmic wind profile, about 0.0002 over open sea; 0 (default) is
+  ///   a uniform wind. With it the wind at a height h above the water is the
+  ///   reference wind times ln(h / z0) / ln(h_ref / z0), so a shape near the
+  ///   waterline sees less than one up a mast. The windage uses it; the wind
+  ///   entity, and so Gazebo's rotor and wing systems, hold the reference
+  ///   height wind.
+  /// * `<reference_height>`: m, the height `<speed>` is given at, default
+  ///   10, as in weather reports.
   /// * `<seed>`: seed of the gusts, 0 (default) for a new one each run. The
   ///   same seed gives the same gusts, and a reset replays them.
   /// * `<publish_rate>`: Hz of simulation time for the ground truth,

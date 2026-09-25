@@ -167,6 +167,13 @@ class gz::sim::maritime::WindPrivate
   /// \return False if the key is unknown or the value out of range.
   public: bool Apply(const std::string &_key, double _value);
 
+  /// \brief The share of the reference height wind at a height above the
+  /// water, from the logarithmic profile over the sea.
+  /// \param[in] _height Height above the waterline, m.
+  /// \return ln(h / z0) / ln(h_ref / z0), never negative; 1 without a
+  /// profile.
+  public: double ProfileFactor(double _height) const;
+
   /// \brief (Re)start the gusts from their seed, calm.
   public: void Reseed();
 
@@ -203,6 +210,12 @@ class gz::sim::maritime::WindPrivate
 
   /// \brief Correlation time of the direction gusts, seconds.
   public: double directionGustTime{10.0};
+
+  /// \brief Roughness length of the surface, m; 0 is a uniform wind.
+  public: double roughnessLength{0.0};
+
+  /// \brief Height the speed is given at, m.
+  public: double referenceHeight{10.0};
 
   /// \brief Seed of the gusts; 0 draws one from the system.
   public: unsigned int seed{0};
@@ -276,6 +289,10 @@ bool WindPrivate::Apply(const std::string &_key, double _value)
     this->directionGust = _value;
   else if (_key == "direction_gust_time" && _value > 0.0)
     this->directionGustTime = _value;
+  else if (_key == "roughness_length" && _value >= 0.0)
+    this->roughnessLength = _value;
+  else if (_key == "reference_height" && _value > 0.0)
+    this->referenceHeight = _value;
   else if (_key == "seed" && _value >= 0.0)
   {
     this->seed = static_cast<unsigned int>(_value);
@@ -294,6 +311,18 @@ bool WindPrivate::Apply(const std::string &_key, double _value)
     this->directionGustState = 0.0;
   this->dirty = true;
   return true;
+}
+
+//////////////////////////////////////////////////
+double WindPrivate::ProfileFactor(double _height) const
+{
+  const double z0 = this->roughnessLength;
+  if (z0 <= 0.0 || this->referenceHeight <= z0)
+    return 1.0;
+  // Below the roughness length the log law gives no wind.
+  if (_height <= z0)
+    return 0.0;
+  return std::log(_height / z0) / std::log(this->referenceHeight / z0);
 }
 
 //////////////////////////////////////////////////
@@ -548,7 +577,8 @@ void Wind::Configure(const Entity &_entity,
   // The same keys as the topic, so the world file and a message speak one
   // vocabulary.
   for (const char *key : {"speed", "direction", "speed_gust",
-      "speed_gust_time", "direction_gust", "direction_gust_time", "seed"})
+      "speed_gust_time", "direction_gust", "direction_gust_time",
+      "roughness_length", "reference_height", "seed"})
   {
     if (_sdf->HasElement(key))
       this->dataPtr->Apply(key, _sdf->Get<double>(key));
@@ -672,8 +702,13 @@ void Wind::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
       const math::Vector3d offset = linkPose->Rot().RotateVectorReverse(
           centre - linkPose->Pos());
       const auto pointVel = link.WorldLinearVelocity(_ecm, offset);
+      // The wind at that height: the entity holds it at the reference
+      // height, the profile scales the horizontal part.
+      const double k = this->dataPtr->ProfileFactor(
+          centre.Z() - this->dataPtr->waterLevel);
+      const math::Vector3d local(wind.X() * k, wind.Y() * k, wind.Z());
       const math::Vector3d rel = worldPose.Rot().RotateVectorReverse(
-          wind - pointVel.value_or(math::Vector3d::Zero));
+          local - pointVel.value_or(math::Vector3d::Zero));
 
       // Quadratic drag per shape axis. The waterline cuts the areas the
       // horizontal wind sees; the plan area is left whole.
