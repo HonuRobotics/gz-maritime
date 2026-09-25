@@ -139,17 +139,19 @@
       <enable_by_default>false</enable_by_default>
     </plugin>
 
-    <!-- Windage (gz_wind): the wind pushes on the collisions a vehicle marks
-         gz:wind="true", by the part of each shape above z = 0, with
-         quadratic drag on its projected area. Like buoyancy, the world names
-         no vehicle: the mark travels with the model, whatever name it was
-         spawned under. The wind itself is the world's, set with
-         <wind><linear_velocity>x y z</linear_velocity></wind> next to
-         <gravity>, or by any system that writes the wind entity; with no
-         <wind> element the air is still and this plugin pushes nothing. -->
+    <!-- Wind (gz_wind). The world owns the wind: <speed> in m/s and the
+         <direction> it comes from, in degrees clockwise from north (270 is a
+         wind from the west). Change it while running with
+         /world/default/wind/set_parameters (keys speed and direction). The
+         system writes it where Gazebo's rotor, wing and air speed systems
+         read it, publishes it on /world/default/wind_info, and pushes on the
+         collisions a vehicle marks gz:wind="true", by the part of each shape
+         above z = 0. Like buoyancy, the world names no vehicle. -->
     <plugin
       filename="gz-maritime-wind-system"
       name="gz::sim::maritime::Wind">
+      <speed>0</speed>
+      <direction>0</direction>
       <air_density>1.225</air_density>
       <water_level>0</water_level>
       <default_drag_coefficient>1</default_drag_coefficient>

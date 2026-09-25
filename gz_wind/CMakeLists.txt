@@ -23,6 +23,10 @@ find_package(gz_math_vendor REQUIRED)
 find_package(gz-math REQUIRED)
 find_package(gz_common_vendor REQUIRED)
 find_package(gz-common REQUIRED COMPONENTS graphics)
+find_package(gz_transport_vendor REQUIRED)
+find_package(gz-transport REQUIRED)
+find_package(gz_msgs_vendor REQUIRED)
+find_package(gz-msgs REQUIRED)
 
 add_library(gz-maritime-wind-system SHARED src/Wind.cc)
 target_include_directories(gz-maritime-wind-system
@@ -34,7 +38,9 @@ target_link_libraries(gz-maritime-wind-system
     gz-plugin::register
     gz-math::gz-math
     gz-common::gz-common
-    gz-common::graphics)
+    gz-common::graphics
+    gz-transport::core
+    gz-msgs::core)
 
 install(TARGETS gz-maritime-wind-system
   LIBRARY DESTINATION lib
@@ -48,10 +54,6 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 
   find_package(ament_cmake_gtest REQUIRED)
-  find_package(gz_transport_vendor REQUIRED)
-  find_package(gz-transport REQUIRED)
-  find_package(gz_msgs_vendor REQUIRED)
-  find_package(gz-msgs REQUIRED)
 
   ament_add_gtest(wind_test test/wind_test.cc)
   if(TARGET wind_test)

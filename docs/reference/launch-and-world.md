@@ -145,7 +145,7 @@ World name: `default`.
 | `gz-sim-sensors-system` | Rendered sensors (ogre2) |
 | `gz-sim-imu-system`, `gz-sim-magnetometer-system`, `gz-sim-navsat-system`, `gz-sim-air-pressure-system` | IMU, magnetometer, GPS and barometer sensors |
 | `gz-maritime-buoyancy-system` | Seawater 1025 kg/m³ below z = 0, air 1 kg/m³ above; `<enable_by_default>false</enable_by_default>`, no `<enable>` list |
-| `gz-maritime-wind-system` | Air 1.225 kg/m³ above z = 0, drag coefficient 1 unless a shape sets its own; pushes only marked collisions, with the world's `<wind>` (still by default) |
+| `gz-maritime-wind-system` | Still air by default (`<speed>0</speed>`), changed at run time with the wind service; air 1.225 kg/m³ above z = 0, drag coefficient 1 unless a shape sets its own; pushes only marked collisions |
 | `gz-sim-waves-fft-system` | Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out) |
 | `model://water_surface` | Draws the sea |
 | `model://landing_pad` at (8, -8) | A static 4 m deck 1 m above the water, the only solid ground; spawn a quad on it at z = 1.25 |
@@ -171,8 +171,9 @@ What a model says to the wind system, and what a world says to it.
 |---|---|---|
 | A `<collision>` in a model | `gz:wind="true"` (same `xmlns:gz` root attribute) | The wind pushes on this shape, by the part of it above the waterline, with quadratic drag on its projected area per axis. A buoyancy box can carry both marks. |
 | The same `<collision>` | `gz:wind_cd="1.2"` | Its drag coefficient; the plugin's `<default_drag_coefficient>` otherwise. |
-| The world | `<wind><linear_velocity>x y z</linear_velocity></wind>` | The wind, in m/s in the world frame. Absent, the air is still. Any system that writes Gazebo's wind entity works too. |
-| The world plugin | `<air_density>`, `<water_level>`, `<default_drag_coefficient>` | 1.225 kg/m³, z = 0 and 1 by default. |
+| The world plugin | `<speed>`, `<direction>` | The wind: m/s, and the direction it comes from in degrees clockwise from north (270, from the west, blows towards +x). |
+| The world | `<wind><linear_velocity>x y z</linear_velocity></wind>` | Used as the starting wind when the plugin sets neither `<speed>` nor `<direction>`. |
+| The world plugin | `<air_density>`, `<water_level>`, `<default_drag_coefficient>`, `<publish_rate>` | 1.225 kg/m³, z = 0, 1 and 10 Hz by default. |
 
 ## Thruster command
 
@@ -191,6 +192,7 @@ All take and return Gazebo messages; call them with `gz service`.
 | Service | Request | Reply | What it does |
 |---|---|---|---|
 | `/world/default/wave/set_parameters` | `gz.msgs.Param` | `gz.msgs.Boolean` | Change wave parameters while running. |
+| `/world/default/wind/set_parameters` | `gz.msgs.Param` | `gz.msgs.Boolean` | Change the wind while running: `speed` (m/s) and `direction` (degrees the wind comes from, clockwise from north). |
 | `/world/default/create` | `gz.msgs.EntityFactory` | `gz.msgs.Boolean` | Spawn a model. |
 | `/world/default/set_pose` | `gz.msgs.Pose` | `gz.msgs.Boolean` | Move a model. |
 
@@ -202,6 +204,15 @@ Change the sea state (0 to 9):
 gz service -s /world/default/wave/set_parameters --reqtype gz.msgs.Param \
   --reptype gz.msgs.Boolean --timeout 2000 \
   --req 'params {key: "sea_state" value {type: INT32 int_value: 3}}'
+```
+
+Set a 6 m/s wind from the west, and read it back:
+
+```bash
+gz service -s /world/default/wind/set_parameters --reqtype gz.msgs.Param \
+  --reptype gz.msgs.Boolean --timeout 2000 \
+  --req 'params {key: "speed" value {type: DOUBLE double_value: 6}} params {key: "direction" value {type: DOUBLE double_value: 270}}'
+gz topic -e -t /world/default/wind_info -n 1
 ```
 
 The other wave parameters are listed in the

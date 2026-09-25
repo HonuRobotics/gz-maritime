@@ -25,9 +25,15 @@ namespace gz::sim::maritime
 {
   class WindPrivate;
 
-  /// \brief Windage on marked collisions.
+  /// \brief The wind of a world, and windage on marked collisions.
   ///
-  /// A world system that pushes on the shapes the wind sees. A vehicle marks
+  /// A world system with two halves. The field: it owns the world's wind, a
+  /// speed and the direction it comes from, changes it at run time through
+  /// `/world/<world>/wind/set_parameters` (gz.msgs.Param with keys `speed`
+  /// and `direction`), writes it into the wind entity every Gazebo world
+  /// carries, where the rotor, wing and air speed systems read it, and
+  /// publishes it as ground truth on `/world/<world>/wind_info`
+  /// (gz.msgs.Wind). The load: it pushes on the shapes the wind sees. A vehicle marks
   /// those shapes with `gz:wind="true"` on a collision, the same way it marks
   /// displacement shapes for buoyancy, and the system finds them on every
   /// model, spawned later under any name included. For each marked shape it
@@ -36,13 +42,19 @@ namespace gz::sim::maritime
   /// 0.5 * rho * Cd * A * |v| * v per axis, at the centre of the exposed part
   /// in the shape frame, so a tall shape heels and turns its link.
   ///
-  /// The wind is read from the wind entity every Gazebo world carries, set by
-  /// the world's `<wind><linear_velocity>` or by a system that writes it.
+  /// Without `<speed>` or `<direction>` the wind starts as the world's
+  /// `<wind><linear_velocity>`, so a world that sets only that keeps it.
   /// Gazebo's `enable_wind` flag is not the mark: it belongs to the mass
   /// based force of the upstream wind effects system.
   ///
   /// World plugin parameters:
   ///
+  /// * `<speed>`: m/s, the horizontal wind speed.
+  /// * `<direction>`: degrees clockwise from north, the direction the wind
+  ///   comes from, as in weather reports: 270 is a wind from the west,
+  ///   blowing towards +x.
+  /// * `<publish_rate>`: Hz of simulation time for the ground truth,
+  ///   default 10.
   /// * `<air_density>`: kg/m^3, default 1.225.
   /// * `<water_level>`: world z of the waterline, default 0.
   /// * `<default_drag_coefficient>`: Cd for shapes without `gz:wind_cd`,
