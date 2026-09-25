@@ -29,8 +29,8 @@ namespace gz::sim::maritime
   ///
   /// A world system with two halves. The field: it owns the world's wind, a
   /// speed and the direction it comes from, changes it at run time on
-  /// the topic `/world/<world>/wind/set` (gz.msgs.Param with keys `speed`
-  /// and `direction`, either or both; ROS reaches it through ros_gz_bridge as
+  /// the topic `/world/<world>/wind/set` (gz.msgs.Param with any of the
+  /// parameter names below as keys; ROS reaches it through ros_gz_bridge as
   /// ros_gz_interfaces/msg/ParamVec), writes it into the wind entity every
   /// Gazebo world
   /// carries, where the rotor, wing and air speed systems read it, and
@@ -55,6 +55,14 @@ namespace gz::sim::maritime
   /// * `<direction>`: degrees clockwise from north, the direction the wind
   ///   comes from, as in weather reports: 270 is a wind from the west,
   ///   blowing towards +x.
+  /// * `<speed_gust>`, `<speed_gust_time>`: standing deviation (m/s) and
+  ///   correlation time (s, default 2) of the gusts on the speed.
+  /// * `<direction_gust>`, `<direction_gust_time>`: standing deviation
+  ///   (degrees) and correlation time (s, default 10) of the gusts on the
+  ///   direction. Each gust is a first order Gauss Markov process, the one
+  ///   VRX uses, with its exact discrete update; zero turns it off.
+  /// * `<seed>`: seed of the gusts, 0 (default) for a new one each run. The
+  ///   same seed gives the same gusts, and a reset replays them.
   /// * `<publish_rate>`: Hz of simulation time for the ground truth,
   ///   default 10.
   /// * `<air_density>`: kg/m^3, default 1.225.
