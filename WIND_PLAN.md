@@ -82,7 +82,7 @@ based force.
 clockwise from east; weather reports, ArduPilot and the marine textbooks
 give the direction it comes from, measured clockwise from north.
 
-**Example.** A wind of 240 in VRX is a wind of 60 to everyone else.
+**Example.** A wind of 240 in VRX is a wind of 30 to everyone else.
 
 **Solution.** The direction the wind comes from, in degrees clockwise from
 north, and the speed at 10 m in metres per second. Convert once at the edge
