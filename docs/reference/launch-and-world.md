@@ -172,8 +172,9 @@ wind topic, below.
 |---|---|
 | `<speed>`, `<direction>` | The wind: m/s, and the direction it comes from in degrees clockwise from north (270, from the west, blows towards +x). |
 | `<wind><linear_velocity>x y z</linear_velocity></wind>` on the world | Used as the starting wind when the plugin sets neither `<speed>` nor `<direction>`. |
+| `<speed_gust>`, `<speed_gust_time>`, `<direction_gust>`, `<direction_gust_time>` | Gusts: standard deviation (m/s, degrees) and correlation time (s, 2 and 10 by default) of the speed and the direction; 0 is steady. The gusts travel with the mean wind. |
 | `<model>` | The wind model the recipe names, `standard` by default. |
-| `<seed>` | Seed of anything random in the model; 0, the default, draws one each run. |
+| `<seed>` | Seed of the gusts; the same seed repeats them, and 0, the default, draws one each run. |
 | `<publish_rate>` | Rate of the ground truth, 10 Hz by default. |
 
 The system keeps the wind on the world entity as a recipe, the way the wave
@@ -229,7 +230,8 @@ gz service -s /world/default/set_pose --reqtype gz.msgs.Pose \
 
 The wind changes while the simulation runs on the topic
 `/world/default/wind/set`: a `gz.msgs.Param` with `speed` (m/s),
-`direction` (degrees the wind comes from, clockwise from north), or both.
+`direction` (degrees the wind comes from, clockwise from north), or any of
+the gust parameters, in any combination.
 The simulation launch bridges it from ROS as
 `ros_gz_interfaces/msg/ParamVec`, with each key a double parameter. The
 current wind is published on `/world/default/wind_info` as `gz.msgs.Wind`.
@@ -253,6 +255,13 @@ A 6 m/s wind from the west, from ROS:
 ```bash
 ros2 topic pub --once /world/default/wind/set ros_gz_interfaces/msg/ParamVec \
   "{params: [{name: speed, value: {type: 3, double_value: 6.0}}, {name: direction, value: {type: 3, double_value: 270.0}}]}"
+```
+
+Gusts of 1.5 m/s that last about 3 s, from ROS:
+
+```bash
+ros2 topic pub --once /world/default/wind/set ros_gz_interfaces/msg/ParamVec \
+  "{params: [{name: speed_gust, value: {type: 3, double_value: 1.5}}, {name: speed_gust_time, value: {type: 3, double_value: 3.0}}]}"
 ```
 
 From Gazebo, turning it to come from the south, and reading it back:

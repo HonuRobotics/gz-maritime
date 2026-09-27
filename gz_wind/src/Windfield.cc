@@ -33,8 +33,16 @@ bool SetParameter(WindParameters &_p, const std::string &_name, double _value)
     _p.seed = static_cast<std::uint32_t>(_value);
     return true;
   }
-  if (_name == "speed" && _value < 0.0)
+  if ((_name == "speed" || _name == "speed_gust" ||
+       _name == "direction_gust") && _value < 0.0)
+  {
     return false;
+  }
+  if ((_name == "speed_gust_time" || _name == "direction_gust_time") &&
+      _value <= 0.0)
+  {
+    return false;
+  }
 #define GZ_WIND_SET(m, name) \
   if (_name == name) { _p.m = _value; return true; }
   GZ_WIND_PARAM_TABLE(GZ_WIND_SET)
