@@ -31,11 +31,15 @@ the same world, since both would write the wind.
 |-----------|---------|---------|
 | `<speed>` | the world's `<wind>` | m/s. |
 | `<direction>` | the world's `<wind>` | Degrees clockwise from north the wind comes from: 270 is from the west, blowing towards +x. |
+| `<speed_gust>` | 0 | Standard deviation of the speed gusts, m/s; 0 is a steady speed. |
+| `<speed_gust_time>` | 2 | Their correlation time, s. |
+| `<direction_gust>` | 0 | Standard deviation of the direction gusts, degrees. |
+| `<direction_gust_time>` | 10 | Their correlation time, s. |
 | `<model>` | standard | The registered wind model. |
 | `<seed>` | 0 | Seed of anything random in the model; 0 draws one each run. |
 | `<publish_rate>` | 10 | Hz of simulation time for `wind_info`. |
 
-`speed`, `direction` and `seed` are also the keys of the wind topic, a
+Every parameter but `<model>` and `<publish_rate>` is also a key of the wind topic, a
 `gz.msgs.Param` with double values, any of them in one message.
 
 ## Direction and units
@@ -50,6 +54,20 @@ the same world, since both would write the wind.
   east its +x axis.
 - **The ground truth** on `/world/<world>/wind_info` is the air's velocity
   in the world frame, not a direction.
+
+## Gusts
+
+Each gust, on the speed and on the direction, is a sum of 256 sinusoids with
+random phases drawn from the seed, weighted to a Lorentzian spectrum: it
+wanders around zero with the standard deviation asked for and forgets
+itself over the correlation time, like the first order Gauss Markov process
+VRX uses, but it is a function of time alone. Every system that rebuilds the
+model from the recipe gets the same gust at the same time, and a reset
+replays it.
+
+The gusts travel with the mean wind (Taylor's frozen turbulence): a point
+downwind sees what a point upwind saw earlier, so the bow and the stern of a
+boat in line with the wind feel a gust one after the other.
 
 ## Asking the wind from a system
 

@@ -51,8 +51,14 @@ namespace gz::sim::maritime
   ///   North is the world's, from its spherical coordinates, the one its GPS
   ///   uses; with ENU and a zero heading it is +y, so 270 blows towards +x.
   /// * `<vertical>`: m/s, positive up.
-  /// * `<seed>`: seed of anything random in the model; 0 (default) draws a
-  ///   new one each run.
+  /// * `<speed_gust>`, `<speed_gust_time>`: standard deviation (m/s) and
+  ///   correlation time (s, default 2) of the gusts on the speed.
+  /// * `<direction_gust>`, `<direction_gust_time>`: standard deviation
+  ///   (degrees) and correlation time (s, default 10) of the gusts on the
+  ///   direction. Each gust is a sum of sinusoids with a Lorentzian
+  ///   spectrum, a function of time that travels with the mean wind; zero
+  ///   turns it off.
+  /// * `<seed>`: seed of the gusts; 0 (default) draws a new one each run.
   /// * `<publish_rate>`: Hz of simulation time for the ground truth,
   ///   default 10.
   class Wind

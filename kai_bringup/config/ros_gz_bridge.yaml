@@ -3,9 +3,9 @@
   gz_type_name: "gz.msgs.Clock"
   direction: GZ_TO_ROS
 
-# The wind, changed from ROS: speed (m/s) and direction (degrees the wind
-# comes from, clockwise from north), either or both, as named double
-# parameters. Every world here is named default.
+# The wind, changed from ROS: speed (m/s), direction (degrees the wind
+# comes from, clockwise from north) and the gust parameters, any of them, as
+# named double parameters. Every world here is named default.
 - topic_name: "/world/default/wind/set"
   ros_type_name: "ros_gz_interfaces/msg/ParamVec"
   gz_type_name: "gz.msgs.Param"
