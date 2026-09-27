@@ -145,7 +145,7 @@ World name: `default`.
 | `gz-sim-sensors-system` | Rendered sensors (ogre2) |
 | `gz-sim-imu-system`, `gz-sim-magnetometer-system`, `gz-sim-navsat-system`, `gz-sim-air-pressure-system` | IMU, magnetometer, GPS and barometer sensors |
 | `gz-maritime-buoyancy-system` | Seawater 1025 kg/m³ below z = 0, air 1 kg/m³ above; `<enable_by_default>false</enable_by_default>`, no `<enable>` list |
-| `gz-maritime-wind-system` | Still air by default (`<speed>0</speed>`), changed at run time on the wind topic |
+| `gz-maritime-wind-system` | Still air by default (`<speed>0</speed>`) at a 10 m reference height, falling off towards the water with a 0.0002 m roughness length, changed at run time on the wind topic |
 | `gz-sim-waves-fft-system` | Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out) |
 | `model://water_surface` | Draws the sea |
 | `model://landing_pad` at (8, -8) | A static 4 m deck 1 m above the water, the only solid ground; spawn a quad on it at z = 1.25 |
@@ -173,6 +173,7 @@ wind topic, below.
 | `<speed>`, `<direction>` | The wind: m/s, and the direction it comes from in degrees clockwise from north (270, from the west, blows towards +x). |
 | `<wind><linear_velocity>x y z</linear_velocity></wind>` on the world | Used as the starting wind when the plugin sets neither `<speed>` nor `<direction>`. |
 | `<speed_gust>`, `<speed_gust_time>`, `<direction_gust>`, `<direction_gust_time>` | Gusts: standard deviation (m/s, degrees) and correlation time (s, 2 and 10 by default) of the speed and the direction; 0 is steady. The gusts travel with the mean wind. |
+| `<reference_height>`, `<roughness_length>`, `<water_level>` | The height above the water `<speed>` is given at, 10 m by default, the surface roughness of a logarithmic wind profile, 0.0002 m over open sea (0, the default, is a uniform wind), and the world z of the water. Gazebo's rotor and wing systems see the reference height wind. |
 | `<model>` | The wind model the recipe names, `standard` by default. |
 | `<seed>` | Seed of the gusts; the same seed repeats them, and 0, the default, draws one each run. |
 | `<publish_rate>` | Rate of the ground truth, 10 Hz by default. |
@@ -238,7 +239,8 @@ current wind is published on `/world/default/wind_info` as `gz.msgs.Wind`.
 
 ### Direction and units
 
-- **Speed** in metres per second, at 10 m, as in weather reports.
+- **Speed** in metres per second, at the reference height, 10 m unless the
+  world says otherwise, as in weather reports.
 - **Direction** the wind comes from, in degrees clockwise from true north,
   as in weather reports, ArduPilot and the marine textbooks: 0 is a north
   wind, blowing south; 270 is a west wind, blowing east.

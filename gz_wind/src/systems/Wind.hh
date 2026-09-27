@@ -34,9 +34,10 @@ namespace gz::sim::maritime
   /// recipe, from the world file and from the topic
   /// `/world/<world>/wind/set`, a gz.msgs.Param whose keys are parameter
   /// names (ROS reaches it through ros_gz_bridge as
-  /// ros_gz_interfaces/msg/ParamVec). It also writes the wind at the world's
-  /// origin into the wind entity every Gazebo world carries, which Gazebo's
-  /// rotor and wing systems read, and publishes it as ground truth on
+  /// ros_gz_interfaces/msg/ParamVec). It also writes the wind above the
+  /// world's origin, at the reference height, into the wind entity every
+  /// Gazebo world carries, which Gazebo's rotor and wing systems read, and
+  /// publishes it as ground truth on
   /// `/world/<world>/wind_info` (gz.msgs.Wind).
   ///
   /// Without `<speed>` or `<direction>` the wind starts as the world's
@@ -58,6 +59,13 @@ namespace gz::sim::maritime
   ///   direction. Each gust is a sum of sinusoids with a Lorentzian
   ///   spectrum, a function of time that travels with the mean wind; zero
   ///   turns it off.
+  /// * `<reference_height>`: m above the water the speed is given at,
+  ///   default 10.
+  /// * `<roughness_length>`: m, the roughness of the surface for a
+  ///   logarithmic wind profile, about 0.0002 over open sea; 0 (default) is
+  ///   a uniform wind. The wind at a height h above the water is the
+  ///   reference wind times ln(h / z0) / ln(h_ref / z0).
+  /// * `<water_level>`: world z of the water, default 0.
   /// * `<seed>`: seed of the gusts; 0 (default) draws a new one each run.
   /// * `<publish_rate>`: Hz of simulation time for the ground truth,
   ///   default 10.

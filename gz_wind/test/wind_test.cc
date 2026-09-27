@@ -56,8 +56,12 @@ struct WindState
   /// \brief The wind entity's velocity, world frame.
   public: math::Vector3d entity;
 
-  /// \brief The wind asked through the recipe at the world's origin.
+  /// \brief The wind asked through the recipe 10 m above the world's
+  /// origin, where the wind entity's wind is taken.
   public: math::Vector3d sampled;
+
+  /// \brief The wind asked through the recipe 1 m above the world's origin.
+  public: math::Vector3d low;
 
   /// \brief The recipe, if the world has one.
   public: std::optional<wind::WindfieldData> recipe;
@@ -79,7 +83,8 @@ WindState ReadWind(const UpdateInfo &_info, const EntityComponentManager &_ecm)
   {
     state.entity = vel->Data();
   }
-  state.sampled = wind::WindAt(_ecm, math::Vector3d::Zero, _info.simTime);
+  state.sampled = wind::WindAt(_ecm, {0, 0, 10}, _info.simTime);
+  state.low = wind::WindAt(_ecm, {0, 0, 1}, _info.simTime);
   const Entity world = _ecm.EntityByComponents(components::World());
   if (const auto *field = _ecm.Component<components::Windfield>(world))
     state.recipe = field->Data();
@@ -362,4 +367,24 @@ TEST(WindGusts, TurnedOnAndOffOnTheTopic)
   ASSERT_TRUE(world.Run(200));
   EXPECT_NEAR(0.0, SpeedSd(world.series), 1e-9) << "steady again";
   EXPECT_NEAR(5.0, world.state.entity.Length(), 1e-9) << "back to the mean";
+}
+
+/////////////////////////////////////////////////
+/// With a roughness length the wind falls off towards the water: 1 m up it
+/// is ln(1 / z0) / ln(10 / z0) of the wind at the 10 m reference height,
+/// which the wind entity keeps. A zero roughness length, sent on the topic,
+/// is a uniform wind.
+TEST(WindProfile, WeakerNearTheWater)
+{
+  WindWorld world("profile.sdf");
+  ASSERT_TRUE(world.Run(10));
+  const double z0 = 0.0002;
+  EXPECT_NEAR(5.0, world.state.entity.X(), 1e-9);
+  EXPECT_NEAR(5.0, world.state.sampled.X(), 1e-9);
+  EXPECT_NEAR(5.0 * std::log(1.0 / z0) / std::log(10.0 / z0),
+              world.state.low.X(), 1e-9);
+
+  ASSERT_TRUE(SetWind("profile", "roughness_length", 0.0));
+  ASSERT_TRUE(world.Run(2));
+  EXPECT_NEAR(5.0, world.state.low.X(), 1e-9);
 }
