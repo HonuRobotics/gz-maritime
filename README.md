@@ -34,7 +34,8 @@ site under
   ships them.
 - [`gz_wind`](gz_wind/): the world's wind, a speed and the direction it
   comes from, changed at run time on a topic bridged to ROS, and kept on the
-  world so any system can ask the wind at a point.
+  world so any system can ask the wind at a point, and windage on the
+  collisions a vehicle marks `gz:wind="true"`.
 - [`kai_gazebo`](kai_gazebo/), [`kai_bringup`](kai_bringup/) and
   [`kai_custom_vehicle`](kai_custom_vehicle/): the worlds, the simulation
   and spawn launches, and the example vehicle.

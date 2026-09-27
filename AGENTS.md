@@ -19,7 +19,7 @@ subsystems will be added over time.
 | `gz_waves_rendering/` | Engine-agnostic **renderer** (`WaterVisual`) + the Ogre2 C-ABI bridge + the `water_surface` model. |
 | `gz_waves_buoyancy/` | Planned, not in the tree yet: a wave-field **consumer** (`WaveBuoyancy`). |
 | `gz_buoyancy/` | gz-sim's Buoyancy system, vendored with the upstream marked-collision change (`gz:buoyancy="true"`, `<enable_by_default>`); a bridge until a Gazebo release ships it. |
-| `gz_wind/` | The world's wind, like the wave field: a `Windfield` recipe (model name, `<speed>`, `<direction>` it comes from, seeded spectral gusts on both that travel with the wind, a logarithmic profile with height) on the world entity, a model registry, and `WindSampler`/`WindAt` for any system that needs the wind at a point. The system writes the recipe, sets gz-sim's wind entity so rotors and wings feel it, takes changes on the `wind/set` topic (bridged to ROS) and publishes `wind_info` ground truth. |
+| `gz_wind/` | The world's wind, like the wave field: a `Windfield` recipe (model name, `<speed>`, `<direction>` it comes from, seeded spectral gusts on both that travel with the wind, a logarithmic profile with height) on the world entity, a model registry, and `WindSampler`/`WindAt` for any system that needs the wind at a point. The system writes the recipe, sets gz-sim's wind entity so rotors and wings feel it, takes changes on the `wind/set` topic (bridged to ROS), publishes `wind_info` ground truth, and pushes on marked collisions (`gz:wind="true"`, optional `gz:wind_cd`): quadratic drag on the part of each shape above the water, with the wind at that part. |
 | `gz_thruster/` | gz-sim's Thruster system, vendored with a normalized command mode (`<use_normalized_cmd>`: a command in [-1, 1] scaled onto the thrust limits), the interface every vehicle here is driven with; intended to go upstream. |
 | `kai_gazebo/` | Worlds (`open_water.sdf` and the four VRX/VORC sites: `sydney_regatta`, `benderson_park`, `sand_island`, `la_spezia`; every world is named `default`), the landing pad and terrain models (Sand Island and La Spezia meshes fetched by the build, see `NOTICE`), resource-path hooks and the world tests. |
 | `kai_bringup/` | ROS 2 launch + `ros_gz_bridge` config. `simulation.launch.xml` is the simulation part only (server, GUI, `/clock`); `spawn_vehicle.launch.xml` puts one instance of any vehicle in, from its model xacro, bridge template and URDF (or its own generator), through `instantiate_vehicle.py`. Neither names a vehicle. |
@@ -136,7 +136,9 @@ the full rationale (section refs below).
   it when a Gazebo release with gz-sim 229ec07e reaches ROS.
 - **The world owns the wind.** Every world runs `gz-maritime-wind-system`,
   calm, with `<speed>` and `<direction>`, changed at run time with the
-  `/world/default/wind/set` topic. A system that needs the wind asks
+  `/world/default/wind/set` topic. A model marks the shapes the wind sees
+  with `gz:wind="true"` (a marked buoyancy box can carry both marks) and
+  never needs Gazebo's mass based `enable_wind`. A system that needs the wind asks
   `gz::sim::wind::WindAt` (or keeps a `WindSampler`) instead of reading the
   wind entity; do not add Gazebo's `WindEffects`, which would write the same
   wind.

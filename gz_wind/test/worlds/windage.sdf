@@ -1,0 +1,136 @@
+<?xml version="1.0"?>
+<!--
+  A world with a 5 m/s wind along +x, no gravity and no damping, so the only
+  thing that moves a box is the wind system. plain_box marks nothing and
+  stays put. marked_box marks its 1 m cube, sits fully above the waterline
+  and is pushed by 0.5 * 1.225 * 1 * 1 * 25 = 15.3 N. half_box is the same
+  cube with its centre at the waterline, so only half of its face is in the
+  wind. cd_box sets gz:wind_cd="2" and takes twice the force. Every box is
+  100 kg, so after one second marked_box moves at about 0.15 m/s.
+  tall_box carries its marked cube 2 m above its centre of mass, so the
+  wind turns it about +y, the way a mast heels a boat. com_box has its
+  centre of mass 2 m from its link origin and its marked cube centred on
+  it: the force goes through the centre of mass and must not turn it.
+-->
+<sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
+  <world name="windage">
+    <gravity>0 0 0</gravity>
+    <wind>
+      <linear_velocity>5 0 0</linear_velocity>
+    </wind>
+    <physics name="fast" type="dart">
+      <max_step_size>0.002</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-maritime-wind-system"
+            name="gz::sim::maritime::Wind">
+      <air_density>1.225</air_density>
+      <water_level>0</water_level>
+      <default_drag_coefficient>1</default_drag_coefficient>
+    </plugin>
+    <model name="plain_box">
+      <pose>0 0 0.5 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>100</mass>
+          <inertia>
+            <ixx>16.667</ixx><iyy>16.667</iyy><izz>16.667</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="contact">
+          <geometry><box><size>1 1 1</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+    <model name="marked_box">
+      <pose>0 5 0.5 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>100</mass>
+          <inertia>
+            <ixx>16.667</ixx><iyy>16.667</iyy><izz>16.667</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="contact">
+          <geometry><box><size>1 1 1</size></box></geometry>
+        </collision>
+        <collision name="windage" gz:wind="true">
+          <geometry><box><size>1 1 1</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+    <model name="half_box">
+      <pose>0 10 0 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>100</mass>
+          <inertia>
+            <ixx>16.667</ixx><iyy>16.667</iyy><izz>16.667</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="windage" gz:wind="true">
+          <geometry><box><size>1 1 1</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+    <model name="cd_box">
+      <pose>0 15 0.5 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>100</mass>
+          <inertia>
+            <ixx>16.667</ixx><iyy>16.667</iyy><izz>16.667</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="windage" gz:wind="true" gz:wind_cd="2">
+          <geometry><box><size>1 1 1</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+    <model name="tall_box">
+      <pose>0 25 0.5 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>100</mass>
+          <inertia>
+            <ixx>16.667</ixx><iyy>16.667</iyy><izz>16.667</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="windage" gz:wind="true">
+          <pose>0 0 2 0 0 0</pose>
+          <geometry><box><size>1 1 1</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+    <model name="com_box">
+      <pose>0 30 0.5 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <pose>0 0 2 0 0 0</pose><mass>100</mass>
+          <inertia>
+            <ixx>16.667</ixx><iyy>16.667</iyy><izz>16.667</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="windage" gz:wind="true">
+          <pose>0 0 2 0 0 0</pose>
+          <geometry><box><size>1 1 1</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+  </world>
+</sdf>

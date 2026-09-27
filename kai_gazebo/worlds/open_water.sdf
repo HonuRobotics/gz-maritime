@@ -126,7 +126,10 @@
          /world/default/wind/set (keys speed and direction), bridged to ROS
          by the simulation launch. The system keeps the wind as a recipe on
          the world, writes it where Gazebo's rotor, wing and air speed systems
-         read it, and publishes it on /world/default/wind_info. Gusts on
+         read it, publishes it on /world/default/wind_info, and pushes on
+         the collisions a vehicle marks gz:wind="true", by the part of each
+         shape above the water. Like buoyancy, the world names no vehicle.
+         Gusts on
          the speed and the direction (<speed_gust>, <direction_gust> and
          their times, <seed>) are listed in the reference docs. -->
     <plugin

@@ -46,9 +46,11 @@
        collisions alone, under whatever name the model was spawned, and the
        world never has to know this vehicle (gz-sim commit 229ec07e). The
        zero collide_bitmask keeps the box out of contact: the URDF's hulls
-       are what the boat bumps with. -->
+       are what the boat bumps with. The same box is marked gz:wind="true":
+       the wind system pushes on the part of it above the waterline, so a
+       wind in the world sets the boat drifting and turning. -->
   <xacro:macro name="pontoon" params="side y">
-    <collision name="pontoon_${side}" gz:buoyancy="true">
+    <collision name="pontoon_${side}" gz:buoyancy="true" gz:wind="true">
       <pose>0 ${y} ${hull_z} 0 0 0</pose>
       <geometry>
         <box><size>${hull_length} ${hull_width} ${hull_height}</size></box>
