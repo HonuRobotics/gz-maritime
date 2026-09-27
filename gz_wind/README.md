@@ -67,10 +67,6 @@ not run in the same world, since both would write the wind.
   in the world frame, not a direction: a west wind of 6 m/s reads
   `x: 6, y: 0` in these worlds.
 
-VRX gives the direction the wind blows towards, counter clockwise from
-east, so a VRX direction `d` is `(90 - d + 180) mod 360` here: VRX's 240
-is 30 here.
-
 ## Gusts
 
 Each gust is a first order Gauss Markov process, the one VRX uses on the

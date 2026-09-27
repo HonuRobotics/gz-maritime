@@ -245,10 +245,6 @@ current wind is published on `/world/default/wind_info` as `gz.msgs.Wind`.
   in the world frame, not a direction: a west wind of 6 m/s reads
   `x: 6, y: 0` in these worlds.
 
-VRX gives the direction the wind blows towards, counter clockwise from
-east, so a VRX direction `d` is `(90 - d + 180) mod 360` here: VRX's 240
-is 30 here.
-
 A 6 m/s wind from the west, from ROS:
 
 ```bash
