@@ -28,6 +28,7 @@
 #include <vector>
 
 #include <gz/msgs/param.pb.h>
+#include <gz/msgs/twist.pb.h>
 #include <gz/msgs/wind.pb.h>
 
 #include <gz/common/Console.hh>
@@ -53,10 +54,14 @@
 #include <gz/sim/Link.hh>
 #include <gz/sim/Util.hh>
 #include <gz/sim/components/Collision.hh>
+#include <gz/sim/components/CustomSensor.hh>
 #include <gz/sim/components/Inertial.hh>
 #include <gz/sim/components/LinearVelocity.hh>
+#include <gz/sim/components/LinearVelocitySeed.hh>
 #include <gz/sim/components/Link.hh>
 #include <gz/sim/components/Name.hh>
+#include <gz/sim/components/ParentEntity.hh>
+#include <gz/sim/components/Pose.hh>
 #include <gz/sim/components/SphericalCoordinates.hh>
 #include <gz/sim/components/Wind.hh>
 
@@ -111,6 +116,28 @@ namespace
   }
 }
 
+/// \brief One anemometer, resolved once when the sensor is found.
+struct Anemometer
+{
+  /// \brief The link it is on.
+  public: Entity link{kNullEntity};
+
+  /// \brief Its pose in the link frame.
+  public: math::Pose3d pose;
+
+  /// \brief Frame id of its readings.
+  public: std::string frameId;
+
+  /// \brief Its topic.
+  public: std::string topic;
+
+  /// \brief Publication period, simulation time; zero is every step.
+  public: std::chrono::steady_clock::duration period{0};
+
+  /// \brief Simulation time of the last reading.
+  public: std::optional<std::chrono::steady_clock::duration> last;
+};
+
 /// \brief One marked shape of a link, resolved once when the link is found.
 struct WindShape
 {
@@ -145,7 +172,27 @@ class gz::sim::maritime::WindPrivate
 
   /// \brief Find the marked shapes of every link the system has not seen.
   /// \param[in] _ecm The entity component manager.
-  public: void FindShapes(EntityComponentManager &_ecm);
+  /// \param[in] _all Scan every link, not only the new ones.
+  public: void FindShapes(EntityComponentManager &_ecm, bool _all);
+
+  /// \brief Find the anemometers the system has not seen.
+  /// \param[in] _ecm The entity component manager.
+  /// \param[in] _all Scan every sensor, not only the new ones.
+  public: void FindAnemometers(EntityComponentManager &_ecm, bool _all);
+
+  /// \brief Publish what each anemometer reads, at its rate.
+  /// \param[in] _info Update info.
+  /// \param[in] _ecm The entity component manager.
+  public: void ReadAnemometers(const UpdateInfo &_info,
+                               const EntityComponentManager &_ecm);
+
+  /// \brief Write a velocity into a component of the wind entity.
+  /// \tparam ComponentT The component.
+  /// \param[in] _ecm The entity component manager.
+  /// \param[in] _wind The velocity.
+  public: template <typename ComponentT>
+          void WriteEntity(EntityComponentManager &_ecm,
+                           const math::Vector3d &_wind);
 
   /// \brief Resolve one collision into a wind shape.
   /// \param[in] _ecm The entity component manager.
@@ -164,7 +211,15 @@ class gz::sim::maritime::WindPrivate
   /// \brief Marked shapes per link.
   public: std::unordered_map<Entity, std::vector<WindShape>> links;
 
-  /// \brief Scan every link instead of only the new ones on the next update.
+  /// \brief Anemometers, by sensor entity.
+  public: std::unordered_map<Entity, Anemometer> anemometers;
+
+  /// \brief A publisher per anemometer topic, kept across resets.
+  public: std::unordered_map<std::string, transport::Node::Publisher>
+          anemometerPubs;
+
+  /// \brief Scan every link and sensor instead of only the new ones on the
+  /// next update.
   public: bool rescan{true};
 
   /// \brief Air density, kg/m^3.
@@ -199,6 +254,9 @@ class gz::sim::maritime::WindPrivate
 
   /// \brief Ground truth publisher.
   public: transport::Node::Publisher windPub;
+
+  /// \brief The same ground truth as a twist, which ROS can bridge.
+  public: transport::Node::Publisher twistPub;
 
   /// \brief Ground truth publication period, simulation time.
   public: std::chrono::steady_clock::duration publishPeriod{
@@ -361,7 +419,7 @@ bool WindPrivate::Resolve(const EntityComponentManager &_ecm,
 }
 
 //////////////////////////////////////////////////
-void WindPrivate::FindShapes(EntityComponentManager &_ecm)
+void WindPrivate::FindShapes(EntityComponentManager &_ecm, bool _all)
 {
   // Collect first: creating components while iterating a view is unsafe.
   std::vector<Entity> candidates;
@@ -371,11 +429,10 @@ void WindPrivate::FindShapes(EntityComponentManager &_ecm)
     return true;
   };
 
-  if (this->rescan)
+  if (_all)
   {
     this->links.clear();
     _ecm.Each<components::Link>(collect);
-    this->rescan = false;
   }
   else
   {
@@ -400,6 +457,117 @@ void WindPrivate::FindShapes(EntityComponentManager &_ecm)
     // The point velocities below need the velocity components.
     Link(link).EnableVelocityChecks(_ecm);
     this->links[link] = std::move(shapes);
+  }
+}
+
+//////////////////////////////////////////////////
+template <typename ComponentT>
+void WindPrivate::WriteEntity(EntityComponentManager &_ecm,
+    const math::Vector3d &_wind)
+{
+  if (auto *comp = _ecm.Component<ComponentT>(this->windEntity))
+    comp->Data() = _wind;
+  else
+    _ecm.CreateComponent(this->windEntity, ComponentT(_wind));
+}
+
+//////////////////////////////////////////////////
+void WindPrivate::FindAnemometers(EntityComponentManager &_ecm, bool _all)
+{
+  std::vector<Entity> found;
+  auto collect = [&](const Entity &_sensor,
+                     const components::CustomSensor *_custom) -> bool
+  {
+    const auto elem = _custom->Data().Element();
+    if (elem && elem->HasAttribute("gz:type") &&
+        elem->GetAttribute("gz:type")->GetAsString() == "anemometer")
+    {
+      found.push_back(_sensor);
+    }
+    return true;
+  };
+  if (_all)
+  {
+    this->anemometers.clear();
+    _ecm.Each<components::CustomSensor>(collect);
+  }
+  else
+  {
+    _ecm.EachNew<components::CustomSensor>(collect);
+  }
+
+  for (const Entity sensor : found)
+  {
+    const auto *parent = _ecm.Component<components::ParentEntity>(sensor);
+    const auto *pose = _ecm.Component<components::Pose>(sensor);
+    const auto &sdfSensor =
+        _ecm.Component<components::CustomSensor>(sensor)->Data();
+    if (nullptr == parent || nullptr == pose)
+      continue;
+
+    Anemometer a;
+    a.link = parent->Data();
+    a.pose = pose->Data();
+    a.frameId = sdfSensor.FrameId().empty() ?
+        scopedName(sensor, _ecm, "::", false) : sdfSensor.FrameId();
+    a.topic = sdfSensor.Topic().empty() ?
+        "/" + scopedName(sensor, _ecm, "/", true) + "/anemometer" :
+        sdfSensor.Topic();
+    if (sdfSensor.UpdateRate() > 0.0)
+    {
+      a.period =
+          std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+          std::chrono::duration<double>(1.0 / sdfSensor.UpdateRate()));
+    }
+    if (0u == this->anemometerPubs.count(a.topic))
+    {
+      this->anemometerPubs[a.topic] =
+          this->node.Advertise<msgs::Twist>(a.topic);
+    }
+    // The reading needs the velocity of the point it is taken at.
+    Link(a.link).EnableVelocityChecks(_ecm);
+    this->anemometers[sensor] = std::move(a);
+  }
+}
+
+//////////////////////////////////////////////////
+void WindPrivate::ReadAnemometers(const UpdateInfo &_info,
+    const EntityComponentManager &_ecm)
+{
+  for (auto it = this->anemometers.begin(); it != this->anemometers.end();)
+  {
+    if (!_ecm.HasEntity(it->first))
+    {
+      it = this->anemometers.erase(it);
+      continue;
+    }
+    Anemometer &a = it->second;
+    ++it;
+    if (a.last && _info.simTime - *a.last < a.period)
+      continue;
+
+    Link link(a.link);
+    const auto linkPose = link.WorldPose(_ecm);
+    if (!linkPose)
+      continue;
+    const math::Pose3d sensorPose = *linkPose * a.pose;
+    const auto own = link.WorldLinearVelocity(_ecm, a.pose.Pos());
+
+    // The apparent wind: the air's velocity relative to the sensor, in the
+    // sensor frame, the way a vane and cups on a moving boat read it.
+    const math::Vector3d apparent = sensorPose.Rot().RotateVectorReverse(
+        this->sampler.At(sensorPose.Pos(), _info.simTime) -
+        own.value_or(math::Vector3d::Zero));
+
+    msgs::Twist msg;
+    msg.mutable_header()->mutable_stamp()->CopyFrom(
+        convert<msgs::Time>(_info.simTime));
+    auto *frame = msg.mutable_header()->add_data();
+    frame->set_key("frame_id");
+    frame->add_value(a.frameId);
+    msgs::Set(msg.mutable_linear(), apparent);
+    this->anemometerPubs[a.topic].Publish(msg);
+    a.last = _info.simTime;
   }
 }
 
@@ -551,13 +719,16 @@ void Wind::Configure(const Entity &_entity,
   if (!d.node.Subscribe(prefix + "/set", &WindPrivate::OnSet, &d))
     gzerr << "Wind: cannot subscribe to " << prefix << "/set\n";
   d.windPub = d.node.Advertise<msgs::Wind>(prefix + "_info");
+  d.twistPub = d.node.Advertise<msgs::Twist>(prefix + "/velocity");
 }
 
 //////////////////////////////////////////////////
 void Wind::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
 {
   auto &d = *this->dataPtr;
-  d.FindShapes(_ecm);
+  d.FindShapes(_ecm, d.rescan);
+  d.FindAnemometers(_ecm, d.rescan);
+  d.rescan = false;
 
   // Apply what the topic queued; any change is a new recipe.
   bool changed{false};
@@ -571,8 +742,9 @@ void Wind::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
     d.WriteRecipe(_ecm);
 
   // The wind above the world's origin, at the reference height, goes into
-  // the wind entity, which Gazebo's rotor and wing systems read; they see
-  // one wind for the whole world.
+  // the wind entity, which Gazebo's rotor and wing systems read, and into
+  // its seed, which Gazebo's air speed sensor reads; they see one wind for
+  // the whole world.
   if (!d.sampler.Sync(_ecm))
     return;
   const math::Vector3d reference(0.0, 0.0,
@@ -580,16 +752,8 @@ void Wind::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
   const math::Vector3d wind = d.sampler.At(reference, _info.simTime);
   if ((d.dirty || d.sampler.TimeVarying()) && kNullEntity != d.windEntity)
   {
-    if (auto *comp = _ecm.Component<components::WorldLinearVelocity>(
-        d.windEntity))
-    {
-      comp->Data() = wind;
-    }
-    else
-    {
-      _ecm.CreateComponent(d.windEntity,
-                           components::WorldLinearVelocity(wind));
-    }
+    d.WriteEntity<components::WorldLinearVelocity>(_ecm, wind);
+    d.WriteEntity<components::WorldLinearVelocitySeed>(_ecm, wind);
     d.dirty = false;
   }
 
@@ -603,17 +767,29 @@ void Wind::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
     msgs::Set(msg.mutable_linear_velocity(), wind);
     msg.set_enable_wind(true);
     d.windPub.Publish(msg);
+
+    msgs::Twist twist;
+    twist.mutable_header()->CopyFrom(msg.header());
+    auto *frame = twist.mutable_header()->add_data();
+    frame->set_key("frame_id");
+    frame->add_value("world");
+    msgs::Set(twist.mutable_linear(), wind);
+    d.twistPub.Publish(twist);
     d.lastPublish = _info.simTime;
   }
 
   if (!_info.paused)
+  {
     d.ApplyWindage(_info, _ecm);
+    d.ReadAnemometers(_info, _ecm);
+  }
 }
 
 //////////////////////////////////////////////////
 void Wind::Reset(const UpdateInfo &, EntityComponentManager &)
 {
   this->dataPtr->links.clear();
+  this->dataPtr->anemometers.clear();
   this->dataPtr->rescan = true;
   this->dataPtr->dirty = true;
   this->dataPtr->lastPublish.reset();

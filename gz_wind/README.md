@@ -22,9 +22,27 @@ running with the wind feels less of it. `gz:wind_cd` sets a shape's drag
 coefficient.
 
 The system also writes the wind at the reference height above the world's
-origin into the wind entity every Gazebo world carries, where the rotor, wing
-and air speed systems read it, and publishes it on
-`/world/<world>/wind_info` as `gz.msgs.Wind`.
+origin into the wind entity every Gazebo world carries, in both the values
+Gazebo's rotor, wing and air speed systems read, and publishes it on
+`/world/<world>/wind_info` as `gz.msgs.Wind` and on
+`/world/<world>/wind/velocity` as `gz.msgs.Twist`, which ROS can bridge.
+
+## Anemometer
+
+A custom sensor on any link of any vehicle reads the apparent wind: the wind
+at the sensor, asked through the recipe, less the sensor's own velocity, in
+the sensor frame, as the linear part of a `gz.msgs.Twist`:
+
+```xml
+<sensor name="anemometer" type="custom" gz:type="anemometer">
+  <frame_id>my_boat/mast_link</frame_id>
+  <topic>my_boat/anemometer</topic>
+  <update_rate>10</update_rate>
+</sensor>
+```
+
+The wind system finds it, like a marked collision, on any model spawned at
+any time. Bridge it to `geometry_msgs/msg/TwistStamped`.
 
 Without `<speed>` or `<direction>` the wind starts as the world's
 `<wind><linear_velocity>`. Gazebo's `WindEffects` system should not run in

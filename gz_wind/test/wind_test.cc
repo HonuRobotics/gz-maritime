@@ -19,6 +19,8 @@
 #include <gz/msgs/boolean.pb.h>
 #include <gz/msgs/entity_factory.pb.h>
 #include <gz/msgs/param.pb.h>
+#include <gz/msgs/twist.pb.h>
+#include <gz/msgs/Utility.hh>
 #include <gz/msgs/wind.pb.h>
 
 #include <chrono>
@@ -39,6 +41,7 @@
 
 #include <gz/sim/components/AngularVelocity.hh>
 #include <gz/sim/components/LinearVelocity.hh>
+#include <gz/sim/components/LinearVelocitySeed.hh>
 #include <gz/sim/components/Link.hh>
 #include <gz/sim/components/Model.hh>
 #include <gz/sim/components/Name.hh>
@@ -115,6 +118,10 @@ struct WindState
   /// \brief The wind entity's velocity, world frame.
   public: math::Vector3d entity;
 
+  /// \brief The wind entity's velocity seed, which the air speed sensor
+  /// reads.
+  public: math::Vector3d seed;
+
   /// \brief The wind asked through the recipe 10 m above the world's
   /// origin, where the wind entity's wind is taken.
   public: math::Vector3d sampled;
@@ -141,6 +148,11 @@ WindState ReadWind(const UpdateInfo &_info, const EntityComponentManager &_ecm)
       _ecm.Component<components::WorldLinearVelocity>(windEntity))
   {
     state.entity = vel->Data();
+  }
+  if (const auto *seed =
+      _ecm.Component<components::WorldLinearVelocitySeed>(windEntity))
+  {
+    state.seed = seed->Data();
   }
   state.sampled = wind::WindAt(_ecm, {0, 0, 10}, _info.simTime);
   state.low = wind::WindAt(_ecm, {0, 0, 1}, _info.simTime);
@@ -477,6 +489,8 @@ TEST(WindField, SpeedAndDirectionFromTheWorld)
   EXPECT_NE(0u, world.state.recipe->params.seed)
       << "a 0 seed is resolved before the recipe is written";
   EXPECT_EQ(world.state.entity, world.state.sampled);
+  EXPECT_EQ(world.state.entity, world.state.seed)
+      << "the air speed sensor reads the same wind";
 }
 
 /////////////////////////////////////////////////
@@ -716,4 +730,116 @@ TEST(WindDirection, PushesGeographicEast)
   EXPECT_GT(end->Lon()->Degree() - start->Lon()->Degree(), 1e-7) << "east";
   EXPECT_NEAR(start->Lat()->Degree(), end->Lat()->Degree(), 1e-9)
       << "not north or south";
+}
+
+namespace
+{
+/// \brief The last message on a topic.
+/// \tparam MsgT Message type.
+template <typename MsgT>
+class Last
+{
+  /// \brief Subscribe.
+  /// \param[in] _topic Topic.
+  public: explicit Last(const std::string &_topic)
+  {
+    this->node.Subscribe(_topic, std::function<void(const MsgT &)>(
+        [this](const MsgT &_msg)
+        {
+          const std::lock_guard<std::mutex> lock(this->mutex);
+          this->msg = _msg;
+        }));
+  }
+
+  /// \brief Wait for a message.
+  /// \return The last one, if any came.
+  public: std::optional<MsgT> Get()
+  {
+    for (int i = 0; i < 50; ++i)
+    {
+      {
+        const std::lock_guard<std::mutex> lock(this->mutex);
+        if (this->msg)
+          return this->msg;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    return std::nullopt;
+  }
+
+  /// \brief Transport node.
+  private: transport::Node node;
+
+  /// \brief Guards the message.
+  private: std::mutex mutex;
+
+  /// \brief The last message.
+  private: std::optional<MsgT> msg;
+};
+
+/// \brief The frame id in a header.
+/// \param[in] _header Header.
+/// \return The frame id, empty if none.
+std::string FrameId(const msgs::Header &_header)
+{
+  for (const auto &d : _header.data())
+  {
+    if (d.key() == "frame_id" && d.value_size() > 0)
+      return d.value(0);
+  }
+  return {};
+}
+}  // namespace
+
+/////////////////////////////////////////////////
+/// An anemometer reads the wind in its own frame: a mast turned 90 degrees
+/// sees a wind towards +x along its -y axis, stamped with its frame id.
+TEST(Anemometer, ReadsTheWindInItsFrame)
+{
+  Last<msgs::Twist> reading("/mast/anemometer");
+  WindWorld world("anemometer.sdf");
+  ASSERT_TRUE(world.Run(100));
+
+  const auto msg = reading.Get();
+  ASSERT_TRUE(msg.has_value());
+  EXPECT_NEAR(0.0, msg->linear().x(), 1e-6);
+  EXPECT_NEAR(-5.0, msg->linear().y(), 1e-6);
+  EXPECT_NEAR(0.0, msg->linear().z(), 1e-6);
+  EXPECT_EQ("mast/anemometer", FrameId(msg->header()));
+}
+
+/////////////////////////////////////////////////
+/// An anemometer reads the apparent wind: one falling freely feels the air
+/// rush up past it at g t on top of the wind.
+TEST(Anemometer, ReadsTheApparentWind)
+{
+  Last<msgs::Twist> reading("/falling/anemometer");
+  WindWorld world("anemometer.sdf");
+  ASSERT_TRUE(world.Run(500));
+
+  const auto msg = reading.Get();
+  ASSERT_TRUE(msg.has_value());
+  const double t = msgs::Convert(msg->header().stamp()).count() * 1e-9;
+  EXPECT_GT(t, 0.9);
+  EXPECT_NEAR(5.0, msg->linear().x(), 1e-3);
+  EXPECT_NEAR(0.0, msg->linear().y(), 1e-3);
+  EXPECT_NEAR(9.8 * t, msg->linear().z(), 0.05);
+  EXPECT_FALSE(FrameId(msg->header()).empty())
+      << "the sensor's scoped name without a frame id";
+}
+
+/////////////////////////////////////////////////
+/// The ground truth is also published as a twist in the world frame, which
+/// ROS can bridge.
+TEST(WindField, GroundTruthAsATwist)
+{
+  Last<msgs::Twist> truth("/world/windfield/wind/velocity");
+  WindWorld world("windfield.sdf");
+  ASSERT_TRUE(world.Run(200));
+
+  const auto msg = truth.Get();
+  ASSERT_TRUE(msg.has_value());
+  EXPECT_NEAR(5.0, msg->linear().x(), 1e-9);
+  EXPECT_NEAR(0.0, msg->linear().y(), 1e-9);
+  EXPECT_EQ("world", FrameId(msg->header()));
 }
