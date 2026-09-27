@@ -55,6 +55,7 @@
 #include <gz/sim/components/LinearVelocity.hh>
 #include <gz/sim/components/Pose.hh>
 #include <gz/sim/components/Name.hh>
+#include <gz/sim/components/SphericalCoordinates.hh>
 #include <gz/sim/components/Wind.hh>
 #include <gz/sim/Conversions.hh>
 
@@ -85,14 +86,14 @@ namespace
     }
   }
 
-  /// \brief The wind velocity, in the world frame (ENU), of a wind that
+  /// \brief The velocity, as east, north and up components, of a wind that
   /// blows from a direction.
   /// \param[in] _speed Speed, m/s.
   /// \param[in] _from Direction the wind comes from, degrees clockwise from
-  /// north, as in weather reports.
+  /// true north, as in weather reports.
   /// \param[in] _vertical Vertical component, m/s.
-  /// \return The velocity the air moves with.
-  math::Vector3d Velocity(double _speed, double _from, double _vertical)
+  /// \return The velocity the air moves with, east north up.
+  math::Vector3d EastNorthUp(double _speed, double _from, double _vertical)
   {
     const double a = GZ_DTOR(_from);
     return {-_speed * std::sin(a), -_speed * std::cos(a), _vertical};
@@ -143,6 +144,21 @@ class gz::sim::maritime::WindPrivate
 
   /// \brief The wind entity of the world.
   public: Entity windEntity{kNullEntity};
+
+  /// \brief The world entity, whose spherical coordinates say where north is.
+  public: Entity worldEntity{kNullEntity};
+
+  /// \brief Convert between east north up and the world frame, through the
+  /// world's spherical coordinates, the frame its GPS and magnetometer use.
+  /// A world without them, or with a heading of zero in ENU, has north
+  /// along +y and this is the identity.
+  /// \param[in] _ecm The entity component manager.
+  /// \param[in] _vel The velocity.
+  /// \param[in] _toWorld True from east north up to the world frame, false
+  /// the other way.
+  /// \return The converted velocity.
+  public: math::Vector3d Convert(const EntityComponentManager &_ecm,
+      const math::Vector3d &_vel, bool _toWorld) const;
 
   /// \brief Air density, kg/m^3.
   public: double airDensity{1.225};
@@ -360,14 +376,34 @@ void WindPrivate::StepGusts(double _dt)
 }
 
 //////////////////////////////////////////////////
+math::Vector3d WindPrivate::Convert(const EntityComponentManager &_ecm,
+    const math::Vector3d &_vel, bool _toWorld) const
+{
+  const auto *sc = _ecm.Component<components::SphericalCoordinates>(
+      this->worldEntity);
+  if (nullptr == sc)
+    return _vel;
+  const auto out = sc->Data().VelocityTransform(
+      math::CoordinateVector3::Metric(_vel),
+      _toWorld ? math::SphericalCoordinates::GLOBAL :
+                 math::SphericalCoordinates::LOCAL,
+      _toWorld ? math::SphericalCoordinates::LOCAL :
+                 math::SphericalCoordinates::GLOBAL);
+  if (!out || !out->IsMetric())
+    return _vel;
+  return out->AsMetricVector().value_or(_vel);
+}
+
+//////////////////////////////////////////////////
 void WindPrivate::WriteWind(EntityComponentManager &_ecm)
 {
   if (kNullEntity == this->windEntity)
     return;
-  // The mean plus the gusts; a gust never makes the speed negative.
-  const math::Vector3d vel = Velocity(
+  // The mean plus the gusts; a gust never makes the speed negative. The
+  // direction is from true north, so it goes through the world's heading.
+  const math::Vector3d vel = this->Convert(_ecm, EastNorthUp(
       std::max(0.0, this->speed + this->speedGustState),
-      this->direction + this->directionGustState, this->vertical);
+      this->direction + this->directionGustState, this->vertical), true);
   auto *comp = _ecm.Component<components::WorldLinearVelocity>(
       this->windEntity);
   if (nullptr == comp)
@@ -541,6 +577,7 @@ void Wind::Configure(const Entity &_entity,
     EntityComponentManager &_ecm,
     EventManager &/*_eventMgr*/)
 {
+  this->dataPtr->worldEntity = _entity;
   this->dataPtr->airDensity = _sdf->Get<double>("air_density",
       this->dataPtr->airDensity).first;
   this->dataPtr->waterLevel = _sdf->Get<double>("water_level",
@@ -570,10 +607,12 @@ void Wind::Configure(const Entity &_entity,
   {
     start = vel->Data();
   }
-  this->dataPtr->vertical = start.Z();
-  this->dataPtr->speed = std::hypot(start.X(), start.Y());
+  // The world's <wind> is in the world frame; the direction is from north.
+  const math::Vector3d enu = this->dataPtr->Convert(_ecm, start, false);
+  this->dataPtr->vertical = enu.Z();
+  this->dataPtr->speed = std::hypot(enu.X(), enu.Y());
   this->dataPtr->direction = this->dataPtr->speed > 0.0 ?
-      GZ_RTOD(std::atan2(-start.X(), -start.Y())) : 0.0;
+      GZ_RTOD(std::atan2(-enu.X(), -enu.Y())) : 0.0;
   // The same keys as the topic, so the world file and a message speak one
   // vocabulary.
   for (const char *key : {"speed", "direction", "speed_gust",

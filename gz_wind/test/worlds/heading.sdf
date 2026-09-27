@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<!--
+  A world turned 90 degrees against true north (heading_deg), with a
+  5 m/s wind from the west. North is the world's spherical coordinates'
+  north, the one its GPS uses, so the wind must push the marked box east in
+  geographic terms: its longitude grows and its latitude stays.
+-->
+<sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
+  <world name="heading">
+    <gravity>0 0 0</gravity>
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <world_frame_orientation>ENU</world_frame_orientation>
+      <latitude_deg>36.69</latitude_deg>
+      <longitude_deg>-121.93</longitude_deg>
+      <elevation>0</elevation>
+      <heading_deg>90</heading_deg>
+    </spherical_coordinates>
+    <physics name="fast" type="dart">
+      <max_step_size>0.002</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-maritime-wind-system"
+            name="gz::sim::maritime::Wind">
+      <speed>5</speed>
+      <direction>270</direction>
+    </plugin>
+    <model name="marked_box">
+      <pose>0 0 0.5 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>100</mass>
+          <inertia>
+            <ixx>16.667</ixx><iyy>16.667</iyy><izz>16.667</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="windage" gz:wind="true">
+          <geometry><box><size>1 1 1</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+  </world>
+</sdf>

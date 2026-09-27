@@ -52,9 +52,10 @@ namespace gz::sim::maritime
   /// World plugin parameters:
   ///
   /// * `<speed>`: m/s, the horizontal wind speed.
-  /// * `<direction>`: degrees clockwise from north, the direction the wind
-  ///   comes from, as in weather reports: 270 is a wind from the west,
-  ///   blowing towards +x.
+  /// * `<direction>`: degrees clockwise from true north, the direction the
+  ///   wind comes from, as in weather reports: 270 is a wind from the west.
+  ///   North is the world's, from its spherical coordinates, the one its GPS
+  ///   uses; with ENU and a zero heading it is +y, so 270 blows towards +x.
   /// * `<speed_gust>`, `<speed_gust_time>`: standing deviation (m/s) and
   ///   correlation time (s, default 2) of the gusts on the speed.
   /// * `<direction_gust>`, `<direction_gust_time>`: standing deviation

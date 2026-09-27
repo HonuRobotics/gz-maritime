@@ -40,6 +40,8 @@
 #include <gz/sim/components/Model.hh>
 #include <gz/sim/components/Name.hh>
 #include <gz/sim/components/ParentEntity.hh>
+#include <gz/sim/components/SphericalCoordinates.hh>
+#include <gz/sim/components/World.hh>
 #include <gz/sim/components/Wind.hh>
 #include <gz/sim/EntityComponentManager.hh>
 #include <gz/sim/TestFixture.hh>
@@ -689,4 +691,74 @@ TEST(WindProfile, ZeroRoughnessIsUniform)
   ASSERT_TRUE(server->Run(true, 500, false));
 
   EXPECT_NEAR(high.vel.X(), low.vel.X(), 1e-3);
+}
+
+/////////////////////////////////////////////////
+/// North is the world's north, the one its spherical coordinates and GPS
+/// use, not its +y axis: in a world turned 90 degrees, a wind from the west
+/// still pushes a box east, so its longitude grows and its latitude stays.
+TEST(WindDirection, NorthIsTheWorldsNorth)
+{
+  TestFixture fixture(World("heading.sdf"));
+
+  math::Vector3d wind;
+  BoxState box;
+  std::optional<math::SphericalCoordinates> sc;
+  fixture.OnPostUpdate([&](const UpdateInfo &,
+      const EntityComponentManager &_ecm)
+  {
+    wind = ReadWind(_ecm);
+    box = ReadBox(_ecm, "marked_box");
+    const Entity world = _ecm.EntityByComponents(components::World());
+    if (const auto *c = _ecm.Component<components::SphericalCoordinates>(
+        world))
+    {
+      sc = c->Data();
+    }
+  });
+  fixture.Finalize();
+  ASSERT_TRUE(fixture.Server()->Run(true, 1000, false));
+
+  ASSERT_TRUE(sc.has_value());
+  // The wind entity holds, in the world frame, 5 m/s towards the east.
+  const auto expected = sc->LocalFromGlobalVelocity(
+      math::CoordinateVector3::Metric(5.0, 0.0, 0.0));
+  ASSERT_TRUE(expected.has_value());
+  EXPECT_NEAR(expected->X().value(), wind.X(), 1e-9);
+  EXPECT_NEAR(expected->Y().value(), wind.Y(), 1e-9);
+  EXPECT_GT(std::abs(wind.Y()), 4.9) << "the heading turned it off +x";
+
+  // And the box, in geographic terms, went east.
+  const auto start = sc->SphericalFromLocalPosition(
+      math::CoordinateVector3::Metric(0.0, 0.0, 0.5));
+  const auto end = sc->SphericalFromLocalPosition(
+      math::CoordinateVector3::Metric(box.pos));
+  ASSERT_TRUE(start.has_value() && end.has_value());
+  EXPECT_GT(end->Lon()->Degree() - start->Lon()->Degree(), 1e-7) << "east";
+  EXPECT_NEAR(start->Lat()->Degree(), end->Lat()->Degree(), 1e-9)
+      << "not north or south";
+}
+
+/////////////////////////////////////////////////
+/// A world's own <wind>, read back as a speed and a direction from north and
+/// written again, is the same world frame vector, heading or not.
+TEST(WindDirection, WorldWindSurvivesTheRoundTrip)
+{
+  TestFixture fixture(World("heading_wind.sdf"));
+
+  math::Vector3d wind;
+  fixture.OnPostUpdate([&](const UpdateInfo &,
+      const EntityComponentManager &_ecm)
+  {
+    wind = ReadWind(_ecm);
+  });
+  fixture.Finalize();
+  auto server = fixture.Server();
+  ASSERT_TRUE(server->Run(true, 1, false));
+  // Rewrite it: the same speed, which forces a write from the stored
+  // speed and direction.
+  ASSERT_TRUE(SetWind("heading_wind", "speed", 5.0));
+  ASSERT_TRUE(server->Run(true, 2, false));
+  EXPECT_NEAR(3.0, wind.X(), 1e-9);
+  EXPECT_NEAR(4.0, wind.Y(), 1e-9);
 }

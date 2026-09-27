@@ -52,6 +52,25 @@ not run in the same world, since both would write the wind.
 | `<water_level>` | 0 | World z of the waterline; the part of a shape below it is not in the wind. |
 | `<default_drag_coefficient>` | 1 | Cd for shapes without `gz:wind_cd`. |
 
+## Direction and units
+
+- **Speed** in metres per second, at the reference height, 10 m unless the
+  world says otherwise, as in weather reports.
+- **Direction** the wind comes from, in degrees clockwise from true north,
+  as in weather reports, ArduPilot and the marine textbooks: 0 is a north
+  wind, blowing south; 270 is a west wind, blowing east.
+- **North** is the world's, from its `<spherical_coordinates>`, the same
+  north its GPS and magnetometer use. With the `ENU` orientation and a
+  `heading_deg` of 0, which every world here has, north is the world's +y
+  axis and east its +x axis.
+- **The ground truth** on `/world/<world>/wind_info` is the air's velocity
+  in the world frame, not a direction: a west wind of 6 m/s reads
+  `x: 6, y: 0` in these worlds.
+
+VRX gives the direction the wind blows towards, counter clockwise from
+east, so a VRX direction `d` is `(90 - d + 180) mod 360` here: VRX's 240
+is 30 here.
+
 ## Gusts
 
 Each gust is a first order Gauss Markov process, the one VRX uses on the
