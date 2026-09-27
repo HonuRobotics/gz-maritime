@@ -111,10 +111,25 @@ math::Vector3d StandardModel::Velocity(const math::Vector3d &_enu,
     t -= towards.Dot(horizontal) / this->params.speed;
   }
 
-  const double speed = std::max(0.0,
+  const double speed = this->Profile(_enu.Z()) * std::max(0.0,
       this->params.speed + this->speedGust.At(t));
   const double b = GZ_DTOR(this->params.direction + this->directionGust.At(t));
   return {-speed * std::sin(b), -speed * std::cos(b), this->params.vertical};
+}
+
+//////////////////////////////////////////////////
+double StandardModel::Profile(double _z) const
+{
+  // The log law over the sea, ln(h / z0) / ln(href / z0): 1 at the reference
+  // height, less towards the water, nothing at the roughness length.
+  const double z0 = this->params.roughness_length;
+  const double href = this->params.reference_height;
+  if (z0 <= 0.0 || href <= z0)
+    return 1.0;
+  const double h = _z - this->params.water_level;
+  if (h <= z0)
+    return 0.0;
+  return std::log(h / z0) / std::log(href / z0);
 }
 
 //////////////////////////////////////////////////

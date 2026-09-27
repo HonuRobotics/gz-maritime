@@ -10,9 +10,10 @@ system rebuilds its own copy of the model from that recipe and asks the wind
 at any point and time, so a new wind model is a new registered model and no
 change to the systems that use the wind.
 
-The system also writes the wind at the world's origin into the wind entity
-every Gazebo world carries, where the rotor, wing and air speed systems read
-it, and publishes it on `/world/<world>/wind_info` as `gz.msgs.Wind`.
+The system also writes the wind at the reference height above the world's
+origin into the wind entity every Gazebo world carries, where the rotor, wing
+and air speed systems read it, and publishes it on
+`/world/<world>/wind_info` as `gz.msgs.Wind`.
 
 Without `<speed>` or `<direction>` the wind starts as the world's
 `<wind><linear_velocity>`. Gazebo's `WindEffects` system should not run in
@@ -35,6 +36,9 @@ the same world, since both would write the wind.
 | `<speed_gust_time>` | 2 | Their correlation time, s. |
 | `<direction_gust>` | 0 | Standard deviation of the direction gusts, degrees. |
 | `<direction_gust_time>` | 10 | Their correlation time, s. |
+| `<reference_height>` | 10 | m above the water, the height `<speed>` is given at. |
+| `<roughness_length>` | 0 | m, the surface roughness of a logarithmic profile, about 0.0002 over open sea; 0 is a uniform wind. |
+| `<water_level>` | 0 | World z of the water. |
 | `<model>` | standard | The registered wind model. |
 | `<seed>` | 0 | Seed of anything random in the model; 0 draws one each run. |
 | `<publish_rate>` | 10 | Hz of simulation time for `wind_info`. |
@@ -44,7 +48,8 @@ Every parameter but `<model>` and `<publish_rate>` is also a key of the wind top
 
 ## Direction and units
 
-- **Speed** in metres per second, at 10 m, as in weather reports.
+- **Speed** in metres per second, at the reference height, 10 m unless the
+  world says otherwise, as in weather reports.
 - **Direction** the wind comes from, in degrees clockwise from true north,
   as in weather reports, ArduPilot and the marine textbooks: 0 is a north
   wind, blowing south; 270 is a west wind, blowing east.
@@ -68,6 +73,15 @@ replays it.
 The gusts travel with the mean wind (Taylor's frozen turbulence): a point
 downwind sees what a point upwind saw earlier, so the bow and the stern of a
 boat in line with the wind feel a gust one after the other.
+
+## Wind with height
+
+With a roughness length `z0`, the wind at a height `h` above the water is
+the reference wind times `ln(h / z0) / ln(h_ref / z0)`: over the sea, about
+0.7 of the 10 m wind half a metre above the water, and none below `z0`.
+The wind entity holds the reference height wind, so Gazebo's rotor, wing
+and air speed systems, which read that single value, do not see the
+profile; a system that asks `WindAt` does.
 
 ## Asking the wind from a system
 

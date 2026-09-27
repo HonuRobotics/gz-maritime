@@ -57,7 +57,8 @@ class Gust
 };
 
 /// \brief The standard wind: a mean speed and direction, with optional gusts
-/// on both, carried along with the mean wind.
+/// on both, carried along with the mean wind, and a logarithmic profile with
+/// height above the water.
 class StandardModel : public IWindModel
 {
   // Documentation inherited.
@@ -72,6 +73,11 @@ class StandardModel : public IWindModel
 
   // Documentation inherited.
   public: std::string_view Kind() const override { return "standard"; }
+
+  /// \brief How much of the reference height wind reaches a height.
+  /// \param[in] _z World z, m.
+  /// \return The factor, 0 at and below the roughness length.
+  private: double Profile(double _z) const;
 
   /// \brief Parameters.
   private: WindParameters params;

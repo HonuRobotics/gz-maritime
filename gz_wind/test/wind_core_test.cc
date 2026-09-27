@@ -312,6 +312,39 @@ TEST(WindModel, SteadyWithoutGusts)
 }
 
 /////////////////////////////////////////////////
+/// The wind follows the log law above the water: whole at the reference
+/// height, ln(h / z0) / ln(href / z0) of it below, nothing at the roughness
+/// length; the water level moves the whole profile; no roughness length is
+/// a uniform wind.
+TEST(WindModel, ProfileWithHeight)
+{
+  wind::WindParameters p;
+  p.speed = 5.0;
+  p.direction = 270.0;
+  p.roughness_length = 0.0002;
+  auto model = wind::CreateWindModel("standard", p);
+  const auto speed = [&](double _z)
+  {
+    return model->Velocity({0, 0, _z}, 0.0).Length();
+  };
+  EXPECT_NEAR(5.0, speed(10.0), 1e-9);
+  EXPECT_NEAR(5.0 * std::log(1.0 / 0.0002) / std::log(10.0 / 0.0002),
+              speed(1.0), 1e-9);
+  EXPECT_GT(speed(20.0), 5.0) << "stronger above the reference height";
+  EXPECT_NEAR(0.0, speed(0.0001), 1e-12);
+  EXPECT_NEAR(0.0, speed(-1.0), 1e-12);
+
+  p.water_level = 2.0;
+  model->SetParameters(p);
+  EXPECT_NEAR(5.0, speed(12.0), 1e-9);
+
+  p.roughness_length = 0.0;
+  model->SetParameters(p);
+  EXPECT_NEAR(5.0, speed(1.0), 1e-9);
+  EXPECT_NEAR(5.0, speed(-1.0), 1e-9);
+}
+
+/////////////////////////////////////////////////
 /// The sampler reads the recipe from the world and answers in the world
 /// frame; without a recipe it has no wind.
 TEST(WindSampler, AnswersFromTheRecipe)

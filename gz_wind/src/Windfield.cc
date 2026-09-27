@@ -34,12 +34,13 @@ bool SetParameter(WindParameters &_p, const std::string &_name, double _value)
     return true;
   }
   if ((_name == "speed" || _name == "speed_gust" ||
-       _name == "direction_gust") && _value < 0.0)
+       _name == "direction_gust" || _name == "roughness_length") &&
+      _value < 0.0)
   {
     return false;
   }
-  if ((_name == "speed_gust_time" || _name == "direction_gust_time") &&
-      _value <= 0.0)
+  if ((_name == "speed_gust_time" || _name == "direction_gust_time" ||
+       _name == "reference_height") && _value <= 0.0)
   {
     return false;
   }

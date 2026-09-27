@@ -264,12 +264,14 @@ void Wind::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
   if (changed)
     d.WriteRecipe(_ecm);
 
-  // The wind at the world's origin goes into the wind entity, which Gazebo's
-  // rotor and wing systems read.
+  // The wind above the world's origin, at the reference height, goes into
+  // the wind entity, which Gazebo's rotor and wing systems read; they see
+  // one wind for the whole world.
   if (!d.sampler.Sync(_ecm))
     return;
-  const math::Vector3d wind = d.sampler.At(math::Vector3d::Zero,
-                                           _info.simTime);
+  const math::Vector3d reference(0.0, 0.0,
+      d.recipe.params.water_level + d.recipe.params.reference_height);
+  const math::Vector3d wind = d.sampler.At(reference, _info.simTime);
   if ((d.dirty || d.sampler.TimeVarying()) && kNullEntity != d.windEntity)
   {
     if (auto *comp = _ecm.Component<components::WorldLinearVelocity>(
