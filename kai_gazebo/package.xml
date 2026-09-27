@@ -11,6 +11,7 @@
 
   <!-- Plugins and models open_water.sdf loads by name at run time. -->
   <exec_depend>gz_buoyancy</exec_depend>
+  <exec_depend>gz_wind</exec_depend>
   <exec_depend>gz_waves_provider_fft</exec_depend>
   <exec_depend>gz_waves_provider_gerstner</exec_depend>
   <exec_depend>gz_waves_rendering</exec_depend>
