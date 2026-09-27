@@ -22,14 +22,17 @@ uniform wind works.
 nothing reads it except the plugin that made it.
 
 **Example.** To try the same boat in calm air and then in a breeze, you edit
-the world file and restart Gazebo.
+the world file and restart Gazebo, and a sensor or a scoring system has no
+way to know what the wind is at the boat.
 
-**Solution.** A world system, `gz-maritime-wind-system`, owns the wind: a
-mean speed and direction, a seed, and a `set_parameters` service shaped like
-the one the waves have, so one command changes the wind at run time. It
-writes the wind into the wind entity that every Gazebo world already carries,
-which is what the rotor, wing and air speed systems read, and it publishes
-the wind as ground truth.
+**Solution.** Treat the wind the way we treat the waves. A `Windfield`
+component on the world holds a recipe: the name of a wind model, its
+parameters and a counter that goes up on every change. Wind models register
+under a name, and any system asks for the wind at a point and a time with
+`WindAt`, without knowing which model is behind it, so a new model later
+means a new engine and no change to the systems that use it. A world system,
+`gz-maritime-wind-system`, owns the recipe: it reads it from the world file
+and changes it from a topic that the simulation launch bridges to ROS.
 
 ## 2. Gusts
 
@@ -39,10 +42,13 @@ own wind system varies both with noise that nobody can seed.
 **Example.** You cannot write a station keeping test against a wind that
 veers, and running a gusty test twice gives two different results.
 
-**Solution.** Keep VRX's Gauss Markov process, because it is scaled correctly
-and its two parameters mean something, and run it on the direction as well as
-the speed from one seed. If we add a spectral model later, the parameters
-stay the same.
+**Solution.** Spectral gusts on the speed and the direction: a sum of
+sinusoids with phases drawn from a seed, as offshore engineering does. The
+gust is a function of time alone, so every system that asks `WindAt`
+computes the same gust without sharing any state, the way every consumer of
+the waves rebuilds the same sea. The gusts move across the water with the
+mean wind, so one reaches a boat downwind a little after the boat upwind.
+The world sets how strong the gusts are and how long they last.
 
 ## 3. Wind with height
 
@@ -53,8 +59,8 @@ up.
 where the real wind is nearly half.
 
 **Solution.** A logarithmic profile over the sea, referenced to 10 m, with a
-roughness length the world can set, evaluated at the height of whatever the
-wind is acting on.
+roughness length the world can set. It lives inside the wind model, so
+`WindAt` returns the wind at the height it is asked for.
 
 ## 4. A load on any vehicle
 
@@ -68,13 +74,13 @@ m/s would be right.
 
 **Solution.** Do what buoyancy does. A vehicle marks the shapes the wind sees
 with `gz:wind="true"` on their collisions, with a drag coefficient of one
-unless a shape says otherwise. The same world system looks for marked shapes
-on every model, whenever it shows up, takes their projected areas from the
-geometry, cuts them off at the waterline, and applies quadratic drag at the
-centre of each shape in the body frame, so a mast heels the boat and turns
-it. The generators write the marks the same way they write the buoyancy ones.
-Gazebo's `enable_wind` flag stays untouched, since it belongs to the mass
-based force.
+unless a shape says otherwise. A world system looks for marked shapes on
+every model, whenever it shows up, takes their projected areas from the
+geometry, cuts them off at the waterline, asks `WindAt` at each shape, and
+applies quadratic drag at the centre of each shape in the body frame, so a
+mast heels the boat and turns it. The generators write the marks the same
+way they write the buoyancy ones. Gazebo's `enable_wind` flag stays
+untouched, since it belongs to the mass based force.
 
 ## 5. Direction and units
 
@@ -90,17 +96,19 @@ and say so in the docs.
 
 ## 6. Reading the wind
 
-**Problem.** A vehicle cannot measure the wind it is in, and ROS never hears
-about it.
+**Problem.** A vehicle cannot measure the wind it is in, ROS never hears
+about it, and Gazebo's own air speed sensor reads a different value from the
+one its rotor and wing systems read.
 
 **Example.** A controller that should feed the wind forward can only react to
 the drift once it has happened, and the drift test has no signal to check.
 
-**Solution.** Publish the ground truth on a world topic as `gz.msgs.Wind` and
-bridge it once, like the clock. Later, add an anemometer per vehicle that
-reports the apparent wind in its own frame, bridged under the instance name
-as `geometry_msgs/msg/Vector3Stamped`; the bridge needs a small conversion
-for that, which we propose to `ros_gz_bridge`.
+**Solution.** The wind system writes the wind at the reference height into
+Gazebo's wind entity, in both the values its systems read, so rotors, wings
+and the air speed sensor all feel it. A custom `anemometer` sensor, declared
+on any link of any vehicle, asks `WindAt` at the sensor and reports the
+apparent wind in its own frame. The ground truth and each anemometer are
+bridged to ROS, the anemometer under the instance name.
 
 ## 7. Worlds, tests and documentation
 
@@ -114,6 +122,7 @@ stopped drifting in someone's demo.
 sensible breeze for each site noted in its header. Add a headless test that
 spawns the custom USV in a set wind and checks the direction and speed of
 the drift against its areas, adds a second boat, holds one with thrust, and
-repeats a gusty run from the same seed. Write a how to page on the wind, add
-the line to the world contract, and put the marks on the custom USV and the
-Blue Robotics vehicles.
+repeats a gusty run from the same seed. Write a how to page on the wind and
+a short design note on the recipe and the models, add the line to the world
+contract, and put the marks on the custom USV and the Blue Robotics
+vehicles.
