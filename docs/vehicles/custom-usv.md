@@ -111,6 +111,7 @@ For the instance `custom_usv`; another name replaces the prefix.
 | `/custom_usv/imu` | `sensor_msgs/msg/Imu` | from Gazebo | 50 Hz, in `custom_usv/imu_link` |
 | `/custom_usv/magnetometer` | `sensor_msgs/msg/MagneticField` | from Gazebo | 50 Hz, in `custom_usv/imu_link` |
 | `/custom_usv/navsat` | `sensor_msgs/msg/NavSatFix` | from Gazebo | 5 Hz, in `custom_usv/gps_link` |
+| `/custom_usv/anemometer` | `geometry_msgs/msg/TwistStamped` | from Gazebo | 10 Hz, the apparent wind (linear part, m/s) in `custom_usv/gps_link` |
 | `/custom_usv/joint_states` | `sensor_msgs/msg/JointState` | from Gazebo | Propeller joint angles |
 | `/clock` | `rosgraph_msgs/msg/Clock` | from Gazebo | Simulation time, bridged once by the simulation launch |
 

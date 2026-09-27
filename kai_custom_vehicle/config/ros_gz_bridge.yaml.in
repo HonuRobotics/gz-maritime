@@ -44,6 +44,11 @@
   ros_type_name: sensor_msgs/msg/Imu
   gz_type_name: gz.msgs.IMU
   direction: GZ_TO_ROS
+- ros_topic_name: /@name@/anemometer
+  gz_topic_name: /@name@/anemometer
+  ros_type_name: geometry_msgs/msg/TwistStamped
+  gz_type_name: gz.msgs.Twist
+  direction: GZ_TO_ROS
 - ros_topic_name: /@name@/navsat
   gz_topic_name: /@name@/navsat
   ros_type_name: sensor_msgs/msg/NavSatFix

@@ -18,7 +18,7 @@ kai_bringup's instantiate_vehicle.py renders this package's model xacro, URDF
 xacro and bridge template for an instance name, which is what
 spawn_vehicle.launch.xml does at launch. Two instances are rendered here and
 checked: the URDF is valid and Gazebo-free, the model floats by marked
-collisions, drives two normalized thrusters and carries three sensors at URDF
+collisions, drives two normalized thrusters and carries four sensors at URDF
 frames, every topic and frame id carries the name, and the bridge lists
 exactly the model's topics. The installed default instance, model://custom_usv,
 is checked as well.
@@ -256,9 +256,12 @@ def test_hydrodynamics_on_base_link(boat):
     assert hydro[0].find('link_name').text == 'base_link'
 
 
-def test_three_sensors_at_urdf_frames(boat):
+def test_four_sensors_at_urdf_frames(boat):
     """
-    IMU, magnetometer and NavSat, posed at URDF frames, publishing them prefixed.
+    IMU, magnetometer, NavSat and anemometer at URDF frames, publishing prefixed.
+
+    The anemometer is a custom sensor, known by its gz:type, which the wind
+    system reads.
 
     Every frame_id is <name>/<URDF link>: the frame robot_state_publisher
     publishes when it runs with frame_prefix set to the instance name.
@@ -266,9 +269,13 @@ def test_three_sensors_at_urdf_frames(boat):
     sensors = {}
     for link in boat.model.findall('link'):
         for sensor in link.findall('sensor'):
-            sensors[sensor.get('type')] = (link, sensor)
-    assert set(sensors) == {'imu', 'magnetometer', 'navsat'}
-    expected_frame = {'imu': 'imu_link', 'magnetometer': 'imu_link', 'navsat': 'gps_link'}
+            kind = sensor.get('type')
+            if kind == 'custom':
+                kind = sensor.get(f'{GZ_NS}type')
+            sensors[kind] = (link, sensor)
+    assert set(sensors) == {'imu', 'magnetometer', 'navsat', 'anemometer'}
+    expected_frame = {'imu': 'imu_link', 'magnetometer': 'imu_link', 'navsat': 'gps_link',
+                      'anemometer': 'gps_link'}
     urdf_links = {li.get('name') for li in boat.urdf.findall('link')}
     for kind, (link, sensor) in sensors.items():
         assert link.find('pose').get('relative_to') == expected_frame[kind]

@@ -11,6 +11,7 @@ already has its half; this page is about yours.
 | `gz-sim-imu-system` | `imu` sensors |
 | `gz-sim-magnetometer-system` | `magnetometer` sensors |
 | `gz-sim-navsat-system` | `navsat` (GPS) sensors |
+| `gz-maritime-wind-system` | `anemometer` sensors: `type="custom"` with `gz:type="anemometer"` |
 | `gz-sim-sensors-system` | Rendered sensors: `camera`, `depth_camera`, `gpu_lidar` and so on. These need a GPU. |
 
 The world also sets `<spherical_coordinates>`: where on Earth the origin is
@@ -32,7 +33,7 @@ Every sensor follows the same four steps:
    ([The bridge configuration](spawn-and-drive.md#the-bridge-configuration)).
 
 The IMU is shown in [Compose the Gazebo model](gazebo-composition.md#sensors).
-The other two sensors on the custom USV differ only in their `<sensor>`
+The other three sensors on the custom USV differ only in their `<sensor>`
 element:
 
 ```{literalinclude} ../../kai_custom_vehicle/models/custom_usv/model.sdf.xacro
@@ -44,6 +45,17 @@ element:
 ```{literalinclude} ../../kai_custom_vehicle/models/custom_usv/model.sdf.xacro
 :language: xml
 :start-at: <xacro:sensor_link sensor_name="navsat"
+:end-at: </xacro:sensor_link>
+```
+
+The anemometer is a custom sensor that the wind system reads. It reports the
+apparent wind, the wind at the sensor less the boat's own velocity, in the
+sensor frame, as the linear part of a `gz.msgs.Twist`, bridged to
+`geometry_msgs/msg/TwistStamped`:
+
+```{literalinclude} ../../kai_custom_vehicle/models/custom_usv/model.sdf.xacro
+:language: xml
+:start-at: <xacro:sensor_link sensor_name="anemometer"
 :end-at: </xacro:sensor_link>
 ```
 
