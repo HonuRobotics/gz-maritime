@@ -25,7 +25,7 @@ namespace gz::sim::maritime
 {
   class WindPrivate;
 
-  /// \brief The wind of a world.
+  /// \brief The wind of a world, and windage on marked collisions.
   ///
   /// A world system that owns the world's wind as a recipe, the Windfield
   /// component on the world entity: a wind model's name and its parameters.
@@ -39,6 +39,18 @@ namespace gz::sim::maritime
   /// Gazebo world carries, which Gazebo's rotor and wing systems read, and
   /// publishes it as ground truth on
   /// `/world/<world>/wind_info` (gz.msgs.Wind).
+  ///
+  /// It pushes on the shapes the wind sees. A vehicle marks those shapes with
+  /// `gz:wind="true"` on a collision, the same way it marks displacement
+  /// shapes for buoyancy, and the system finds them on every model, spawned
+  /// later under any name included. For each marked shape it takes the
+  /// projected area per shape axis from the geometry, cuts the part below the
+  /// water, asks the wind at the centre of the exposed part, and applies
+  /// quadratic drag, 0.5 * rho * Cd * A * |v| * v per axis on the wind
+  /// relative to the shape, at that centre, so a tall shape heels and turns
+  /// its link. `gz:wind_cd` on the collision sets its drag coefficient.
+  /// Gazebo's `enable_wind` flag is not the mark: it belongs to the mass
+  /// based force of the upstream wind effects system.
   ///
   /// Without `<speed>` or `<direction>` the wind starts as the world's
   /// `<wind><linear_velocity>`, so a world that sets only that keeps it.
@@ -69,6 +81,9 @@ namespace gz::sim::maritime
   /// * `<seed>`: seed of the gusts; 0 (default) draws a new one each run.
   /// * `<publish_rate>`: Hz of simulation time for the ground truth,
   ///   default 10.
+  /// * `<air_density>`: kg/m^3 for the windage, default 1.225.
+  /// * `<default_drag_coefficient>`: Cd of the shapes without
+  ///   `gz:wind_cd`, default 1.
   class Wind
     : public System,
       public ISystemConfigure,
