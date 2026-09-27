@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!--
+  A world that sets only its own <wind>, 5 m/s towards +x. The wind system
+  starts from it and keeps it.
+-->
+<sdf version="1.9">
+  <world name="world_wind">
+    <wind>
+      <linear_velocity>5 0 0</linear_velocity>
+    </wind>
+    <plugin filename="gz-maritime-wind-system"
+            name="gz::sim::maritime::Wind">
+    </plugin>
+  </world>
+</sdf>
