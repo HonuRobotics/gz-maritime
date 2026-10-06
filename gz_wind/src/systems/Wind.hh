@@ -89,6 +89,7 @@ namespace gz::sim::maritime
     : public System,
       public ISystemConfigure,
       public ISystemPreUpdate,
+      public ISystemPostUpdate,
       public ISystemReset
   {
     /// \brief Constructor.
@@ -106,6 +107,10 @@ namespace gz::sim::maritime
     // Documentation inherited.
     public: void PreUpdate(const UpdateInfo &_info,
                            EntityComponentManager &_ecm) override;
+
+    // Documentation inherited.
+    public: void PostUpdate(const UpdateInfo &_info,
+                            const EntityComponentManager &_ecm) override;
 
     // Documentation inherited.
     public: void Reset(const UpdateInfo &_info,

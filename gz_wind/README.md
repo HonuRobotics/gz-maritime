@@ -19,7 +19,9 @@ axis, on the projected area of the part above the water, at the centre of
 that part, with the wind asked at that centre, so a tall shape heels and
 turns its link. The velocity is the wind relative to the shape, so a boat
 running with the wind feels less of it. `gz:wind_cd` sets a shape's drag
-coefficient.
+coefficient. A mark is read as a bool, so `"1"` works too. Boxes,
+cylinders, spheres, capsules and ellipsoids keep their shape; a mesh counts
+as its bounding box.
 
 The system also writes the wind at the reference height above the world's
 origin into the wind entity every Gazebo world carries, where the rotor, wing

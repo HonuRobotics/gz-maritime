@@ -32,7 +32,6 @@
 
 #include <gz/common/Console.hh>
 #include <gz/common/Mesh.hh>
-#include <gz/common/MeshManager.hh>
 #include <gz/math/Angle.hh>
 #include <gz/math/CoordinateVector3.hh>
 #include <gz/math/Matrix3.hh>
@@ -57,6 +56,7 @@
 #include <gz/sim/components/LinearVelocity.hh>
 #include <gz/sim/components/Link.hh>
 #include <gz/sim/components/Name.hh>
+#include <gz/sim/components/Pose.hh>
 #include <gz/sim/components/SphericalCoordinates.hh>
 #include <gz/sim/components/Wind.hh>
 
@@ -167,6 +167,10 @@ class gz::sim::maritime::WindPrivate
   /// \brief Scan every link instead of only the new ones on the next update.
   public: bool rescan{true};
 
+  /// \brief Links created since the last scan, noted in PostUpdate, after
+  /// every system's PreUpdate, so a link is seen whichever system made it.
+  public: std::vector<Entity> newLinks;
+
   /// \brief Air density, kg/m^3.
   public: double airDensity{1.225};
 
@@ -263,9 +267,11 @@ bool WindPrivate::Resolve(const EntityComponentManager &_ecm,
   if (nullptr == coll || nullptr == coll->Data().Element())
     return false;
 
+  // Read as a bool, like the buoyancy mark, so "1" marks a shape too.
   const auto elem = coll->Data().Element();
+  bool marked{false};
   if (!elem->HasAttribute(kMark) ||
-      elem->GetAttribute(kMark)->GetAsString() != "true")
+      !elem->GetAttribute(kMark)->Get<bool>(marked) || !marked)
   {
     return false;
   }
@@ -280,7 +286,10 @@ bool WindPrivate::Resolve(const EntityComponentManager &_ecm,
       gzwarn << "Ignoring invalid " << kCdMark << " on a wind shape\n";
   }
 
-  _shape.pose = coll->Data().RawPose();
+  // The entity's pose is already resolved against any relative_to frame;
+  // the raw pose is not.
+  const auto *pose = _ecm.Component<components::Pose>(_collision);
+  _shape.pose = nullptr != pose ? pose->Data() : coll->Data().RawPose();
 
   const sdf::Geometry *geom = coll->Data().Geom();
   if (nullptr == geom)
@@ -329,14 +338,13 @@ bool WindPrivate::Resolve(const EntityComponentManager &_ecm,
     }
     case sdf::GeometryType::MESH:
     {
-      // A mesh is treated as its bounding box.
+      // A mesh is treated as its bounding box. loadMesh resolves model://
+      // and Fuel URIs the way the rest of gz-sim does.
       const sdf::Mesh *meshSdf = geom->MeshShape();
-      const std::string file = asFullPath(meshSdf->Uri(),
-          meshSdf->FilePath());
-      const common::Mesh *mesh = common::MeshManager::Instance()->Load(file);
+      const common::Mesh *mesh = loadMesh(*meshSdf);
       if (nullptr == mesh)
       {
-        gzwarn << "Cannot load wind shape mesh [" << file << "]\n";
+        gzwarn << "Cannot load wind shape mesh [" << meshSdf->Uri() << "]\n";
         return false;
       }
       math::Vector3d min;
@@ -360,27 +368,26 @@ bool WindPrivate::Resolve(const EntityComponentManager &_ecm,
 //////////////////////////////////////////////////
 void WindPrivate::FindShapes(EntityComponentManager &_ecm)
 {
-  // Collect first: creating components while iterating a view is unsafe.
   std::vector<Entity> candidates;
-  auto collect = [&](const Entity &_link, const components::Link *) -> bool
-  {
-    candidates.push_back(_link);
-    return true;
-  };
-
+  candidates.swap(this->newLinks);
   if (this->rescan)
   {
+    // Collect first: creating components while iterating a view is unsafe.
     this->links.clear();
-    _ecm.Each<components::Link>(collect);
+    candidates.clear();
+    _ecm.Each<components::Link>(
+        [&](const Entity &_link, const components::Link *) -> bool
+        {
+          candidates.push_back(_link);
+          return true;
+        });
     this->rescan = false;
-  }
-  else
-  {
-    _ecm.EachNew<components::Link>(collect);
   }
 
   for (const Entity link : candidates)
   {
+    if (!_ecm.HasEntity(link))
+      continue;
     std::vector<WindShape> shapes;
     for (const Entity collision : _ecm.ChildrenByComponents(link,
         components::Collision()))
@@ -489,14 +496,22 @@ void Wind::Configure(const Entity &_entity,
   auto &d = *this->dataPtr;
   d.worldEntity = _entity;
   d.windEntity = _ecm.EntityByComponents(components::Wind());
-  d.airDensity = _sdf->Get<double>("air_density", d.airDensity).first;
-  d.defaultCd = _sdf->Get<double>("default_drag_coefficient",
-                                  d.defaultCd).first;
-  if (d.airDensity <= 0.0 || d.defaultCd < 0.0)
-  {
-    gzerr << "Wind: <air_density> must be positive and "
-          << "<default_drag_coefficient> cannot be negative\n";
-  }
+  // An invalid value keeps the default: a negative coefficient would make
+  // the wind pull.
+  const double density = _sdf->Get<double>("air_density",
+                                           d.airDensity).first;
+  if (density > 0.0)
+    d.airDensity = density;
+  else
+    gzerr << "Wind: <air_density> must be positive, using "
+          << d.airDensity << "\n";
+  const double cd = _sdf->Get<double>("default_drag_coefficient",
+                                      d.defaultCd).first;
+  if (cd >= 0.0)
+    d.defaultCd = cd;
+  else
+    gzerr << "Wind: <default_drag_coefficient> cannot be negative, using "
+          << d.defaultCd << "\n";
 
   // The world's <wind> is the starting point, in the world frame; the recipe
   // speaks of a speed and a direction from true north.
@@ -604,6 +619,20 @@ void Wind::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
 }
 
 //////////////////////////////////////////////////
+void Wind::PostUpdate(const UpdateInfo &, const EntityComponentManager &_ecm)
+{
+  // EachNew only sees a link in the step it was made in. Noting it here,
+  // after every PreUpdate, catches it whatever order the systems run in;
+  // its shapes are resolved at the next PreUpdate.
+  _ecm.EachNew<components::Link>(
+      [&](const Entity &_link, const components::Link *) -> bool
+      {
+        this->dataPtr->newLinks.push_back(_link);
+        return true;
+      });
+}
+
+//////////////////////////////////////////////////
 void Wind::Reset(const UpdateInfo &, EntityComponentManager &_ecm)
 {
   auto &d = *this->dataPtr;
@@ -627,6 +656,7 @@ GZ_ADD_PLUGIN(Wind,
               System,
               Wind::ISystemConfigure,
               Wind::ISystemPreUpdate,
+              Wind::ISystemPostUpdate,
               Wind::ISystemReset)
 
 GZ_ADD_PLUGIN_ALIAS(Wind, "gz::sim::maritime::Wind")

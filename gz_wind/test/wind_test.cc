@@ -294,12 +294,14 @@ TEST(Windage, MarkedCollisions)
   BoxState plain;
   BoxState marked;
   BoxState half;
+  BoxState one;
   fixture.OnPostUpdate([&](const UpdateInfo &,
       const EntityComponentManager &_ecm)
   {
     plain = ReadBox(_ecm, "plain_box");
     marked = ReadBox(_ecm, "marked_box");
     half = ReadBox(_ecm, "half_box");
+    one = ReadBox(_ecm, "one_box");
   });
   fixture.Finalize();
 
@@ -322,6 +324,10 @@ TEST(Windage, MarkedCollisions)
   EXPECT_TRUE(half.tracked);
   EXPECT_NEAR(kSpeedAfterOneSecond / 2.0, half.vel.X(), 0.005)
       << "only the face above the waterline is in the wind";
+
+  ASSERT_TRUE(one.found);
+  EXPECT_TRUE(one.tracked) << "a mark is a bool, so \"1\" marks too";
+  EXPECT_NEAR(marked.vel.X(), one.vel.X(), 1e-9);
 }
 
 /////////////////////////////////////////////////

@@ -169,7 +169,7 @@ What a model says to the wind system.
 
 | Where | Markup | Meaning |
 |---|---|---|
-| A `<collision>` in a model | `gz:wind="true"` (same `xmlns:gz` root attribute) | The wind pushes on this shape, by the part of it above the water, with quadratic drag on its projected area per axis, taking the wind at the centre of that part. A buoyancy box can carry both marks. |
+| A `<collision>` in a model | `gz:wind="true"` (same `xmlns:gz` root attribute) | The wind pushes on this shape, by the part of it above the water, with quadratic drag on its projected area per axis, taking the wind at the centre of that part. `"1"` works too. A mesh counts as its bounding box. A buoyancy box can carry both marks. |
 | The same `<collision>` | `gz:wind_cd="1.2"` | Its drag coefficient; the plugin's `<default_drag_coefficient>` otherwise. |
 
 ## Wind parameters
