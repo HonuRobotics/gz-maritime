@@ -571,7 +571,7 @@ credited in <code class="docutils literal notranslate"><span class="pre">kai_gaz
 <td><p>Seawater 1025 kg/m³ below z = 0, air 1 kg/m³ above; <code class="docutils literal notranslate"><span class="pre">&lt;enable_by_default&gt;false&lt;/enable_by_default&gt;</span></code>, no <code class="docutils literal notranslate"><span class="pre">&lt;enable&gt;</span></code> list</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gz-maritime-wind-system</span></code></p></td>
-<td><p>Still air by default (<code class="docutils literal notranslate"><span class="pre">&lt;speed&gt;0&lt;/speed&gt;</span></code>), changed at run time on the wind topic</p></td>
+<td><p>Still air by default (<code class="docutils literal notranslate"><span class="pre">&lt;speed&gt;0&lt;/speed&gt;</span></code>) at a 10 m reference height, falling off towards the water with a 0.0002 m roughness length, changed at run time on the wind topic</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-waves-fft-system</span></code></p></td>
 <td><p>Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out)</p></td>
@@ -645,13 +645,16 @@ credited in <code class="docutils literal notranslate"><span class="pre">kai_gaz
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;speed_gust&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;speed_gust_time&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;direction_gust&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;direction_gust_time&gt;</span></code></p></td>
 <td><p>Gusts: standard deviation (m/s, degrees) and correlation time (s, 2 and 10 by default) of the speed and the direction; 0 is steady. The gusts travel with the mean wind.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;model&gt;</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;reference_height&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;roughness_length&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;water_level&gt;</span></code></p></td>
+<td><p>The height above the water <code class="docutils literal notranslate"><span class="pre">&lt;speed&gt;</span></code> is given at, 10 m by default, the surface roughness of a logarithmic wind profile, 0.0002 m over open sea (0, the default, is a uniform wind; it slows the mean wind, not the gusts), and the world z of the water. Gazebo’s rotor and wing systems see the reference height wind.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;model&gt;</span></code></p></td>
 <td><p>The wind model the recipe names, <code class="docutils literal notranslate"><span class="pre">standard</span></code> by default.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;seed&gt;</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;seed&gt;</span></code></p></td>
 <td><p>Seed of the gusts; the same seed repeats them, and 0, the default, draws one each run.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;publish_rate&gt;</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;publish_rate&gt;</span></code></p></td>
 <td><p>Rate of the ground truth, 10 Hz by default.</p></td>
 </tr>
 </tbody>
@@ -747,7 +750,8 @@ current wind is published on <code class="docutils literal notranslate"><span cl
 <section id="direction-and-units">
 <h3>Direction and units<a class="headerlink" href="#direction-and-units" title="Link to this heading"></a></h3>
 <ul class="simple">
-<li><p><strong>Speed</strong> in metres per second, at 10 m, as in weather reports.</p></li>
+<li><p><strong>Speed</strong> in metres per second, at the reference height, 10 m unless the
+world says otherwise, as in weather reports.</p></li>
 <li><p><strong>Direction</strong> the wind comes from, in degrees clockwise from true north,
 as in weather reports, ArduPilot and the marine textbooks: 0 is a north
 wind, blowing south; 270 is a west wind, blowing east.</p></li>
