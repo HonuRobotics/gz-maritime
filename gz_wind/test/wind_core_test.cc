@@ -188,6 +188,22 @@ TEST(Windfield, SetParameterByName)
 }
 
 /////////////////////////////////////////////////
+/// A direction is kept in [0, 360), whatever turn it was given in.
+TEST(Windfield, DirectionIsWrapped)
+{
+  wind::WindParameters p;
+  EXPECT_TRUE(wind::SetParameter(p, "direction", 450.0));
+  EXPECT_DOUBLE_EQ(90.0, p.direction);
+  EXPECT_TRUE(wind::SetParameter(p, "direction", -90.0));
+  EXPECT_DOUBLE_EQ(270.0, p.direction);
+  EXPECT_TRUE(wind::SetParameter(p, "direction", 360.0));
+  EXPECT_DOUBLE_EQ(0.0, p.direction);
+  EXPECT_TRUE(wind::SetParameter(p, "direction", -1e-20));
+  EXPECT_LT(p.direction, 360.0);
+  EXPECT_GE(p.direction, 0.0);
+}
+
+/////////////////////////////////////////////////
 /// The standard model is always there; an unknown name gives nothing; a new
 /// model is one registration away.
 TEST(WindModel, Registry)
@@ -300,6 +316,26 @@ TEST(WindModel, GustsTravelWithTheWind)
 }
 
 /////////////////////////////////////////////////
+/// In light air the gusts travel at 1 m/s, not at the mean speed, and the
+/// wind stays continuous as the mean speed falls to zero.
+TEST(WindModel, GustsTravelAtLeastOneMetrePerSecond)
+{
+  auto p = Gusty(42);
+  p.speed = 0.2;
+  auto model = wind::CreateWindModel("standard", p);
+  const math::Vector3d downwind(3, 0, 0);
+  EXPECT_LT((model->Velocity({}, 0.5) - model->Velocity(downwind, 3.5))
+            .Length(), 1e-9) << "3 m downwind at 1 m/s is 3 s later";
+
+  p.speed = 0.0;
+  auto calm = wind::CreateWindModel("standard", p);
+  p.speed = 1e-9;
+  auto nearlyCalm = wind::CreateWindModel("standard", p);
+  EXPECT_LT((calm->Velocity(downwind, 2.0) -
+             nearlyCalm->Velocity(downwind, 2.0)).Length(), 1e-6);
+}
+
+/////////////////////////////////////////////////
 /// Without gusts the wind does not change with time.
 TEST(WindModel, SteadyWithoutGusts)
 {
@@ -342,6 +378,29 @@ TEST(WindModel, ProfileWithHeight)
   model->SetParameters(p);
   EXPECT_NEAR(5.0, speed(1.0), 1e-9);
   EXPECT_NEAR(5.0, speed(-1.0), 1e-9);
+}
+
+/////////////////////////////////////////////////
+/// The profile slows the mean wind, not the gusts: 1 m above the water the
+/// speed wanders as much as at the reference height, around a slower mean.
+TEST(WindModel, GustsKeepTheirStrengthWithHeight)
+{
+  auto p = Gusty(42);
+  p.roughness_length = 0.0002;
+  auto model = wind::CreateWindModel("standard", p);
+  std::vector<double> high;
+  std::vector<double> low;
+  for (int i = 0; i < 30000; ++i)
+  {
+    high.push_back(model->Velocity({0, 0, 10.0}, i * 0.002).Length());
+    low.push_back(model->Velocity({0, 0, 1.0}, i * 0.002).Length());
+  }
+  const auto [highMean, highSd] = Stats(high);
+  const auto [lowMean, lowSd] = Stats(low);
+  const double factor = std::log(1.0 / 0.0002) / std::log(10.0 / 0.0002);
+  EXPECT_NEAR(5.0, highMean, 0.2);
+  EXPECT_NEAR(5.0 * factor, lowMean, 0.2);
+  EXPECT_NEAR(highSd, lowSd, 0.02);
 }
 
 /////////////////////////////////////////////////

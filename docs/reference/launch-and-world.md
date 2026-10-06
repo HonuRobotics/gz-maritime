@@ -169,7 +169,7 @@ What a model says to the wind system.
 
 | Where | Markup | Meaning |
 |---|---|---|
-| A `<collision>` in a model | `gz:wind="true"` (same `xmlns:gz` root attribute) | The wind pushes on this shape, by the part of it above the water, with quadratic drag on its projected area per axis, taking the wind at the centre of that part. A buoyancy box can carry both marks. |
+| A `<collision>` in a model | `gz:wind="true"` (same `xmlns:gz` root attribute) | The wind pushes on this shape, by the part of it above the water, with quadratic drag on its projected area per axis, taking the wind at the centre of that part. `"1"` works too. A mesh counts as its bounding box. A buoyancy box can carry both marks. |
 | The same `<collision>` | `gz:wind_cd="1.2"` | Its drag coefficient; the plugin's `<default_drag_coefficient>` otherwise. |
 | A `<sensor>` on a link | `type="custom" gz:type="anemometer"` | Reads the apparent wind at the sensor, in the sensor frame, as `gz.msgs.Twist` on its `<topic>`, at its `<update_rate>` (every step without one), with its `<frame_id>`. |
 
@@ -182,9 +182,10 @@ key on the wind topic, below.
 | Markup | Meaning |
 |---|---|
 | `<speed>`, `<direction>` | The wind: m/s, and the direction it comes from in degrees clockwise from north (270, from the west, blows towards +x). |
+| `<vertical>` | The vertical wind, m/s, positive up; the z of the world's `<wind>` by default. |
 | `<wind><linear_velocity>x y z</linear_velocity></wind>` on the world | Used as the starting wind when the plugin sets neither `<speed>` nor `<direction>`. |
 | `<speed_gust>`, `<speed_gust_time>`, `<direction_gust>`, `<direction_gust_time>` | Gusts: standard deviation (m/s, degrees) and correlation time (s, 2 and 10 by default) of the speed and the direction; 0 is steady. The gusts travel with the mean wind. |
-| `<reference_height>`, `<roughness_length>`, `<water_level>` | The height above the water `<speed>` is given at, 10 m by default, the surface roughness of a logarithmic wind profile, 0.0002 m over open sea (0, the default, is a uniform wind), and the world z of the water. Gazebo's rotor and wing systems see the reference height wind. |
+| `<reference_height>`, `<roughness_length>`, `<water_level>` | The height above the water `<speed>` is given at, 10 m by default, the surface roughness of a logarithmic wind profile, 0.0002 m over open sea (0, the default, is a uniform wind; it slows the mean wind, not the gusts), and the world z of the water. Gazebo's rotor and wing systems see the reference height wind. |
 | `<model>` | The wind model the recipe names, `standard` by default. |
 | `<seed>` | Seed of the gusts; the same seed repeats them, and 0, the default, draws one each run. |
 | `<publish_rate>` | Rate of the ground truth, 10 Hz by default. |
@@ -243,8 +244,9 @@ gz service -s /world/default/set_pose --reqtype gz.msgs.Pose \
 
 The wind changes while the simulation runs on the topic
 `/world/default/wind/set`: a `gz.msgs.Param` with `speed` (m/s),
-`direction` (degrees the wind comes from, clockwise from north), or any of
-the gust parameters, in any combination.
+`direction` (degrees the wind comes from, clockwise from north, kept in
+[0, 360)), `vertical` (m/s, positive up), or any of the gust parameters, in
+any combination.
 The simulation launch bridges it from ROS as
 `ros_gz_interfaces/msg/ParamVec`, with each key a double parameter. The
 current wind is published on `/world/default/wind_info` as `gz.msgs.Wind`,

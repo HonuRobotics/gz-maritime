@@ -82,8 +82,9 @@ namespace gz::sim::maritime
   ///   default 10.
   /// * `<roughness_length>`: m, the roughness of the surface for a
   ///   logarithmic wind profile, about 0.0002 over open sea; 0 (default) is
-  ///   a uniform wind. The wind at a height h above the water is the
-  ///   reference wind times ln(h / z0) / ln(h_ref / z0).
+  ///   a uniform wind. The mean wind at a height h above the water is the
+  ///   reference wind times ln(h / z0) / ln(h_ref / z0); the gusts are
+  ///   added after it, at full strength.
   /// * `<water_level>`: world z of the water, default 0.
   /// * `<seed>`: seed of the gusts; 0 (default) draws a new one each run.
   /// * `<publish_rate>`: Hz of simulation time for the ground truth,
@@ -95,6 +96,7 @@ namespace gz::sim::maritime
     : public System,
       public ISystemConfigure,
       public ISystemPreUpdate,
+      public ISystemPostUpdate,
       public ISystemReset
   {
     /// \brief Constructor.
@@ -112,6 +114,10 @@ namespace gz::sim::maritime
     // Documentation inherited.
     public: void PreUpdate(const UpdateInfo &_info,
                            EntityComponentManager &_ecm) override;
+
+    // Documentation inherited.
+    public: void PostUpdate(const UpdateInfo &_info,
+                            const EntityComponentManager &_ecm) override;
 
     // Documentation inherited.
     public: void Reset(const UpdateInfo &_info,

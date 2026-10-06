@@ -33,7 +33,6 @@
 
 #include <gz/common/Console.hh>
 #include <gz/common/Mesh.hh>
-#include <gz/common/MeshManager.hh>
 #include <gz/math/Angle.hh>
 #include <gz/math/CoordinateVector3.hh>
 #include <gz/math/Matrix3.hh>
@@ -222,6 +221,13 @@ class gz::sim::maritime::WindPrivate
   /// next update.
   public: bool rescan{true};
 
+  /// \brief Links created since the last scan, noted in PostUpdate, after
+  /// every system's PreUpdate, so a link is seen whichever system made it.
+  public: std::vector<Entity> newLinks;
+
+  /// \brief Custom sensors created since the last scan, noted the same way.
+  public: std::vector<Entity> newSensors;
+
   /// \brief Air density, kg/m^3.
   public: double airDensity{1.225};
 
@@ -302,16 +308,13 @@ bool WindPrivate::Set(const std::string &_name, double _value)
 void WindPrivate::WriteRecipe(EntityComponentManager &_ecm)
 {
   ++this->recipe.generation;
-  if (auto *comp = _ecm.Component<components::Windfield>(this->worldEntity))
+  // SetComponentData creates the component or updates it, but leaves the
+  // change unmarked, and the mark is what replicates the recipe.
+  if (_ecm.SetComponentData<components::Windfield>(this->worldEntity,
+                                                   this->recipe))
   {
-    comp->Data() = this->recipe;
     _ecm.SetChanged(this->worldEntity, components::Windfield::typeId,
                     ComponentState::OneTimeChange);
-  }
-  else
-  {
-    _ecm.CreateComponent(this->worldEntity,
-                         components::Windfield(this->recipe));
   }
   this->dirty = true;
 }
@@ -324,9 +327,11 @@ bool WindPrivate::Resolve(const EntityComponentManager &_ecm,
   if (nullptr == coll || nullptr == coll->Data().Element())
     return false;
 
+  // Read as a bool, like the buoyancy mark, so "1" marks a shape too.
   const auto elem = coll->Data().Element();
+  bool marked{false};
   if (!elem->HasAttribute(kMark) ||
-      elem->GetAttribute(kMark)->GetAsString() != "true")
+      !elem->GetAttribute(kMark)->Get<bool>(marked) || !marked)
   {
     return false;
   }
@@ -341,7 +346,10 @@ bool WindPrivate::Resolve(const EntityComponentManager &_ecm,
       gzwarn << "Ignoring invalid " << kCdMark << " on a wind shape\n";
   }
 
-  _shape.pose = coll->Data().RawPose();
+  // The entity's pose is already resolved against any relative_to frame;
+  // the raw pose is not.
+  const auto *pose = _ecm.Component<components::Pose>(_collision);
+  _shape.pose = nullptr != pose ? pose->Data() : coll->Data().RawPose();
 
   const sdf::Geometry *geom = coll->Data().Geom();
   if (nullptr == geom)
@@ -390,14 +398,13 @@ bool WindPrivate::Resolve(const EntityComponentManager &_ecm,
     }
     case sdf::GeometryType::MESH:
     {
-      // A mesh is treated as its bounding box.
+      // A mesh is treated as its bounding box. loadMesh resolves model://
+      // and Fuel URIs the way the rest of gz-sim does.
       const sdf::Mesh *meshSdf = geom->MeshShape();
-      const std::string file = asFullPath(meshSdf->Uri(),
-          meshSdf->FilePath());
-      const common::Mesh *mesh = common::MeshManager::Instance()->Load(file);
+      const common::Mesh *mesh = loadMesh(*meshSdf);
       if (nullptr == mesh)
       {
-        gzwarn << "Cannot load wind shape mesh [" << file << "]\n";
+        gzwarn << "Cannot load wind shape mesh [" << meshSdf->Uri() << "]\n";
         return false;
       }
       math::Vector3d min;
@@ -421,26 +428,25 @@ bool WindPrivate::Resolve(const EntityComponentManager &_ecm,
 //////////////////////////////////////////////////
 void WindPrivate::FindShapes(EntityComponentManager &_ecm, bool _all)
 {
-  // Collect first: creating components while iterating a view is unsafe.
   std::vector<Entity> candidates;
-  auto collect = [&](const Entity &_link, const components::Link *) -> bool
-  {
-    candidates.push_back(_link);
-    return true;
-  };
-
+  candidates.swap(this->newLinks);
   if (_all)
   {
+    // Collect first: creating components while iterating a view is unsafe.
     this->links.clear();
-    _ecm.Each<components::Link>(collect);
-  }
-  else
-  {
-    _ecm.EachNew<components::Link>(collect);
+    candidates.clear();
+    _ecm.Each<components::Link>(
+        [&](const Entity &_link, const components::Link *) -> bool
+        {
+          candidates.push_back(_link);
+          return true;
+        });
   }
 
   for (const Entity link : candidates)
   {
+    if (!_ecm.HasEntity(link))
+      continue;
     std::vector<WindShape> shapes;
     for (const Entity collision : _ecm.ChildrenByComponents(link,
         components::Collision()))
@@ -465,43 +471,46 @@ template <typename ComponentT>
 void WindPrivate::WriteEntity(EntityComponentManager &_ecm,
     const math::Vector3d &_wind)
 {
-  if (auto *comp = _ecm.Component<ComponentT>(this->windEntity))
-    comp->Data() = _wind;
-  else
-    _ecm.CreateComponent(this->windEntity, ComponentT(_wind));
+  // SetComponentData creates or updates the component but leaves the change
+  // unmarked.
+  if (_ecm.SetComponentData<ComponentT>(this->windEntity, _wind))
+  {
+    _ecm.SetChanged(this->windEntity, ComponentT::typeId,
+                    ComponentState::OneTimeChange);
+  }
 }
 
 //////////////////////////////////////////////////
 void WindPrivate::FindAnemometers(EntityComponentManager &_ecm, bool _all)
 {
-  std::vector<Entity> found;
-  auto collect = [&](const Entity &_sensor,
-                     const components::CustomSensor *_custom) -> bool
-  {
-    const auto elem = _custom->Data().Element();
-    if (elem && elem->HasAttribute("gz:type") &&
-        elem->GetAttribute("gz:type")->GetAsString() == "anemometer")
-    {
-      found.push_back(_sensor);
-    }
-    return true;
-  };
+  std::vector<Entity> candidates;
+  candidates.swap(this->newSensors);
   if (_all)
   {
     this->anemometers.clear();
-    _ecm.Each<components::CustomSensor>(collect);
-  }
-  else
-  {
-    _ecm.EachNew<components::CustomSensor>(collect);
+    candidates.clear();
+    _ecm.Each<components::CustomSensor>(
+        [&](const Entity &_sensor, const components::CustomSensor *) -> bool
+        {
+          candidates.push_back(_sensor);
+          return true;
+        });
   }
 
-  for (const Entity sensor : found)
+  for (const Entity sensor : candidates)
   {
+    const auto *custom = _ecm.Component<components::CustomSensor>(sensor);
+    if (nullptr == custom)
+      continue;
+    const auto elem = custom->Data().Element();
+    if (!elem || !elem->HasAttribute("gz:type") ||
+        elem->GetAttribute("gz:type")->GetAsString() != "anemometer")
+    {
+      continue;
+    }
     const auto *parent = _ecm.Component<components::ParentEntity>(sensor);
     const auto *pose = _ecm.Component<components::Pose>(sensor);
-    const auto &sdfSensor =
-        _ecm.Component<components::CustomSensor>(sensor)->Data();
+    const auto &sdfSensor = custom->Data();
     if (nullptr == parent || nullptr == pose)
       continue;
 
@@ -660,14 +669,22 @@ void Wind::Configure(const Entity &_entity,
   auto &d = *this->dataPtr;
   d.worldEntity = _entity;
   d.windEntity = _ecm.EntityByComponents(components::Wind());
-  d.airDensity = _sdf->Get<double>("air_density", d.airDensity).first;
-  d.defaultCd = _sdf->Get<double>("default_drag_coefficient",
-                                  d.defaultCd).first;
-  if (d.airDensity <= 0.0 || d.defaultCd < 0.0)
-  {
-    gzerr << "Wind: <air_density> must be positive and "
-          << "<default_drag_coefficient> cannot be negative\n";
-  }
+  // An invalid value keeps the default: a negative coefficient would make
+  // the wind pull.
+  const double density = _sdf->Get<double>("air_density",
+                                           d.airDensity).first;
+  if (density > 0.0)
+    d.airDensity = density;
+  else
+    gzerr << "Wind: <air_density> must be positive, using "
+          << d.airDensity << "\n";
+  const double cd = _sdf->Get<double>("default_drag_coefficient",
+                                      d.defaultCd).first;
+  if (cd >= 0.0)
+    d.defaultCd = cd;
+  else
+    gzerr << "Wind: <default_drag_coefficient> cannot be negative, using "
+          << d.defaultCd << "\n";
 
   // The world's <wind> is the starting point, in the world frame; the recipe
   // speaks of a speed and a direction from true north.
@@ -689,8 +706,8 @@ void Wind::Configure(const Entity &_entity,
   d.recipe.params.vertical = start.Z();
   d.recipe.params.speed = std::hypot(start.X(), start.Y());
   const double from = GZ_RTOD(std::atan2(-start.X(), -start.Y()));
-  d.recipe.params.direction = d.recipe.params.speed > 0.0 ?
-      std::fmod(from + 360.0, 360.0) : 0.0;
+  wind::SetParameter(d.recipe.params, "direction",
+                     d.recipe.params.speed > 0.0 ? from : 0.0);
 
   // The same names as the topic, so the world file and a message speak one
   // vocabulary.
@@ -786,19 +803,51 @@ void Wind::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
 }
 
 //////////////////////////////////////////////////
-void Wind::Reset(const UpdateInfo &, EntityComponentManager &)
+void Wind::PostUpdate(const UpdateInfo &, const EntityComponentManager &_ecm)
 {
-  this->dataPtr->links.clear();
-  this->dataPtr->anemometers.clear();
-  this->dataPtr->rescan = true;
-  this->dataPtr->dirty = true;
-  this->dataPtr->lastPublish.reset();
+  // EachNew only sees an entity in the step it was made in. Noting it here,
+  // after every PreUpdate, catches it whatever order the systems run in;
+  // it is resolved at the next PreUpdate.
+  _ecm.EachNew<components::Link>(
+      [&](const Entity &_link, const components::Link *) -> bool
+      {
+        this->dataPtr->newLinks.push_back(_link);
+        return true;
+      });
+  _ecm.EachNew<components::CustomSensor>(
+      [&](const Entity &_sensor, const components::CustomSensor *) -> bool
+      {
+        this->dataPtr->newSensors.push_back(_sensor);
+        return true;
+      });
+}
+
+//////////////////////////////////////////////////
+void Wind::Reset(const UpdateInfo &, EntityComponentManager &_ecm)
+{
+  auto &d = *this->dataPtr;
+
+  // A reset puts the world's recipe back as the world file set it. Start
+  // again from that one, not from the changes made since, under a new
+  // generation, so no consumer mistakes it for one it has already seen.
+  if (const auto *comp = _ecm.Component<components::Windfield>(d.worldEntity))
+  {
+    d.recipe.model = comp->Data().model;
+    d.recipe.params = comp->Data().params;
+    d.WriteRecipe(_ecm);
+  }
+  d.links.clear();
+  d.anemometers.clear();
+  d.rescan = true;
+  d.dirty = true;
+  d.lastPublish.reset();
 }
 
 GZ_ADD_PLUGIN(Wind,
               System,
               Wind::ISystemConfigure,
               Wind::ISystemPreUpdate,
+              Wind::ISystemPostUpdate,
               Wind::ISystemReset)
 
 GZ_ADD_PLUGIN_ALIAS(Wind, "gz::sim::maritime::Wind")

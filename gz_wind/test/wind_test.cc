@@ -22,6 +22,7 @@
 #include <gz/msgs/twist.pb.h>
 #include <gz/msgs/Utility.hh>
 #include <gz/msgs/wind.pb.h>
+#include <gz/msgs/world_control.pb.h>
 
 #include <chrono>
 #include <cmath>
@@ -188,6 +189,20 @@ bool SetWind(const std::string &_world, const std::string &_key,
   return sent;
 }
 
+/// \brief Ask a world to reset, as the GUI's reset button does.
+/// \param[in] _world World name.
+/// \return True if the world took the request.
+bool ResetWorld(const std::string &_world)
+{
+  transport::Node node;
+  msgs::WorldControl req;
+  req.mutable_reset()->set_all(true);
+  msgs::Boolean rep;
+  bool result{false};
+  return node.Request("/world/" + _world + "/control", req, 2000, rep,
+                      result) && result && rep.data();
+}
+
 /// \brief Path to one of the test worlds.
 /// \param[in] _file World file name.
 /// \return Its absolute path.
@@ -291,12 +306,14 @@ TEST(Windage, MarkedCollisions)
   BoxState plain;
   BoxState marked;
   BoxState half;
+  BoxState one;
   fixture.OnPostUpdate([&](const UpdateInfo &,
       const EntityComponentManager &_ecm)
   {
     plain = ReadBox(_ecm, "plain_box");
     marked = ReadBox(_ecm, "marked_box");
     half = ReadBox(_ecm, "half_box");
+    one = ReadBox(_ecm, "one_box");
   });
   fixture.Finalize();
 
@@ -319,6 +336,10 @@ TEST(Windage, MarkedCollisions)
   EXPECT_TRUE(half.tracked);
   EXPECT_NEAR(kSpeedAfterOneSecond / 2.0, half.vel.X(), 0.005)
       << "only the face above the waterline is in the wind";
+
+  ASSERT_TRUE(one.found);
+  EXPECT_TRUE(one.tracked) << "a mark is a bool, so \"1\" marks too";
+  EXPECT_NEAR(marked.vel.X(), one.vel.X(), 1e-9);
 }
 
 /////////////////////////////////////////////////
@@ -521,6 +542,33 @@ TEST(WindField, ChangedAtRunTimeOnItsTopic)
   ASSERT_TRUE(world.Run(2));
   EXPECT_EQ(before, world.state.recipe->generation);
   EXPECT_NEAR(0.0, world.state.entity.Length(), 1e-9);
+}
+
+/////////////////////////////////////////////////
+/// A reset brings back the world file's wind, under a new generation, and a
+/// change after it starts from that wind, not from the one before.
+TEST(WindField, ResetRestoresTheWorldsWind)
+{
+  WindWorld world("windfield.sdf");
+  ASSERT_TRUE(world.Run(1));
+  ASSERT_TRUE(SetWind("windfield", "speed", 8.0));
+  ASSERT_TRUE(world.Run(2));
+  EXPECT_NEAR(8.0, world.state.entity.X(), 1e-9);
+  ASSERT_TRUE(world.state.recipe.has_value());
+  const auto generation = world.state.recipe->generation;
+
+  ASSERT_TRUE(ResetWorld("windfield"));
+  ASSERT_TRUE(world.Run(3));
+  EXPECT_NEAR(5.0, world.state.entity.X(), 1e-9);
+  EXPECT_NEAR(5.0, world.state.recipe->params.speed, 1e-9);
+  EXPECT_GT(world.state.recipe->generation, generation)
+      << "the restored recipe is new to every consumer";
+
+  ASSERT_TRUE(SetWind("windfield", "direction", 180.0));
+  ASSERT_TRUE(world.Run(2));
+  EXPECT_NEAR(0.0, world.state.entity.X(), 1e-9);
+  EXPECT_NEAR(5.0, world.state.entity.Y(), 1e-9)
+      << "the speed is the world file's, not the one set before the reset";
 }
 
 /////////////////////////////////////////////////

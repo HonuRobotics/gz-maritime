@@ -22,16 +22,16 @@
       <max_step_size>0.002</max_step_size>
       <real_time_factor>0</real_time_factor>
     </physics>
-    <plugin filename="gz-sim-physics-system"
-            name="gz::sim::systems::Physics"/>
-    <plugin filename="gz-sim-user-commands-system"
-            name="gz::sim::systems::UserCommands"/>
     <plugin filename="gz-maritime-wind-system"
             name="gz::sim::maritime::Wind">
       <air_density>1.225</air_density>
       <water_level>0</water_level>
       <default_drag_coefficient>1</default_drag_coefficient>
     </plugin>
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
     <model name="plain_box">
       <pose>0 0 0.5 0 0 0</pose>
       <link name="link">
@@ -61,6 +61,25 @@
           <geometry><box><size>1 1 1</size></box></geometry>
         </collision>
         <collision name="windage" gz:wind="true">
+          <geometry><box><size>1 1 1</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+    <model name="one_box">
+      <pose>0 40 0.5 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>100</mass>
+          <inertia>
+            <ixx>16.667</ixx><iyy>16.667</iyy><izz>16.667</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="contact">
+          <geometry><box><size>1 1 1</size></box></geometry>
+        </collision>
+        <collision name="windage" gz:wind="1">
           <geometry><box><size>1 1 1</size></box></geometry>
           <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
         </collision>

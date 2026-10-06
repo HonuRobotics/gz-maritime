@@ -16,8 +16,10 @@
  */
 #include "gz/sim/wind/WindSampler.hh"
 
+#include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
 
 #include <gz/common/Console.hh>
 #include <gz/math/CoordinateVector3.hh>
@@ -54,10 +56,13 @@ class WindSamplerPrivate
     return out->AsMetricVector().value_or(_v);
   }
 
+  /// \brief The world entity, found once.
+  public: Entity world{kNullEntity};
+
   /// \brief The private copy of the model.
   public: std::unique_ptr<IWindModel> model;
 
-  /// \brief Model name and generation of that copy.
+  /// \brief Model name of that copy.
   public: std::string modelName;
 
   /// \brief Generation of that copy.
@@ -82,7 +87,11 @@ WindSampler::~WindSampler() = default;
 //////////////////////////////////////////////////
 bool WindSampler::Sync(const EntityComponentManager &_ecm)
 {
-  const Entity world = _ecm.EntityByComponents(components::World());
+  // The world entity never changes; look it up again only when the sampler
+  // is handed a world it has not seen.
+  Entity &world = this->dataPtr->world;
+  if (nullptr == _ecm.Component<components::World>(world))
+    world = _ecm.EntityByComponents(components::World());
   const auto *field = _ecm.Component<components::Windfield>(world);
   if (nullptr == field)
   {
