@@ -307,7 +307,10 @@ already has its half; this page is about yours.</p>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-navsat-system</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">navsat</span></code> (GPS) sensors</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-sensors-system</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gz-maritime-wind-system</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">anemometer</span></code> sensors: <code class="docutils literal notranslate"><span class="pre">type=&quot;custom&quot;</span></code> with <code class="docutils literal notranslate"><span class="pre">gz:type=&quot;anemometer&quot;</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-sensors-system</span></code></p></td>
 <td><p>Rendered sensors: <code class="docutils literal notranslate"><span class="pre">camera</span></code>, <code class="docutils literal notranslate"><span class="pre">depth_camera</span></code>, <code class="docutils literal notranslate"><span class="pre">gpu_lidar</span></code> and so on. These need a GPU.</p></td>
 </tr>
 </tbody>
@@ -331,7 +334,7 @@ name the frame <code class="docutils literal notranslate"><span class="pre">robo
 (<a class="reference internal" href="spawn-and-drive.html#the-bridge-configuration"><span class="std std-ref">The bridge configuration</span></a>).</p></li>
 </ol>
 <p>The IMU is shown in <a class="reference internal" href="gazebo-composition.html#sensors"><span class="std std-ref">Compose the Gazebo model</span></a>.
-The other two sensors on the custom USV differ only in their <code class="docutils literal notranslate"><span class="pre">&lt;sensor&gt;</span></code>
+The other three sensors on the custom USV differ only in their <code class="docutils literal notranslate"><span class="pre">&lt;sensor&gt;</span></code>
 element:</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="nt">&lt;xacro:sensor_link</span><span class="w"> </span><span class="na">sensor_name=</span><span class="s">"magnetometer"</span><span class="w"> </span><span class="na">frame=</span><span class="s">"imu_link"</span><span class="nt">&gt;</span>
 <span class="w">      </span><span class="nt">&lt;sensor</span><span class="w"> </span><span class="na">name=</span><span class="s">"magnetometer"</span><span class="w"> </span><span class="na">type=</span><span class="s">"magnetometer"</span><span class="nt">&gt;</span>
@@ -353,6 +356,30 @@ element:</p>
 <span class="w">    </span><span class="nt">&lt;/xacro:sensor_link&gt;</span>
 </pre></div>
 </div>
+<p>The anemometer is a custom sensor that the wind system reads. It reports the
+apparent wind, the wind at the sensor less the boat’s own velocity, in the
+sensor frame, as the linear part of a <code class="docutils literal notranslate"><span class="pre">gz.msgs.Twist</span></code>, bridged to
+<code class="docutils literal notranslate"><span class="pre">geometry_msgs/msg/TwistStamped</span></code>:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="nt">&lt;xacro:sensor_link</span><span class="w"> </span><span class="na">sensor_name=</span><span class="s">"anemometer"</span><span class="w"> </span><span class="na">frame=</span><span class="s">"gps_link"</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;sensor</span><span class="w"> </span><span class="na">name=</span><span class="s">"anemometer"</span><span class="w"> </span><span class="na">type=</span><span class="s">"custom"</span><span class="w"> </span><span class="na">gz:type=</span><span class="s">"anemometer"</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;frame_id&gt;</span>${name}/gps_link<span class="nt">&lt;/frame_id&gt;</span>
+<span class="w">        </span><span class="nt">&lt;topic&gt;</span>${name}/anemometer<span class="nt">&lt;/topic&gt;</span>
+<span class="w">        </span><span class="nt">&lt;update_rate&gt;</span>10<span class="nt">&lt;/update_rate&gt;</span>
+<span class="w">        </span><span class="nt">&lt;always_on&gt;</span>true<span class="nt">&lt;/always_on&gt;</span>
+<span class="w">        </span><span class="nt">&lt;gz:anemometer&gt;</span>
+<span class="w">          </span><span class="nt">&lt;noise</span><span class="w"> </span><span class="na">type=</span><span class="s">"gaussian"</span><span class="nt">&gt;</span>
+<span class="w">            </span><span class="nt">&lt;mean&gt;</span>0<span class="nt">&lt;/mean&gt;</span>
+<span class="w">            </span><span class="nt">&lt;stddev&gt;</span>0.1<span class="nt">&lt;/stddev&gt;</span>
+<span class="w">          </span><span class="nt">&lt;/noise&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/gz:anemometer&gt;</span>
+<span class="w">      </span><span class="nt">&lt;/sensor&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/xacro:sensor_link&gt;</span>
+</pre></div>
+</div>
+<p>It is a gz-sensors custom sensor, so it takes <code class="docutils literal notranslate"><span class="pre">&lt;topic&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;frame_id&gt;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&lt;update_rate&gt;</span></code> and <code class="docutils literal notranslate"><span class="pre">&lt;pose&gt;</span></code> like any other, and the standard <code class="docutils literal notranslate"><span class="pre">&lt;noise&gt;</span></code>
+block inside <code class="docutils literal notranslate"><span class="pre">&lt;gz:anemometer&gt;</span></code>, applied to each axis on its own and seeded
+from Gazebo’s seed (<code class="docutils literal notranslate"><span class="pre">gz</span> <span class="pre">sim</span> <span class="pre">--seed</span></code>). Without one its readings are exact.</p>
 </section>
 <section id="a-camera">
 <h2>A camera<a class="headerlink" href="#a-camera" title="Link to this heading"></a></h2>

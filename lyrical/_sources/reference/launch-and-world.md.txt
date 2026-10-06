@@ -171,6 +171,7 @@ What a model says to the wind system.
 |---|---|---|
 | A `<collision>` in a model | `gz:wind="true"` (same `xmlns:gz` root attribute) | The wind pushes on this shape, by the part of it above the water, with quadratic drag on its projected area per axis, taking the wind at the centre of that part. `"1"` works too. A mesh counts as its bounding box. A buoyancy box can carry both marks. |
 | The same `<collision>` | `gz:wind_cd="1.2"` | Its drag coefficient; the plugin's `<default_drag_coefficient>` otherwise. |
+| A `<sensor>` on a link | `type="custom" gz:type="anemometer"` | Reads the apparent wind at the sensor, in the sensor frame, as `gz.msgs.Twist` on its `<topic>`, at its `<update_rate>` (every step without one), with its `<frame_id>`. |
 
 ## Wind parameters
 
@@ -248,7 +249,11 @@ The wind changes while the simulation runs on the topic
 any combination.
 The simulation launch bridges it from ROS as
 `ros_gz_interfaces/msg/ParamVec`, with each key a double parameter. The
-current wind is published on `/world/default/wind_info` as `gz.msgs.Wind`.
+current wind is published on `/world/default/wind_info` as `gz.msgs.Wind`,
+and on `/world/default/wind/velocity` as `gz.msgs.Twist`, which the
+simulation launch bridges to ROS as `geometry_msgs/msg/TwistStamped` in the
+`world` frame. Gazebo's rotor, wing and air speed systems all read the same
+wind, at the reference height.
 
 ### Direction and units
 

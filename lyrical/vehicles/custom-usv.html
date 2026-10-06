@@ -811,12 +811,17 @@ two more terminals:</p>
 <td><p>from Gazebo</p></td>
 <td><p>5 Hz, in <code class="docutils literal notranslate"><span class="pre">custom_usv/gps_link</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">/custom_usv/joint_states</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">/custom_usv/anemometer</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">geometry_msgs/msg/TwistStamped</span></code></p></td>
+<td><p>from Gazebo</p></td>
+<td><p>10 Hz, the apparent wind (linear part, m/s) in <code class="docutils literal notranslate"><span class="pre">custom_usv/gps_link</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">/custom_usv/joint_states</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">sensor_msgs/msg/JointState</span></code></p></td>
 <td><p>from Gazebo</p></td>
 <td><p>Propeller joint angles</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">/clock</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">/clock</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">rosgraph_msgs/msg/Clock</span></code></p></td>
 <td><p>from Gazebo</p></td>
 <td><p>Simulation time, bridged once by the simulation launch</p></td>

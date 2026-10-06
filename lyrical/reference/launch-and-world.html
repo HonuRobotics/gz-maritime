@@ -642,6 +642,10 @@ credited in <code class="docutils literal notranslate"><span class="pre">kai_gaz
 <td><p><code class="docutils literal notranslate"><span class="pre">gz:wind_cd=&quot;1.2&quot;</span></code></p></td>
 <td><p>Its drag coefficient; the plugin’s <code class="docutils literal notranslate"><span class="pre">&lt;default_drag_coefficient&gt;</span></code> otherwise.</p></td>
 </tr>
+<tr class="row-even"><td><p>A <code class="docutils literal notranslate"><span class="pre">&lt;sensor&gt;</span></code> on a link</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">type=&quot;custom&quot;</span> <span class="pre">gz:type=&quot;anemometer&quot;</span></code></p></td>
+<td><p>Reads the apparent wind at the sensor, in the sensor frame, as <code class="docutils literal notranslate"><span class="pre">gz.msgs.Twist</span></code> on its <code class="docutils literal notranslate"><span class="pre">&lt;topic&gt;</span></code>, at its <code class="docutils literal notranslate"><span class="pre">&lt;update_rate&gt;</span></code> (every step without one), with its <code class="docutils literal notranslate"><span class="pre">&lt;frame_id&gt;</span></code>.</p></td>
+</tr>
 </tbody>
 </table>
 </section>
@@ -773,7 +777,11 @@ gz<span class="w"> </span>service<span class="w"> </span>-s<span class="w"> </sp
 any combination.
 The simulation launch bridges it from ROS as
 <code class="docutils literal notranslate"><span class="pre">ros_gz_interfaces/msg/ParamVec</span></code>, with each key a double parameter. The
-current wind is published on <code class="docutils literal notranslate"><span class="pre">/world/default/wind_info</span></code> as <code class="docutils literal notranslate"><span class="pre">gz.msgs.Wind</span></code>.</p>
+current wind is published on <code class="docutils literal notranslate"><span class="pre">/world/default/wind_info</span></code> as <code class="docutils literal notranslate"><span class="pre">gz.msgs.Wind</span></code>,
+and on <code class="docutils literal notranslate"><span class="pre">/world/default/wind/velocity</span></code> as <code class="docutils literal notranslate"><span class="pre">gz.msgs.Twist</span></code>, which the
+simulation launch bridges to ROS as <code class="docutils literal notranslate"><span class="pre">geometry_msgs/msg/TwistStamped</span></code> in the
+<code class="docutils literal notranslate"><span class="pre">world</span></code> frame. Gazebo’s rotor, wing and air speed systems all read the same
+wind, at the reference height.</p>
 <section id="direction-and-units">
 <h3>Direction and units<a class="headerlink" href="#direction-and-units" title="Link to this heading"></a></h3>
 <ul class="simple">
