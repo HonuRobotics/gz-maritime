@@ -37,6 +37,10 @@ namespace gz::sim::wind
 /// * speed_gust, direction_gust: standard deviation of the gusts on the
 ///   speed (m/s) and on the direction (degrees); 0 is steady.
 /// * speed_gust_time, direction_gust_time: their correlation times, s.
+/// * reference_height: height above the water the speed is given at, m.
+/// * roughness_length: surface roughness of a logarithmic profile, m; 0 is a
+///   uniform wind.
+/// * water_level: world z of the water, m.
 #define GZ_WIND_PARAM_TABLE(X)                     \
   X(speed,               "speed")                  \
   X(direction,           "direction")              \
@@ -44,7 +48,10 @@ namespace gz::sim::wind
   X(speed_gust,          "speed_gust")             \
   X(speed_gust_time,     "speed_gust_time")        \
   X(direction_gust,      "direction_gust")         \
-  X(direction_gust_time, "direction_gust_time")
+  X(direction_gust_time, "direction_gust_time")    \
+  X(reference_height,    "reference_height")       \
+  X(roughness_length,    "roughness_length")       \
+  X(water_level,         "water_level")
 
 /// \brief What a wind model is built from.
 struct WindParameters
@@ -69,6 +76,15 @@ struct WindParameters
 
   /// \brief Correlation time of the direction gusts, s.
   double direction_gust_time{10.0};
+
+  /// \brief Height above the water the speed is given at, m.
+  double reference_height{10.0};
+
+  /// \brief Surface roughness of a logarithmic profile, m; 0 is uniform.
+  double roughness_length{0.0};
+
+  /// \brief World z of the water, m.
+  double water_level{0.0};
 
   /// \brief Seed of anything random in the model. The wind system resolves a
   /// requested 0 into a drawn seed before it writes the recipe, so every

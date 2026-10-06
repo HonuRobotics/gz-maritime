@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!--
+  A 5 m/s wind from the west, given at 10 m, that falls off towards the
+  water with the 0.0002 m roughness length of the open sea.
+-->
+<sdf version="1.9">
+  <world name="profile">
+    <plugin filename="gz-maritime-wind-system"
+            name="gz::sim::maritime::Wind">
+      <speed>5</speed>
+      <direction>270</direction>
+      <reference_height>10</reference_height>
+      <roughness_length>0.0002</roughness_length>
+    </plugin>
+  </world>
+</sdf>
