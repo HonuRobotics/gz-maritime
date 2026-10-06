@@ -165,12 +165,13 @@ What a model says to the buoyancy system, and what a world says to it.
 
 ## Wind parameters
 
-What a world says to the wind system. Each parameter is also a key on the
-wind topic, below.
+What a world says to the wind system. `speed`, `direction`, `vertical` and
+`seed` are also keys on the wind topic, below.
 
 | Markup | Meaning |
 |---|---|
 | `<speed>`, `<direction>` | The wind: m/s, and the direction it comes from in degrees clockwise from north (270, from the west, blows towards +x). |
+| `<vertical>` | The vertical wind, m/s, positive up; the z of the world's `<wind>` by default. |
 | `<wind><linear_velocity>x y z</linear_velocity></wind>` on the world | Used as the starting wind when the plugin sets neither `<speed>` nor `<direction>`. |
 | `<speed_gust>`, `<speed_gust_time>`, `<direction_gust>`, `<direction_gust_time>` | Gusts: standard deviation (m/s, degrees) and correlation time (s, 2 and 10 by default) of the speed and the direction; 0 is steady. The gusts travel with the mean wind. |
 | `<reference_height>`, `<roughness_length>`, `<water_level>` | The height above the water `<speed>` is given at, 10 m by default, the surface roughness of a logarithmic wind profile, 0.0002 m over open sea (0, the default, is a uniform wind), and the world z of the water. Gazebo's rotor and wing systems see the reference height wind. |
@@ -231,8 +232,9 @@ gz service -s /world/default/set_pose --reqtype gz.msgs.Pose \
 
 The wind changes while the simulation runs on the topic
 `/world/default/wind/set`: a `gz.msgs.Param` with `speed` (m/s),
-`direction` (degrees the wind comes from, clockwise from north), or any of
-the gust parameters, in any combination.
+`direction` (degrees the wind comes from, clockwise from north, kept in
+[0, 360)), `vertical` (m/s, positive up), or any of the gust parameters, in
+any combination.
 The simulation launch bridges it from ROS as
 `ros_gz_interfaces/msg/ParamVec`, with each key a double parameter. The
 current wind is published on `/world/default/wind_info` as `gz.msgs.Wind`.

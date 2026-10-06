@@ -32,6 +32,7 @@ the same world, since both would write the wind.
 |-----------|---------|---------|
 | `<speed>` | the world's `<wind>` | m/s. |
 | `<direction>` | the world's `<wind>` | Degrees clockwise from north the wind comes from: 270 is from the west, blowing towards +x. |
+| `<vertical>` | the world's `<wind>` | m/s, positive up. |
 | `<speed_gust>` | 0 | Standard deviation of the speed gusts, m/s; 0 is a steady speed. |
 | `<speed_gust_time>` | 2 | Their correlation time, s. |
 | `<direction_gust>` | 0 | Standard deviation of the direction gusts, degrees. |
@@ -62,7 +63,7 @@ Every parameter but `<model>` and `<publish_rate>` is also a key of the wind top
 
 ## Gusts
 
-Each gust, on the speed and on the direction, is a sum of 256 sinusoids with
+Each gust, on the speed and on the direction, is a sum of 64 sinusoids with
 random phases drawn from the seed, weighted to a Lorentzian spectrum: it
 wanders around zero with the standard deviation asked for and forgets
 itself over the correlation time, like the first order Gauss Markov process
@@ -73,6 +74,14 @@ replays it.
 The gusts travel with the mean wind (Taylor's frozen turbulence): a point
 downwind sees what a point upwind saw earlier, so the bow and the stern of a
 boat in line with the wind feel a gust one after the other.
+They never travel slower than 1 m/s, since frozen turbulence does not hold
+in near calm air: below that the delay across a boat would grow without
+bound and the gusts at bow and stern would stop resembling each other.
+
+The speed never goes below zero. When `<speed_gust>` comes close to
+`<speed>` the clamp cuts off the lulls, so the speed averages above
+`<speed>` and spreads less than `<speed_gust>`; keep the gust well under
+the mean for the statistics to hold.
 
 ## Wind with height
 

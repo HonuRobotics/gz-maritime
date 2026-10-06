@@ -138,7 +138,8 @@ inline std::istream &operator>>(std::istream &_is, WindfieldData &_d)
   return _is;
 }
 
-/// \brief Set one parameter by its name.
+/// \brief Set one parameter by its name. A direction is wrapped into
+/// [0, 360).
 /// \param[in,out] _p Parameters.
 /// \param[in] _name Name from the table, or "seed".
 /// \param[in] _value Value.

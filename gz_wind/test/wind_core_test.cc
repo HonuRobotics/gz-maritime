@@ -188,6 +188,22 @@ TEST(Windfield, SetParameterByName)
 }
 
 /////////////////////////////////////////////////
+/// A direction is kept in [0, 360), whatever turn it was given in.
+TEST(Windfield, DirectionIsWrapped)
+{
+  wind::WindParameters p;
+  EXPECT_TRUE(wind::SetParameter(p, "direction", 450.0));
+  EXPECT_DOUBLE_EQ(90.0, p.direction);
+  EXPECT_TRUE(wind::SetParameter(p, "direction", -90.0));
+  EXPECT_DOUBLE_EQ(270.0, p.direction);
+  EXPECT_TRUE(wind::SetParameter(p, "direction", 360.0));
+  EXPECT_DOUBLE_EQ(0.0, p.direction);
+  EXPECT_TRUE(wind::SetParameter(p, "direction", -1e-20));
+  EXPECT_LT(p.direction, 360.0);
+  EXPECT_GE(p.direction, 0.0);
+}
+
+/////////////////////////////////////////////////
 /// The standard model is always there; an unknown name gives nothing; a new
 /// model is one registration away.
 TEST(WindModel, Registry)
@@ -297,6 +313,26 @@ TEST(WindModel, GustsTravelWithTheWind)
     EXPECT_TRUE(near(model->Velocity({}, t), model->Velocity(across, t)));
   }
   EXPECT_FALSE(near(model->Velocity({}, 0.3), model->Velocity(downwind, 0.3)));
+}
+
+/////////////////////////////////////////////////
+/// In light air the gusts travel at 1 m/s, not at the mean speed, and the
+/// wind stays continuous as the mean speed falls to zero.
+TEST(WindModel, GustsTravelAtLeastOneMetrePerSecond)
+{
+  auto p = Gusty(42);
+  p.speed = 0.2;
+  auto model = wind::CreateWindModel("standard", p);
+  const math::Vector3d downwind(3, 0, 0);
+  EXPECT_LT((model->Velocity({}, 0.5) - model->Velocity(downwind, 3.5))
+            .Length(), 1e-9) << "3 m downwind at 1 m/s is 3 s later";
+
+  p.speed = 0.0;
+  auto calm = wind::CreateWindModel("standard", p);
+  p.speed = 1e-9;
+  auto nearlyCalm = wind::CreateWindModel("standard", p);
+  EXPECT_LT((calm->Velocity(downwind, 2.0) -
+             nearlyCalm->Velocity(downwind, 2.0)).Length(), 1e-6);
 }
 
 /////////////////////////////////////////////////
