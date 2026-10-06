@@ -25,9 +25,10 @@ namespace gz::sim::wind
 {
 namespace
 {
-/// \brief Components of a gust. Enough that the sum looks Gaussian and
-/// does not repeat over any run.
-constexpr int kComponents{256};
+/// \brief Components of a gust. Enough that the sum looks Gaussian, does
+/// not repeat over any run and follows exp(-lag / T) to within 0.05, few
+/// enough that a query stays cheap when every marked shape asks each step.
+constexpr int kComponents{64};
 
 /// \brief Band of the components, in multiples of 1 / T: the Lorentzian
 /// spectrum holds about 99 % of its variance in it.
@@ -35,6 +36,11 @@ constexpr double kLowest{1e-3};
 
 /// \brief Upper end of the band, in multiples of 1 / T.
 constexpr double kHighest{10.0};
+
+/// \brief Slowest speed the gusts travel at, m/s. Frozen turbulence does not
+/// hold in near calm air, and below this the delay between two points of a
+/// vehicle would grow without bound.
+constexpr double kMinAdvection{1.0};
 }  // namespace
 
 //////////////////////////////////////////////////
@@ -103,13 +109,11 @@ math::Vector3d StandardModel::Velocity(const math::Vector3d &_enu,
 
   // The gusts travel with the mean wind: a point downwind sees what a point
   // upwind saw earlier (Taylor's frozen turbulence), so two points in line
-  // with the wind see the same gust, one after the other.
-  double t = _time;
-  if (this->params.speed > 0.0)
-  {
-    const math::Vector3d horizontal(_enu.X(), _enu.Y(), 0.0);
-    t -= towards.Dot(horizontal) / this->params.speed;
-  }
+  // with the wind see the same gust, one after the other. In light air they
+  // travel at kMinAdvection, so the gust stays continuous down to calm.
+  const math::Vector3d horizontal(_enu.X(), _enu.Y(), 0.0);
+  const double t = _time - towards.Dot(horizontal) /
+      std::max(this->params.speed, kMinAdvection);
 
   const double speed = std::max(0.0,
       this->params.speed + this->speedGust.At(t));

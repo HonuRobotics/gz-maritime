@@ -316,6 +316,26 @@ TEST(WindModel, GustsTravelWithTheWind)
 }
 
 /////////////////////////////////////////////////
+/// In light air the gusts travel at 1 m/s, not at the mean speed, and the
+/// wind stays continuous as the mean speed falls to zero.
+TEST(WindModel, GustsTravelAtLeastOneMetrePerSecond)
+{
+  auto p = Gusty(42);
+  p.speed = 0.2;
+  auto model = wind::CreateWindModel("standard", p);
+  const math::Vector3d downwind(3, 0, 0);
+  EXPECT_LT((model->Velocity({}, 0.5) - model->Velocity(downwind, 3.5))
+            .Length(), 1e-9) << "3 m downwind at 1 m/s is 3 s later";
+
+  p.speed = 0.0;
+  auto calm = wind::CreateWindModel("standard", p);
+  p.speed = 1e-9;
+  auto nearlyCalm = wind::CreateWindModel("standard", p);
+  EXPECT_LT((calm->Velocity(downwind, 2.0) -
+             nearlyCalm->Velocity(downwind, 2.0)).Length(), 1e-6);
+}
+
+/////////////////////////////////////////////////
 /// Without gusts the wind does not change with time.
 TEST(WindModel, SteadyWithoutGusts)
 {
