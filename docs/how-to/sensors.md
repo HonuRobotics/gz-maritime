@@ -59,6 +59,11 @@ sensor frame, as the linear part of a `gz.msgs.Twist`, bridged to
 :end-at: </xacro:sensor_link>
 ```
 
+It is a gz-sensors custom sensor, so it takes `<topic>`, `<frame_id>`,
+`<update_rate>` and `<pose>` like any other, and the standard `<noise>`
+block inside `<gz:anemometer>`, applied to each axis on its own and seeded
+from Gazebo's seed (`gz sim --seed`). Without one its readings are exact.
+
 ## A camera
 
 The custom USV has no camera, but adding one follows the same pattern. With

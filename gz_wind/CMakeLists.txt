@@ -27,6 +27,8 @@ find_package(gz_transport_vendor REQUIRED)
 find_package(gz-transport REQUIRED)
 find_package(gz_msgs_vendor REQUIRED)
 find_package(gz-msgs REQUIRED)
+find_package(gz_sensors_vendor REQUIRED)
+find_package(gz-sensors REQUIRED)
 
 # --------------------------------------------------------------------------
 # Core library: the wind as a recipe (the Windfield component), the registry
@@ -58,15 +60,20 @@ target_link_libraries(${PROJECT_NAME}
 
 # --------------------------------------------------------------------------
 # The wind system: owns the recipe, the wind topic and the ground truth, and
-# pushes on the collisions a vehicle marks gz:wind="true".
+# pushes on the collisions a vehicle marks gz:wind="true", and reads the
+# anemometers, a gz-sensors custom sensor.
 # --------------------------------------------------------------------------
-add_library(gz-maritime-wind-system SHARED src/systems/Wind.cc)
+add_library(gz-maritime-wind-system SHARED
+  src/systems/Wind.cc
+  src/systems/Anemometer.cc
+)
 target_link_libraries(gz-maritime-wind-system
   PRIVATE
     ${PROJECT_NAME}
     gz-plugin::register
     gz-common::gz-common
     gz-common::graphics
+    gz-sensors::gz-sensors
     gz-transport::core
     gz-msgs::core)
 

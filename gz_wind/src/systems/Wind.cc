@@ -39,6 +39,8 @@
 #include <gz/math/Pose3.hh>
 #include <gz/math/SphericalCoordinates.hh>
 #include <gz/plugin/Register.hh>
+#include <gz/sensors/SensorFactory.hh>
+#include <gz/sensors/Util.hh>
 #include <gz/transport/Node.hh>
 #include <sdf/Box.hh>
 #include <sdf/Capsule.hh>
@@ -67,6 +69,8 @@
 #include "gz/sim/components/Windfield.hh"
 #include "gz/sim/wind/Windfield.hh"
 #include "gz/sim/wind/WindSampler.hh"
+
+#include "Anemometer.hh"
 
 using namespace gz;
 using namespace sim;
@@ -115,8 +119,8 @@ namespace
   }
 }
 
-/// \brief One anemometer, resolved once when the sensor is found.
-struct Anemometer
+/// \brief One anemometer and where it sits, resolved once when it is found.
+struct AnemometerMount
 {
   /// \brief The link it is on.
   public: Entity link{kNullEntity};
@@ -124,17 +128,8 @@ struct Anemometer
   /// \brief Its pose in the link frame.
   public: math::Pose3d pose;
 
-  /// \brief Frame id of its readings.
-  public: std::string frameId;
-
-  /// \brief Its topic.
-  public: std::string topic;
-
-  /// \brief Publication period, simulation time; zero is every step.
-  public: std::chrono::steady_clock::duration period{0};
-
-  /// \brief Simulation time of the last reading.
-  public: std::optional<std::chrono::steady_clock::duration> last;
+  /// \brief The sensor, which publishes at its rate.
+  public: std::unique_ptr<Anemometer> sensor;
 };
 
 /// \brief One marked shape of a link, resolved once when the link is found.
@@ -211,11 +206,7 @@ class gz::sim::maritime::WindPrivate
   public: std::unordered_map<Entity, std::vector<WindShape>> links;
 
   /// \brief Anemometers, by sensor entity.
-  public: std::unordered_map<Entity, Anemometer> anemometers;
-
-  /// \brief A publisher per anemometer topic, kept across resets.
-  public: std::unordered_map<std::string, transport::Node::Publisher>
-          anemometerPubs;
+  public: std::unordered_map<Entity, AnemometerMount> anemometers;
 
   /// \brief Scan every link and sensor instead of only the new ones on the
   /// next update.
@@ -500,42 +491,36 @@ void WindPrivate::FindAnemometers(EntityComponentManager &_ecm, bool _all)
   for (const Entity sensor : candidates)
   {
     const auto *custom = _ecm.Component<components::CustomSensor>(sensor);
-    if (nullptr == custom)
-      continue;
-    const auto elem = custom->Data().Element();
-    if (!elem || !elem->HasAttribute("gz:type") ||
-        elem->GetAttribute("gz:type")->GetAsString() != "anemometer")
-    {
-      continue;
-    }
     const auto *parent = _ecm.Component<components::ParentEntity>(sensor);
     const auto *pose = _ecm.Component<components::Pose>(sensor);
-    const auto &sdfSensor = custom->Data();
-    if (nullptr == parent || nullptr == pose)
+    if (nullptr == custom || nullptr == parent || nullptr == pose ||
+        sensors::customType(custom->Data()) != "anemometer")
+    {
       continue;
+    }
 
-    Anemometer a;
-    a.link = parent->Data();
-    a.pose = pose->Data();
-    a.frameId = sdfSensor.FrameId().empty() ?
-        scopedName(sensor, _ecm, "::", false) : sdfSensor.FrameId();
-    a.topic = sdfSensor.Topic().empty() ?
-        "/" + scopedName(sensor, _ecm, "/", true) + "/anemometer" :
-        sdfSensor.Topic();
-    if (sdfSensor.UpdateRate() > 0.0)
+    // The sensor base class reads the topic, frame id and update rate; the
+    // name, which the frame id defaults to, and the topic default to the
+    // sensor's scoped name.
+    sdf::Sensor data = custom->Data();
+    data.SetName(scopedName(sensor, _ecm, "::", false));
+    if (data.Topic().empty())
+      data.SetTopic("/" + scopedName(sensor, _ecm, "/", true) + "/anemometer");
+    sensors::SensorFactory factory;
+    auto created = factory.CreateSensor<Anemometer>(data);
+    if (nullptr == created)
     {
-      a.period =
-          std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-          std::chrono::duration<double>(1.0 / sdfSensor.UpdateRate()));
+      gzerr << "Wind: cannot create anemometer [" << data.Name() << "]\n";
+      continue;
     }
-    if (0u == this->anemometerPubs.count(a.topic))
-    {
-      this->anemometerPubs[a.topic] =
-          this->node.Advertise<msgs::Twist>(a.topic);
-    }
+
+    AnemometerMount mount;
+    mount.link = parent->Data();
+    mount.pose = pose->Data();
+    mount.sensor = std::move(created);
     // The reading needs the velocity of the point it is taken at.
-    Link(a.link).EnableVelocityChecks(_ecm);
-    this->anemometers[sensor] = std::move(a);
+    Link(mount.link).EnableVelocityChecks(_ecm);
+    this->anemometers[sensor] = std::move(mount);
   }
 }
 
@@ -550,9 +535,10 @@ void WindPrivate::ReadAnemometers(const UpdateInfo &_info,
       it = this->anemometers.erase(it);
       continue;
     }
-    Anemometer &a = it->second;
+    AnemometerMount &a = it->second;
     ++it;
-    if (a.last && _info.simTime - *a.last < a.period)
+    // Work the wind out only when the sensor is due to publish.
+    if (_info.simTime < a.sensor->NextDataUpdateTime())
       continue;
 
     Link link(a.link);
@@ -564,19 +550,10 @@ void WindPrivate::ReadAnemometers(const UpdateInfo &_info,
 
     // The apparent wind: the air's velocity relative to the sensor, in the
     // sensor frame, the way a vane and cups on a moving boat read it.
-    const math::Vector3d apparent = sensorPose.Rot().RotateVectorReverse(
+    a.sensor->SetApparentWind(sensorPose.Rot().RotateVectorReverse(
         this->sampler.At(sensorPose.Pos(), _info.simTime) -
-        own.value_or(math::Vector3d::Zero));
-
-    msgs::Twist msg;
-    msg.mutable_header()->mutable_stamp()->CopyFrom(
-        convert<msgs::Time>(_info.simTime));
-    auto *frame = msg.mutable_header()->add_data();
-    frame->set_key("frame_id");
-    frame->add_value(a.frameId);
-    msgs::Set(msg.mutable_linear(), apparent);
-    this->anemometerPubs[a.topic].Publish(msg);
-    a.last = _info.simTime;
+        own.value_or(math::Vector3d::Zero)));
+    a.sensor->Update(_info.simTime, false);
   }
 }
 

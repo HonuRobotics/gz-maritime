@@ -877,6 +877,84 @@ TEST(Anemometer, ReadsTheApparentWind)
 }
 
 /////////////////////////////////////////////////
+/// The standard <noise> under <gz:anemometer> spreads each axis by its
+/// standard deviation around the true wind.
+TEST(Anemometer, NoiseFromTheSensorsOwnBlock)
+{
+  std::mutex mutex;
+  std::vector<math::Vector3d> readings;
+  transport::Node node;
+  ASSERT_TRUE(node.Subscribe("/noisy/anemometer",
+      std::function<void(const msgs::Twist &)>(
+      [&](const msgs::Twist &_msg)
+      {
+        const std::lock_guard<std::mutex> lock(mutex);
+        readings.push_back(msgs::Convert(_msg.linear()));
+      })));
+
+  WindWorld world("anemometer.sdf");
+  ASSERT_TRUE(world.Run(2000));
+  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+  const std::lock_guard<std::mutex> lock(mutex);
+  ASSERT_GT(readings.size(), 1000u);
+  const math::Vector3d truth(5.0, 0.0, 0.0);
+  for (int axis = 0; axis < 3; ++axis)
+  {
+    double sum{0.0};
+    double sumSq{0.0};
+    for (const auto &r : readings)
+    {
+      const double e = r[axis] - truth[axis];
+      sum += e;
+      sumSq += e * e;
+    }
+    const double n = static_cast<double>(readings.size());
+    const double mean = sum / n;
+    EXPECT_NEAR(0.0, mean, 0.05) << "axis " << axis;
+    EXPECT_NEAR(0.5, std::sqrt(sumSq / n - mean * mean), 0.05)
+        << "axis " << axis;
+  }
+}
+
+/////////////////////////////////////////////////
+/// An anemometer on a model spawned while the world runs is found and read,
+/// even with the wind system listed before the one that spawns it.
+TEST(Anemometer, SpawnedAtRunTime)
+{
+  Last<msgs::Twist> reading("/spawned/anemometer");
+  WindWorld world("anemometer.sdf");
+  ASSERT_TRUE(world.Run(10));
+
+  msgs::EntityFactory req;
+  req.set_sdf(R"(<?xml version="1.0"?>
+<sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
+  <model name="spawned">
+    <static>true</static>
+    <link name="link">
+      <sensor name="anemometer" type="custom" gz:type="anemometer">
+        <topic>/spawned/anemometer</topic>
+      </sensor>
+    </link>
+  </model>
+</sdf>)");
+  req.set_allow_renaming(false);
+  req.mutable_pose()->mutable_position()->set_z(3.0);
+  transport::Node node;
+  msgs::Boolean rep;
+  bool result{false};
+  ASSERT_TRUE(node.Request("/world/anemometer/create", req, 5000, rep,
+                           result));
+  ASSERT_TRUE(result && rep.data());
+
+  ASSERT_TRUE(world.Run(100));
+  const auto msg = reading.Get();
+  ASSERT_TRUE(msg.has_value()) << "the spawned anemometer never published";
+  EXPECT_NEAR(5.0, msg->linear().x(), 1e-6);
+  EXPECT_NEAR(0.0, msg->linear().y(), 1e-6);
+}
+
+/////////////////////////////////////////////////
 /// The ground truth is also published as a twist in the world frame, which
 /// ROS can bridge.
 TEST(WindField, GroundTruthAsATwist)
