@@ -140,6 +140,20 @@
       <enable_by_default>false</enable_by_default>
     </plugin>
 
+    <!-- Wind (gz_wind). The world owns the wind: <speed> in m/s at 10 m and
+         the <direction> it comes from, in degrees clockwise from north (270
+         is a wind from the west). Change it while running on the topic
+         /world/default/wind/set (keys speed and direction), bridged to ROS
+         by the simulation launch. The system keeps the wind as a recipe on
+         the world, writes it where Gazebo's rotor, wing and air speed systems
+         read it, and publishes it on /world/default/wind_info. -->
+    <plugin
+      filename="gz-maritime-wind-system"
+      name="gz::sim::maritime::Wind">
+      <speed>0</speed>
+      <direction>0</direction>
+    </plugin>
+
     <!-- ==================================================================
          WAVE SOURCE — the engine is the plugin's identity. Keep exactly ONE of
          the two <plugin> blocks below active and comment the other out. Both
