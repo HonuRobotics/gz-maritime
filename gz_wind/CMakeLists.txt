@@ -22,7 +22,7 @@ find_package(gz-plugin REQUIRED COMPONENTS register)
 find_package(gz_math_vendor REQUIRED)
 find_package(gz-math REQUIRED)
 find_package(gz_common_vendor REQUIRED)
-find_package(gz-common REQUIRED)
+find_package(gz-common REQUIRED COMPONENTS graphics)
 find_package(gz_transport_vendor REQUIRED)
 find_package(gz-transport REQUIRED)
 find_package(gz_msgs_vendor REQUIRED)
@@ -57,7 +57,8 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 # --------------------------------------------------------------------------
-# The wind system: owns the recipe, the wind topic and the ground truth.
+# The wind system: owns the recipe, the wind topic and the ground truth, and
+# pushes on the collisions a vehicle marks gz:wind="true".
 # --------------------------------------------------------------------------
 add_library(gz-maritime-wind-system SHARED src/systems/Wind.cc)
 target_link_libraries(gz-maritime-wind-system
@@ -65,6 +66,7 @@ target_link_libraries(gz-maritime-wind-system
     ${PROJECT_NAME}
     gz-plugin::register
     gz-common::gz-common
+    gz-common::graphics
     gz-transport::core
     gz-msgs::core)
 

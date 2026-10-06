@@ -2,9 +2,18 @@
 <!--
   A 5 m/s wind from the west, given at 10 m, that falls off towards the
   water with the 0.0002 m roughness length of the open sea.
+  high_box sits at the 10 m reference height and low_box at 1 m, with no
+  gravity and no damping, so the wind is all that moves them.
 -->
-<sdf version="1.9">
+<sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
   <world name="profile">
+    <gravity>0 0 0</gravity>
+    <physics name="fast" type="dart">
+      <max_step_size>0.002</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
     <plugin filename="gz-maritime-wind-system"
             name="gz::sim::maritime::Wind">
       <speed>5</speed>
@@ -12,5 +21,37 @@
       <reference_height>10</reference_height>
       <roughness_length>0.0002</roughness_length>
     </plugin>
+    <model name="high_box">
+      <pose>0 0 10 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>100</mass>
+          <inertia>
+            <ixx>16.667</ixx><iyy>16.667</iyy><izz>16.667</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="windage" gz:wind="true">
+          <geometry><box><size>1 1 1</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+    <model name="low_box">
+      <pose>0 5 1 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>100</mass>
+          <inertia>
+            <ixx>16.667</ixx><iyy>16.667</iyy><izz>16.667</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="windage" gz:wind="true">
+          <geometry><box><size>1 1 1</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
   </world>
 </sdf>
