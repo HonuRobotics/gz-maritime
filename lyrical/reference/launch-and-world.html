@@ -642,13 +642,16 @@ credited in <code class="docutils literal notranslate"><span class="pre">kai_gaz
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;wind&gt;&lt;linear_velocity&gt;x</span> <span class="pre">y</span> <span class="pre">z&lt;/linear_velocity&gt;&lt;/wind&gt;</span></code> on the world</p></td>
 <td><p>Used as the starting wind when the plugin sets neither <code class="docutils literal notranslate"><span class="pre">&lt;speed&gt;</span></code> nor <code class="docutils literal notranslate"><span class="pre">&lt;direction&gt;</span></code>.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;model&gt;</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;speed_gust&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;speed_gust_time&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;direction_gust&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;direction_gust_time&gt;</span></code></p></td>
+<td><p>Gusts: standard deviation (m/s, degrees) and correlation time (s, 2 and 10 by default) of the speed and the direction; 0 is steady. The gusts travel with the mean wind.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;model&gt;</span></code></p></td>
 <td><p>The wind model the recipe names, <code class="docutils literal notranslate"><span class="pre">standard</span></code> by default.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;seed&gt;</span></code></p></td>
-<td><p>Seed of anything random in the model; 0, the default, draws one each run.</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;seed&gt;</span></code></p></td>
+<td><p>Seed of the gusts; the same seed repeats them, and 0, the default, draws one each run.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;publish_rate&gt;</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;publish_rate&gt;</span></code></p></td>
 <td><p>Rate of the ground truth, 10 Hz by default.</p></td>
 </tr>
 </tbody>
@@ -736,7 +739,8 @@ gz<span class="w"> </span>service<span class="w"> </span>-s<span class="w"> </sp
 <p>The wind changes while the simulation runs on the topic
 <code class="docutils literal notranslate"><span class="pre">/world/default/wind/set</span></code>: a <code class="docutils literal notranslate"><span class="pre">gz.msgs.Param</span></code> with <code class="docutils literal notranslate"><span class="pre">speed</span></code> (m/s),
 <code class="docutils literal notranslate"><span class="pre">direction</span></code> (degrees the wind comes from, clockwise from north, kept in
-[0, 360)), <code class="docutils literal notranslate"><span class="pre">vertical</span></code> (m/s, positive up), or any of them.
+[0, 360)), <code class="docutils literal notranslate"><span class="pre">vertical</span></code> (m/s, positive up), or any of the gust parameters, in
+any combination.
 The simulation launch bridges it from ROS as
 <code class="docutils literal notranslate"><span class="pre">ros_gz_interfaces/msg/ParamVec</span></code>, with each key a double parameter. The
 current wind is published on <code class="docutils literal notranslate"><span class="pre">/world/default/wind_info</span></code> as <code class="docutils literal notranslate"><span class="pre">gz.msgs.Wind</span></code>.</p>
@@ -758,6 +762,11 @@ in the world frame, not a direction: a west wind of 6 m/s reads
 <p>A 6 m/s wind from the west, from ROS:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>topic<span class="w"> </span>pub<span class="w"> </span>--once<span class="w"> </span>/world/default/wind/set<span class="w"> </span>ros_gz_interfaces/msg/ParamVec<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="s2">"{params: [{name: speed, value: {type: 3, double_value: 6.0}}, {name: direction, value: {type: 3, double_value: 270.0}}]}"</span>
+</pre></div>
+</div>
+<p>Gusts of 1.5 m/s that last about 3 s, from ROS:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>topic<span class="w"> </span>pub<span class="w"> </span>--once<span class="w"> </span>/world/default/wind/set<span class="w"> </span>ros_gz_interfaces/msg/ParamVec<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">"{params: [{name: speed_gust, value: {type: 3, double_value: 1.5}}, {name: speed_gust_time, value: {type: 3, double_value: 3.0}}]}"</span>
 </pre></div>
 </div>
 <p>From Gazebo, turning it to come from the south, and reading it back:</p>
