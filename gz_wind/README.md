@@ -77,6 +77,8 @@ boat in line with the wind feel a gust one after the other.
 They never travel slower than 1 m/s, since frozen turbulence does not hold
 in near calm air: below that the delay across a boat would grow without
 bound and the gusts at bow and stern would stop resembling each other.
+At every height they travel at the reference height speed, not at the
+slower wind of the profile, a small approximation near the water.
 
 The speed never goes below zero. When `<speed_gust>` comes close to
 `<speed>` the clamp cuts off the lulls, so the speed averages above
@@ -86,8 +88,12 @@ the mean for the statistics to hold.
 ## Wind with height
 
 With a roughness length `z0`, the wind at a height `h` above the water is
-the reference wind times `ln(h / z0) / ln(h_ref / z0)`: over the sea, about
-0.7 of the 10 m wind half a metre above the water, and none below `z0`.
+the mean reference wind times `ln(h / z0) / ln(h_ref / z0)`: over the sea,
+about 0.7 of the 10 m wind half a metre above the water, and none below
+`z0`. The gusts are added after the profile, at full strength, since near
+the sea they are about as strong at any height; `<vertical>` is not
+profiled either. A `z0` at or above the reference height gives a uniform
+wind, with a warning.
 The wind entity holds the reference height wind, so Gazebo's rotor, wing
 and air speed systems, which read that single value, do not see the
 profile; a system that asks `WindAt` does.

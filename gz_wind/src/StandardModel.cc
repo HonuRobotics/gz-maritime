@@ -17,8 +17,10 @@
 #include "StandardModel.hh"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 
+#include <gz/common/Console.hh>
 #include <gz/math/Angle.hh>
 
 namespace gz::sim::wind
@@ -92,6 +94,17 @@ double Gust::At(double _t) const
 void StandardModel::SetParameters(const WindParameters &_params)
 {
   this->params = _params;
+  if (_params.roughness_length >= _params.reference_height)
+  {
+    // Once per process: every consumer rebuilds the model on every change.
+    static std::atomic<bool> warned{false};
+    if (!warned.exchange(true))
+    {
+      gzwarn << "Wind: roughness_length [" << _params.roughness_length
+             << "] is not below reference_height ["
+             << _params.reference_height << "], the wind is uniform\n";
+    }
+  }
   // One generator for both, speed first, so the seed fixes both series.
   std::mt19937 rng(_params.seed);
   this->speedGust.Build(_params.speed_gust, _params.speed_gust_time, rng);
@@ -115,8 +128,12 @@ math::Vector3d StandardModel::Velocity(const math::Vector3d &_enu,
   const double t = _time - towards.Dot(horizontal) /
       std::max(this->params.speed, kMinAdvection);
 
-  const double speed = this->Profile(_enu.Z()) * std::max(0.0,
-      this->params.speed + this->speedGust.At(t));
+  // The profile slows the mean wind alone: near the sea the gusts are about
+  // as strong at any height, so the gust asked for is the gust a deck feels.
+  // There is no wind at or below the roughness length.
+  const double profile = this->Profile(_enu.Z());
+  const double speed = profile > 0.0 ? std::max(0.0,
+      profile * this->params.speed + this->speedGust.At(t)) : 0.0;
   const double b = GZ_DTOR(this->params.direction + this->directionGust.At(t));
   return {-speed * std::sin(b), -speed * std::cos(b), this->params.vertical};
 }

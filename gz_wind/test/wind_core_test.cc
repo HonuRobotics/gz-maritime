@@ -381,6 +381,29 @@ TEST(WindModel, ProfileWithHeight)
 }
 
 /////////////////////////////////////////////////
+/// The profile slows the mean wind, not the gusts: 1 m above the water the
+/// speed wanders as much as at the reference height, around a slower mean.
+TEST(WindModel, GustsKeepTheirStrengthWithHeight)
+{
+  auto p = Gusty(42);
+  p.roughness_length = 0.0002;
+  auto model = wind::CreateWindModel("standard", p);
+  std::vector<double> high;
+  std::vector<double> low;
+  for (int i = 0; i < 30000; ++i)
+  {
+    high.push_back(model->Velocity({0, 0, 10.0}, i * 0.002).Length());
+    low.push_back(model->Velocity({0, 0, 1.0}, i * 0.002).Length());
+  }
+  const auto [highMean, highSd] = Stats(high);
+  const auto [lowMean, lowSd] = Stats(low);
+  const double factor = std::log(1.0 / 0.0002) / std::log(10.0 / 0.0002);
+  EXPECT_NEAR(5.0, highMean, 0.2);
+  EXPECT_NEAR(5.0 * factor, lowMean, 0.2);
+  EXPECT_NEAR(highSd, lowSd, 0.02);
+}
+
+/////////////////////////////////////////////////
 /// The sampler reads the recipe from the world and answers in the world
 /// frame; without a recipe it has no wind.
 TEST(WindSampler, AnswersFromTheRecipe)
