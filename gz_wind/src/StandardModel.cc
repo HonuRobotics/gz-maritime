@@ -17,17 +17,20 @@
 #include "StandardModel.hh"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 
+#include <gz/common/Console.hh>
 #include <gz/math/Angle.hh>
 
 namespace gz::sim::wind
 {
 namespace
 {
-/// \brief Components of a gust. Enough that the sum looks Gaussian and
-/// does not repeat over any run.
-constexpr int kComponents{256};
+/// \brief Components of a gust. Enough that the sum looks Gaussian, does
+/// not repeat over any run and follows exp(-lag / T) to within 0.05, few
+/// enough that a query stays cheap when every marked shape asks each step.
+constexpr int kComponents{64};
 
 /// \brief Band of the components, in multiples of 1 / T: the Lorentzian
 /// spectrum holds about 99 % of its variance in it.
@@ -35,6 +38,11 @@ constexpr double kLowest{1e-3};
 
 /// \brief Upper end of the band, in multiples of 1 / T.
 constexpr double kHighest{10.0};
+
+/// \brief Slowest speed the gusts travel at, m/s. Frozen turbulence does not
+/// hold in near calm air, and below this the delay between two points of a
+/// vehicle would grow without bound.
+constexpr double kMinAdvection{1.0};
 }  // namespace
 
 //////////////////////////////////////////////////
@@ -86,6 +94,17 @@ double Gust::At(double _t) const
 void StandardModel::SetParameters(const WindParameters &_params)
 {
   this->params = _params;
+  if (_params.roughness_length >= _params.reference_height)
+  {
+    // Once per process: every consumer rebuilds the model on every change.
+    static std::atomic<bool> warned{false};
+    if (!warned.exchange(true))
+    {
+      gzwarn << "Wind: roughness_length [" << _params.roughness_length
+             << "] is not below reference_height ["
+             << _params.reference_height << "], the wind is uniform\n";
+    }
+  }
   // One generator for both, speed first, so the seed fixes both series.
   std::mt19937 rng(_params.seed);
   this->speedGust.Build(_params.speed_gust, _params.speed_gust_time, rng);
@@ -103,16 +122,18 @@ math::Vector3d StandardModel::Velocity(const math::Vector3d &_enu,
 
   // The gusts travel with the mean wind: a point downwind sees what a point
   // upwind saw earlier (Taylor's frozen turbulence), so two points in line
-  // with the wind see the same gust, one after the other.
-  double t = _time;
-  if (this->params.speed > 0.0)
-  {
-    const math::Vector3d horizontal(_enu.X(), _enu.Y(), 0.0);
-    t -= towards.Dot(horizontal) / this->params.speed;
-  }
+  // with the wind see the same gust, one after the other. In light air they
+  // travel at kMinAdvection, so the gust stays continuous down to calm.
+  const math::Vector3d horizontal(_enu.X(), _enu.Y(), 0.0);
+  const double t = _time - towards.Dot(horizontal) /
+      std::max(this->params.speed, kMinAdvection);
 
-  const double speed = this->Profile(_enu.Z()) * std::max(0.0,
-      this->params.speed + this->speedGust.At(t));
+  // The profile slows the mean wind alone: near the sea the gusts are about
+  // as strong at any height, so the gust asked for is the gust a deck feels.
+  // There is no wind at or below the roughness length.
+  const double profile = this->Profile(_enu.Z());
+  const double speed = profile > 0.0 ? std::max(0.0,
+      profile * this->params.speed + this->speedGust.At(t)) : 0.0;
   const double b = GZ_DTOR(this->params.direction + this->directionGust.At(t));
   return {-speed * std::sin(b), -speed * std::cos(b), this->params.vertical};
 }
