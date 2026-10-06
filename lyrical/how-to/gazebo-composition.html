@@ -589,6 +589,7 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#worlds">Worlds</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#the-open-water-sdf-world">The <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code> world</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#buoyancy-markup">Buoyancy markup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#wind-markup">Wind markup</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#wind-parameters">Wind parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#thruster-command">Thruster command</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#services">Services</a><ul>
@@ -716,7 +717,7 @@ whose collision shapes are the volume that floats the vehicle, and mark each
 of them with <code class="docutils literal notranslate"><span class="pre">gz:buoyancy=&quot;true&quot;</span></code>. The custom USV’s macro makes one box per
 hull:</p>
 <div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">&lt;xacro:macro</span><span class="w"> </span><span class="na">name=</span><span class="s">"pontoon"</span><span class="w"> </span><span class="na">params=</span><span class="s">"side y"</span><span class="nt">&gt;</span>
-<span class="w">    </span><span class="nt">&lt;collision</span><span class="w"> </span><span class="na">name=</span><span class="s">"pontoon_${side}"</span><span class="w"> </span><span class="na">gz:buoyancy=</span><span class="s">"true"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;collision</span><span class="w"> </span><span class="na">name=</span><span class="s">"pontoon_${side}"</span><span class="w"> </span><span class="na">gz:buoyancy=</span><span class="s">"true"</span><span class="w"> </span><span class="na">gz:wind=</span><span class="s">"true"</span><span class="nt">&gt;</span>
 <span class="w">      </span><span class="nt">&lt;pose&gt;</span>0<span class="w"> </span>${y}<span class="w"> </span>${hull_z}<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="nt">&lt;/pose&gt;</span>
 <span class="w">      </span><span class="nt">&lt;geometry&gt;</span>
 <span class="w">        </span><span class="nt">&lt;box&gt;&lt;size&gt;</span>${hull_length}<span class="w"> </span>${hull_width}<span class="w"> </span>${hull_height}<span class="nt">&lt;/size&gt;&lt;/box&gt;</span>
