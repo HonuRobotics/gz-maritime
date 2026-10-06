@@ -137,6 +137,22 @@ TEST(Windfield, SetParameterByName)
 }
 
 /////////////////////////////////////////////////
+/// A direction is kept in [0, 360), whatever turn it was given in.
+TEST(Windfield, DirectionIsWrapped)
+{
+  wind::WindParameters p;
+  EXPECT_TRUE(wind::SetParameter(p, "direction", 450.0));
+  EXPECT_DOUBLE_EQ(90.0, p.direction);
+  EXPECT_TRUE(wind::SetParameter(p, "direction", -90.0));
+  EXPECT_DOUBLE_EQ(270.0, p.direction);
+  EXPECT_TRUE(wind::SetParameter(p, "direction", 360.0));
+  EXPECT_DOUBLE_EQ(0.0, p.direction);
+  EXPECT_TRUE(wind::SetParameter(p, "direction", -1e-20));
+  EXPECT_LT(p.direction, 360.0);
+  EXPECT_GE(p.direction, 0.0);
+}
+
+/////////////////////////////////////////////////
 /// The standard model is always there; an unknown name gives nothing; a new
 /// model is one registration away.
 TEST(WindModel, Registry)

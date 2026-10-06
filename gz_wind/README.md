@@ -31,11 +31,12 @@ the same world, since both would write the wind.
 |-----------|---------|---------|
 | `<speed>` | the world's `<wind>` | m/s. |
 | `<direction>` | the world's `<wind>` | Degrees clockwise from north the wind comes from: 270 is from the west, blowing towards +x. |
+| `<vertical>` | the world's `<wind>` | m/s, positive up. |
 | `<model>` | standard | The registered wind model. |
 | `<seed>` | 0 | Seed of anything random in the model; 0 draws one each run. |
 | `<publish_rate>` | 10 | Hz of simulation time for `wind_info`. |
 
-`speed`, `direction` and `seed` are also the keys of the wind topic, a
+`speed`, `direction`, `vertical` and `seed` are also the keys of the wind topic, a
 `gz.msgs.Param` with double values, any of them in one message.
 
 ## Direction and units

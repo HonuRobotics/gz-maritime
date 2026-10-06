@@ -165,12 +165,13 @@ What a model says to the buoyancy system, and what a world says to it.
 
 ## Wind parameters
 
-What a world says to the wind system. Each parameter is also a key on the
-wind topic, below.
+What a world says to the wind system. `speed`, `direction`, `vertical` and
+`seed` are also keys on the wind topic, below.
 
 | Markup | Meaning |
 |---|---|
 | `<speed>`, `<direction>` | The wind: m/s, and the direction it comes from in degrees clockwise from north (270, from the west, blows towards +x). |
+| `<vertical>` | The vertical wind, m/s, positive up; the z of the world's `<wind>` by default. |
 | `<wind><linear_velocity>x y z</linear_velocity></wind>` on the world | Used as the starting wind when the plugin sets neither `<speed>` nor `<direction>`. |
 | `<model>` | The wind model the recipe names, `standard` by default. |
 | `<seed>` | Seed of anything random in the model; 0, the default, draws one each run. |
@@ -229,7 +230,8 @@ gz service -s /world/default/set_pose --reqtype gz.msgs.Pose \
 
 The wind changes while the simulation runs on the topic
 `/world/default/wind/set`: a `gz.msgs.Param` with `speed` (m/s),
-`direction` (degrees the wind comes from, clockwise from north), or both.
+`direction` (degrees the wind comes from, clockwise from north, kept in
+[0, 360)), `vertical` (m/s, positive up), or any of them.
 The simulation launch bridges it from ROS as
 `ros_gz_interfaces/msg/ParamVec`, with each key a double parameter. The
 current wind is published on `/world/default/wind_info` as `gz.msgs.Wind`.

@@ -35,6 +35,15 @@ bool SetParameter(WindParameters &_p, const std::string &_name, double _value)
   }
   if (_name == "speed" && _value < 0.0)
     return false;
+  // A direction is kept in [0, 360), whatever turn it was given in.
+  if (_name == "direction")
+  {
+    _value = std::fmod(_value, 360.0);
+    if (_value < 0.0)
+      _value += 360.0;
+    if (_value >= 360.0)
+      _value = 0.0;
+  }
 #define GZ_WIND_SET(m, name) \
   if (_name == name) { _p.m = _value; return true; }
   GZ_WIND_PARAM_TABLE(GZ_WIND_SET)

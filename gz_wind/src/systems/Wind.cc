@@ -163,16 +163,13 @@ bool WindPrivate::Set(const std::string &_name, double _value)
 void WindPrivate::WriteRecipe(EntityComponentManager &_ecm)
 {
   ++this->recipe.generation;
-  if (auto *comp = _ecm.Component<components::Windfield>(this->worldEntity))
+  // SetComponentData creates the component or updates it, but leaves the
+  // change unmarked, and the mark is what replicates the recipe.
+  if (_ecm.SetComponentData<components::Windfield>(this->worldEntity,
+                                                   this->recipe))
   {
-    comp->Data() = this->recipe;
     _ecm.SetChanged(this->worldEntity, components::Windfield::typeId,
                     ComponentState::OneTimeChange);
-  }
-  else
-  {
-    _ecm.CreateComponent(this->worldEntity,
-                         components::Windfield(this->recipe));
   }
   this->dirty = true;
 }
@@ -216,8 +213,8 @@ void Wind::Configure(const Entity &_entity,
   d.recipe.params.vertical = start.Z();
   d.recipe.params.speed = std::hypot(start.X(), start.Y());
   const double from = GZ_RTOD(std::atan2(-start.X(), -start.Y()));
-  d.recipe.params.direction = d.recipe.params.speed > 0.0 ?
-      std::fmod(from + 360.0, 360.0) : 0.0;
+  wind::SetParameter(d.recipe.params, "direction",
+                     d.recipe.params.speed > 0.0 ? from : 0.0);
 
   // The same names as the topic, so the world file and a message speak one
   // vocabulary.
@@ -272,15 +269,11 @@ void Wind::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
                                            _info.simTime);
   if ((d.dirty || d.sampler.TimeVarying()) && kNullEntity != d.windEntity)
   {
-    if (auto *comp = _ecm.Component<components::WorldLinearVelocity>(
-        d.windEntity))
+    if (_ecm.SetComponentData<components::WorldLinearVelocity>(d.windEntity,
+                                                               wind))
     {
-      comp->Data() = wind;
-    }
-    else
-    {
-      _ecm.CreateComponent(d.windEntity,
-                           components::WorldLinearVelocity(wind));
+      _ecm.SetChanged(d.windEntity, components::WorldLinearVelocity::typeId,
+                      ComponentState::OneTimeChange);
     }
     d.dirty = false;
   }
@@ -300,10 +293,21 @@ void Wind::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
 }
 
 //////////////////////////////////////////////////
-void Wind::Reset(const UpdateInfo &, EntityComponentManager &)
+void Wind::Reset(const UpdateInfo &, EntityComponentManager &_ecm)
 {
-  this->dataPtr->dirty = true;
-  this->dataPtr->lastPublish.reset();
+  auto &d = *this->dataPtr;
+
+  // A reset puts the world's recipe back as the world file set it. Start
+  // again from that one, not from the changes made since, under a new
+  // generation, so no consumer mistakes it for one it has already seen.
+  if (const auto *comp = _ecm.Component<components::Windfield>(d.worldEntity))
+  {
+    d.recipe.model = comp->Data().model;
+    d.recipe.params = comp->Data().params;
+    d.WriteRecipe(_ecm);
+  }
+  d.dirty = true;
+  d.lastPublish.reset();
 }
 
 GZ_ADD_PLUGIN(Wind,
