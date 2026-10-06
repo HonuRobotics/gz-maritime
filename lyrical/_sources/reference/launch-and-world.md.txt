@@ -145,6 +145,7 @@ World name: `default`.
 | `gz-sim-sensors-system` | Rendered sensors (ogre2) |
 | `gz-sim-imu-system`, `gz-sim-magnetometer-system`, `gz-sim-navsat-system`, `gz-sim-air-pressure-system` | IMU, magnetometer, GPS and barometer sensors |
 | `gz-maritime-buoyancy-system` | Seawater 1025 kg/m³ below z = 0, air 1 kg/m³ above; `<enable_by_default>false</enable_by_default>`, no `<enable>` list |
+| `gz-maritime-wind-system` | Still air by default (`<speed>0</speed>`), changed at run time on the wind topic |
 | `gz-sim-waves-fft-system` | Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out) |
 | `model://water_surface` | Draws the sea |
 | `model://landing_pad` at (8, -8) | A static 4 m deck 1 m above the water, the only solid ground; spawn a quad on it at z = 1.25 |
@@ -161,6 +162,25 @@ What a model says to the buoyancy system, and what a world says to it.
 | The same `<collision>` | `<surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>` | The shape touches nothing; recommended for every mark. |
 | The world plugin | `<enable_by_default>false</enable_by_default>` | Unmarked collisions never float. Defaults to `true` with no `<enable>` list and `false` with one. |
 | The world plugin | `<enable>model</enable>`, `<enable>model::link</enable>` | Unmarked collisions of the named model or link float. Names as spawned. |
+
+## Wind parameters
+
+What a world says to the wind system. `speed`, `direction`, `vertical` and
+`seed` are also keys on the wind topic, below.
+
+| Markup | Meaning |
+|---|---|
+| `<speed>`, `<direction>` | The wind: m/s, and the direction it comes from in degrees clockwise from north (270, from the west, blows towards +x). |
+| `<vertical>` | The vertical wind, m/s, positive up; the z of the world's `<wind>` by default. |
+| `<wind><linear_velocity>x y z</linear_velocity></wind>` on the world | Used as the starting wind when the plugin sets neither `<speed>` nor `<direction>`. |
+| `<model>` | The wind model the recipe names, `standard` by default. |
+| `<seed>` | Seed of anything random in the model; 0, the default, draws one each run. |
+| `<publish_rate>` | Rate of the ground truth, 10 Hz by default. |
+
+The system keeps the wind on the world entity as a recipe, the way the wave
+field works, and writes it into gz-sim's wind entity at the world's origin.
+A system that needs the wind at a point asks `gz::sim::wind::WindAt`, or
+keeps a `gz::sim::wind::WindSampler`, from the `gz_wind` library.
 
 ## Thruster command
 
@@ -204,6 +224,45 @@ gz service -s /world/default/create --reqtype gz.msgs.EntityFactory \
 gz service -s /world/default/set_pose --reqtype gz.msgs.Pose \
   --reptype gz.msgs.Boolean --timeout 2000 \
   --req 'name: "my_boat", position: {x: 5, y: 0, z: 0}, orientation: {w: 1}'
+```
+
+## Wind
+
+The wind changes while the simulation runs on the topic
+`/world/default/wind/set`: a `gz.msgs.Param` with `speed` (m/s),
+`direction` (degrees the wind comes from, clockwise from north, kept in
+[0, 360)), `vertical` (m/s, positive up), or any of them.
+The simulation launch bridges it from ROS as
+`ros_gz_interfaces/msg/ParamVec`, with each key a double parameter. The
+current wind is published on `/world/default/wind_info` as `gz.msgs.Wind`.
+
+### Direction and units
+
+- **Speed** in metres per second, at 10 m, as in weather reports.
+- **Direction** the wind comes from, in degrees clockwise from true north,
+  as in weather reports, ArduPilot and the marine textbooks: 0 is a north
+  wind, blowing south; 270 is a west wind, blowing east.
+- **North** is the world's, from its `<spherical_coordinates>`, the same
+  north its GPS and magnetometer use. With the `ENU` orientation and a
+  `heading_deg` of 0, which every world here has, north is the world's +y
+  axis and east its +x axis.
+- **The ground truth** on `/world/default/wind_info` is the air's velocity
+  in the world frame, not a direction: a west wind of 6 m/s reads
+  `x: 6, y: 0` in these worlds.
+
+A 6 m/s wind from the west, from ROS:
+
+```bash
+ros2 topic pub --once /world/default/wind/set ros_gz_interfaces/msg/ParamVec \
+  "{params: [{name: speed, value: {type: 3, double_value: 6.0}}, {name: direction, value: {type: 3, double_value: 270.0}}]}"
+```
+
+From Gazebo, turning it to come from the south, and reading it back:
+
+```bash
+gz topic -t /world/default/wind/set -m gz.msgs.Param \
+  -p 'params {key: "direction" value {type: DOUBLE double_value: 180}}'
+gz topic -e -t /world/default/wind_info -n 1
 ```
 
 ## Topics

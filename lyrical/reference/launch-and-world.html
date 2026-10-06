@@ -231,9 +231,14 @@
 <li class="toctree-l3"><a class="reference internal" href="#worlds">Worlds</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#the-open-water-sdf-world">The <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code> world</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#buoyancy-markup">Buoyancy markup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#wind-parameters">Wind parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#thruster-command">Thruster command</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#services">Services</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#examples">Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#wind">Wind</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#direction-and-units">Direction and units</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#topics">Topics</a></li>
@@ -565,16 +570,19 @@ credited in <code class="docutils literal notranslate"><span class="pre">kai_gaz
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gz-maritime-buoyancy-system</span></code></p></td>
 <td><p>Seawater 1025 kg/m³ below z = 0, air 1 kg/m³ above; <code class="docutils literal notranslate"><span class="pre">&lt;enable_by_default&gt;false&lt;/enable_by_default&gt;</span></code>, no <code class="docutils literal notranslate"><span class="pre">&lt;enable&gt;</span></code> list</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-waves-fft-system</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gz-maritime-wind-system</span></code></p></td>
+<td><p>Still air by default (<code class="docutils literal notranslate"><span class="pre">&lt;speed&gt;0&lt;/speed&gt;</span></code>), changed at run time on the wind topic</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-waves-fft-system</span></code></p></td>
 <td><p>Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out)</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">model://water_surface</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">model://water_surface</span></code></p></td>
 <td><p>Draws the sea</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">model://landing_pad</span></code> at (8, -8)</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">model://landing_pad</span></code> at (8, -8)</p></td>
 <td><p>A static 4 m deck 1 m above the water, the only solid ground; spawn a quad on it at z = 1.25</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;spherical_coordinates&gt;</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;spherical_coordinates&gt;</span></code></p></td>
 <td><p>36.693509° N, 121.936568° W, elevation 0, ENU</p></td>
 </tr>
 </tbody>
@@ -613,6 +621,42 @@ credited in <code class="docutils literal notranslate"><span class="pre">kai_gaz
 </tr>
 </tbody>
 </table>
+</section>
+<section id="wind-parameters">
+<h2>Wind parameters<a class="headerlink" href="#wind-parameters" title="Link to this heading"></a></h2>
+<p>What a world says to the wind system. <code class="docutils literal notranslate"><span class="pre">speed</span></code>, <code class="docutils literal notranslate"><span class="pre">direction</span></code>, <code class="docutils literal notranslate"><span class="pre">vertical</span></code> and
+<code class="docutils literal notranslate"><span class="pre">seed</span></code> are also keys on the wind topic, below.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Markup</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;speed&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;direction&gt;</span></code></p></td>
+<td><p>The wind: m/s, and the direction it comes from in degrees clockwise from north (270, from the west, blows towards +x).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;vertical&gt;</span></code></p></td>
+<td><p>The vertical wind, m/s, positive up; the z of the world’s <code class="docutils literal notranslate"><span class="pre">&lt;wind&gt;</span></code> by default.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;wind&gt;&lt;linear_velocity&gt;x</span> <span class="pre">y</span> <span class="pre">z&lt;/linear_velocity&gt;&lt;/wind&gt;</span></code> on the world</p></td>
+<td><p>Used as the starting wind when the plugin sets neither <code class="docutils literal notranslate"><span class="pre">&lt;speed&gt;</span></code> nor <code class="docutils literal notranslate"><span class="pre">&lt;direction&gt;</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;model&gt;</span></code></p></td>
+<td><p>The wind model the recipe names, <code class="docutils literal notranslate"><span class="pre">standard</span></code> by default.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;seed&gt;</span></code></p></td>
+<td><p>Seed of anything random in the model; 0, the default, draws one each run.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;publish_rate&gt;</span></code></p></td>
+<td><p>Rate of the ground truth, 10 Hz by default.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The system keeps the wind on the world entity as a recipe, the way the wave
+field works, and writes it into gz-sim’s wind entity at the world’s origin.
+A system that needs the wind at a point asks <code class="docutils literal notranslate"><span class="pre">gz::sim::wind::WindAt</span></code>, or
+keeps a <code class="docutils literal notranslate"><span class="pre">gz::sim::wind::WindSampler</span></code>, from the <code class="docutils literal notranslate"><span class="pre">gz_wind</span></code> library.</p>
 </section>
 <section id="thruster-command">
 <h2>Thruster command<a class="headerlink" href="#thruster-command" title="Link to this heading"></a></h2>
@@ -683,6 +727,43 @@ in normalized mode (<code class="docutils literal notranslate"><span class="pre"
 gz<span class="w"> </span>service<span class="w"> </span>-s<span class="w"> </span>/world/default/set_pose<span class="w"> </span>--reqtype<span class="w"> </span>gz.msgs.Pose<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--reptype<span class="w"> </span>gz.msgs.Boolean<span class="w"> </span>--timeout<span class="w"> </span><span class="m">2000</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--req<span class="w"> </span><span class="s1">'name: "my_boat", position: {x: 5, y: 0, z: 0}, orientation: {w: 1}'</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="wind">
+<h2>Wind<a class="headerlink" href="#wind" title="Link to this heading"></a></h2>
+<p>The wind changes while the simulation runs on the topic
+<code class="docutils literal notranslate"><span class="pre">/world/default/wind/set</span></code>: a <code class="docutils literal notranslate"><span class="pre">gz.msgs.Param</span></code> with <code class="docutils literal notranslate"><span class="pre">speed</span></code> (m/s),
+<code class="docutils literal notranslate"><span class="pre">direction</span></code> (degrees the wind comes from, clockwise from north, kept in
+[0, 360)), <code class="docutils literal notranslate"><span class="pre">vertical</span></code> (m/s, positive up), or any of them.
+The simulation launch bridges it from ROS as
+<code class="docutils literal notranslate"><span class="pre">ros_gz_interfaces/msg/ParamVec</span></code>, with each key a double parameter. The
+current wind is published on <code class="docutils literal notranslate"><span class="pre">/world/default/wind_info</span></code> as <code class="docutils literal notranslate"><span class="pre">gz.msgs.Wind</span></code>.</p>
+<section id="direction-and-units">
+<h3>Direction and units<a class="headerlink" href="#direction-and-units" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Speed</strong> in metres per second, at 10 m, as in weather reports.</p></li>
+<li><p><strong>Direction</strong> the wind comes from, in degrees clockwise from true north,
+as in weather reports, ArduPilot and the marine textbooks: 0 is a north
+wind, blowing south; 270 is a west wind, blowing east.</p></li>
+<li><p><strong>North</strong> is the world’s, from its <code class="docutils literal notranslate"><span class="pre">&lt;spherical_coordinates&gt;</span></code>, the same
+north its GPS and magnetometer use. With the <code class="docutils literal notranslate"><span class="pre">ENU</span></code> orientation and a
+<code class="docutils literal notranslate"><span class="pre">heading_deg</span></code> of 0, which every world here has, north is the world’s +y
+axis and east its +x axis.</p></li>
+<li><p><strong>The ground truth</strong> on <code class="docutils literal notranslate"><span class="pre">/world/default/wind_info</span></code> is the air’s velocity
+in the world frame, not a direction: a west wind of 6 m/s reads
+<code class="docutils literal notranslate"><span class="pre">x:</span> <span class="pre">6,</span> <span class="pre">y:</span> <span class="pre">0</span></code> in these worlds.</p></li>
+</ul>
+<p>A 6 m/s wind from the west, from ROS:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>topic<span class="w"> </span>pub<span class="w"> </span>--once<span class="w"> </span>/world/default/wind/set<span class="w"> </span>ros_gz_interfaces/msg/ParamVec<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">"{params: [{name: speed, value: {type: 3, double_value: 6.0}}, {name: direction, value: {type: 3, double_value: 270.0}}]}"</span>
+</pre></div>
+</div>
+<p>From Gazebo, turning it to come from the south, and reading it back:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gz<span class="w"> </span>topic<span class="w"> </span>-t<span class="w"> </span>/world/default/wind/set<span class="w"> </span>-m<span class="w"> </span>gz.msgs.Param<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-p<span class="w"> </span><span class="s1">'params {key: "direction" value {type: DOUBLE double_value: 180}}'</span>
+gz<span class="w"> </span>topic<span class="w"> </span>-e<span class="w"> </span>-t<span class="w"> </span>/world/default/wind_info<span class="w"> </span>-n<span class="w"> </span><span class="m">1</span>
 </pre></div>
 </div>
 </section>
