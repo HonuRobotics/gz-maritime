@@ -28,6 +28,8 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <utility>
+#include <vector>
 
 #include <gz/common/Filesystem.hh>
 #include <gz/math/CoordinateVector3.hh>
@@ -146,6 +148,7 @@ class WindWorld
         const EntityComponentManager &_ecm)
     {
       this->state = ReadWind(_info, _ecm);
+      this->series.push_back(this->state.entity);
     });
     this->fixture.Finalize();
   }
@@ -161,9 +164,30 @@ class WindWorld
   /// \brief The fixture.
   public: TestFixture fixture;
 
+  /// \brief The wind entity's velocity after every step.
+  public: std::vector<math::Vector3d> series;
+
   /// \brief The wind after the last step.
   public: WindState state;
 };
+
+/// \brief Standard deviation of the horizontal speed of a series of winds.
+/// \param[in] _v The winds.
+/// \return The standard deviation, m/s.
+double SpeedSd(const std::vector<math::Vector3d> &_v)
+{
+  double mean{0.0};
+  for (const auto &w : _v)
+    mean += std::hypot(w.X(), w.Y());
+  mean /= static_cast<double>(_v.size());
+  double var{0.0};
+  for (const auto &w : _v)
+  {
+    const double d = std::hypot(w.X(), w.Y()) - mean;
+    var += d * d;
+  }
+  return std::sqrt(var / static_cast<double>(_v.size()));
+}
 }  // namespace
 
 /////////////////////////////////////////////////
@@ -318,4 +342,67 @@ TEST(WindDirection, WorldWindSurvivesTheRoundTrip)
   ASSERT_TRUE(world.Run(2));
   EXPECT_NEAR(3.0, world.state.entity.X(), 1e-9);
   EXPECT_NEAR(4.0, world.state.entity.Y(), 1e-9);
+}
+
+/////////////////////////////////////////////////
+/// Gusts move the wind entity every step, and the wind asked through the
+/// recipe agrees with it: every system sees the same gust.
+TEST(WindGusts, EveryoneSeesTheSameGust)
+{
+  WindWorld world("gusts.sdf");
+  ASSERT_TRUE(world.Run(1000));
+  EXPECT_GT(SpeedSd(world.series), 0.3);
+  EXPECT_NEAR(0.0, (world.state.entity - world.state.sampled).Length(),
+              1e-9);
+}
+
+/////////////////////////////////////////////////
+/// The same seed gives the same gusts, run after run.
+TEST(WindGusts, SeedRepeatsTheSeries)
+{
+  WindWorld first("gusts.sdf");
+  ASSERT_TRUE(first.Run(1000));
+  WindWorld second("gusts.sdf");
+  ASSERT_TRUE(second.Run(1000));
+  ASSERT_EQ(first.series.size(), second.series.size());
+  for (std::size_t i = 0; i < first.series.size(); ++i)
+    ASSERT_EQ(first.series[i], second.series[i]) << "step " << i;
+}
+
+/////////////////////////////////////////////////
+/// The gusts are a function of time, so a reset replays them.
+TEST(WindGusts, ResetReplaysTheGusts)
+{
+  WindWorld world("gusts.sdf");
+  ASSERT_TRUE(world.Run(500));
+  const std::vector<math::Vector3d> before = world.series;
+  world.series.clear();
+  world.fixture.Server()->ResetAll();
+  ASSERT_TRUE(world.Run(500));
+  // The first iteration after a reset is the reset itself, which still
+  // reports the wind as it was; the replay starts on the next one.
+  ASSERT_GT(world.series.size(), 400u);
+  for (std::size_t i = 1; i < world.series.size(); ++i)
+    ASSERT_EQ(before[i - 1], world.series[i]) << "step " << i;
+}
+
+/////////////////////////////////////////////////
+/// The topic turns gusts on in a world that has none, and off again.
+TEST(WindGusts, TurnedOnAndOffOnTheTopic)
+{
+  WindWorld world("windfield.sdf");
+  ASSERT_TRUE(world.Run(200));
+  EXPECT_NEAR(0.0, SpeedSd(world.series), 1e-9) << "steady before";
+
+  ASSERT_TRUE(SetWind("windfield", "speed_gust", 1.0));
+  world.series.clear();
+  ASSERT_TRUE(world.Run(5000));
+  EXPECT_GT(SpeedSd(world.series), 0.3) << "gusting after";
+
+  ASSERT_TRUE(SetWind("windfield", "speed_gust", 0.0));
+  ASSERT_TRUE(world.Run(2));
+  world.series.clear();
+  ASSERT_TRUE(world.Run(200));
+  EXPECT_NEAR(0.0, SpeedSd(world.series), 1e-9) << "steady again";
+  EXPECT_NEAR(5.0, world.state.entity.Length(), 1e-9) << "back to the mean";
 }

@@ -34,10 +34,17 @@ namespace gz::sim::wind
 /// * direction: direction the wind comes from, degrees clockwise from true
 ///   north, as in weather reports.
 /// * vertical: vertical component, m/s, positive up.
-#define GZ_WIND_PARAM_TABLE(X) \
-  X(speed,     "speed")        \
-  X(direction, "direction")    \
-  X(vertical,  "vertical")
+/// * speed_gust, direction_gust: standard deviation of the gusts on the
+///   speed (m/s) and on the direction (degrees); 0 is steady.
+/// * speed_gust_time, direction_gust_time: their correlation times, s.
+#define GZ_WIND_PARAM_TABLE(X)                     \
+  X(speed,               "speed")                  \
+  X(direction,           "direction")              \
+  X(vertical,            "vertical")               \
+  X(speed_gust,          "speed_gust")             \
+  X(speed_gust_time,     "speed_gust_time")        \
+  X(direction_gust,      "direction_gust")         \
+  X(direction_gust_time, "direction_gust_time")
 
 /// \brief What a wind model is built from.
 struct WindParameters
@@ -50,6 +57,18 @@ struct WindParameters
 
   /// \brief Vertical component, m/s, positive up.
   double vertical{0.0};
+
+  /// \brief Standard deviation of the speed gusts, m/s.
+  double speed_gust{0.0};
+
+  /// \brief Correlation time of the speed gusts, s.
+  double speed_gust_time{2.0};
+
+  /// \brief Standard deviation of the direction gusts, degrees.
+  double direction_gust{0.0};
+
+  /// \brief Correlation time of the direction gusts, s.
+  double direction_gust_time{10.0};
 
   /// \brief Seed of anything random in the model. The wind system resolves a
   /// requested 0 into a drawn seed before it writes the recipe, so every
