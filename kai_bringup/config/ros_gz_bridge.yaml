@@ -10,3 +10,10 @@
   ros_type_name: "ros_gz_interfaces/msg/ParamVec"
   gz_type_name: "gz.msgs.Param"
   direction: ROS_TO_GZ
+
+# The wind, as ground truth: the air's velocity at the reference height, in
+# the world frame.
+- topic_name: "/world/default/wind/velocity"
+  ros_type_name: "geometry_msgs/msg/TwistStamped"
+  gz_type_name: "gz.msgs.Twist"
+  direction: GZ_TO_ROS

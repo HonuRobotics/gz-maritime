@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<!--
+  A 5 m/s wind from the west, blowing towards +x, and three anemometers.
+  mast is static and turned 90 degrees, so its anemometer reads the wind
+  along its -y axis. falling drops freely under gravity, so its anemometer
+  also reads the air rushing up past it at g t. noisy reads the wind with
+  Gaussian noise of 0.5 m/s on each axis.
+-->
+<sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
+  <world name="anemometer">
+    <physics name="fast" type="dart">
+      <max_step_size>0.002</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-maritime-wind-system"
+            name="gz::sim::maritime::Wind">
+      <speed>5</speed>
+      <direction>270</direction>
+    </plugin>
+    <!-- After the wind system on purpose: an anemometer spawned at run time
+         must be found whatever order the systems run in. -->
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <model name="mast">
+      <static>true</static>
+      <pose>0 0 0 0 0 1.5707963267948966</pose>
+      <link name="link">
+        <sensor name="anemometer" type="custom" gz:type="anemometer">
+          <pose>0 0 3 0 0 0</pose>
+          <topic>/mast/anemometer</topic>
+          <frame_id>mast/anemometer</frame_id>
+          <update_rate>50</update_rate>
+        </sensor>
+      </link>
+    </model>
+    <model name="noisy">
+      <static>true</static>
+      <pose>0 -10 0 0 0 0</pose>
+      <link name="link">
+        <sensor name="anemometer" type="custom" gz:type="anemometer">
+          <pose>0 0 3 0 0 0</pose>
+          <topic>/noisy/anemometer</topic>
+          <gz:anemometer>
+            <noise type="gaussian">
+              <mean>0</mean>
+              <stddev>0.5</stddev>
+            </noise>
+          </gz:anemometer>
+        </sensor>
+      </link>
+    </model>
+    <model name="falling">
+      <pose>0 10 100 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>1</mass>
+          <inertia>
+            <ixx>0.1</ixx><iyy>0.1</iyy><izz>0.1</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <sensor name="anemometer" type="custom" gz:type="anemometer">
+          <topic>/falling/anemometer</topic>
+        </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>

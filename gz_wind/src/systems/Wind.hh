@@ -37,8 +37,9 @@ namespace gz::sim::maritime
   /// ros_gz_interfaces/msg/ParamVec). It also writes the wind above the
   /// world's origin, at the reference height, into the wind entity every
   /// Gazebo world carries, which Gazebo's rotor and wing systems read, and
-  /// publishes it as ground truth on
-  /// `/world/<world>/wind_info` (gz.msgs.Wind).
+  /// into its seed, which Gazebo's air speed sensor reads, and publishes it
+  /// as ground truth on `/world/<world>/wind_info` (gz.msgs.Wind) and, for
+  /// ROS, on `/world/<world>/wind/velocity` (gz.msgs.Twist).
   ///
   /// It pushes on the shapes the wind sees. A vehicle marks those shapes with
   /// `gz:wind="true"` on a collision, the same way it marks displacement
@@ -49,6 +50,12 @@ namespace gz::sim::maritime
   /// quadratic drag, 0.5 * rho * Cd * A * |v| * v per axis on the wind
   /// relative to the shape, at that centre, so a tall shape heels and turns
   /// its link. `gz:wind_cd` on the collision sets its drag coefficient.
+  /// A custom sensor, `<sensor type="custom" gz:type="anemometer">` on any
+  /// link, reads the apparent wind: the wind at the sensor, asked through the
+  /// recipe, less the sensor's own velocity, in the sensor frame, published
+  /// as gz.msgs.Twist (linear part) on its `<topic>` at its `<update_rate>`,
+  /// with its `<frame_id>` in the header.
+  ///
   /// Gazebo's `enable_wind` flag is not the mark: it belongs to the mass
   /// based force of the upstream wind effects system.
   ///

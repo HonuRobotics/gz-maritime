@@ -202,6 +202,25 @@
       </sensor>
     </xacro:sensor_link>
 
+    <!-- The apparent wind, read by the wind system (gz_wind) at the GPS
+         mast: the wind less the boat's own velocity, in the sensor frame,
+         with 0.1 m/s of noise on each axis, like a small marine
+         anemometer. -->
+    <xacro:sensor_link sensor_name="anemometer" frame="gps_link">
+      <sensor name="anemometer" type="custom" gz:type="anemometer">
+        <frame_id>${name}/gps_link</frame_id>
+        <topic>${name}/anemometer</topic>
+        <update_rate>10</update_rate>
+        <always_on>true</always_on>
+        <gz:anemometer>
+          <noise type="gaussian">
+            <mean>0</mean>
+            <stddev>0.1</stddev>
+          </noise>
+        </gz:anemometer>
+      </sensor>
+    </xacro:sensor_link>
+
     <xacro:sensor_link sensor_name="navsat" frame="gps_link">
       <sensor name="navsat" type="navsat">
         <frame_id>${name}/gps_link</frame_id>

@@ -19,6 +19,8 @@
 #include <gz/msgs/boolean.pb.h>
 #include <gz/msgs/entity_factory.pb.h>
 #include <gz/msgs/param.pb.h>
+#include <gz/msgs/twist.pb.h>
+#include <gz/msgs/Utility.hh>
 #include <gz/msgs/wind.pb.h>
 #include <gz/msgs/world_control.pb.h>
 
@@ -40,6 +42,7 @@
 
 #include <gz/sim/components/AngularVelocity.hh>
 #include <gz/sim/components/LinearVelocity.hh>
+#include <gz/sim/components/LinearVelocitySeed.hh>
 #include <gz/sim/components/Link.hh>
 #include <gz/sim/components/Model.hh>
 #include <gz/sim/components/Name.hh>
@@ -116,6 +119,10 @@ struct WindState
   /// \brief The wind entity's velocity, world frame.
   public: math::Vector3d entity;
 
+  /// \brief The wind entity's velocity seed, which the air speed sensor
+  /// reads.
+  public: math::Vector3d seed;
+
   /// \brief The wind asked through the recipe 10 m above the world's
   /// origin, where the wind entity's wind is taken.
   public: math::Vector3d sampled;
@@ -142,6 +149,11 @@ WindState ReadWind(const UpdateInfo &_info, const EntityComponentManager &_ecm)
       _ecm.Component<components::WorldLinearVelocity>(windEntity))
   {
     state.entity = vel->Data();
+  }
+  if (const auto *seed =
+      _ecm.Component<components::WorldLinearVelocitySeed>(windEntity))
+  {
+    state.seed = seed->Data();
   }
   state.sampled = wind::WindAt(_ecm, {0, 0, 10}, _info.simTime);
   state.low = wind::WindAt(_ecm, {0, 0, 1}, _info.simTime);
@@ -498,6 +510,8 @@ TEST(WindField, SpeedAndDirectionFromTheWorld)
   EXPECT_NE(0u, world.state.recipe->params.seed)
       << "a 0 seed is resolved before the recipe is written";
   EXPECT_EQ(world.state.entity, world.state.sampled);
+  EXPECT_EQ(world.state.entity, world.state.seed)
+      << "the air speed sensor reads the same wind";
 }
 
 /////////////////////////////////////////////////
@@ -764,4 +778,194 @@ TEST(WindDirection, PushesGeographicEast)
   EXPECT_GT(end->Lon()->Degree() - start->Lon()->Degree(), 1e-7) << "east";
   EXPECT_NEAR(start->Lat()->Degree(), end->Lat()->Degree(), 1e-9)
       << "not north or south";
+}
+
+namespace
+{
+/// \brief The last message on a topic.
+/// \tparam MsgT Message type.
+template <typename MsgT>
+class Last
+{
+  /// \brief Subscribe.
+  /// \param[in] _topic Topic.
+  public: explicit Last(const std::string &_topic)
+  {
+    this->node.Subscribe(_topic, std::function<void(const MsgT &)>(
+        [this](const MsgT &_msg)
+        {
+          const std::lock_guard<std::mutex> lock(this->mutex);
+          this->msg = _msg;
+        }));
+  }
+
+  /// \brief Wait for a message.
+  /// \return The last one, if any came.
+  public: std::optional<MsgT> Get()
+  {
+    for (int i = 0; i < 50; ++i)
+    {
+      {
+        const std::lock_guard<std::mutex> lock(this->mutex);
+        if (this->msg)
+          return this->msg;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    return std::nullopt;
+  }
+
+  /// \brief Transport node.
+  private: transport::Node node;
+
+  /// \brief Guards the message.
+  private: std::mutex mutex;
+
+  /// \brief The last message.
+  private: std::optional<MsgT> msg;
+};
+
+/// \brief The frame id in a header.
+/// \param[in] _header Header.
+/// \return The frame id, empty if none.
+std::string FrameId(const msgs::Header &_header)
+{
+  for (const auto &d : _header.data())
+  {
+    if (d.key() == "frame_id" && d.value_size() > 0)
+      return d.value(0);
+  }
+  return {};
+}
+}  // namespace
+
+/////////////////////////////////////////////////
+/// An anemometer reads the wind in its own frame: a mast turned 90 degrees
+/// sees a wind towards +x along its -y axis, stamped with its frame id.
+TEST(Anemometer, ReadsTheWindInItsFrame)
+{
+  Last<msgs::Twist> reading("/mast/anemometer");
+  WindWorld world("anemometer.sdf");
+  ASSERT_TRUE(world.Run(100));
+
+  const auto msg = reading.Get();
+  ASSERT_TRUE(msg.has_value());
+  EXPECT_NEAR(0.0, msg->linear().x(), 1e-6);
+  EXPECT_NEAR(-5.0, msg->linear().y(), 1e-6);
+  EXPECT_NEAR(0.0, msg->linear().z(), 1e-6);
+  EXPECT_EQ("mast/anemometer", FrameId(msg->header()));
+}
+
+/////////////////////////////////////////////////
+/// An anemometer reads the apparent wind: one falling freely feels the air
+/// rush up past it at g t on top of the wind.
+TEST(Anemometer, ReadsTheApparentWind)
+{
+  Last<msgs::Twist> reading("/falling/anemometer");
+  WindWorld world("anemometer.sdf");
+  ASSERT_TRUE(world.Run(500));
+
+  const auto msg = reading.Get();
+  ASSERT_TRUE(msg.has_value());
+  const double t = msgs::Convert(msg->header().stamp()).count() * 1e-9;
+  EXPECT_GT(t, 0.9);
+  EXPECT_NEAR(5.0, msg->linear().x(), 1e-3);
+  EXPECT_NEAR(0.0, msg->linear().y(), 1e-3);
+  EXPECT_NEAR(9.8 * t, msg->linear().z(), 0.05);
+  EXPECT_FALSE(FrameId(msg->header()).empty())
+      << "the sensor's scoped name without a frame id";
+}
+
+/////////////////////////////////////////////////
+/// The standard <noise> under <gz:anemometer> spreads each axis by its
+/// standard deviation around the true wind.
+TEST(Anemometer, NoiseFromTheSensorsOwnBlock)
+{
+  std::mutex mutex;
+  std::vector<math::Vector3d> readings;
+  transport::Node node;
+  ASSERT_TRUE(node.Subscribe("/noisy/anemometer",
+      std::function<void(const msgs::Twist &)>(
+      [&](const msgs::Twist &_msg)
+      {
+        const std::lock_guard<std::mutex> lock(mutex);
+        readings.push_back(msgs::Convert(_msg.linear()));
+      })));
+
+  WindWorld world("anemometer.sdf");
+  ASSERT_TRUE(world.Run(2000));
+  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+  const std::lock_guard<std::mutex> lock(mutex);
+  ASSERT_GT(readings.size(), 1000u);
+  const math::Vector3d truth(5.0, 0.0, 0.0);
+  for (int axis = 0; axis < 3; ++axis)
+  {
+    double sum{0.0};
+    double sumSq{0.0};
+    for (const auto &r : readings)
+    {
+      const double e = r[axis] - truth[axis];
+      sum += e;
+      sumSq += e * e;
+    }
+    const double n = static_cast<double>(readings.size());
+    const double mean = sum / n;
+    EXPECT_NEAR(0.0, mean, 0.05) << "axis " << axis;
+    EXPECT_NEAR(0.5, std::sqrt(sumSq / n - mean * mean), 0.05)
+        << "axis " << axis;
+  }
+}
+
+/////////////////////////////////////////////////
+/// An anemometer on a model spawned while the world runs is found and read,
+/// even with the wind system listed before the one that spawns it.
+TEST(Anemometer, SpawnedAtRunTime)
+{
+  Last<msgs::Twist> reading("/spawned/anemometer");
+  WindWorld world("anemometer.sdf");
+  ASSERT_TRUE(world.Run(10));
+
+  msgs::EntityFactory req;
+  req.set_sdf(R"(<?xml version="1.0"?>
+<sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
+  <model name="spawned">
+    <static>true</static>
+    <link name="link">
+      <sensor name="anemometer" type="custom" gz:type="anemometer">
+        <topic>/spawned/anemometer</topic>
+      </sensor>
+    </link>
+  </model>
+</sdf>)");
+  req.set_allow_renaming(false);
+  req.mutable_pose()->mutable_position()->set_z(3.0);
+  transport::Node node;
+  msgs::Boolean rep;
+  bool result{false};
+  ASSERT_TRUE(node.Request("/world/anemometer/create", req, 5000, rep,
+                           result));
+  ASSERT_TRUE(result && rep.data());
+
+  ASSERT_TRUE(world.Run(100));
+  const auto msg = reading.Get();
+  ASSERT_TRUE(msg.has_value()) << "the spawned anemometer never published";
+  EXPECT_NEAR(5.0, msg->linear().x(), 1e-6);
+  EXPECT_NEAR(0.0, msg->linear().y(), 1e-6);
+}
+
+/////////////////////////////////////////////////
+/// The ground truth is also published as a twist in the world frame, which
+/// ROS can bridge.
+TEST(WindField, GroundTruthAsATwist)
+{
+  Last<msgs::Twist> truth("/world/windfield/wind/velocity");
+  WindWorld world("windfield.sdf");
+  ASSERT_TRUE(world.Run(200));
+
+  const auto msg = truth.Get();
+  ASSERT_TRUE(msg.has_value());
+  EXPECT_NEAR(5.0, msg->linear().x(), 1e-9);
+  EXPECT_NEAR(0.0, msg->linear().y(), 1e-9);
+  EXPECT_EQ("world", FrameId(msg->header()));
 }
