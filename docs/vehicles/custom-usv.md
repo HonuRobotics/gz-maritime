@@ -179,6 +179,10 @@ flowchart TB
 
 ## Limitations
 
-- The hydrodynamic damping values are placeholders, not measured.
+- The hydrodynamic damping values are placeholders, not measured. Surge
+  and sway come from the water's drag on the marked pontoons, quadratic
+  only, which is lighter than the BlueBoat's Fossen values the boat used
+  before: it is faster and turns more freely. `gz:ocean_current_cd` on the
+  pontoons tunes it.
 - The sensors are ideal: no noise, no bias, no drift.
 - It floats on the flat water level: waves are drawn but don't move it yet.

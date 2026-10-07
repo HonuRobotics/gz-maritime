@@ -121,6 +121,21 @@ attribute, so it travels with the model file: nothing in the world and
 nothing in a launch file refers to it.
 ```
 
+The same boxes carry two more marks, for the wind and the ocean current:
+
+- **`gz:wind="true"`**: the wind system pushes on the part of each box above
+  the waterline.
+- **`gz:ocean_current="true"`**: the ocean current system drags the part of
+  each box below the waterline against the water, so the boat drifts with
+  the world's current. `gz:ocean_current_cd` sets a box's drag coefficient,
+  1 by default; it is the knob for how hard the water holds the hull.
+
+With the ocean current mark, the water's drag in surge and sway comes from
+the marked boxes, so the Hydrodynamics plugin below leaves those two
+motions out. Never put both on the same axis: Fossen damping in the plugin
+works against the ground, not the water, and beside the marks it would hold
+the boat back so it drifts at a fraction of the current.
+
 ## Thrusters
 
 Add one Thruster plugin per propeller joint. It is gz-maritime's thruster
@@ -153,8 +168,10 @@ mode, only the plugin's filename and name change.
 
 ## Hydrodynamic damping
 
-Water resists motion. The Hydrodynamics plugin applies that resistance to
-one link:
+Water resists motion. The marked boxes take care of surge and sway, against
+the water; the Hydrodynamics plugin applies the rest to one link: heave, roll
+and pitch so the boat settles on the buoyancy instead of bobbing, and yaw so
+it does not spin freely.
 
 ```{literalinclude} ../../kai_custom_vehicle/models/custom_usv/model.sdf.xacro
 :language: xml
@@ -166,17 +183,19 @@ Each pair of coefficients resists one kind of motion:
 
 | Coefficients | Motion | |
 |---|---|---|
-| `xU`, `xUabsU` | Surge | forwards and backwards |
-| `yV`, `yVabsV` | Sway | sideways |
+| `xU`, `xUabsU` | Surge | forwards and backwards: from the `gz:ocean_current` marks instead |
+| `yV`, `yVabsV` | Sway | sideways: from the `gz:ocean_current` marks instead |
 | `zW`, `zWabsW` | Heave | up and down |
 | `kP`, `kPabsP` | Roll | tipping to the side |
 | `mQ`, `mQabsQ` | Pitch | nose up and down |
 | `nR`, `nRabsR` | Yaw | turning |
 
-The first of each pair grows with speed, the `abs` one with speed squared. A
-boat should resist sideways motion much more than forward motion, or it
-slides out of its turns. The custom USV's values are placeholders borrowed
-from the BlueBoat; tune them for your vehicle.
+The first of each pair grows with speed, the `abs` one with speed squared.
+The custom USV's values are placeholders borrowed from the BlueBoat; tune
+them for your vehicle. A boat should resist sideways motion much more than
+forward motion, or it slides out of its turns; with the marks, the long side
+of a hull already shows the water far more area than its end does, and
+`gz:ocean_current_cd` tunes both.
 
 ```{note}
 The damping acts in the air too, so a boat spawned well above the water falls

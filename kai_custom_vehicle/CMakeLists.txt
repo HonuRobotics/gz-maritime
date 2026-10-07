@@ -39,6 +39,12 @@ if(BUILD_TESTING)
   # even when every assertion passes.
   ament_add_pytest_test(test_two_instances test/test_two_instances.py
     TIMEOUT 300 NOCAPTURE)
+  # Boats in an ocean current, through the launches: one drifts with it,
+  # one holds station against it, one spawned later drifts the same. A boat
+  # dragged only on its marked pontoons takes a minute of sim time to catch
+  # up with the current, hence the longer timeout.
+  ament_add_pytest_test(test_ocean_current test/test_ocean_current.py
+    TIMEOUT 600 NOCAPTURE)
 endif()
 
 ament_package()

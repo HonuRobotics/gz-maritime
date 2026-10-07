@@ -26,6 +26,7 @@ is checked as well.
 
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
@@ -203,6 +204,10 @@ def test_displacement_link_marks_its_pontoons(boat):
     marked = [c for c in displacement.findall('collision')
               if c.get(f'{GZ_NS}buoyancy') == 'true']
     assert sorted(c.get('name') for c in marked) == ['pontoon_port', 'pontoon_stbd']
+    # The same boxes are what the wind and the ocean current push on.
+    for collision in marked:
+        assert collision.get(f'{GZ_NS}wind') == 'true'
+        assert collision.get(f'{GZ_NS}ocean_current') == 'true'
     for collision in marked:
         assert int(collision.find('surface/contact/collide_bitmask').text, 16) == 0
     unmarked = [c.get('name') for c in boat.raw.iter('collision') if c not in marked]
@@ -250,10 +255,19 @@ def test_two_normalized_counter_rotating_thrusters(boat):
 
 
 def test_hydrodynamics_on_base_link(boat):
-    """One Hydrodynamics plugin, on the link the displacement is fixed to."""
+    """
+    One Hydrodynamics plugin, on the link the displacement is fixed to.
+
+    It carries no surge or sway term: the pontoons' ocean current marks
+    provide those against the water, and a Fossen term on the same axis would
+    damp the boat against the ground too and hold it back in a current.
+    """
     hydro = plugins(boat.model, 'gz-sim-hydrodynamics-system')
     assert len(hydro) == 1
     assert hydro[0].find('link_name').text == 'base_link'
+    surge_sway = [child.tag for child in hydro[0]
+                  if re.fullmatch(r'[xy](U|V)(abs)?(U|V)?', child.tag)]
+    assert surge_sway == [], f'surge or sway damping beside the marks: {surge_sway}'
 
 
 def test_four_sensors_at_urdf_frames(boat):

@@ -48,9 +48,13 @@
        zero collide_bitmask keeps the box out of contact: the URDF's hulls
        are what the boat bumps with. The same box is marked gz:wind="true":
        the wind system pushes on the part of it above the waterline, so a
-       wind in the world sets the boat drifting and turning. -->
+       wind in the world sets the boat drifting and turning. And it is
+       marked gz:ocean_current="true": the ocean current system drags the
+       part below the waterline against the water, so the boat drifts with
+       the world's current. -->
   <xacro:macro name="pontoon" params="side y">
-    <collision name="pontoon_${side}" gz:buoyancy="true" gz:wind="true">
+    <collision name="pontoon_${side}" gz:buoyancy="true" gz:wind="true"
+               gz:ocean_current="true">
       <pose>0 ${y} ${hull_z} 0 0 0</pose>
       <geometry>
         <box><size>${hull_length} ${hull_width} ${hull_height}</size></box>
@@ -142,19 +146,20 @@
     <xacro:thruster side="stbd" coefficient="-0.02"/>
 
     <!-- ===================== Hydrodynamics =====================
-         Fossen damping on base_link. Placeholder surface-vessel coefficients,
-         the magnitudes the BlueBoat uses: strong sway and yaw resistance,
-         moderate surge, and heave, roll and pitch damping so the boat settles
-         on the buoyancy instead of bobbing. Tune them against the real
-         vehicle. -->
+         Fossen damping on base_link, for the motions the water's drag on the
+         marked pontoons does not cover: heave, roll, pitch and yaw, so the
+         boat settles on the buoyancy instead of bobbing and does not spin
+         freely. Surge and sway are left out on purpose: the pontoons'
+         gz:ocean_current marks provide them, against the water, and Fossen
+         terms on the same axes would damp the boat against the ground as
+         well and hold it back in a current. Placeholder coefficients, the
+         magnitudes the BlueBoat uses; tune them against the real vehicle. -->
     <plugin filename="gz-sim-hydrodynamics-system"
             name="gz::sim::systems::Hydrodynamics">
       <link_name>base_link</link_name>
       <water_density>${water_density}</water_density>
-      <xU>-20</xU>    <yV>-40</yV>    <zW>-30</zW>
+      <zW>-30</zW>
       <kP>-20</kP>    <mQ>-20</mQ>    <nR>-15</nR>
-      <xUabsU>-30</xUabsU>
-      <yVabsV>-90</yVabsV>
       <zWabsW>-100</zWabsW>
       <kPabsP>-40</kPabsP>
       <mQabsQ>-40</mQabsQ>

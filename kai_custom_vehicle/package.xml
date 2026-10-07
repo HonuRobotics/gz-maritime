@@ -25,6 +25,7 @@
        and the thruster system with the normalized command. -->
   <exec_depend>gz_buoyancy</exec_depend>
   <exec_depend>gz_wind</exec_depend>
+  <exec_depend>gz_ocean_current</exec_depend>
   <exec_depend>gz_thruster</exec_depend>
   <exec_depend>xacro</exec_depend>
   <exec_depend>ros_gz_sim</exec_depend>

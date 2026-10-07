@@ -18,9 +18,11 @@ open_water.sdf is copied with its ocean current set to 0.5 m/s setting east
 (towards +x). sim.launch.xml brings it up with drifter, engines off, pointing
 east; holder is spawned pointing west, into the current, with the command
 that balances it; latecomer is spawned once the others have been in the water
-a while. The drifter and the latecomer settle at the current's velocity, and
-the holder stays put. Behaviour is measured in sim time, so a slow runner
-changes how long the tests wait, never what they assert.
+a while. The water pushes on each boat's pontoons, marked
+gz:ocean_current="true", relative to the water. The drifter and the latecomer
+settle at the current's velocity, and the holder stays put. Behaviour is
+measured in sim time, so a slow runner changes how long the tests wait, never
+what they assert.
 """
 
 import functools
@@ -49,11 +51,27 @@ SPAWN = ['ros2', 'launch', 'kai_bringup', 'spawn_vehicle.launch.xml',
 CURRENT_SPEED = 0.5
 CURRENT = (CURRENT_SPEED, 0.0)
 
+# The custom USV's pontoons, from kai_custom_vehicle/urdf/dimensions.xacro:
+# two boxes 1.0 m long and 0.15 m wide, floating a 12.1 kg boat in seawater
+# at a draft of 12.1 / (1025 * 2 * 1.0 * 0.15), about 3.9 cm.
+WATER_DENSITY = 1025.0
+DRAFT = 12.1 / (WATER_DENSITY * 2 * 1.0 * 0.15)
+
+# What the current sees head on: the wetted part of both pontoons' 0.15 m
+# wide ends, with the marks' drag coefficient of 1.
+WETTED_FRONT = 2 * 0.15 * DRAFT
+
 # The command that holds the custom USV still, pointing into the current.
-# Through the water it makes 0.5 m/s, where its surge damping is
-# 20 * 0.5 + 30 * 0.5**2 = 17.5 N (xU, xUabsU in its model), 8.75 N a motor,
-# and a command of 1 is 20 N.
-HOLD = (20 * CURRENT_SPEED + 30 * CURRENT_SPEED ** 2) / 2 / 20.0
+# Through the water it makes the current's speed, where the drag on the
+# marked pontoons is 0.5 * rho * Cd * A * u**2, about 1.5 N, shared by two
+# motors, and a command of 1 is 20 N.
+HOLD = 0.5 * WATER_DENSITY * WETTED_FRONT * CURRENT_SPEED ** 2 / 2 / 20.0
+
+# Quadratic drag alone has no linear term, so a boat starting at rest
+# catches up with the current slowly: its shortfall is 1 / (1 / u + k t),
+# k = 0.5 * rho * Cd * A / m, about 0.5 1/m here, under 0.05 m/s after
+# about 36 s. A minute leaves margin.
+SETTLE = 60
 
 # How close to the expected ground velocity a settled boat must be, m/s.
 TOL = 0.05
@@ -184,10 +202,10 @@ def test_a_boat_with_its_engines_off_drifts_with_the_current(sim):
     """
     The drifter settles at the current's velocity over the ground.
 
-    Gazebo's own hydrodynamics would damp it against the ground, and it would
-    not move at all.
+    The marks drag its pontoons against the water; a hull damped against the
+    ground, as Gazebo's own hydrodynamics does, would not move at all.
     """
-    wait_sim_seconds(sim, 10)          # onset: it picks up the current
+    wait_sim_seconds(sim, SETTLE)      # onset: it catches up with the current
     vx, vy = ground_velocity(sim, 'drifter')
     assert vx == pytest.approx(CURRENT[0], abs=TOL), f'drifting at ({vx:+.3f},{vy:+.3f}) m/s'
     assert vy == pytest.approx(CURRENT[1], abs=TOL), f'drifting at ({vx:+.3f},{vy:+.3f}) m/s'
@@ -197,8 +215,8 @@ def test_a_boat_making_the_currents_speed_upstream_holds_station(sim):
     """
     The holder, pointing into the current, makes 0.5 m/s through the water.
 
-    The thrust it takes is what its surge damping predicts at the current's
-    speed, so over the ground it barely moves.
+    The thrust it takes is the drag the current puts on its wetted pontoons
+    at that speed, so over the ground it barely moves.
     """
     wait_sim_seconds(sim, 10)
     vx, vy = ground_velocity(sim, 'holder')
@@ -208,7 +226,7 @@ def test_a_boat_making_the_currents_speed_upstream_holds_station(sim):
 def test_a_boat_spawned_later_drifts_the_same(sim):
     """A third boat, spawned into the running current, drifts like the first."""
     spawn(sim, 'latecomer', 'y:=-12')
-    wait_sim_seconds(sim, 10)
+    wait_sim_seconds(sim, SETTLE)
     vx, vy = ground_velocity(sim, 'latecomer')
     assert vx == pytest.approx(CURRENT[0], abs=TOL), f'drifting at ({vx:+.3f},{vy:+.3f}) m/s'
     assert vy == pytest.approx(CURRENT[1], abs=TOL), f'drifting at ({vx:+.3f},{vy:+.3f}) m/s'
