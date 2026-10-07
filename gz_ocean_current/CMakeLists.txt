@@ -27,6 +27,7 @@ find_package(gz_transport_vendor REQUIRED)
 find_package(gz-transport REQUIRED)
 find_package(gz_msgs_vendor REQUIRED)
 find_package(gz-msgs REQUIRED)
+find_package(gz_marked_shapes REQUIRED)
 
 # --------------------------------------------------------------------------
 # Core library: the ocean current as a recipe (the OceanCurrentfield
@@ -58,7 +59,8 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 # --------------------------------------------------------------------------
-# The ocean current system: owns the recipe and publishes the ground truth.
+# The ocean current system: owns the recipe, publishes the ground truth, and
+# pushes on the collisions a vehicle marks gz:ocean_current="true".
 # --------------------------------------------------------------------------
 add_library(gz-maritime-ocean-current-system SHARED
   src/systems/OceanCurrent.cc
@@ -66,6 +68,7 @@ add_library(gz-maritime-ocean-current-system SHARED
 target_link_libraries(gz-maritime-ocean-current-system
   PRIVATE
     ${PROJECT_NAME}
+    gz_marked_shapes::gz_marked_shapes
     gz-plugin::register
     gz-common::gz-common
     gz-transport::core
@@ -109,6 +112,19 @@ if(BUILD_TESTING)
     # The plugin library is loaded by name from the build tree so the test
     # runs before install.
     set_tests_properties(ocean_current_test PROPERTIES
+      ENVIRONMENT "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}")
+  endif()
+
+  # The load on marked collisions in a running world.
+  ament_add_gtest(ocean_current_load_test test/ocean_current_load_test.cc)
+  if(TARGET ocean_current_load_test)
+    target_compile_definitions(ocean_current_load_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(ocean_current_load_test
+      ${PROJECT_NAME}
+      gz-transport::core
+      gz-msgs::core)
+    set_tests_properties(ocean_current_load_test PROPERTIES
       ENVIRONMENT "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}")
   endif()
 endif()

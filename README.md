@@ -40,7 +40,11 @@ site under
   speed and the direction it sets towards, set in the world file and
   constant for the run, kept on the world as a recipe naming a registered
   current model, so any system can ask the current at a point and a new
-  model needs no change to anything else.
+  model needs no change to anything else, and the water's drag on the
+  collisions a vehicle marks `gz:ocean_current="true"`.
+- [`gz_marked_shapes`](gz_marked_shapes/): the marked collisions the wind
+  and the ocean current push on, their areas and the cut at the water
+  level, shared by both.
 - [`kai_gazebo`](kai_gazebo/), [`kai_bringup`](kai_bringup/) and
   [`kai_custom_vehicle`](kai_custom_vehicle/): the worlds, the simulation
   and spawn launches, and the example vehicle.

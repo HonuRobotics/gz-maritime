@@ -39,6 +39,25 @@ namespace gz::sim::maritime
   /// new current model is one class registered under a name; this system
   /// and the consumers do not change.
   ///
+  /// It pushes on the shapes the water sees. A vehicle marks those shapes
+  /// with `gz:ocean_current="true"` on a collision, the way it marks
+  /// displacement shapes for buoyancy and windage shapes for the wind, and
+  /// the system finds them on every model, spawned later under any name
+  /// included. For each marked shape it takes the projected area per shape
+  /// axis from the geometry, keeps the part below the water, asks the current
+  /// at the centre of that part, and applies quadratic drag,
+  /// 0.5 * rho * Cd * A * |v| * v per axis on the water's velocity relative
+  /// to the shape, at that centre. `gz:ocean_current_cd` on the collision
+  /// sets its drag coefficient. A marked box can carry the buoyancy and wind
+  /// marks too: the wind takes the part above the water, the current the
+  /// part below.
+  ///
+  /// The current is the water, not a force on top of it: a vehicle that
+  /// marks its hull drops the surge and sway terms from its hydrodynamics
+  /// plugin, which the marks now provide relative to the water, and keeps
+  /// heave, roll, pitch and yaw. Kept beside ground relative damping, the
+  /// marked load would make it drift at a fraction of the current.
+  ///
   /// The system publishes the current at the world's origin as ground truth
   /// on `/world/<world>/ocean_current_info`, a gz.msgs.Twist in the world
   /// frame, which ROS can bridge.
@@ -60,10 +79,15 @@ namespace gz::sim::maritime
   ///   new one each run. The standard model has nothing random.
   /// * `<publish_rate>`: Hz of simulation time for the ground truth,
   ///   default 10.
+  /// * `<water_density>`: kg/m^3 for the load, default 1025.
+  /// * `<water_level>`: world z of the water, default 0.
+  /// * `<default_drag_coefficient>`: Cd of the shapes without
+  ///   `gz:ocean_current_cd`, default 1.
   class OceanCurrent
     : public System,
       public ISystemConfigure,
       public ISystemPreUpdate,
+      public ISystemPostUpdate,
       public ISystemReset
   {
     /// \brief Constructor.
@@ -81,6 +105,10 @@ namespace gz::sim::maritime
     // Documentation inherited.
     public: void PreUpdate(const UpdateInfo &_info,
                            EntityComponentManager &_ecm) override;
+
+    // Documentation inherited.
+    public: void PostUpdate(const UpdateInfo &_info,
+                            const EntityComponentManager &_ecm) override;
 
     // Documentation inherited.
     public: void Reset(const UpdateInfo &_info,

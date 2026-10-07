@@ -1,23 +1,17 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>gz_ocean_current</name>
+  <name>gz_marked_shapes</name>
   <version>0.1.0</version>
-  <description>The ocean current of a world for Gazebo Sim, as a recipe any system can query at a point: an OceanCurrentfield component naming a current model and its parameters, a registry of models, a sampler, and a world system that owns the recipe and publishes it as ground truth.</description>
+  <description>The collisions a vehicle marks for a fluid, such as gz:wind="true" or gz:ocean_current="true": their shapes and projected areas, the cut at the water level, the links that carry them, found whenever they are spawned, and the quadratic drag the fluid applies. Shared by gz_wind and gz_ocean_current.</description>
   <maintainer email="caguero@honurobotics.com">Carlos Agüero</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>gz_sim_vendor</depend>
-  <depend>gz_plugin_vendor</depend>
   <depend>gz_math_vendor</depend>
   <depend>gz_common_vendor</depend>
-  <!-- The ground truth topic. -->
-  <depend>gz_transport_vendor</depend>
-  <depend>gz_msgs_vendor</depend>
-  <!-- The shapes a vehicle marks gz:ocean_current, shared with the wind. -->
-  <depend>gz_marked_shapes</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_lint_auto</test_depend>

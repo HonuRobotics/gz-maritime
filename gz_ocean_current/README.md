@@ -18,6 +18,25 @@ The model built in, `standard`, is a speed and the direction the current
 sets towards, uniform over the world, horizontal and constant. On the
 kilometre and hour scales this simulation works at, that is the water.
 
+The same system pushes on the shapes the water sees. A vehicle marks them
+with `gz:ocean_current="true"` on a collision (a zero `collide_bitmask` keeps
+a dedicated shape out of contact, and a buoyancy box can carry the buoyancy
+and wind marks too: the wind takes the part above the water, the current the
+part below). The system finds those shapes on every model, spawned at any
+time under any name, and applies quadratic drag,
+`0.5 * rho * Cd * A * |v| * v` per shape axis, on the projected area of the
+part below the water, at the centre of that part, with the current asked at
+that centre. The velocity is the water relative to the shape, so a boat with
+nothing else holding it drifts at the current's speed. `gz:ocean_current_cd`
+sets a shape's drag coefficient. The shape code is shared with the wind's
+windage, in `gz_marked_shapes`.
+
+The current is the water, not a force on top of it: a vehicle that marks its
+hull drops the surge and sway terms from its Hydrodynamics plugin (`xU`,
+`xUabsU`, `yV`, `yVabsV`), which the marks now provide relative to the water,
+and keeps heave, roll, pitch and yaw. Kept beside ground relative damping,
+the marked load would make it drift at a fraction of the current.
+
 The system publishes the current at the world's origin as ground truth on
 `/world/<world>/ocean_current_info`, a `gz.msgs.Twist` in the world frame,
 which ROS can bridge.
@@ -40,6 +59,9 @@ which ROS can bridge.
 | `<source>` | empty | An external source for a model that reads one, such as the file of a gridded current; unread by `standard`. |
 | `<seed>` | 0 | Seed of anything random in a model; 0 draws one each run. `standard` has nothing random. |
 | `<publish_rate>` | 10 | Hz of simulation time for the ground truth. |
+| `<water_density>` | 1025 | kg/m^3, for the load on marked shapes. |
+| `<water_level>` | 0 | World z of the water. |
+| `<default_drag_coefficient>` | 1 | Cd for shapes without `gz:ocean_current_cd`. |
 
 ## Direction and units
 

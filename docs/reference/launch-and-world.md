@@ -146,7 +146,7 @@ World name: `default`.
 | `gz-sim-imu-system`, `gz-sim-magnetometer-system`, `gz-sim-navsat-system`, `gz-sim-air-pressure-system` | IMU, magnetometer, GPS and barometer sensors |
 | `gz-maritime-buoyancy-system` | Seawater 1025 kg/m³ below z = 0, air 1 kg/m³ above; `<enable_by_default>false</enable_by_default>`, no `<enable>` list |
 | `gz-maritime-wind-system` | Still air by default (`<speed>0</speed>`) at a 10 m reference height, falling off towards the water with a 0.0002 m roughness length, changed at run time on the wind topic; pushes only marked collisions, with air at 1.225 kg/m³ and a drag coefficient of 1 unless a shape sets its own |
-| `gz-maritime-ocean-current-system` | Slack water by default (`<speed>0</speed>`); a constant, horizontal current set in the world file, kept on the world as a recipe any system can ask at a point and published as ground truth. Nothing feels it yet: the hydrodynamics reads it in a later change |
+| `gz-maritime-ocean-current-system` | Slack water by default (`<speed>0</speed>`); a constant, horizontal current set in the world file, kept on the world as a recipe any system can ask at a point and published as ground truth; pushes only marked collisions, below the water, with seawater at 1025 kg/m³ and a drag coefficient of 1 unless a shape sets its own |
 | `gz-sim-waves-fft-system` | Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out) |
 | `model://water_surface` | Draws the sea |
 | `model://landing_pad` at (8, -8) | A static 4 m deck 1 m above the water, the only solid ground; spawn a quad on it at z = 1.25 |
@@ -197,6 +197,22 @@ field works, and writes it into gz-sim's wind entity at the world's origin.
 A system that needs the wind at a point asks `gz::sim::wind::WindAt`, or
 keeps a `gz::sim::wind::WindSampler`, from the `gz_wind` library.
 
+## Ocean current markup
+
+What a model says to the ocean current system.
+
+| Where | Markup | Meaning |
+|---|---|---|
+| A `<collision>` in a model | `gz:ocean_current="true"` (same `xmlns:gz` root attribute) | The water pushes on this shape, by the part of it below the water, with quadratic drag on its projected area per axis, taking the current at the centre of that part and the shape's own velocity there. `"1"` works too. A mesh counts as its bounding box. A buoyancy box can carry the buoyancy and wind marks too. |
+| The same `<collision>` | `gz:ocean_current_cd="1.2"` | Its drag coefficient; the plugin's `<default_drag_coefficient>` otherwise. |
+
+The marks are the water's drag on the hull, relative to the water, so a
+model that marks its hull drops the surge and sway terms from its
+Hydrodynamics plugin (`xU`, `xUabsU`, `yV`, `yVabsV` and their cross terms)
+and keeps heave, roll, pitch and yaw. Ground relative damping beside the
+marks would hold the boat back, and it would drift at a fraction of the
+current.
+
 ## Ocean current parameters
 
 What a world says to the ocean current system.
@@ -207,6 +223,7 @@ What a world says to the ocean current system.
 | `<model>` | The current model the recipe names, `standard` by default: uniform, horizontal and constant. A new model is one class registered under a name; nothing else changes. |
 | `<source>`, `<seed>` | For a model that reads a file (a gridded current) or draws random numbers; `standard` uses neither. A 0 seed, the default, draws one each run. |
 | `<publish_rate>` | Rate of the ground truth, 10 Hz by default. |
+| `<water_density>`, `<water_level>`, `<default_drag_coefficient>` | For the load on marked shapes: 1025 kg/m³, the world z of the water (0), and a drag coefficient of 1 by default. |
 
 The current is constant for the run and horizontal with the `standard`
 model: on the kilometre and hour scales these worlds work at, that is the
