@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!--
+  A world whose current comes from the ocean current system's parameters:
+  1 m/s setting east (90 degrees clockwise from north), so it flows towards
+  +x.
+-->
+<sdf version="1.9">
+  <world name="ocean_currentfield">
+    <plugin filename="gz-maritime-ocean-current-system"
+            name="gz::sim::maritime::OceanCurrent">
+      <speed>1</speed>
+      <direction>90</direction>
+    </plugin>
+  </world>
+</sdf>

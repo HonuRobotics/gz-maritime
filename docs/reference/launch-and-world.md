@@ -146,6 +146,7 @@ World name: `default`.
 | `gz-sim-imu-system`, `gz-sim-magnetometer-system`, `gz-sim-navsat-system`, `gz-sim-air-pressure-system` | IMU, magnetometer, GPS and barometer sensors |
 | `gz-maritime-buoyancy-system` | Seawater 1025 kg/m³ below z = 0, air 1 kg/m³ above; `<enable_by_default>false</enable_by_default>`, no `<enable>` list |
 | `gz-maritime-wind-system` | Still air by default (`<speed>0</speed>`) at a 10 m reference height, falling off towards the water with a 0.0002 m roughness length, changed at run time on the wind topic; pushes only marked collisions, with air at 1.225 kg/m³ and a drag coefficient of 1 unless a shape sets its own |
+| `gz-maritime-ocean-current-system` | Slack water by default (`<speed>0</speed>`); a constant, horizontal current set in the world file, kept on the world as a recipe any system can ask at a point and published as ground truth. Nothing feels it yet: the hydrodynamics reads it in a later change |
 | `gz-sim-waves-fft-system` | Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out) |
 | `model://water_surface` | Draws the sea |
 | `model://landing_pad` at (8, -8) | A static 4 m deck 1 m above the water, the only solid ground; spawn a quad on it at z = 1.25 |
@@ -195,6 +196,28 @@ The system keeps the wind on the world entity as a recipe, the way the wave
 field works, and writes it into gz-sim's wind entity at the world's origin.
 A system that needs the wind at a point asks `gz::sim::wind::WindAt`, or
 keeps a `gz::sim::wind::WindSampler`, from the `gz_wind` library.
+
+## Ocean current parameters
+
+What a world says to the ocean current system.
+
+| Markup | Meaning |
+|---|---|
+| `<speed>`, `<direction>` | The current: m/s, and the direction it sets towards in degrees clockwise from north (90, setting east, flows towards +x). The opposite convention from the wind, which is given by where it comes from. |
+| `<model>` | The current model the recipe names, `standard` by default: uniform, horizontal and constant. A new model is one class registered under a name; nothing else changes. |
+| `<source>`, `<seed>` | For a model that reads a file (a gridded current) or draws random numbers; `standard` uses neither. A 0 seed, the default, draws one each run. |
+| `<publish_rate>` | Rate of the ground truth, 10 Hz by default. |
+
+The current is constant for the run and horizontal with the `standard`
+model: on the kilometre and hour scales these worlds work at, that is the
+water. The system keeps it on the world entity as a recipe, the way the wind
+and the wave field work, written as a component change and nothing else, so
+every consumer, loaded with the world or spawned later, sees it on the same
+step. A system that needs the current at a point asks
+`gz::sim::ocean_current::OceanCurrentAt`, or keeps a
+`gz::sim::ocean_current::OceanCurrentSampler`, from the `gz_ocean_current`
+library. The query is a point query: a consumer that spans a gradient
+integrates over its own extent with repeated queries.
 
 ## Thruster command
 
@@ -290,6 +313,33 @@ From Gazebo, turning it to come from the south, and reading it back:
 gz topic -t /world/default/wind/set -m gz.msgs.Param \
   -p 'params {key: "direction" value {type: DOUBLE double_value: 180}}'
 gz topic -e -t /world/default/wind_info -n 1
+```
+
+## Ocean current
+
+The ocean current is set in the world file and constant for the run. It is
+published on `/world/default/ocean_current_info` as `gz.msgs.Twist`, which
+the simulation launch bridges to ROS as `geometry_msgs/msg/TwistStamped` in
+the `world` frame.
+
+### Direction and units
+
+- **Speed** in metres per second.
+- **Direction** the current sets towards, in degrees clockwise from true
+  north, as charts draw it and tide tables predict it: 0 sets north, 90 sets
+  east. The wind is given the other way round, by where it comes from: a
+  wind from 270 and a current setting 090 move a boat the same way.
+- **North** is the world's, the same one the wind and the GPS use: with the
+  `ENU` orientation and a `heading_deg` of 0, which every world here has,
+  north is the world's +y axis and east its +x axis.
+- **The ground truth** on `/world/default/ocean_current_info` is the water's
+  velocity in the world frame, not a direction: a 0.5 m/s current setting
+  east reads `x: 0.5, y: 0` in these worlds.
+
+Reading it back, from Gazebo:
+
+```bash
+gz topic -e -t /world/default/ocean_current_info -n 1
 ```
 
 ## Topics

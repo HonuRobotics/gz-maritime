@@ -163,6 +163,22 @@
       <roughness_length>0.0002</roughness_length>
     </plugin>
 
+    <!-- Ocean current (gz_ocean_current). The world owns the current: <speed>
+         in m/s and the <direction> it sets towards, in degrees clockwise from
+         north (90 sets east, towards +x; the opposite convention from the
+         wind, which is given by where it comes from). Set here, constant for
+         the run and horizontal: on this simulation's scales that is the
+         water. The system keeps it as a recipe on the world, which any
+         system asks at a point, and publishes it on
+         /world/default/ocean_current_info. Slack by default.
+         A rowing lake: slack water, leave it at 0. -->
+    <plugin
+      filename="gz-maritime-ocean-current-system"
+      name="gz::sim::maritime::OceanCurrent">
+      <speed>0</speed>
+      <direction>0</direction>
+    </plugin>
+
     <!-- ==================================================================
          WAVE SOURCE — the engine is the plugin's identity. Keep exactly ONE of
          the two <plugin> blocks below active and comment the other out. Both

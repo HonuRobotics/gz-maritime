@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!--
+  A world that names a current model the ocean current system does not
+  know, "upwelling", registered by the test: 0.3 m/s straight up. The
+  system reads the recipe and the consumers run the model unchanged.
+-->
+<sdf version="1.9">
+  <world name="ocean_current_upwelling">
+    <plugin filename="gz-maritime-ocean-current-system"
+            name="gz::sim::maritime::OceanCurrent">
+      <model>upwelling</model>
+      <speed>0.3</speed>
+    </plugin>
+  </world>
+</sdf>
