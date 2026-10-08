@@ -38,17 +38,27 @@ which ROS can bridge.
 | `<speed>` | 0 | m/s. |
 | `<direction>` | 0 | Degrees clockwise from north the current sets towards: 90 sets east, towards +x. |
 | `<water_level>` | 0 | World z of the water's surface, so a model that varies with depth knows where the surface is; unread by `standard`. |
-| `<source>` | empty | An external source for a model that reads one, such as the file of a gridded current. Opaque to the system, which only stores and replicates it; its meaning belongs to the model. Unread by `standard`. |
-| `<seed>` | 0 | Seed of anything random in a model; 0 draws one each run. `standard` has nothing random. |
+| `<parameters>` | none | The parameters the model owns, one element each, such as `<source>`, the file of a gridded current. Opaque to the system, which only stores and replicates them as text; the model accepts or refuses them. `standard` takes none. |
+| `<seed>` | 1 | Seed of anything random in a model, fixed by default so a run repeats; 0 draws a new one each run. `standard` has nothing random. |
 | `<publish_rate>` | 10 | Hz of simulation time for the ground truth. |
+
+Any other element is warned about and ignored, so a typo does not leave
+slack water in silence. The system checks the model once, at the first step
+(a plugin may register it after the world is loaded): a model nobody
+registered, or one that refuses its parameters, is one error, and the world
+has no current and no ground truth.
 
 ## Changing it while the world runs
 
 The current changes on the topic `/world/<world>/ocean_current/set`, a
-`gz.msgs.Param` whose keys are parameter names: `speed`, `direction` and
-`water_level` as doubles, `source` as a string, any of them in one message. A message is
+`gz.msgs.Param` whose keys are parameter names: `speed`, `direction`,
+`water_level` and `seed` take a double or an integer; any other key is a
+parameter the model owns and takes a string or a number. A message is
 queued and applied at the next step, as a new recipe, so every consumer sees
-the change on the same step; a reset puts the world file's current back.
+the change on the same step. It is applied whole or not at all: one key out
+of range, of the wrong type, or refused by the model, and it changes
+nothing. It cannot change `<model>`. A reset puts the world file's current
+back.
 From ROS, through the simulation launch's bridge:
 
 ```bash
@@ -77,8 +87,10 @@ A change is a step: the current does not ramp from one value to the next.
 
 A system keeps a `gz::sim::ocean_current::OceanCurrentSampler`, calls
 `Sync` once per step and `At` as often as it likes, or asks
-`gz::sim::ocean_current::OceanCurrentAt(ecm, position, time)` in one call.
-Both take and return world frame vectors. It is a point query and nothing
+`gz::sim::ocean_current::OceanCurrentAt(ecm, position, time)` in one call,
+which builds the model each time and suits an occasional query; a system
+that asks every step keeps a sampler. Both take and return world frame
+vectors. It is a point query and nothing
 more: a consumer that spans a gradient integrates over its own extent with
 repeated queries.
 
@@ -94,5 +106,20 @@ ocean_current::RegisterOceanCurrentModelFactory("my_model",
 ```
 
 A world then names it with `<model>my_model</model>`. The system that owns
-the recipe and every consumer run it unchanged; a model that needs a file
-reads `<source>`, one that needs randomness draws from `<seed>`.
+the recipe and every consumer run it unchanged. A model's own parameters
+come from the world's `<parameters>` block, or a key on the topic, as text
+in `params.extra`: a gridded current reads `source`, a tide its
+constituents. The model refuses what it cannot read in `Validate`, and the
+system then refuses the change. A model that places itself on the Earth gets
+the world's spherical coordinates in `SetSphericalCoordinates`; one that
+needs randomness draws from `<seed>`.
+
+```xml
+<plugin filename="gz-maritime-ocean-current-system"
+        name="gz::sim::maritime::OceanCurrent">
+  <model>my_model</model>
+  <parameters>
+    <source>noaa_blended_currents.nc</source>
+  </parameters>
+</plugin>
+```

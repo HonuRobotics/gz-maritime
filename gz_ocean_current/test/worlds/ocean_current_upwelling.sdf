@@ -2,7 +2,8 @@
 <!--
   A world that names a current model the ocean current system does not
   know, "upwelling", registered by the test: 0.3 m/s straight up. The
-  system reads the recipe and the consumers run the model unchanged.
+  system reads the recipe and the consumers run the model unchanged. The
+  <parameters> block is the model's own, opaque to the system.
 -->
 <sdf version="1.9">
   <world name="ocean_current_upwelling">
@@ -10,6 +11,9 @@
             name="gz::sim::maritime::OceanCurrent">
       <model>upwelling</model>
       <speed>0.3</speed>
+      <parameters>
+        <source>noaa_blended_currents.nc</source>
+      </parameters>
     </plugin>
   </world>
 </sdf>

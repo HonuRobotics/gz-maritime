@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!--
+  A world that names a current model nobody registered. The ocean current
+  system reports it once, and the world has no current and no ground truth.
+-->
+<sdf version="1.9">
+  <world name="ocean_current_unknown_model">
+    <plugin filename="gz-maritime-ocean-current-system"
+            name="gz::sim::maritime::OceanCurrent">
+      <model>no_such_model</model>
+      <speed>1</speed>
+    </plugin>
+  </world>
+</sdf>

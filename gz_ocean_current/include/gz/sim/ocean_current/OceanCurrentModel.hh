@@ -22,6 +22,7 @@
 #include <string>
 #include <string_view>
 
+#include <gz/math/SphericalCoordinates.hh>
 #include <gz/math/Vector3.hh>
 
 #include "gz/sim/ocean_current/OceanCurrentfield.hh"
@@ -47,7 +48,32 @@ class IOceanCurrentModel
   /// \brief Destructor.
   public: virtual ~IOceanCurrentModel() = default;
 
-  /// \brief Set the parameters.
+  /// \brief Check parameters before they are used. The typed ones are
+  /// already in range; this is where a model refuses an `extra` parameter
+  /// it does not know or cannot read. The ocean current system applies a
+  /// change only if the model accepts it, and no consumer builds a model
+  /// from parameters it refuses.
+  /// \param[in] _params Parameters.
+  /// \return Empty if the model accepts them, else why it does not.
+  public: virtual std::string Validate(
+      const OceanCurrentParameters &_params) const
+  {
+    (void)_params;
+    return {};
+  }
+
+  /// \brief Set the world's spherical coordinates, its geodetic origin and
+  /// heading, for a model that places itself on the Earth, such as a
+  /// gridded current or a tide at a station. Called before SetParameters
+  /// when the world has them; the model is rebuilt when they change.
+  /// \param[in] _sc The world's spherical coordinates.
+  public: virtual void SetSphericalCoordinates(
+      const math::SphericalCoordinates &_sc)
+  {
+    (void)_sc;
+  }
+
+  /// \brief Set the parameters, which Validate accepted.
   /// \param[in] _params Parameters.
   public: virtual void SetParameters(const OceanCurrentParameters &_params)
       = 0;
@@ -83,18 +109,29 @@ void RegisterOceanCurrentModelFactory(const std::string &_name,
 /// \brief Build a registered model and set its parameters.
 /// \param[in] _name Name the model was registered under.
 /// \param[in] _params Parameters.
-/// \return The model, or null if no model has that name.
+/// \param[in] _sc The world's spherical coordinates, if it has them.
+/// \return The model, or null if no model has that name or it refuses the
+/// parameters.
 std::unique_ptr<IOceanCurrentModel> CreateOceanCurrentModel(
-    const std::string &_name, const OceanCurrentParameters &_params);
+    const std::string &_name, const OceanCurrentParameters &_params,
+    const math::SphericalCoordinates *_sc = nullptr);
 
-/// \brief The velocity a speed and a direction the current sets towards
-/// make, east north up and horizontal. The one place the convention lives: a
-/// direction of 90, clockwise from north, sets east.
+/// \brief Whether a registered model accepts parameters.
+/// \param[in] _name Name the model was registered under.
+/// \param[in] _params Parameters.
+/// \return Empty if it does, else why not: no model has that name, or the
+/// model's own reason.
+std::string ValidateOceanCurrentModel(const std::string &_name,
+                                      const OceanCurrentParameters &_params);
+
+/// \brief The velocity of a current from its speed and the direction it
+/// sets towards, east north up and horizontal. The one place the convention
+/// lives: a direction of 90, clockwise from north, sets east.
 /// \param[in] _speed Speed, m/s.
 /// \param[in] _directionDeg Direction the current sets towards, degrees
 /// clockwise from true north.
 /// \return The velocity, east north up, m/s.
-math::Vector3d SetVector(double _speed, double _directionDeg);
+math::Vector3d VelocityFromSet(double _speed, double _directionDeg);
 }  // namespace gz::sim::ocean_current
 
 #endif  // GZ_SIM_OCEAN_CURRENT_OCEANCURRENTMODEL_HH_

@@ -107,9 +107,11 @@ if(BUILD_TESTING)
       gz-transport::core
       gz-msgs::core)
     # The plugin library is loaded by name from the build tree so the test
-    # runs before install.
+    # runs before install. A partition of its own keeps its topics apart
+    # from other packages' tests, which colcon runs in parallel.
     set_tests_properties(ocean_current_test PROPERTIES
-      ENVIRONMENT "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}")
+      ENVIRONMENT
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR};GZ_PARTITION=gz_ocean_current_test")
   endif()
 endif()
 
@@ -120,6 +122,9 @@ ament_environment_hooks("hooks/hook.sh.in")
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
-ament_export_dependencies(gz_sim_vendor gz_math_vendor)
+# The library's public targets link gz-sim::core and gz-math::gz-math, so a
+# consumer's find_package(gz_ocean_current) must find them too: the vendor
+# packages only put them on the path.
+ament_export_dependencies(gz_sim_vendor gz-sim gz_math_vendor gz-math)
 
 ament_package()

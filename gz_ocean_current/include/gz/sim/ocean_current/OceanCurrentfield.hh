@@ -21,6 +21,7 @@
 #include <iomanip>
 #include <istream>
 #include <limits>
+#include <map>
 #include <ostream>
 #include <string>
 
@@ -55,17 +56,19 @@ struct OceanCurrentParameters
   /// measures depth from it.
   double water_level{0.0};
 
-  /// \brief An external source for a model that reads one, such as the file
-  /// of a gridded current. Opaque to the ocean current system, which only
-  /// stores and replicates it: its meaning belongs to the model that reads
-  /// it. Empty for the model built in; here so that such a model later
-  /// changes neither the recipe nor the query consumers are written against.
-  std::string source;
-
   /// \brief Seed of anything random in a model. The ocean current system
   /// resolves a requested 0 into a drawn seed before it writes the recipe,
   /// so every process that rebuilds the model gets the same current.
   std::uint32_t seed{1};
+
+  /// \brief Parameters the model owns, by name, as text: the file of a
+  /// gridded current (`source`), the constituents of a tide, a depth table.
+  /// Opaque to the ocean current system, which only stores and replicates
+  /// them; their meaning belongs to the model, which accepts or rejects them
+  /// (IOceanCurrentModel::Validate). Empty for the model built in; here so
+  /// that a richer model changes neither the recipe nor the query consumers
+  /// are written against.
+  std::map<std::string, std::string> extra;
 };
 
 /// \brief The ocean current of a world as a recipe: which model, with which
@@ -96,10 +99,14 @@ inline std::ostream &operator<<(std::ostream &_os,
 {
   const auto old = _os.precision(std::numeric_limits<double>::max_digits10);
   _os << std::quoted(_d.model) << ' ' << _d.generation << ' '
-      << _d.params.seed << ' ' << std::quoted(_d.params.source);
+      << _d.params.seed;
 #define GZ_OCEAN_CURRENT_WR(m, name) _os << ' ' << _d.params.m;
   GZ_OCEAN_CURRENT_PARAM_TABLE(GZ_OCEAN_CURRENT_WR)
 #undef GZ_OCEAN_CURRENT_WR
+  // The model's own parameters: a count, then quoted name and value pairs.
+  _os << ' ' << _d.params.extra.size();
+  for (const auto &[name, value] : _d.params.extra)
+    _os << ' ' << std::quoted(name) << ' ' << std::quoted(value);
   _os.precision(old);
   return _os;
 }
@@ -110,11 +117,20 @@ inline std::ostream &operator<<(std::ostream &_os,
 /// \return The stream.
 inline std::istream &operator>>(std::istream &_is, OceanCurrentfieldData &_d)
 {
-  _is >> std::quoted(_d.model) >> _d.generation >> _d.params.seed
-      >> std::quoted(_d.params.source);
+  _is >> std::quoted(_d.model) >> _d.generation >> _d.params.seed;
 #define GZ_OCEAN_CURRENT_RD(m, name) _is >> _d.params.m;
   GZ_OCEAN_CURRENT_PARAM_TABLE(GZ_OCEAN_CURRENT_RD)
 #undef GZ_OCEAN_CURRENT_RD
+  std::size_t count{0};
+  _is >> count;
+  _d.params.extra.clear();
+  for (std::size_t i = 0; i < count && _is; ++i)
+  {
+    std::string name;
+    std::string value;
+    _is >> std::quoted(name) >> std::quoted(value);
+    _d.params.extra[name] = value;
+  }
   return _is;
 }
 
@@ -126,6 +142,12 @@ inline std::istream &operator>>(std::istream &_is, OceanCurrentfieldData &_d)
 /// \return False if the name is unknown or the value out of range.
 bool SetParameter(OceanCurrentParameters &_p, const std::string &_name,
                   double _value);
+
+/// \brief Whether a name is one of the numeric parameters the recipe types,
+/// the table's or "seed"; any other name belongs to the model.
+/// \param[in] _name Parameter name.
+/// \return True if SetParameter takes it.
+bool IsTypedParameter(const std::string &_name);
 }  // namespace gz::sim::ocean_current
 
 #endif  // GZ_SIM_OCEAN_CURRENT_OCEANCURRENTFIELD_HH_

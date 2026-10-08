@@ -71,8 +71,8 @@ class OceanCurrentSamplerPrivate
   /// \brief The world's spherical coordinates, if it has them.
   public: std::optional<math::SphericalCoordinates> sc;
 
-  /// \brief Warned about an unknown model already.
-  public: bool warned{false};
+  /// \brief Logged about a model it could not build already.
+  public: bool logged{false};
 };
 
 //////////////////////////////////////////////////
@@ -99,24 +99,40 @@ bool OceanCurrentSampler::Sync(const EntityComponentManager &_ecm)
     return false;
   }
 
+  // Copied only when they change: a copy allocates, and Sync runs every
+  // step. A model that places itself on the Earth is rebuilt with them.
+  auto &cached = this->dataPtr->sc;
+  bool scChanged{false};
   const auto *sc = _ecm.Component<components::SphericalCoordinates>(world);
-  if (nullptr != sc)
-    this->dataPtr->sc = sc->Data();
-  else
-    this->dataPtr->sc.reset();
+  if (nullptr != sc && (!cached || !(*cached == sc->Data())))
+  {
+    cached = sc->Data();
+    scChanged = true;
+  }
+  else if (nullptr == sc && cached)
+  {
+    cached.reset();
+    scChanged = true;
+  }
 
   const auto &data = field->Data();
-  if (!this->dataPtr->model || data.generation != this->dataPtr->generation ||
+  // Without a model it tries again every step: a plugin may register the
+  // model after the world started.
+  if (!this->dataPtr->model || scChanged ||
+      data.generation != this->dataPtr->generation ||
       data.model != this->dataPtr->modelName)
   {
-    this->dataPtr->model = CreateOceanCurrentModel(data.model, data.params);
+    this->dataPtr->model = CreateOceanCurrentModel(data.model, data.params,
+        cached ? &*cached : nullptr);
     this->dataPtr->modelName = data.model;
     this->dataPtr->generation = data.generation;
-    if (!this->dataPtr->model && !this->dataPtr->warned)
+    // The ocean current system reports a model it cannot build, once; a
+    // consumer only notes it, so each process does not repeat the error.
+    if (!this->dataPtr->model && !this->dataPtr->logged)
     {
-      gzerr << "OceanCurrent: no ocean current model named [" << data.model
-            << "]\n";
-      this->dataPtr->warned = true;
+      gzdbg << "OceanCurrent: cannot build ocean current model ["
+            << data.model << "], no current\n";
+      this->dataPtr->logged = true;
     }
   }
   return nullptr != this->dataPtr->model;
@@ -151,9 +167,11 @@ math::Vector3d OceanCurrentAt(const EntityComponentManager &_ecm,
     const math::Vector3d &_position,
     const std::chrono::steady_clock::duration &_time)
 {
-  // One sampler per thread, kept between calls, so the model is rebuilt only
-  // when the recipe changes.
-  thread_local OceanCurrentSampler sampler;
+  // A sampler of its own, every call: one kept between calls could answer
+  // for another world, since every world numbers its entity and its
+  // generations alike, and would outlive a model a plugin registered. A
+  // system that asks every step keeps its own OceanCurrentSampler.
+  OceanCurrentSampler sampler;
   sampler.Sync(_ecm);
   return sampler.At(_position, _time);
 }

@@ -58,8 +58,12 @@ void RegisterOceanCurrentModelFactory(const std::string &_name,
 }
 
 //////////////////////////////////////////////////
-std::unique_ptr<IOceanCurrentModel> CreateOceanCurrentModel(
-    const std::string &_name, const OceanCurrentParameters &_params)
+namespace
+{
+/// \brief Build a registered model with no parameters set.
+/// \param[in] _name Name the model was registered under.
+/// \return The model, or null if no model has that name.
+std::unique_ptr<IOceanCurrentModel> Build(const std::string &_name)
 {
   OceanCurrentModelFactory factory;
   {
@@ -70,14 +74,36 @@ std::unique_ptr<IOceanCurrentModel> CreateOceanCurrentModel(
       return nullptr;
     factory = it->second;
   }
-  auto model = factory();
-  if (model)
-    model->SetParameters(_params);
+  return factory();
+}
+}  // namespace
+
+//////////////////////////////////////////////////
+std::unique_ptr<IOceanCurrentModel> CreateOceanCurrentModel(
+    const std::string &_name, const OceanCurrentParameters &_params,
+    const math::SphericalCoordinates *_sc)
+{
+  auto model = Build(_name);
+  if (!model || !model->Validate(_params).empty())
+    return nullptr;
+  if (nullptr != _sc)
+    model->SetSphericalCoordinates(*_sc);
+  model->SetParameters(_params);
   return model;
 }
 
 //////////////////////////////////////////////////
-math::Vector3d SetVector(double _speed, double _directionDeg)
+std::string ValidateOceanCurrentModel(const std::string &_name,
+                                      const OceanCurrentParameters &_params)
+{
+  const auto model = Build(_name);
+  if (!model)
+    return "no ocean current model named [" + _name + "]";
+  return model->Validate(_params);
+}
+
+//////////////////////////////////////////////////
+math::Vector3d VelocityFromSet(double _speed, double _directionDeg)
 {
   // A current sets towards its direction: 90, clockwise from north, is east.
   const double a = GZ_DTOR(_directionDeg);

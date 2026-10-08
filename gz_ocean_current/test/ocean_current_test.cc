@@ -31,7 +31,6 @@
 #include <thread>
 
 #include <gz/common/Filesystem.hh>
-#include <gz/math/CoordinateVector3.hh>
 #include <gz/math/SphericalCoordinates.hh>
 #include <gz/math/Vector3.hh>
 #include <gz/transport/Node.hh>
@@ -121,10 +120,9 @@ bool Publish(const std::string &_world, const msgs::Param &_msg)
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
   if (!pub.HasConnections())
     return false;
-  const bool sent = pub.Publish(_msg);
-  // Delivery is asynchronous; give the subscriber a moment to queue it.
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  return sent;
+  // Delivery is asynchronous: a test runs the world until it sees the
+  // change, rather than sleeping for it.
+  return pub.Publish(_msg);
 }
 
 /// \brief Ask the ocean current system to change a numeric parameter.
@@ -142,18 +140,23 @@ bool SetCurrent(const std::string &_world, const std::string &_key,
   return Publish(_world, msg);
 }
 
-/// \brief Ask the ocean current system to change the source.
+/// \brief Ask the ocean current system to change a string parameter.
 /// \param[in] _world World name.
-/// \param[in] _source The new source.
+/// \param[in] _key Parameter name.
+/// \param[in] _value Its new value.
 /// \return True once the message was sent to a subscriber.
-bool SetSource(const std::string &_world, const std::string &_source)
+bool SetText(const std::string &_world, const std::string &_key,
+             const std::string &_value)
 {
   msgs::Param msg;
-  auto &any = (*msg.mutable_params())["source"];
+  auto &any = (*msg.mutable_params())[_key];
   any.set_type(msgs::Any::STRING);
-  any.set_string_value(_source);
+  any.set_string_value(_value);
   return Publish(_world, msg);
 }
+
+/// \brief The water level the marker messages set, a value no world uses.
+constexpr double kMarker{-0.75};
 
 /// \brief Path to one of the test worlds.
 /// \param[in] _file World file name.
@@ -185,6 +188,40 @@ class CurrentWorld
   public: bool Run(std::size_t _steps)
   {
     return this->fixture.Server()->Run(true, _steps, false);
+  }
+
+  /// \brief Run step by step until a condition holds on the current, for
+  /// up to five seconds of wall time: a message on the topic arrives on
+  /// another thread, at a time no fixed sleep can promise.
+  /// \param[in] _done The condition.
+  /// \return True once it holds.
+  public: bool RunUntil(const std::function<bool(const CurrentState &)> &_done)
+  {
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+      if (!this->Run(1))
+        return false;
+      if (_done(this->state))
+        return true;
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return false;
+  }
+
+  /// \brief Send a valid message that sets the water level to kMarker, and
+  /// run until it lands. Messages from one publisher arrive in order, so
+  /// once it has, every message sent before it was handled.
+  /// \param[in] _world World name.
+  /// \return True once the marker landed.
+  public: bool Marker(const std::string &_world)
+  {
+    return SetCurrent(_world, "water_level", kMarker) &&
+        this->RunUntil([](const CurrentState &_s)
+        {
+          return _s.recipe && _s.recipe->params.water_level == kMarker;
+        });
   }
 
   /// \brief The fixture.
@@ -290,9 +327,9 @@ TEST(OceanCurrentField, SpeedAndDirectionFromTheWorld)
   EXPECT_NEAR(90.0, world.state.recipe->params.direction, 1e-9);
   EXPECT_NEAR(0.25, world.state.recipe->params.water_level, 1e-9)
       << "the water level is part of the recipe";
-  EXPECT_NE(0u, world.state.recipe->params.seed)
-      << "a 0 seed is resolved before the recipe is written";
-  EXPECT_TRUE(world.state.recipe->params.source.empty());
+  EXPECT_EQ(1u, world.state.recipe->params.seed)
+      << "the default seed is fixed, so a run repeats";
+  EXPECT_TRUE(world.state.recipe->params.extra.empty());
 }
 
 /////////////////////////////////////////////////
@@ -309,9 +346,9 @@ TEST(OceanCurrentField, LateConsumerReadsTheRecipe)
 }
 
 /////////////////////////////////////////////////
-/// The current is constant for the run: an hour later it is what the world
-/// file said, under the same recipe.
-TEST(OceanCurrentField, ConstantUntilChanged)
+/// Without a message the current stays as the world file set it: an hour
+/// later it is the same, under the same recipe.
+TEST(OceanCurrentField, UnchangedWithoutAMessage)
 {
   CurrentWorld world("ocean_currentfield.sdf");
   ASSERT_TRUE(world.Run(1));
@@ -338,51 +375,120 @@ TEST(OceanCurrentField, ChangedAtRunTimeOnItsTopic)
   const auto generation = world.state.recipe->generation;
 
   ASSERT_TRUE(SetCurrent("ocean_currentfield", "direction", 180.0));
-  ASSERT_TRUE(world.Run(2));
-  EXPECT_NEAR(0.0, world.state.sampled.X(), 1e-9);
-  EXPECT_NEAR(-1.0, world.state.sampled.Y(), 1e-9)
+  ASSERT_TRUE(world.RunUntil([](const CurrentState &_s)
+      { return std::abs(_s.sampled.Y() + 1.0) < 1e-9; }))
       << "setting south flows south";
+  EXPECT_NEAR(0.0, world.state.sampled.X(), 1e-9);
   EXPECT_EQ(world.state.sampled, world.state.late)
       << "a consumer made now reads the change too";
   EXPECT_GT(world.state.recipe->generation, generation);
 
   ASSERT_TRUE(SetCurrent("ocean_currentfield", "speed", 0.0));
-  ASSERT_TRUE(world.Run(2));
-  EXPECT_NEAR(0.0, world.state.sampled.Length(), 1e-9);
+  ASSERT_TRUE(world.RunUntil([](const CurrentState &_s)
+      { return _s.sampled.Length() < 1e-9; }));
 
   ASSERT_TRUE(SetCurrent("ocean_currentfield", "water_level", -1.5));
-  ASSERT_TRUE(world.Run(2));
-  EXPECT_NEAR(-1.5, world.state.recipe->params.water_level, 1e-9);
+  ASSERT_TRUE(world.RunUntil([](const CurrentState &_s)
+      { return _s.recipe->params.water_level == -1.5; }));
 
   const auto before = world.state.recipe->generation;
   ASSERT_TRUE(SetCurrent("ocean_currentfield", "gust", 3.0));
   ASSERT_TRUE(SetCurrent("ocean_currentfield", "speed", -1.0));
-  ASSERT_TRUE(world.Run(2));
-  EXPECT_EQ(before, world.state.recipe->generation);
+  ASSERT_TRUE(world.Marker("ocean_currentfield"));
+  EXPECT_EQ(before + 1, world.state.recipe->generation)
+      << "only the marker changed the recipe";
+  EXPECT_TRUE(world.state.recipe->params.extra.empty())
+      << "the standard model refuses a parameter of its own";
   EXPECT_NEAR(0.0, world.state.sampled.Length(), 1e-9);
 }
 
 /////////////////////////////////////////////////
-/// The source is a string key on the topic; it reaches the recipe as a new
-/// generation and changes nothing the standard model reads.
-TEST(OceanCurrentField, SourceOnTheTopic)
+/// A message is applied whole or not at all: one bad key and the good ones
+/// beside it change nothing either.
+TEST(OceanCurrentField, MessageIsAppliedWholeOrNotAtAll)
 {
   CurrentWorld world("ocean_currentfield.sdf");
   ASSERT_TRUE(world.Run(1));
+
+  msgs::Param msg;
+  auto &direction = (*msg.mutable_params())["direction"];
+  direction.set_type(msgs::Any::DOUBLE);
+  direction.set_double_value(180.0);
+  auto &speed = (*msg.mutable_params())["speed"];
+  speed.set_type(msgs::Any::DOUBLE);
+  speed.set_double_value(-1.0);
+  ASSERT_TRUE(Publish("ocean_currentfield", msg));
+  ASSERT_TRUE(world.Marker("ocean_currentfield"));
+  EXPECT_NEAR(90.0, world.state.recipe->params.direction, 1e-9)
+      << "the valid direction in a refused message is not applied";
+  EXPECT_NEAR(1.0, world.state.sampled.X(), 1e-9);
+}
+
+/////////////////////////////////////////////////
+/// ROS sends `speed: 1` as an integer; the bridge makes it an INT32, which
+/// the topic takes as a number.
+TEST(OceanCurrentField, IntegerOnTheTopic)
+{
+  CurrentWorld world("ocean_currentfield.sdf");
+  ASSERT_TRUE(world.Run(1));
+
+  msgs::Param msg;
+  auto &any = (*msg.mutable_params())["speed"];
+  any.set_type(msgs::Any::INT32);
+  any.set_int_value(2);
+  ASSERT_TRUE(Publish("ocean_currentfield", msg));
+  ASSERT_TRUE(world.RunUntil([](const CurrentState &_s)
+      { return std::abs(_s.sampled.X() - 2.0) < 1e-9; }));
+  EXPECT_NEAR(2.0, world.state.recipe->params.speed, 1e-9);
+}
+
+/////////////////////////////////////////////////
+/// A source on the topic is a parameter the model owns: the standard model
+/// takes none and refuses it, while a model that reads one gets it, as a
+/// new generation.
+TEST(OceanCurrentField, SourceOnTheTopic)
+{
+  {
+    CurrentWorld world("ocean_currentfield.sdf");
+    ASSERT_TRUE(world.Run(1));
+    ASSERT_TRUE(SetText("ocean_currentfield", "source", "grid.nc"));
+    ASSERT_TRUE(world.Marker("ocean_currentfield"));
+    EXPECT_TRUE(world.state.recipe->params.extra.empty());
+  }
+
+  ocean_current::RegisterOceanCurrentModelFactory("upwelling",
+      [] { return std::make_unique<Upwelling>(); });
+  CurrentWorld world("ocean_current_upwelling.sdf");
+  ASSERT_TRUE(world.Run(1));
   ASSERT_TRUE(world.state.recipe.has_value());
   const auto generation = world.state.recipe->generation;
-
-  ASSERT_TRUE(SetSource("ocean_currentfield", "noaa_blended_currents.nc"));
-  ASSERT_TRUE(world.Run(2));
-  EXPECT_EQ("noaa_blended_currents.nc", world.state.recipe->params.source);
+  ASSERT_TRUE(SetText("ocean_current_upwelling", "source", "grid.nc"));
+  ASSERT_TRUE(world.RunUntil([](const CurrentState &_s)
+      { return _s.recipe->params.extra.count("source") &&
+               _s.recipe->params.extra.at("source") == "grid.nc"; }));
   EXPECT_GT(world.state.recipe->generation, generation);
-  EXPECT_NEAR(1.0, world.state.sampled.X(), 1e-9)
-      << "the standard model reads no source";
 
-  const auto before = world.state.recipe->generation;
-  ASSERT_TRUE(SetCurrent("ocean_currentfield", "source", 4.0));
-  ASSERT_TRUE(world.Run(2));
-  EXPECT_EQ(before, world.state.recipe->generation);
+  ASSERT_TRUE(SetCurrent("ocean_current_upwelling", "tide_m2", 0.25));
+  ASSERT_TRUE(world.RunUntil([](const CurrentState &_s)
+      { return _s.recipe->params.extra.count("tide_m2"); }));
+  EXPECT_DOUBLE_EQ(0.25,
+      std::stod(world.state.recipe->params.extra.at("tide_m2")))
+      << "a number for the model is kept as text, at full precision";
+}
+
+/////////////////////////////////////////////////
+/// A world names a model nobody registered: the system reports it, and
+/// there is no current and no ground truth.
+TEST(OceanCurrentField, UnknownModel)
+{
+  Last<msgs::Twist> truth(
+      "/world/ocean_current_unknown_model/ocean_current_info");
+  CurrentWorld world("ocean_current_unknown_model.sdf");
+  ASSERT_TRUE(world.Run(200));
+  ASSERT_TRUE(world.state.recipe.has_value());
+  EXPECT_EQ("no_such_model", world.state.recipe->model);
+  EXPECT_EQ(math::Vector3d::Zero, world.state.sampled);
+  EXPECT_FALSE(truth.Get().has_value()) << "no ground truth";
 }
 
 /////////////////////////////////////////////////
@@ -400,6 +506,10 @@ TEST(OceanCurrentField, ModelFromTheWorldFile)
   EXPECT_NEAR(0.0, world.state.sampled.Y(), 1e-9);
   EXPECT_NEAR(0.3, world.state.sampled.Z(), 1e-9);
   EXPECT_EQ(world.state.sampled, world.state.late);
+  ASSERT_EQ(1u, world.state.recipe->params.extra.count("source"))
+      << "the <parameters> block reaches the recipe";
+  EXPECT_EQ("noaa_blended_currents.nc",
+            world.state.recipe->params.extra.at("source"));
 }
 
 /////////////////////////////////////////////////
@@ -410,8 +520,8 @@ TEST(OceanCurrentField, ResetRewritesTheWorldsCurrent)
   CurrentWorld world("ocean_currentfield.sdf");
   ASSERT_TRUE(world.Run(1));
   ASSERT_TRUE(SetCurrent("ocean_currentfield", "speed", 2.0));
-  ASSERT_TRUE(world.Run(2));
-  EXPECT_NEAR(2.0, world.state.sampled.X(), 1e-9);
+  ASSERT_TRUE(world.RunUntil([](const CurrentState &_s)
+      { return std::abs(_s.sampled.X() - 2.0) < 1e-9; }));
   ASSERT_TRUE(world.state.recipe.has_value());
   const auto generation = world.state.recipe->generation;
 
@@ -425,8 +535,8 @@ TEST(OceanCurrentField, ResetRewritesTheWorldsCurrent)
       << "the restored recipe is new to every consumer";
 
   ASSERT_TRUE(SetCurrent("ocean_currentfield", "direction", 180.0));
-  ASSERT_TRUE(world.Run(2));
-  EXPECT_NEAR(-1.0, world.state.sampled.Y(), 1e-9)
+  ASSERT_TRUE(world.RunUntil([](const CurrentState &_s)
+      { return std::abs(_s.sampled.Y() + 1.0) < 1e-9; }))
       << "a change after the reset starts from the world file's speed";
 }
 
@@ -447,18 +557,15 @@ TEST(OceanCurrentField, GroundTruthIsPublished)
 
 /////////////////////////////////////////////////
 /// North is the world's north, the one its spherical coordinates and GPS
-/// use, not its +y axis: in a world turned 90 degrees, a current setting
-/// east flows geographic east.
+/// use, not its +y axis. In gz-math a heading of 90 degrees turns the world
+/// so its +x points north, so a current setting east flows towards -y. A
+/// fixed value, so a change of convention anywhere shows up here.
 TEST(OceanCurrentDirection, NorthIsTheWorldsNorth)
 {
-  CurrentWorld world("heading.sdf");
+  CurrentWorld world("ocean_current_heading.sdf");
   ASSERT_TRUE(world.Run(2));
   ASSERT_TRUE(world.state.sc.has_value());
-  const auto expected = world.state.sc->LocalFromGlobalVelocity(
-      math::CoordinateVector3::Metric(1.0, 0.0, 0.0));
-  ASSERT_TRUE(expected.has_value());
-  EXPECT_NEAR(expected->X().value(), world.state.sampled.X(), 1e-9);
-  EXPECT_NEAR(expected->Y().value(), world.state.sampled.Y(), 1e-9);
-  EXPECT_GT(std::abs(world.state.sampled.Y()), 0.99)
-      << "the heading turned it off +x";
+  EXPECT_NEAR(0.0, world.state.sampled.X(), 1e-9);
+  EXPECT_NEAR(-1.0, world.state.sampled.Y(), 1e-9)
+      << "geographic east is -y here";
 }
