@@ -19,6 +19,7 @@
 #include <chrono>
 #include <iomanip>
 #include <limits>
+#include <map>
 #include <mutex>
 #include <optional>
 #include <random>
@@ -95,6 +96,18 @@ namespace
     os << std::setprecision(std::numeric_limits<double>::max_digits10)
        << _value;
     return os.str();
+  }
+
+  /// \brief The value of one child of the <parameters> block. A leaf is its
+  /// text; a child with children or attributes of its own is its SDF text,
+  /// so a nested structure reaches the model whole.
+  /// \param[in] _child The child.
+  /// \return Its value.
+  std::string ParameterValue(const sdf::ElementPtr &_child)
+  {
+    if (_child->GetFirstElement() || _child->GetAttributeCount() > 0u)
+      return _child->ToString("");
+    return _child->Get<std::string>();
   }
 }
 
@@ -182,6 +195,12 @@ bool OceanCurrentPrivate::Apply(const msgs::Param &_msg)
   auto params = this->recipe.params;
   for (const auto &[key, value] : _msg.params())
   {
+    if ("model" == key)
+    {
+      gzwarn << "OceanCurrent: the model cannot change at run time, only "
+             << "in the world file; message ignored\n";
+      return false;
+    }
     double d{0.0};
     const bool numeric = ReadDouble(value, d);
     if (ocean_current::IsTypedParameter(key))
@@ -271,14 +290,26 @@ void OceanCurrent::Configure(const Entity &_entity,
     }
   }
 
-  // The parameters the model owns, as text, opaque to this system.
+  // The parameters the model owns, as text, opaque to this system. A name
+  // that repeats is a list, numbered in order, name.0, name.1, ..., so no
+  // entry overwrites another.
   if (_sdf->HasElement(kParameters))
   {
     auto block = _sdf->FindElement(kParameters);
+    std::map<std::string, std::size_t> count;
     for (auto child = block->GetFirstElement(); child;
          child = child->GetNextElement())
     {
-      d.recipe.params.extra[child->GetName()] = child->Get<std::string>();
+      ++count[child->GetName()];
+    }
+    std::map<std::string, std::size_t> index;
+    for (auto child = block->GetFirstElement(); child;
+         child = child->GetNextElement())
+    {
+      const std::string &name = child->GetName();
+      const std::string key = count[name] > 1u ?
+          name + "." + std::to_string(index[name]++) : name;
+      d.recipe.params.extra[key] = ParameterValue(child);
     }
   }
 
@@ -333,16 +364,20 @@ void OceanCurrent::PreUpdate(const UpdateInfo &_info,
   }
 
   // Apply what the topic queued; any change is a new recipe, which every
-  // consumer sees on this step.
+  // consumer sees on this step. The queue is taken under the lock and
+  // applied outside it, since validating builds the model, which for a
+  // gridded current may take a while, and the transport thread must not
+  // wait for it.
+  std::vector<msgs::Param> pending;
   {
     const std::lock_guard<std::mutex> lock(d.mutex);
-    bool changed{false};
-    for (const auto &msg : d.pending)
-      changed = d.Apply(msg) || changed;
-    d.pending.clear();
-    if (changed)
-      d.WriteRecipe(_ecm);
+    pending.swap(d.pending);
   }
+  bool changed{false};
+  for (const auto &msg : pending)
+    changed = d.Apply(msg) || changed;
+  if (changed)
+    d.WriteRecipe(_ecm);
 
   if (!d.sampler.Sync(_ecm))
     return;

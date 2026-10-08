@@ -38,7 +38,7 @@ which ROS can bridge.
 | `<speed>` | 0 | m/s. |
 | `<direction>` | 0 | Degrees clockwise from north the current sets towards: 90 sets east, towards +x. |
 | `<water_level>` | 0 | World z of the water's surface, so a model that varies with depth knows where the surface is; unread by `standard`. |
-| `<parameters>` | none | The parameters the model owns, one element each, such as `<source>`, the file of a gridded current. Opaque to the system, which only stores and replicates them as text; the model accepts or refuses them. `standard` takes none. |
+| `<parameters>` | none | The parameters the model owns, one element each, such as `<source>`, the file of a gridded current. Opaque to the system, which only stores and replicates them as text; the model accepts or refuses them. A leaf is its text; an element with children or attributes of its own, such as `<layer><depth>10</depth></layer>`, is its SDF text, for the model to parse. A name that repeats is a list, numbered in order: three `<constituent>` elements are `constituent.0`, `constituent.1` and `constituent.2`. `standard` takes none. |
 | `<seed>` | 1 | Seed of anything random in a model, fixed by default so a run repeats; 0 draws a new one each run. `standard` has nothing random. |
 | `<publish_rate>` | 10 | Hz of simulation time for the ground truth. |
 
@@ -57,7 +57,7 @@ parameter the model owns and takes a string or a number. A message is
 queued and applied at the next step, as a new recipe, so every consumer sees
 the change on the same step. It is applied whole or not at all: one key out
 of range, of the wrong type, or refused by the model, and it changes
-nothing. It cannot change `<model>`. A reset puts the world file's current
+nothing. It cannot change `<model>`: a `model` key is refused. A reset puts the world file's current
 back.
 From ROS, through the simulation launch's bridge:
 
@@ -109,7 +109,8 @@ A world then names it with `<model>my_model</model>`. The system that owns
 the recipe and every consumer run it unchanged. A model's own parameters
 come from the world's `<parameters>` block, or a key on the topic, as text
 in `params.extra`: a gridded current reads `source`, a tide its
-constituents. The model refuses what it cannot read in `Validate`, and the
+constituents, `constituent.0`, `constituent.1` and so on, and a depth
+profile the SDF text of each `<layer>`, which it parses itself. The model refuses what it cannot read in `Validate`, and the
 system then refuses the change. A model that places itself on the Earth gets
 the world's spherical coordinates in `SetSphericalCoordinates`; one that
 needs randomness draws from `<seed>`.
@@ -120,6 +121,9 @@ needs randomness draws from `<seed>`.
   <model>my_model</model>
   <parameters>
     <source>noaa_blended_currents.nc</source>
+    <constituent>M2 0.25 0</constituent>
+    <constituent>S2 0.1 30</constituent>
+    <layer><depth>10</depth><speed>0.2</speed></layer>
   </parameters>
 </plugin>
 ```

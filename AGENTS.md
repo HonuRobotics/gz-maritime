@@ -147,9 +147,10 @@ the full rationale (section refs below).
   `gz-maritime-ocean-current-system`, slack, with `<speed>` and
   `<direction>` (the direction it sets *towards*, the opposite of the wind),
   set in the world file and changed at run time on the
-  `/world/default/ocean_current/set` topic. A system that needs the current asks
-  `gz::sim::ocean_current::OceanCurrentAt` (or keeps an
-  `OceanCurrentSampler`), and the query stays a point query. A new current
+  `/world/default/ocean_current/set` topic. A system that asks the current
+  every step, such as the hydrodynamics, keeps an `OceanCurrentSampler`;
+  `gz::sim::ocean_current::OceanCurrentAt` builds the model on every call
+  and is for an occasional query. Either way the query stays a point query. A new current
   model is a class registered under a name, never a change to the system or
   its consumers; nothing
   publishes on Gazebo's `/ocean_current` topic. A change on the topic is a
