@@ -3,48 +3,59 @@
 ## Scope and success
 
 What matters most is the architecture, the way the waves and the wind have
-it. We want an ocean current that every vehicle feels, whether it was loaded
-with the world or spawned at run time, and a plugin structure that takes new
-current models, simpler or richer, without a change to the system that owns
-the current or to the systems that read it. On that, the model this phase
-ships is the simplest that fits the use case: for the kilometre and the hour
-this simulation works at, the current is **uniform and horizontal**. The
-world file gives its speed and the direction it sets towards, and a topic
-bridged to ROS changes them while the world runs.
+it. We want an ocean current that the world owns and any system can ask at a
+point, a plugin structure that takes new current models, simpler or richer,
+without a change to the system that owns the current or to the systems that
+read it, and vehicles that feel it whether they were loaded with the world or
+spawned at run time. On that, the model this phase ships is the simplest that
+fits the use case: for the kilometre and the hour this simulation works at,
+the current is **uniform and horizontal**. The world file gives its speed and
+the direction it sets towards, and a topic bridged to ROS changes them while
+the world runs.
+
+A vehicle's hydrodynamic model is one set of equations, added mass, Coriolis
+and damping, on its velocity relative to the water, and it belongs in one
+plugin. So the vehicles here keep the hydrodynamics plugin and the
+coefficients they were identified with, and that plugin reads the current
+from the world. The end state is upstream Hydrodynamics reading an upstream
+current component; a vendored copy reading `OceanCurrentAt` is the step
+towards it.
 
 The demo uses a USV: the custom USV, engines off, drifts with the current at
 the current's speed and in its direction, a second boat spawned later drifts
-the same way, and a boat holding station under thrust has to push against
-it with the force its wetted area predicts. A headless end to end test runs
-that demo. The Blue Robotics vehicles drift the same way, with the drag they
-were identified with.
+the same way, and a boat holding station under thrust has to push against it
+with the force its damping predicts. The BlueBoat and the BlueROV2 drift the
+same way. In a slack world, the default, nothing about any vehicle changes.
 
-The work lands in four pull requests:
+The work lands in three pull requests, and a fourth later:
 
-1. **A current the world owns** (§1, §3): the recipe, the model registry, the
-   sampler, the world system, the topic and the ground truth, in every world.
-2. **Ocean current on marked collisions** (§2): the load on collisions marked
-   `gz:ocean_current="true"`, with the shape code shared with the wind.
-3. **The custom USV drifts with the ocean current** (§4): its pontoons
-   marked, its surge, sway and heave damping moved to the marks, the end to
-   end test and the docs.
-4. **The BlueBoat and the BlueROV2 drift with the ocean current** (§5), in
-   `bluerobotics_models`.
+1. **A current the world owns** (§1, §4): the recipe, the model registry, the
+   sampler, the world system, the `set` topic and the ground truth, in every
+   world.
+2. **A hull that feels the current** (§2): Gazebo's Hydrodynamics vendored as
+   `gz_hydrodynamics`, taking the current from `OceanCurrentAt`, with the late
+   spawn fix as its own commit, meant for upstream.
+3. **The vehicles drift with the current** (§3): the custom USV, the BlueBoat
+   and the BlueROV2 switched to it, coefficients unchanged; the Blue Robotics
+   change in `bluerobotics_models`.
+4. **Later, a geometric model** (§5): the load on collisions marked
+   `gz:ocean_current="true"`, for vehicles without identified coefficients,
+   and the upstream work that retires the vendored copy.
 
 Out of this phase, each a separate issue, upstream where the code is, for
-whoever needs it: a ramp between two currents, since a change on the topic is
-a step and a step in the current is a force spike through any plugin added
-mass term; a current that varies in time on its own (gusts, a tide), with
-depth, with place (a gridded current from NOAA data, which the recipe leaves
-room for), or has a vertical component; a vendored hydrodynamics that damps
-Fossen coefficients against the water, for a vehicle that keeps its
-identified translational damping instead of marking its hull; the thrusters
-feeling the current, which only an advance ratio nobody here turns on would
-notice; rudders, keels and fins and the slipstream over a rudder, which no
-vehicle here has; a speed log sensor, and Gazebo's DVL; the wave surface's
-height in the wetted area, which stays at the flat water level as the wind's
-does; the waves' own water motion, which stays out of the relative velocity
-on purpose; and anything on an anchor.
+whoever needs it: a ramp between two currents (a change on the topic is a
+step, which the plugin's added mass terms turn into a force spike, so a
+vehicle that carries added mass sees one until a ramp lands); a current that
+varies in time on its own (gusts, a tide), with depth, with place (a gridded
+current from NOAA data, which the recipe leaves room for), or has a vertical
+component; the thrusters feeling the current, which only an advance ratio
+nobody here turns on would notice; rudders, keels and fins and the
+slipstream over a rudder, which no vehicle here has, and which stock
+LiftDrag cannot do since it cannot read a gz-maritime component (the path is
+a vendored LiftDrag reading `OceanCurrentAt` until the upstream component
+lands); a speed log sensor, and Gazebo's DVL; the waves' own water motion,
+which stays out of the relative velocity on purpose, since manoeuvring
+coefficients are identified in calm water; and anything on an anchor.
 
 The Gazebo side of this, what upstream has and what we should send back, is
 in `OCEAN_CURRENT_UPSTREAM_REVIEW.md`, written to become a gz-sim issue.
@@ -65,142 +76,146 @@ drift test cannot say on which step the current began.
 **Solution.** Treat the current the way we treat the wind, the waves and
 buoyancy: in the ECM, with no transport on the data path. An
 `OceanCurrentfield` component on the world holds a recipe: the name of a
-current model, its parameters (a speed and the direction it sets towards,
-and a `source` string and a seed for models that need them) and a
-generation, written as a component change and nothing else, so every
-consumer, in every process, sees it on the same step. Because it lives on
-the world entity, a system on a vehicle spawned an hour into the run reads
-it exactly as one loaded with the world. Models register under a name in an
-`IOceanCurrentModel` registry; any system asks for the current at a point
-and a time with `OceanCurrentAt`, or keeps an `OceanCurrentSampler`,
-without knowing which model is behind it, so a new model, a tide, a depth
-profile or a grid from NOAA data, is one class and one registration and no
-change to anything else. The model built in, `standard`, is uniform and
-horizontal. The query is a point query and nothing more: a consumer that
+current model, its parameters and a generation, written as a component
+change and nothing else, so every consumer, in every process, sees it on the
+same step. The parameters are a speed and the direction the current sets
+towards; the world z of the water (`water_level`), as the wind's recipe has
+it, so a depth model can find the surface; and a `source` string and a seed
+for models that need them. The `source` is opaque to the system: it stores
+and replicates it, and only the model that reads it gives it meaning, such
+as the file of a gridded current. Because the recipe lives on the world
+entity, a system on a vehicle spawned an hour into the run reads it exactly
+as one loaded with the world.
+
+Models register under a name in an `IOceanCurrentModel` registry; any system
+asks for the current at a point and a time with `OceanCurrentAt`, or keeps
+an `OceanCurrentSampler`, without knowing which model is behind it, so a new
+model, a tide, a depth profile or a grid, is one class and one registration
+and no change to anything else. The model built in, `standard`, is uniform
+and horizontal. The query is a point query and nothing more: a consumer that
 spans a gradient integrates over its own extent with repeated queries.
 
 A world system, `gz-maritime-ocean-current-system`, reads the recipe from the
 world file and writes it. Topics touch it only at the boundary, as the
-wind's do: `/world/<world>/ocean_current/set`, a `gz.msgs.Param` with
-`speed` and `direction` as doubles and `source` as a string, is queued under
-a mutex and applied at the next `PreUpdate`, so a change lands on one known
-step; the simulation launch bridges it from ROS as
-`ros_gz_interfaces/msg/ParamVec`. The current is published as ground truth on
-`ocean_current_info`, a twist in the world frame, bridged to ROS. A reset puts
-the world file's current back. The system does not publish on Gazebo's
-`/ocean_current`.
+wind's do: `/world/<world>/ocean_current/set`, a `gz.msgs.Param` with `speed`
+and `direction` as doubles and `source` as a string, is queued under a mutex
+and applied at the next `PreUpdate`, so a change lands on one known step; the
+simulation launch bridges it from ROS as `ros_gz_interfaces/msg/ParamVec`.
+The current is published as ground truth on `ocean_current_info`, a twist in
+the world frame, bridged to ROS. A reset puts the world file's current back.
+The system does not publish on Gazebo's `/ocean_current`.
 
-## 2. A load on any vehicle
+## 2. A hull that feels the current
 
-**Problem.** Gazebo damps a vehicle against the ground, not against the
-water, unless that vehicle subscribes to the current topic, and a vehicle
-spawned after the first step never sees a current loaded from a file at all.
+**Problem.** Gazebo's hydrodynamics damps a vehicle against the ground, not
+against the water, unless that vehicle subscribes to the current topic; and a
+vehicle spawned after the first step never sees a current loaded from a file
+at all, since the plugin looks for the data only while the world entity is
+new, so every vehicle here, spawned at run time under its own name, would sit
+in a current it cannot feel.
 
-**Example.** A boat in a 0.5 m/s current with its engines off should drift
-at 0.5 m/s. Today it sits still, because its hull is damped against a world
-that is not moving, and a boat spawned as `boat_b` stays still even in a
-world whose current came from a file.
+**Example.** A boat in a 0.5 m/s current with its engines off should drift at
+0.5 m/s. Today it sits still, because its hull is damped against a world that
+is not moving, and a boat spawned as `boat_b` stays still even in a world
+whose current came from a file.
 
-**Solution.** Do what buoyancy and the wind do. A vehicle marks the shapes
-the water sees with `gz:ocean_current="true"` on their collisions, with
-`gz:ocean_current_cd` for a drag coefficient other than one. A box a boat
-already marks for buoyancy or wind carries this mark too, and the two drag
-systems split it at the waterline: the wind takes the part above, the
-current the part below. The ocean current system looks for marked shapes on
-every model, whenever it shows up, takes their projected areas from the
-geometry, cuts them at the water level, asks `OceanCurrentAt` at the centre
-of each submerged part, and applies quadratic drag, `0.5 * rho * Cd * A *
-|v| * v` per shape axis, on the water's velocity relative to that point, at
-that point. A current across an offset shape turns the boat, as a mast heels
-it in the wind, and a submerged vehicle has every marked shape wetted. The
-shape bookkeeping the wind system already had, the areas, the cut, the links
-found whenever they show up and the per shape drag, moves to a small package
-both systems share, `gz_marked_shapes`, rather than being written twice. The
-system takes `<water_density>` (1025), `<water_level>` (0) and
-`<default_drag_coefficient>` (1).
+**Solution.** Vendor Gazebo's Hydrodynamics as `gz_hydrodynamics`, the way
+`gz_thruster` and `gz_buoyancy` are vendored, from the gz-sim release ROS
+ships, verbatim in its own commit so the delta reads on its own. One change:
+when the world has an ocean current recipe, the plugin takes ν_c from
+`OceanCurrentAt` at its link's centre of mass every step, so damping, added
+mass and Coriolis all use the velocity relative to that water, Fossen's
+model as written. With no recipe in the world, its old inputs,
+`<default_current>`, `<lookup_current_*>` and the `/ocean_current` topic,
+behave exactly as today. A vehicle keeps the coefficients it was identified
+with, needs no retune, and feels the current the day it is spawned.
 
-The current is the water, not a force on top of it, so a body with no other
-translational drag drifts at exactly the current's speed, and a body damped
-against the ground as well does not: kept beside ground relative Fossen
-damping, the marked load makes a boat drift at about a quarter of the
-current. The marks drag every axis of a shape in the water, so the rule, in
-the invariants, is: *a vehicle that marks its hull drops the surge, sway and
-heave terms from its hydrodynamics plugin* (`xU`, `xUabsU`, `yV`, `yVabsV`,
-`zW`, `zWabsW` and their cross terms) *and keeps roll, pitch and yaw*. Fossen
-surge and sway beside the marks would hold the vehicle back in a current;
-Fossen heave would damp heave twice. Roll, pitch and yaw stay on Gazebo's
-own hydrodynamics system, unchanged: nothing it still computes depends on
-the current. A vehicle with identified translational coefficients keeps
-them by choosing its marks' drag coefficient, or the shape of a dedicated
-drag box, so the marks reproduce them.
+The late spawn fix goes in a separate commit, with its test, meant for
+upstream: read the world's environmental data whenever it is present instead
+of only while the world entity is new, and find the world by its component
+at the first step rather than from the model at configure time, since a
+model spawned at run time is not parented yet when it is configured.
+`PROVENANCE.md` lists both changes and states that the package is a fork
+until upstream has a current component, and is retired then.
 
-## 3. Direction and units
+Added mass goes through the plugin's own coefficients (`<xDotU>` and the
+rest), never the SDF `<fluid_added_mass>`, which only DART implements and
+would tie a vehicle to one physics engine. Plugin added mass is numerically
+unstable as it approaches the body's mass, so it stays small or out, as it is
+on all three vehicles today. The plugin samples the current once per link,
+which is all a uniform current needs; a current that varies along one hull
+is out of this phase.
+
+## 3. The vehicles drift with the current
+
+**Problem.** The custom USV, the BlueBoat and the BlueROV2 run Gazebo's own
+Hydrodynamics, which ignores the world's current.
+
+**Example.** In a world with a 0.5 m/s current, all three sit still.
+
+**Solution.** Switch each to `gz-maritime-hydrodynamics-system`, with its
+coefficients unchanged, and add `gz_hydrodynamics` to its dependencies. In a
+slack world nothing changes. The custom USV's switch is in this repository;
+the BlueBoat's and the BlueROV2's are a pull request in `bluerobotics_models`,
+which also corrects the BlueROV2's comment that recommends `<fluid_added_mass>`
+as the stable path for added mass (`bluerov2_gazebo/model.sdf.xacro:426-429`),
+to point to the plugin coefficients instead.
+
+Each vehicle gets a headless drift test: in a world with a 0.5 m/s current
+setting east, with no thrust, it settles at the current's velocity over the
+ground. With the vehicles' linear damping terms the approach is close to
+exponential and quick; a vehicle with quadratic damping only approaches the
+current as `u / (1 + k u t)` (`k` the quadratic coefficient over the mass),
+about 6 % short after a minute for the custom USV's size, so a test of such a
+vehicle compares against that curve rather than against the current itself.
+The custom USV's end to end test also spawns a second boat after the first
+step and checks it drifts the same, and holds one boat against the current
+with the thrust its surge damping predicts at the current's speed.
+
+## 4. Direction, units, worlds and documentation
 
 **Problem.** A current is given by the direction it flows towards, its set,
-in degrees clockwise from north, as charts draw it and NOAA predicts it,
-and the wind by the direction it comes from. DAVE and UUV Simulator give a
-current as an angle counter clockwise from east, in radians, as VRX gave
-the wind, and the speed in metres per second where tide tables use knots.
+in degrees clockwise from north, as charts draw it and NOAA predicts it, and
+the wind by the direction it comes from. VRX gave the wind the other way
+again, the direction it blows towards in degrees counter clockwise from east.
+DAVE gives a current's horizontal angle in radians and builds the vector as
+`(cos a, sin a)` (`dave_gazebo_world_plugins/src/ocean_current_world_plugin.cc:126-129`,
+Field-Robotics-Lab/dave `e54ea16`), counter clockwise from the world's +x,
+which is east in an ENU world. Tide tables give speeds in knots.
 
-**Example.** A westerly wind of 270 and a current setting 090 move a boat
-the same way, and a DAVE current of 1.57 is a current setting north.
+**Example.** A westerly wind of 270 and a current setting 090 move a boat the
+same way, and a DAVE current with a horizontal angle of 1.57 sets north.
 
 **Solution.** The direction the current sets towards, in degrees clockwise
-from north, and the speed in metres per second. Say in the docs, next to
-the wind, that the two directions follow their own trades, and convert once
-at the edge. North is the world's, from its spherical coordinates, the one
-its GPS uses. The name is `ocean_current` everywhere: the package, the mark,
-the system and the topics, matching Gazebo's and DAVE's topic.
+from north, and the speed in metres per second. North is the world's, from
+its spherical coordinates, the one its GPS uses. Say in the docs, next to the
+wind, that the two directions follow their own trades, and convert once at
+the edge. The name is `ocean_current` everywhere: the package, the system and
+the topics, matching Gazebo's and DAVE's topic.
 
-## 4. The custom USV, worlds, tests and documentation
+Every world runs the ocean current system, slack: `open_water.sdf` with a
+speed of 0 and a note that open water takes any current, 0.5 m/s being a
+brisk coastal set; the site worlds the same, with a note on what fits each
+site, a tidal set in the harbour, weak in the gulf, none on the rowing lakes.
+The reference gets the world contract line, the parameters and the topic
+with its ROS and Gazebo commands; the composition how to says which
+hydrodynamics plugin a vehicle should name, and that gz-sim's own does not
+see the world's current; `AGENTS.md` gets that as an invariant.
 
-**Problem.** No world has a current, no vehicle is marked, no test checks
-it, and the docs never mention it.
+## 5. Later: a geometric model, and upstream
 
-**Example.** A change that broke the marks would go unnoticed until a boat
-stopped drifting in someone's demo.
+**Problem.** A vehicle without identified coefficients has nothing to damp
+it, and gz-maritime carries a fork of Hydrodynamics.
 
-**Solution.** Put the current system in every world, slack by default, with
-a sensible current for each site noted beside it: a tidal set in the
-harbour, weak in the gulf, none on the rowing lakes. Mark the custom USV's
-pontoons, which already carry the buoyancy and wind marks, and drop the
-surge, sway and heave terms from its hydrodynamics. This changes how it
-moves, and the docs say so: its Fossen coefficients were placeholders
-borrowed from the BlueBoat, and the marked drag is quadratic only and much
-lighter (about 1.5 N at 0.5 m/s head on), so it is faster and turns more
-freely; `gz:ocean_current_cd` is the knob to tune it against the real boat.
-Add system tests for the load: a marked box drifts at the current's speed, a
-half submerged one takes half the area, `gz:ocean_current_cd` is read, a box
-spawned later is found, an unmarked one does not move. Add a headless end to
-end test that loads the custom USV into a world with a set current and
-checks that it drifts at the current's speed and in its direction, spawns a
-second boat after the first step and checks that it drifts the same, and
-holds one with the thrust its wetted area predicts; quadratic drag alone
-catches up with a current slowly, so each drift is measured after a minute
-of sim time. Add an "Ocean current markup" table to the reference next to
-the wind's, the topic and its commands, the mark and the rule to the
-composition how to, and the rule to `AGENTS.md`.
+**Example.** Someone brings a new hull with no tank or sea trial data and
+wants it to drift and turn plausibly in a current.
 
-## 5. The Blue Robotics vehicles
-
-**Problem.** The BlueBoat and the BlueROV2 are damped by Gazebo's own
-hydrodynamics against the ground, so they sit still in a current, and their
-surge coefficients are identified (the BlueBoat's in its PR #72, the ROV's
-from the reference BlueROV2), which a plain mark would lose.
-
-**Example.** A BlueBoat marked with the default drag coefficient would see a
-fraction of its identified surge damping and speed up under the same thrust.
-
-**Solution.** In `bluerobotics_models`, apply the same rule, with marks that
-reproduce the identified coefficients. The BlueBoat's full hull boxes, which
-already carry the wind mark, carry `gz:ocean_current="true"` with a drag
-coefficient of 1.19, which gives the identified surge (`xUabsU` = -7.0) at
-its 3.2 cm draft. The BlueROV2 gets one box on a link of its own, marked and
-centred on its centre of mass, sized from the reference coefficients so that
-each face reproduces one of them exactly with a drag coefficient of one,
-about 0.48 by 0.30 by 0.22 m. Both drop their surge, sway and heave terms.
-These marks, unlike the buoyancy marks, need the ocean current system to run:
-it is their translational damping. Every world in that repository runs it,
-slack and at its own water's density, both packages depend on
-`gz_ocean_current`, and the guide to running them in another world lists it
-as required. Each vehicle gets a drift test in a set current.
+**Solution.** The load on marked collisions, as a different hydrodynamic
+model rather than a supplement: a vehicle marks the shapes the water sees
+with `gz:ocean_current="true"` (and `gz:ocean_current_cd`), and the ocean
+current system applies quadratic drag on the submerged part of each, against
+the water at that part, with the shape code shared with the wind's windage.
+A vehicle uses one model on each axis, Fossen or marks, never both, and both
+read the current from the ECM. Separately, send the late spawn fix, the
+current component and the Hydrodynamics change upstream, and retire
+`gz_hydrodynamics` once a Gazebo release that ROS ships carries them.
