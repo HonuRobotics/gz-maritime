@@ -56,6 +56,26 @@ namespace gz::sim::maritime
   /// that refuses its parameters, is one error here, and the world has no
   /// current and no ground truth.
   ///
+  /// It pushes on the shapes the water sees. A vehicle marks those shapes
+  /// with `gz:ocean_current="true"` on a collision, the way it marks
+  /// displacement shapes for buoyancy and windage shapes for the wind, and
+  /// the system finds them on every model, spawned later under any name
+  /// included. For each marked shape it takes the projected area per shape
+  /// axis from the geometry, keeps the part below `<water_level>`, asks the
+  /// current at the centre of that part, and applies quadratic drag,
+  /// 0.5 * rho * Cd * A * |v| * v per axis on the water's velocity relative
+  /// to the shape, at that centre. `gz:ocean_current_cd` on the collision
+  /// sets its drag coefficient. A marked box can carry the buoyancy and wind
+  /// marks too: the wind takes the part above the water, the current the
+  /// part below.
+  ///
+  /// The marks are a hydrodynamic model of their own, for a vehicle without
+  /// identified coefficients, not a supplement to one: a vehicle that marks
+  /// its hull drops the surge and sway terms from its hydrodynamics plugin,
+  /// which the marks now provide relative to the water, and keeps heave,
+  /// roll, pitch and yaw. Kept beside ground relative damping, the marked
+  /// load would make it drift at a fraction of the current.
+  ///
   /// The system publishes the current at the world's origin as ground truth
   /// on `/world/<world>/ocean_current_info`, a gz.msgs.Twist in the world
   /// frame, which ROS can bridge.
@@ -71,9 +91,9 @@ namespace gz::sim::maritime
   ///   comes from. North is the world's, from its spherical coordinates, the
   ///   one its GPS uses; with ENU and a zero heading it is +y, so 90 sets
   ///   towards +x.
-  /// * `<water_level>`: world z of the water's surface, default 0, so a
-  ///   model that varies with depth knows where the surface is; unread by
-  ///   the standard model.
+  /// * `<water_level>`: world z of the water's surface, default 0: where the
+  ///   load on marked shapes cuts them, and where a model that varies with
+  ///   depth puts the surface; unread by the standard model.
   /// * `<parameters>`: the parameters the model owns, one element each, such
   ///   as `<source>`, the file of a gridded current. Opaque to this system,
   ///   which only stores and replicates them as text; their meaning belongs
@@ -82,15 +102,19 @@ namespace gz::sim::maritime
   /// * `<seed>`: seed of anything random in a model, default 1 so a run
   ///   repeats; 0 draws a new one each run. The standard model has nothing
   ///   random.
+  /// * `<publish_rate>`: Hz of simulation time for the ground truth,
+  ///   default 10.
+  /// * `<water_density>`: kg/m^3 for the load on marked shapes, default 1025.
+  /// * `<default_drag_coefficient>`: Cd of the marked shapes without
+  ///   `gz:ocean_current_cd`, default 1.
   ///
   /// Any other element is warned about and ignored, so a typo does not leave
   /// slack water in silence.
-  /// * `<publish_rate>`: Hz of simulation time for the ground truth,
-  ///   default 10.
   class OceanCurrent
     : public System,
       public ISystemConfigure,
       public ISystemPreUpdate,
+      public ISystemPostUpdate,
       public ISystemReset
   {
     /// \brief Constructor.
@@ -108,6 +132,10 @@ namespace gz::sim::maritime
     // Documentation inherited.
     public: void PreUpdate(const UpdateInfo &_info,
                            EntityComponentManager &_ecm) override;
+
+    // Documentation inherited.
+    public: void PostUpdate(const UpdateInfo &_info,
+                            const EntityComponentManager &_ecm) override;
 
     // Documentation inherited.
     public: void Reset(const UpdateInfo &_info,

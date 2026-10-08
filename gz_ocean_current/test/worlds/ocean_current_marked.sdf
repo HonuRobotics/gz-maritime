@@ -1,0 +1,106 @@
+<?xml version="1.0"?>
+<!--
+  A 0.5 m/s current setting east, towards +x, and 1 m boxes of 10 kg, with
+  a rotational inertia large enough that the drag below their centre cannot
+  tip them. No gravity and no damping: the water is all that moves them, so
+  each follows the closed form of quadratic drag,
+  v(t) = u - 1 / (1 / u + k t), k = 0.5 * rho * Cd * A / m.
+-->
+<sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
+  <world name="ocean_current_marked">
+    <gravity>0 0 0</gravity>
+    <physics name="1ms" type="dart">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-maritime-ocean-current-system"
+            name="gz::sim::maritime::OceanCurrent">
+      <speed>0.5</speed>
+      <direction>90</direction>
+    </plugin>
+    <model name="submerged">
+      <pose>0 0 -2 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>10</mass>
+          <inertia>
+            <ixx>1000</ixx><iyy>1000</iyy><izz>1000</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="hull" gz:ocean_current="true">
+          <geometry><box><size>1 1 1</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+    <model name="half">
+      <pose>0 3 0 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>10</mass>
+          <inertia>
+            <ixx>1000</ixx><iyy>1000</iyy><izz>1000</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="hull" gz:ocean_current="true">
+          <geometry><box><size>1 1 1</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+    <model name="draggy">
+      <pose>0 6 -2 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>10</mass>
+          <inertia>
+            <ixx>1000</ixx><iyy>1000</iyy><izz>1000</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="hull" gz:ocean_current="true" gz:ocean_current_cd="2">
+          <geometry><box><size>1 1 1</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+    <model name="above">
+      <pose>0 9 2 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>10</mass>
+          <inertia>
+            <ixx>1000</ixx><iyy>1000</iyy><izz>1000</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="hull" gz:ocean_current="true">
+          <geometry><box><size>1 1 1</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+    <model name="unmarked">
+      <pose>0 12 -2 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>10</mass>
+          <inertia>
+            <ixx>1000</ixx><iyy>1000</iyy><izz>1000</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="hull">
+          <geometry><box><size>1 1 1</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+  </world>
+</sdf>
