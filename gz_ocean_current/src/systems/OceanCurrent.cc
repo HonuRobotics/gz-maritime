@@ -39,6 +39,7 @@
 #include <gz/sim/components/Name.hh>
 
 #include "gz/sim/components/OceanCurrentfield.hh"
+#include "gz/sim/marked_shapes/MarkedShapes.hh"
 #include "gz/sim/ocean_current/OceanCurrentModel.hh"
 #include "gz/sim/ocean_current/OceanCurrentSampler.hh"
 #include "gz/sim/ocean_current/OceanCurrentfield.hh"
@@ -51,6 +52,13 @@ namespace
 {
   /// \brief The block of the parameters the model owns.
   const std::string kParameters{"parameters"};
+
+  /// \brief The attribute a collision is marked with. Namespaced, so SDFormat
+  /// keeps it without knowing it.
+  const std::string kMark{"gz:ocean_current"};
+
+  /// \brief The optional per shape drag coefficient attribute.
+  const std::string kCdMark{"gz:ocean_current_cd"};
 
   /// \brief Read a numeric Any as a double.
   /// \param[in] _v The value.
@@ -79,7 +87,8 @@ namespace
   /// \brief Every element the plugin reads at its top level.
   std::set<std::string> KnownElements()
   {
-    std::set<std::string> known{"model", "publish_rate", kParameters};
+    std::set<std::string> known{"model", "publish_rate", kParameters,
+                                "water_density", "default_drag_coefficient"};
     for (const auto &name : ParameterNames())
       known.insert(name);
     return known;
@@ -130,6 +139,13 @@ class gz::sim::maritime::OceanCurrentPrivate
 
   /// \brief The world entity.
   public: Entity worldEntity{kNullEntity};
+
+  /// \brief The links carrying collisions marked gz:ocean_current, and the
+  /// drag of the water on them.
+  public: marked_shapes::MarkedLinks marked{kMark, kCdMark};
+
+  /// \brief Water density, kg/m^3.
+  public: double waterDensity{1025.0};
 
   /// \brief Messages queued by the topic, applied at the next step.
   public: std::vector<msgs::Param> pending;
@@ -296,6 +312,22 @@ void OceanCurrent::Configure(const Entity &_entity,
   }
   d.WriteRecipe(_ecm);
 
+  // The load on marked shapes. An invalid value keeps the default: a
+  // negative density or coefficient would make the water pull.
+  const double density =
+      _sdf->Get<double>("water_density", d.waterDensity).first;
+  if (density > 0.0)
+    d.waterDensity = density;
+  else
+    gzerr << "OceanCurrent: <water_density> must be positive, using "
+          << d.waterDensity << "\n";
+  const double cd = _sdf->Get<double>("default_drag_coefficient", 1.0).first;
+  if (cd >= 0.0)
+    d.marked.SetDefaultCd(cd);
+  else
+    gzerr << "OceanCurrent: <default_drag_coefficient> cannot be negative, "
+          << "using 1\n";
+
   const double rate = _sdf->Get<double>("publish_rate", 10.0).first;
   if (rate > 0.0)
   {
@@ -344,6 +376,7 @@ void OceanCurrent::PreUpdate(const UpdateInfo &_info,
       d.WriteRecipe(_ecm);
   }
 
+  d.marked.Find(_ecm);
   if (!d.sampler.Sync(_ecm))
     return;
 
@@ -363,6 +396,29 @@ void OceanCurrent::PreUpdate(const UpdateInfo &_info,
     d.pub.Publish(twist);
     d.lastPublish = _info.simTime;
   }
+
+  // The water on the part of each marked shape below the water level,
+  // relative to that part, at its centre. The water level is the recipe's,
+  // so a change on the topic moves it too.
+  if (!_info.paused)
+  {
+    d.marked.ApplyDrag(_info, _ecm, marked_shapes::Side::kBelow,
+        d.recipe.params.water_level, d.waterDensity,
+        [&d](const math::Vector3d &_point,
+             const std::chrono::steady_clock::duration &_time)
+        {
+          return d.sampler.At(_point, _time);
+        });
+  }
+}
+
+//////////////////////////////////////////////////
+void OceanCurrent::PostUpdate(const UpdateInfo &,
+    const EntityComponentManager &_ecm)
+{
+  // A link is noted after every system's PreUpdate, whichever system made
+  // it, and resolved at the next PreUpdate.
+  this->dataPtr->marked.NoteNew(_ecm);
 }
 
 //////////////////////////////////////////////////
@@ -384,6 +440,7 @@ void OceanCurrent::Reset(const UpdateInfo &, EntityComponentManager &_ecm)
     const std::lock_guard<std::mutex> lock(d.mutex);
     d.pending.clear();
   }
+  d.marked.Reset();
   d.lastPublish.reset();
 }
 
@@ -391,6 +448,7 @@ GZ_ADD_PLUGIN(OceanCurrent,
               System,
               OceanCurrent::ISystemConfigure,
               OceanCurrent::ISystemPreUpdate,
+              OceanCurrent::ISystemPostUpdate,
               OceanCurrent::ISystemReset)
 
 GZ_ADD_PLUGIN_ALIAS(OceanCurrent, "gz::sim::maritime::OceanCurrent")

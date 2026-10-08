@@ -146,7 +146,7 @@ World name: `default`.
 | `gz-sim-imu-system`, `gz-sim-magnetometer-system`, `gz-sim-navsat-system`, `gz-sim-air-pressure-system` | IMU, magnetometer, GPS and barometer sensors |
 | `gz-maritime-buoyancy-system` | Seawater 1025 kg/m³ below z = 0, air 1 kg/m³ above; `<enable_by_default>false</enable_by_default>`, no `<enable>` list |
 | `gz-maritime-wind-system` | Still air by default (`<speed>0</speed>`) at a 10 m reference height, falling off towards the water with a 0.0002 m roughness length, changed at run time on the wind topic; pushes only marked collisions, with air at 1.225 kg/m³ and a drag coefficient of 1 unless a shape sets its own |
-| `gz-maritime-ocean-current-system` | Slack water by default (`<speed>0</speed>`); a uniform, horizontal current set in the world file and changed at run time on the ocean current topic, kept on the world as a recipe any system can ask at a point and published as ground truth. A vehicle feels it through `gz-maritime-hydrodynamics-system`; gz-sim's own Hydrodynamics does not see it |
+| `gz-maritime-ocean-current-system` | Slack water by default (`<speed>0</speed>`); a uniform, horizontal current set in the world file and changed at run time on the ocean current topic, kept on the world as a recipe any system can ask at a point and published as ground truth. A vehicle feels it through `gz-maritime-hydrodynamics-system`, or through collisions it marks, with seawater at 1025 kg/m³ and a drag coefficient of 1 unless a shape sets its own; gz-sim's own Hydrodynamics does not see it |
 | `gz-sim-waves-fft-system` | Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out) |
 | `model://water_surface` | Draws the sea |
 | `model://landing_pad` at (8, -8) | A static 4 m deck 1 m above the water, the only solid ground; spawn a quad on it at z = 1.25 |
@@ -197,6 +197,23 @@ field works, and writes it into gz-sim's wind entity at the world's origin.
 A system that needs the wind at a point asks `gz::sim::wind::WindAt`, or
 keeps a `gz::sim::wind::WindSampler`, from the `gz_wind` library.
 
+## Ocean current markup
+
+What a model says to the ocean current system.
+
+| Where | Markup | Meaning |
+|---|---|---|
+| A `<collision>` in a model | `gz:ocean_current="true"` (same `xmlns:gz` root attribute) | The water pushes on this shape, by the part of it below the water, with quadratic drag on its projected area per axis, taking the current at the centre of that part and the shape's own velocity there. `"1"` works too. A mesh counts as its bounding box. A buoyancy box can carry the buoyancy and wind marks too. |
+| The same `<collision>` | `gz:ocean_current_cd="1.2"` | Its drag coefficient; the plugin's `<default_drag_coefficient>` otherwise. |
+
+The marks are a hydrodynamic model of their own, for a vehicle without
+identified coefficients: the water's drag on the hull, relative to the
+water. A model that marks its hull drops the surge and sway terms from its
+Hydrodynamics plugin (`xU`, `xUabsU`, `yV`, `yVabsV` and their cross terms)
+and keeps heave, roll, pitch and yaw. The plugin's damping beside the marks
+would damp those axes twice, and the boat would drift slower than the
+current.
+
 ## Ocean current parameters
 
 What a world says to the ocean current system.
@@ -205,10 +222,11 @@ What a world says to the ocean current system.
 |---|---|
 | `<speed>`, `<direction>` | The current: m/s, and the direction it sets towards in degrees clockwise from north (90, setting east, flows towards +x). The opposite convention from the wind, which is given by where it comes from. Also keys on the ocean current topic, below. |
 | `<model>` | The current model the recipe names, `standard` by default: uniform and horizontal. A new model is one class registered under a name; nothing else changes. |
-| `<water_level>` | World z of the water's surface, 0 by default, so a model that varies with depth knows where the surface is; `standard` does not read it. |
+| `<water_level>` | World z of the water's surface, 0 by default: where the load on marked shapes cuts them, and where a model that varies with depth puts the surface; `standard` does not read it. |
 | `<parameters>` | The parameters a model owns, one element each, such as `<source>`, the file of a gridded current. Opaque to the system, which only stores and replicates them; the model accepts or refuses them. `standard` takes none. |
 | `<seed>` | For a model that draws random numbers; `standard` draws none. 1 by default, so a run repeats; 0 draws a new one each run. |
 | `<publish_rate>` | Rate of the ground truth, 10 Hz by default. |
+| `<water_density>`, `<default_drag_coefficient>` | For the load on marked shapes: 1025 kg/m³ and a drag coefficient of 1 by default. The load cuts each shape at `<water_level>`. |
 
 Any other element is warned about and ignored, so a typo such as `<speeed>`
 does not leave slack water in silence. A `<model>` nobody registered, or one

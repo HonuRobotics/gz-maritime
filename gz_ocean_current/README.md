@@ -18,6 +18,27 @@ The model built in, `standard`, is a speed and the direction the current
 sets towards, uniform over the world and horizontal. On the
 kilometre and hour scales this simulation works at, that is the water.
 
+The same system pushes on the shapes the water sees, a hydrodynamic model
+for a vehicle without identified coefficients. A vehicle marks them with
+`gz:ocean_current="true"` on a collision (a zero `collide_bitmask` keeps a
+dedicated shape out of contact, and a buoyancy box can carry the buoyancy
+and wind marks too: the wind takes the part above the water, the current the
+part below). The system finds those shapes on every model, spawned at any
+time under any name, and applies quadratic drag,
+`0.5 * rho * Cd * A * |v| * v` per shape axis, on the projected area of the
+part below `<water_level>`, at the centre of that part, with the current
+asked at that centre. The velocity is the water relative to the shape, so a
+boat with nothing else holding it drifts at the current's speed.
+`gz:ocean_current_cd` sets a shape's drag coefficient. The shape code is
+shared with the wind's windage, in `gz_marked_shapes`.
+
+A vehicle uses one model on each axis, its Hydrodynamics plugin or the
+marks, never both: a vehicle that marks its hull drops the surge and sway
+terms from its Hydrodynamics plugin (`xU`, `xUabsU`, `yV`, `yVabsV`), which
+the marks now provide relative to the water, and keeps heave, roll, pitch
+and yaw. Kept beside the plugin's damping, the marked load would make it
+drift slower than the current.
+
 The system publishes the current at the world's origin as ground truth on
 `/world/<world>/ocean_current_info`, a `gz.msgs.Twist` in the world frame,
 which ROS can bridge.
@@ -37,10 +58,12 @@ which ROS can bridge.
 | `<model>` | standard | The registered current model. |
 | `<speed>` | 0 | m/s. |
 | `<direction>` | 0 | Degrees clockwise from north the current sets towards: 90 sets east, towards +x. |
-| `<water_level>` | 0 | World z of the water's surface, so a model that varies with depth knows where the surface is; unread by `standard`. |
+| `<water_level>` | 0 | World z of the water's surface: where the load on marked shapes cuts them, and where a model that varies with depth puts the surface; `standard` does not read it. |
 | `<parameters>` | none | The parameters the model owns, one element each, such as `<source>`, the file of a gridded current. Opaque to the system, which only stores and replicates them as text; the model accepts or refuses them. `standard` takes none. |
 | `<seed>` | 1 | Seed of anything random in a model, fixed by default so a run repeats; 0 draws a new one each run. `standard` has nothing random. |
 | `<publish_rate>` | 10 | Hz of simulation time for the ground truth. |
+| `<water_density>` | 1025 | kg/m^3, for the load on marked shapes. |
+| `<default_drag_coefficient>` | 1 | Cd for marked shapes without `gz:ocean_current_cd`. |
 
 Any other element is warned about and ignored, so a typo does not leave
 slack water in silence. The system checks the model once, at the first step

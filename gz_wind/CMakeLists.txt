@@ -29,6 +29,7 @@ find_package(gz_msgs_vendor REQUIRED)
 find_package(gz-msgs REQUIRED)
 find_package(gz_sensors_vendor REQUIRED)
 find_package(gz-sensors REQUIRED)
+find_package(gz_marked_shapes REQUIRED)
 
 # --------------------------------------------------------------------------
 # Core library: the wind as a recipe (the Windfield component), the registry
@@ -70,6 +71,7 @@ add_library(gz-maritime-wind-system SHARED
 target_link_libraries(gz-maritime-wind-system
   PRIVATE
     ${PROJECT_NAME}
+    gz_marked_shapes::gz_marked_shapes
     gz-plugin::register
     gz-common::gz-common
     gz-common::graphics
