@@ -6,7 +6,7 @@ wave field are.
 The world owns the current: a recipe on the world entity, the
 `OceanCurrentfield` component, naming a current model and its parameters,
 read from the world file by the `gz::sim::maritime::OceanCurrent` world
-system and constant for the run. Any system rebuilds its own copy of the
+system and changed at run time on a topic. Any system rebuilds its own copy of the
 model from that recipe and asks the current at a point, whether it was
 loaded with the world or spawned long after: the recipe is a component, so
 every consumer, in every process, sees it on the same step, and nothing
@@ -40,6 +40,22 @@ which ROS can bridge.
 | `<source>` | empty | An external source for a model that reads one, such as the file of a gridded current; unread by `standard`. |
 | `<seed>` | 0 | Seed of anything random in a model; 0 draws one each run. `standard` has nothing random. |
 | `<publish_rate>` | 10 | Hz of simulation time for the ground truth. |
+
+## Changing it while the world runs
+
+The current changes on the topic `/world/<world>/ocean_current/set`, a
+`gz.msgs.Param` whose keys are parameter names: `speed` and `direction` as
+doubles, `source` as a string, any of them in one message. A message is
+queued and applied at the next step, as a new recipe, so every consumer sees
+the change on the same step; a reset puts the world file's current back.
+From ROS, through the simulation launch's bridge:
+
+```bash
+ros2 topic pub --once /world/default/ocean_current/set ros_gz_interfaces/msg/ParamVec \
+  "{params: [{name: speed, value: {type: 3, double_value: 0.5}}, {name: direction, value: {type: 3, double_value: 90.0}}]}"
+```
+
+A change is a step: the current does not ramp from one value to the next.
 
 ## Direction and units
 

@@ -17,11 +17,14 @@
 #include "OceanCurrent.hh"
 
 #include <chrono>
+#include <mutex>
 #include <optional>
 #include <random>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include <gz/msgs/param.pb.h>
 #include <gz/msgs/twist.pb.h>
 #include <gz/msgs/Utility.hh>
 
@@ -42,6 +45,23 @@ using namespace maritime;
 
 namespace
 {
+  /// \brief The one string key of the topic.
+  const std::string kSource{"source"};
+
+  /// \brief Read a numeric Any as a double.
+  /// \param[in] _v The value.
+  /// \param[out] _out The number, when there is one.
+  /// \return True if the value is numeric.
+  bool ReadDouble(const msgs::Any &_v, double &_out)
+  {
+    switch (_v.type())
+    {
+      case msgs::Any::DOUBLE: _out = _v.double_value(); return true;
+      case msgs::Any::INT32: _out = _v.int_value(); return true;
+      default: return false;
+    }
+  }
+
   /// \brief Every numeric parameter name the recipe takes.
   std::vector<std::string> ParameterNames()
   {
@@ -55,11 +75,16 @@ namespace
 
 class gz::sim::maritime::OceanCurrentPrivate
 {
+  /// \brief Handler of the ocean current topic, on a transport thread.
+  /// \param[in] _msg Parameter names and values.
+  public: void OnSet(const msgs::Param &_msg);
+
   /// \brief Set one numeric parameter of the recipe, drawing a seed for a 0
   /// seed.
   /// \param[in] _name Parameter name.
   /// \param[in] _value Value.
-  public: void Set(const std::string &_name, double _value);
+  /// \return False if the name is unknown or the value out of range.
+  public: bool Set(const std::string &_name, double _value);
 
   /// \brief Write the recipe into the world's OceanCurrentfield component.
   /// \param[in] _ecm The entity component manager.
@@ -74,7 +99,18 @@ class gz::sim::maritime::OceanCurrentPrivate
   /// \brief The world entity.
   public: Entity worldEntity{kNullEntity};
 
-  /// \brief Transport node for the ground truth.
+  /// \brief Numeric parameters queued by the topic, applied at the next
+  /// step.
+  public: std::vector<std::pair<std::string, double>> pending;
+
+  /// \brief A source queued by the topic, applied at the next step.
+  public: std::optional<std::string> pendingSource;
+
+  /// \brief Guards the queue across the transport and ECM threads.
+  public: std::mutex mutex;
+
+  /// \brief Transport node for the ocean current topic and the ground
+  /// truth.
   public: transport::Node node;
 
   /// \brief Ground truth publisher.
@@ -89,7 +125,32 @@ class gz::sim::maritime::OceanCurrentPrivate
 };
 
 //////////////////////////////////////////////////
-void OceanCurrentPrivate::Set(const std::string &_name, double _value)
+void OceanCurrentPrivate::OnSet(const msgs::Param &_msg)
+{
+  const std::lock_guard<std::mutex> lock(this->mutex);
+  for (const auto &[key, value] : _msg.params())
+  {
+    if (key == kSource)
+    {
+      if (value.type() == msgs::Any::STRING)
+        this->pendingSource = value.string_value();
+      else
+        gzwarn << "OceanCurrent: key 'source' takes a string, ignored\n";
+      continue;
+    }
+    double d{0.0};
+    if (!ReadDouble(value, d))
+    {
+      gzwarn << "OceanCurrent: key '" << key << "' is not a number, "
+             << "ignored\n";
+      continue;
+    }
+    this->pending.emplace_back(key, d);
+  }
+}
+
+//////////////////////////////////////////////////
+bool OceanCurrentPrivate::Set(const std::string &_name, double _value)
 {
   // A requested 0 seed is resolved here, once, so every process that rebuilds
   // the model from the recipe gets the same current.
@@ -97,9 +158,11 @@ void OceanCurrentPrivate::Set(const std::string &_name, double _value)
     _value = static_cast<double>(std::random_device{}() | 1u);
   if (!ocean_current::SetParameter(this->recipe.params, _name, _value))
   {
-    gzerr << "OceanCurrent: <" << _name << "> value " << _value
-          << " is out of range, ignored\n";
+    gzwarn << "OceanCurrent: key '" << _name << "' value " << _value
+           << " is unknown or out of range, ignored\n";
+    return false;
   }
+  return true;
 }
 
 //////////////////////////////////////////////////
@@ -154,12 +217,14 @@ void OceanCurrent::Configure(const Entity &_entity,
         std::chrono::duration<double>(1.0 / rate));
   }
 
-  // The world's name scopes the ground truth.
+  // The world's name scopes the topic and the ground truth.
   std::string worldName{"default"};
   if (const auto *name = _ecm.Component<components::Name>(_entity))
     worldName = name->Data();
-  d.pub = d.node.Advertise<msgs::Twist>(
-      "/world/" + worldName + "/ocean_current_info");
+  const std::string prefix = "/world/" + worldName + "/ocean_current";
+  if (!d.node.Subscribe(prefix + "/set", &OceanCurrentPrivate::OnSet, &d))
+    gzerr << "OceanCurrent: cannot subscribe to " << prefix << "/set\n";
+  d.pub = d.node.Advertise<msgs::Twist>(prefix + "_info");
 }
 
 //////////////////////////////////////////////////
@@ -167,6 +232,25 @@ void OceanCurrent::PreUpdate(const UpdateInfo &_info,
     EntityComponentManager &_ecm)
 {
   auto &d = *this->dataPtr;
+
+  // Apply what the topic queued; any change is a new recipe, which every
+  // consumer sees on this step.
+  {
+    const std::lock_guard<std::mutex> lock(d.mutex);
+    bool changed{false};
+    for (const auto &[key, value] : d.pending)
+      changed = d.Set(key, value) || changed;
+    d.pending.clear();
+    if (d.pendingSource)
+    {
+      changed = changed || d.recipe.params.source != *d.pendingSource;
+      d.recipe.params.source = *d.pendingSource;
+      d.pendingSource.reset();
+    }
+    if (changed)
+      d.WriteRecipe(_ecm);
+  }
+
   if (!d.sampler.Sync(_ecm))
     return;
 
@@ -202,6 +286,11 @@ void OceanCurrent::Reset(const UpdateInfo &, EntityComponentManager &_ecm)
     d.recipe.model = comp->Data().model;
     d.recipe.params = comp->Data().params;
     d.WriteRecipe(_ecm);
+  }
+  {
+    const std::lock_guard<std::mutex> lock(d.mutex);
+    d.pending.clear();
+    d.pendingSource.reset();
   }
   d.lastPublish.reset();
 }

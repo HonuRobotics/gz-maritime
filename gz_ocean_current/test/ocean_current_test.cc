@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 
 #include <gz/msgs/boolean.pb.h>
+#include <gz/msgs/param.pb.h>
 #include <gz/msgs/twist.pb.h>
 #include <gz/msgs/world_control.pb.h>
 
@@ -105,6 +106,53 @@ bool ResetWorld(const std::string &_world)
   bool result{false};
   return node.Request("/world/" + _world + "/control", req, 2000, rep,
                       result) && result && rep.data();
+}
+
+/// \brief Publish one message on the world's ocean current topic.
+/// \param[in] _world World name.
+/// \param[in] _msg The message.
+/// \return True once the message was sent to a subscriber.
+bool Publish(const std::string &_world, const msgs::Param &_msg)
+{
+  static transport::Node node;
+  auto pub = node.Advertise<msgs::Param>(
+      "/world/" + _world + "/ocean_current/set");
+  for (int i = 0; i < 100 && !pub.HasConnections(); ++i)
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  if (!pub.HasConnections())
+    return false;
+  const bool sent = pub.Publish(_msg);
+  // Delivery is asynchronous; give the subscriber a moment to queue it.
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  return sent;
+}
+
+/// \brief Ask the ocean current system to change a numeric parameter.
+/// \param[in] _world World name.
+/// \param[in] _key Parameter name.
+/// \param[in] _value Its new value.
+/// \return True once the message was sent to a subscriber.
+bool SetCurrent(const std::string &_world, const std::string &_key,
+                double _value)
+{
+  msgs::Param msg;
+  auto &any = (*msg.mutable_params())[_key];
+  any.set_type(msgs::Any::DOUBLE);
+  any.set_double_value(_value);
+  return Publish(_world, msg);
+}
+
+/// \brief Ask the ocean current system to change the source.
+/// \param[in] _world World name.
+/// \param[in] _source The new source.
+/// \return True once the message was sent to a subscriber.
+bool SetSource(const std::string &_world, const std::string &_source)
+{
+  msgs::Param msg;
+  auto &any = (*msg.mutable_params())["source"];
+  any.set_type(msgs::Any::STRING);
+  any.set_string_value(_source);
+  return Publish(_world, msg);
 }
 
 /// \brief Path to one of the test worlds.
@@ -261,7 +309,7 @@ TEST(OceanCurrentField, LateConsumerReadsTheRecipe)
 /////////////////////////////////////////////////
 /// The current is constant for the run: an hour later it is what the world
 /// file said, under the same recipe.
-TEST(OceanCurrentField, ConstantForTheRun)
+TEST(OceanCurrentField, ConstantUntilChanged)
 {
   CurrentWorld world("ocean_currentfield.sdf");
   ASSERT_TRUE(world.Run(1));
@@ -274,6 +322,61 @@ TEST(OceanCurrentField, ConstantForTheRun)
   EXPECT_NEAR(0.0, world.state.sampled.Y(), 1e-9);
   EXPECT_EQ(generation, world.state.recipe->generation)
       << "nothing rewrote the recipe";
+}
+
+/////////////////////////////////////////////////
+/// The topic changes the current while the world runs, as a new recipe that
+/// a consumer reads on the next step; an unknown key or an out of range
+/// value changes nothing.
+TEST(OceanCurrentField, ChangedAtRunTimeOnItsTopic)
+{
+  CurrentWorld world("ocean_currentfield.sdf");
+  ASSERT_TRUE(world.Run(1));
+  ASSERT_TRUE(world.state.recipe.has_value());
+  const auto generation = world.state.recipe->generation;
+
+  ASSERT_TRUE(SetCurrent("ocean_currentfield", "direction", 180.0));
+  ASSERT_TRUE(world.Run(2));
+  EXPECT_NEAR(0.0, world.state.sampled.X(), 1e-9);
+  EXPECT_NEAR(-1.0, world.state.sampled.Y(), 1e-9)
+      << "setting south flows south";
+  EXPECT_EQ(world.state.sampled, world.state.late)
+      << "a consumer made now reads the change too";
+  EXPECT_GT(world.state.recipe->generation, generation);
+
+  ASSERT_TRUE(SetCurrent("ocean_currentfield", "speed", 0.0));
+  ASSERT_TRUE(world.Run(2));
+  EXPECT_NEAR(0.0, world.state.sampled.Length(), 1e-9);
+
+  const auto before = world.state.recipe->generation;
+  ASSERT_TRUE(SetCurrent("ocean_currentfield", "gust", 3.0));
+  ASSERT_TRUE(SetCurrent("ocean_currentfield", "speed", -1.0));
+  ASSERT_TRUE(world.Run(2));
+  EXPECT_EQ(before, world.state.recipe->generation);
+  EXPECT_NEAR(0.0, world.state.sampled.Length(), 1e-9);
+}
+
+/////////////////////////////////////////////////
+/// The source is a string key on the topic; it reaches the recipe as a new
+/// generation and changes nothing the standard model reads.
+TEST(OceanCurrentField, SourceOnTheTopic)
+{
+  CurrentWorld world("ocean_currentfield.sdf");
+  ASSERT_TRUE(world.Run(1));
+  ASSERT_TRUE(world.state.recipe.has_value());
+  const auto generation = world.state.recipe->generation;
+
+  ASSERT_TRUE(SetSource("ocean_currentfield", "noaa_blended_currents.nc"));
+  ASSERT_TRUE(world.Run(2));
+  EXPECT_EQ("noaa_blended_currents.nc", world.state.recipe->params.source);
+  EXPECT_GT(world.state.recipe->generation, generation);
+  EXPECT_NEAR(1.0, world.state.sampled.X(), 1e-9)
+      << "the standard model reads no source";
+
+  const auto before = world.state.recipe->generation;
+  ASSERT_TRUE(SetCurrent("ocean_currentfield", "source", 4.0));
+  ASSERT_TRUE(world.Run(2));
+  EXPECT_EQ(before, world.state.recipe->generation);
 }
 
 /////////////////////////////////////////////////
@@ -294,22 +397,31 @@ TEST(OceanCurrentField, ModelFromTheWorldFile)
 }
 
 /////////////////////////////////////////////////
-/// A reset writes the world file's current again, under a new generation,
+/// A reset brings back the world file's current, under a new generation,
 /// so a consumer that cached anything refreshes it.
 TEST(OceanCurrentField, ResetRewritesTheWorldsCurrent)
 {
   CurrentWorld world("ocean_currentfield.sdf");
+  ASSERT_TRUE(world.Run(1));
+  ASSERT_TRUE(SetCurrent("ocean_currentfield", "speed", 2.0));
   ASSERT_TRUE(world.Run(2));
+  EXPECT_NEAR(2.0, world.state.sampled.X(), 1e-9);
   ASSERT_TRUE(world.state.recipe.has_value());
   const auto generation = world.state.recipe->generation;
 
   ASSERT_TRUE(ResetWorld("ocean_currentfield"));
   ASSERT_TRUE(world.Run(3));
-  EXPECT_NEAR(1.0, world.state.sampled.X(), 1e-9);
+  EXPECT_NEAR(1.0, world.state.sampled.X(), 1e-9)
+      << "the world file's current, not the one set before the reset";
   EXPECT_NEAR(1.0, world.state.recipe->params.speed, 1e-9);
   EXPECT_EQ("standard", world.state.recipe->model);
   EXPECT_GT(world.state.recipe->generation, generation)
       << "the restored recipe is new to every consumer";
+
+  ASSERT_TRUE(SetCurrent("ocean_currentfield", "direction", 180.0));
+  ASSERT_TRUE(world.Run(2));
+  EXPECT_NEAR(-1.0, world.state.sampled.Y(), 1e-9)
+      << "a change after the reset starts from the world file's speed";
 }
 
 /////////////////////////////////////////////////

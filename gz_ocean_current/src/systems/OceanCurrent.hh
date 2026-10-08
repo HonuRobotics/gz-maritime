@@ -29,8 +29,8 @@ namespace gz::sim::maritime
   ///
   /// A world system that owns the world's ocean current as a recipe, the
   /// OceanCurrentfield component on the world entity: a current model's
-  /// name and its parameters, read from the world file and constant for the
-  /// run. Any system reads the current at a point from that recipe through
+  /// name and its parameters, read from the world file. Any system reads
+  /// the current at a point from that recipe through
   /// ocean_current::OceanCurrentSampler, or in one call through
   /// ocean_current::OceanCurrentAt, whatever model is behind it, whether it
   /// was loaded with the world or spawned long after. Nothing travels over
@@ -38,6 +38,14 @@ namespace gz::sim::maritime
   /// as a component change, so every consumer sees it on the same step. A
   /// new current model is one class registered under a name; this system
   /// and the consumers do not change.
+  ///
+  /// The current changes while the world runs on the topic
+  /// `/world/<world>/ocean_current/set`, a gz.msgs.Param whose keys are
+  /// parameter names: `speed` and `direction` as doubles, `source` as a
+  /// string (ROS reaches it through ros_gz_bridge as
+  /// ros_gz_interfaces/msg/ParamVec). A message is queued and applied at the
+  /// next PreUpdate, as a new recipe, so a change lands on one known step.
+  /// A reset puts the world file's current back.
   ///
   /// The system publishes the current at the world's origin as ground truth
   /// on `/world/<world>/ocean_current_info`, a gz.msgs.Twist in the world

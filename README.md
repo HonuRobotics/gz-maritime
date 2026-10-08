@@ -38,7 +38,7 @@ site under
   collisions a vehicle marks `gz:wind="true"`.
 - [`gz_ocean_current`](gz_ocean_current/): the world's ocean current, a
   speed and the direction it sets towards, set in the world file and
-  constant for the run, kept on the world as a recipe naming a registered
+  changed at run time on a topic bridged to ROS, kept on the world as a recipe naming a registered
   current model, so any system can ask the current at a point and a new
   model needs no change to anything else.
 - [`kai_gazebo`](kai_gazebo/), [`kai_bringup`](kai_bringup/) and

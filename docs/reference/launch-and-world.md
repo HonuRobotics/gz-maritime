@@ -203,13 +203,13 @@ What a world says to the ocean current system.
 
 | Markup | Meaning |
 |---|---|
-| `<speed>`, `<direction>` | The current: m/s, and the direction it sets towards in degrees clockwise from north (90, setting east, flows towards +x). The opposite convention from the wind, which is given by where it comes from. |
+| `<speed>`, `<direction>` | The current: m/s, and the direction it sets towards in degrees clockwise from north (90, setting east, flows towards +x). The opposite convention from the wind, which is given by where it comes from. Also keys on the ocean current topic, below. |
 | `<model>` | The current model the recipe names, `standard` by default: uniform, horizontal and constant. A new model is one class registered under a name; nothing else changes. |
 | `<source>`, `<seed>` | For a model that reads a file (a gridded current) or draws random numbers; `standard` uses neither. A 0 seed, the default, draws one each run. |
 | `<publish_rate>` | Rate of the ground truth, 10 Hz by default. |
 
-The current is constant for the run and horizontal with the `standard`
-model: on the kilometre and hour scales these worlds work at, that is the
+The current is horizontal and uniform with the `standard` model, and
+constant between changes: on the kilometre and hour scales these worlds work at, that is the
 water. The system keeps it on the world entity as a recipe, the way the wind
 and the wave field work, written as a component change and nothing else, so
 every consumer, loaded with the world or spawned later, sees it on the same
@@ -317,10 +317,15 @@ gz topic -e -t /world/default/wind_info -n 1
 
 ## Ocean current
 
-The ocean current is set in the world file and constant for the run. It is
-published on `/world/default/ocean_current_info` as `gz.msgs.Twist`, which
-the simulation launch bridges to ROS as `geometry_msgs/msg/TwistStamped` in
-the `world` frame.
+The ocean current is set in the world file and changes while the simulation
+runs on the topic `/world/default/ocean_current/set`: a `gz.msgs.Param` with
+`speed` (m/s) or `direction` (degrees the current sets towards, clockwise
+from north, kept in [0, 360)), in any combination. The simulation launch
+bridges it from ROS as `ros_gz_interfaces/msg/ParamVec`, with each key a
+double parameter. A change takes effect on the next step, for every vehicle
+at once. The current is published on `/world/default/ocean_current_info` as
+`gz.msgs.Twist`, which the simulation launch bridges to ROS as
+`geometry_msgs/msg/TwistStamped` in the `world` frame.
 
 ### Direction and units
 
@@ -336,9 +341,18 @@ the `world` frame.
   velocity in the world frame, not a direction: a 0.5 m/s current setting
   east reads `x: 0.5, y: 0` in these worlds.
 
-Reading it back, from Gazebo:
+A 0.5 m/s current setting east, from ROS:
 
 ```bash
+ros2 topic pub --once /world/default/ocean_current/set ros_gz_interfaces/msg/ParamVec \
+  "{params: [{name: speed, value: {type: 3, double_value: 0.5}}, {name: direction, value: {type: 3, double_value: 90.0}}]}"
+```
+
+From Gazebo, turning it to set south, and reading it back:
+
+```bash
+gz topic -t /world/default/ocean_current/set -m gz.msgs.Param \
+  -p 'params {key: "direction" value {type: DOUBLE double_value: 180}}'
 gz topic -e -t /world/default/ocean_current_info -n 1
 ```
 
