@@ -17,6 +17,7 @@
 #ifndef GZ_SIM_OCEAN_CURRENT_STANDARDMODEL_HH_
 #define GZ_SIM_OCEAN_CURRENT_STANDARDMODEL_HH_
 
+#include <string>
 #include <string_view>
 
 #include <gz/math/Vector3.hh>
@@ -30,6 +31,12 @@ namespace gz::sim::ocean_current
 /// kilometre and hour scales this simulation works at, that is the water.
 class StandardModel : public IOceanCurrentModel
 {
+  // Documentation inherited. The standard model reads no parameter of its
+  // own, so it refuses any, rather than ignore a typo or a source meant for
+  // another model.
+  public: std::string Validate(const OceanCurrentParameters &_params) const
+      override;
+
   // Documentation inherited.
   public: void SetParameters(const OceanCurrentParameters &_params) override;
 

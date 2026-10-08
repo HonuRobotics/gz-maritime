@@ -51,4 +51,13 @@ bool SetParameter(OceanCurrentParameters &_p, const std::string &_name,
 #undef GZ_OCEAN_CURRENT_SET
   return false;
 }
+
+//////////////////////////////////////////////////
+bool IsTypedParameter(const std::string &_name)
+{
+#define GZ_OCEAN_CURRENT_IS(m, name) if (_name == name) return true;
+  GZ_OCEAN_CURRENT_PARAM_TABLE(GZ_OCEAN_CURRENT_IS)
+#undef GZ_OCEAN_CURRENT_IS
+  return _name == "seed";
+}
 }  // namespace gz::sim::ocean_current

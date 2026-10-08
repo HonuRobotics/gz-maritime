@@ -80,10 +80,13 @@ current model, its parameters and a generation, written as a component
 change and nothing else, so every consumer, in every process, sees it on the
 same step. The parameters are a speed and the direction the current sets
 towards; the world z of the water (`water_level`), as the wind's recipe has
-it, so a depth model can find the surface; and a `source` string and a seed
-for models that need them. The `source` is opaque to the system: it stores
-and replicates it, and only the model that reads it gives it meaning, such
-as the file of a gridded current. Because the recipe lives on the world
+it, so a depth model can find the surface; a seed, fixed by default so a
+run repeats; and a map of parameters the model owns, such as `source`, the
+file of a gridded current, or a tide's constituents, set in a
+`<parameters>` block. They are opaque to the system: it stores and
+replicates them, and only the model gives them meaning, accepting or
+refusing them. A model also gets the world's spherical coordinates, so a
+grid or a tide station can place itself. Because the recipe lives on the world
 entity, a system on a vehicle spawned an hour into the run reads it exactly
 as one loaded with the world.
 
@@ -97,10 +100,13 @@ spans a gradient integrates over its own extent with repeated queries.
 
 A world system, `gz-maritime-ocean-current-system`, reads the recipe from the
 world file and writes it. Topics touch it only at the boundary, as the
-wind's do: `/world/<world>/ocean_current/set`, a `gz.msgs.Param` with `speed`
-and `direction` as doubles and `source` as a string, is queued under a mutex
-and applied at the next `PreUpdate`, so a change lands on one known step; the
-simulation launch bridges it from ROS as `ros_gz_interfaces/msg/ParamVec`.
+wind's do: `/world/<world>/ocean_current/set`, a `gz.msgs.Param` with `speed`,
+`direction` and `water_level` as numbers and the model's own parameters as
+strings or numbers, is queued under a mutex and applied at the next
+`PreUpdate`, whole or not at all, so a change lands on one known step and a
+bad key changes nothing; the simulation launch bridges it from ROS as
+`ros_gz_interfaces/msg/ParamVec`. The system checks the model once, at its
+first step, and warns about any element of its own it does not know.
 The current is published as ground truth on `ocean_current_info`, a twist in
 the world frame, bridged to ROS. A reset puts the world file's current back.
 The system does not publish on Gazebo's `/ocean_current`.

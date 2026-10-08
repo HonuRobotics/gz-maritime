@@ -206,8 +206,14 @@ What a world says to the ocean current system.
 | `<speed>`, `<direction>` | The current: m/s, and the direction it sets towards in degrees clockwise from north (90, setting east, flows towards +x). The opposite convention from the wind, which is given by where it comes from. Also keys on the ocean current topic, below. |
 | `<model>` | The current model the recipe names, `standard` by default: uniform and horizontal. A new model is one class registered under a name; nothing else changes. |
 | `<water_level>` | World z of the water's surface, 0 by default, so a model that varies with depth knows where the surface is; `standard` does not read it. |
-| `<source>`, `<seed>` | For a model that reads a file (a gridded current) or draws random numbers; `standard` uses neither. The source is opaque to the system, which only stores and replicates it; its meaning belongs to the model. A 0 seed, the default, draws one each run. |
+| `<parameters>` | The parameters a model owns, one element each, such as `<source>`, the file of a gridded current. Opaque to the system, which only stores and replicates them; the model accepts or refuses them. `standard` takes none. |
+| `<seed>` | For a model that draws random numbers; `standard` draws none. 1 by default, so a run repeats; 0 draws a new one each run. |
 | `<publish_rate>` | Rate of the ground truth, 10 Hz by default. |
+
+Any other element is warned about and ignored, so a typo such as `<speeed>`
+does not leave slack water in silence. A `<model>` nobody registered, or one
+that refuses its parameters, is one error from the system, and the world has
+no current and no ground truth.
 
 The current is horizontal and uniform with the `standard` model, and
 constant between changes: on the kilometre and hour scales these worlds work at, that is the
@@ -321,9 +327,12 @@ gz topic -e -t /world/default/wind_info -n 1
 The ocean current is set in the world file and changes while the simulation
 runs on the topic `/world/default/ocean_current/set`: a `gz.msgs.Param` with
 `speed` (m/s), `direction` (degrees the current sets towards, clockwise
-from north, kept in [0, 360)) or `water_level` (m), in any combination. The simulation launch
-bridges it from ROS as `ros_gz_interfaces/msg/ParamVec`, with each key a
-double parameter. A change takes effect on the next step, for every vehicle
+from north, kept in [0, 360)) or `water_level` (m), in any combination, each
+a double or an integer; any other key is a parameter the model owns and takes
+a string or a number. The simulation launch bridges it from ROS as
+`ros_gz_interfaces/msg/ParamVec`. A message is applied whole or not at all:
+one key out of range, of the wrong type, or refused by the model, and it
+changes nothing. A change takes effect on the next step, for every vehicle
 at once. The current is published on `/world/default/ocean_current_info` as
 `gz.msgs.Twist`, which the simulation launch bridges to ROS as
 `geometry_msgs/msg/TwistStamped` in the `world` frame.

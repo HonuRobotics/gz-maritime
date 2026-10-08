@@ -18,9 +18,10 @@
   gz_type_name: "gz.msgs.Twist"
   direction: GZ_TO_ROS
 
-# The ocean current, changed from ROS: speed (m/s) and direction (degrees
-# the current sets towards, clockwise from north) as named double
-# parameters, any of them.
+# The ocean current, changed from ROS: speed (m/s), direction (degrees the
+# current sets towards, clockwise from north) and water_level (m) as named
+# double or integer parameters, any of them; any other name is a parameter
+# the current model owns, a string or a number.
 - topic_name: "/world/default/ocean_current/set"
   ros_type_name: "ros_gz_interfaces/msg/ParamVec"
   gz_type_name: "gz.msgs.Param"

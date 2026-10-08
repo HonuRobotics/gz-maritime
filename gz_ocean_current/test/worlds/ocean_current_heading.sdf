@@ -5,7 +5,7 @@
   use, so the current flows geographic east, which is not +x here.
 -->
 <sdf version="1.9">
-  <world name="heading">
+  <world name="ocean_current_heading">
     <spherical_coordinates>
       <surface_model>EARTH_WGS84</surface_model>
       <world_frame_orientation>ENU</world_frame_orientation>

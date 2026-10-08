@@ -16,12 +16,26 @@
  */
 #include "StandardModel.hh"
 
+#include <string>
+
 namespace gz::sim::ocean_current
 {
 //////////////////////////////////////////////////
+std::string StandardModel::Validate(
+    const OceanCurrentParameters &_params) const
+{
+  if (_params.extra.empty())
+    return {};
+  std::string names;
+  for (const auto &[name, value] : _params.extra)
+    names += (names.empty() ? "" : ", ") + name;
+  return "the standard model takes no parameter [" + names + "]";
+}
+
+//////////////////////////////////////////////////
 void StandardModel::SetParameters(const OceanCurrentParameters &_params)
 {
-  this->velocity = SetVector(_params.speed, _params.direction);
+  this->velocity = VelocityFromSet(_params.speed, _params.direction);
 }
 
 //////////////////////////////////////////////////

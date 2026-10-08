@@ -41,11 +41,20 @@ namespace gz::sim::maritime
   ///
   /// The current changes while the world runs on the topic
   /// `/world/<world>/ocean_current/set`, a gz.msgs.Param whose keys are
-  /// parameter names: `speed`, `direction` and `water_level` as doubles,
-  /// `source` as a string (ROS reaches it through ros_gz_bridge as
-  /// ros_gz_interfaces/msg/ParamVec). A message is queued and applied at the
-  /// next PreUpdate, as a new recipe, so a change lands on one known step.
-  /// A reset puts the world file's current back.
+  /// parameter names (ROS reaches it through ros_gz_bridge as
+  /// ros_gz_interfaces/msg/ParamVec): `speed`, `direction`, `water_level`
+  /// and `seed` take a number, a double or an integer; any other key is a
+  /// parameter the model owns and takes a string or a number. A message is
+  /// queued and applied at the next PreUpdate, as a new recipe, so a change
+  /// lands on one known step. It is applied whole or not at all: one key out
+  /// of range, of the wrong type, or refused by the model, and the message
+  /// changes nothing. It cannot change `<model>`. A reset puts the world
+  /// file's current back.
+  ///
+  /// The model is checked once, at the first step, since a plugin may
+  /// register it after this system is configured: an unknown model, or one
+  /// that refuses its parameters, is one error here, and the world has no
+  /// current and no ground truth.
   ///
   /// The system publishes the current at the world's origin as ground truth
   /// on `/world/<world>/ocean_current_info`, a gz.msgs.Twist in the world
@@ -65,12 +74,17 @@ namespace gz::sim::maritime
   /// * `<water_level>`: world z of the water's surface, default 0, so a
   ///   model that varies with depth knows where the surface is; unread by
   ///   the standard model.
-  /// * `<source>`: an external source for a model that reads one, such as
-  ///   the file of a gridded current. Opaque to this system, which only
-  ///   stores and replicates it; its meaning belongs to the model. Unread by
-  ///   the standard model.
-  /// * `<seed>`: seed of anything random in a model; 0 (default) draws a
-  ///   new one each run. The standard model has nothing random.
+  /// * `<parameters>`: the parameters the model owns, one element each, such
+  ///   as `<source>`, the file of a gridded current. Opaque to this system,
+  ///   which only stores and replicates them as text; their meaning belongs
+  ///   to the model, which accepts or refuses them. The standard model takes
+  ///   none.
+  /// * `<seed>`: seed of anything random in a model, default 1 so a run
+  ///   repeats; 0 draws a new one each run. The standard model has nothing
+  ///   random.
+  ///
+  /// Any other element is warned about and ignored, so a typo does not leave
+  /// slack water in silence.
   /// * `<publish_rate>`: Hz of simulation time for the ground truth,
   ///   default 10.
   class OceanCurrent
