@@ -10,6 +10,7 @@
             name="gz::sim::maritime::OceanCurrent">
       <speed>1</speed>
       <direction>90</direction>
+      <water_level>0.25</water_level>
     </plugin>
   </world>
 </sdf>

@@ -26,7 +26,7 @@
 namespace gz::sim::ocean_current
 {
 /// \brief The standard ocean current: a speed and the direction it sets
-/// towards, uniform over the world, horizontal and constant. On the
+/// towards, uniform over the world and horizontal. On the
 /// kilometre and hour scales this simulation works at, that is the water.
 class StandardModel : public IOceanCurrentModel
 {

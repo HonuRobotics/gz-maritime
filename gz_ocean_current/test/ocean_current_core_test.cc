@@ -113,6 +113,7 @@ TEST(OceanCurrentfield, RoundTripsAtFullPrecision)
   in.params.seed = 4242424242u;
   in.params.speed = 3.141592653589793;
   in.params.direction = 271.828182845904;
+  in.params.water_level = -1.234567890123456;
   in.params.source = "a file with spaces.nc";
 
   std::stringstream ss;
@@ -125,6 +126,7 @@ TEST(OceanCurrentfield, RoundTripsAtFullPrecision)
   EXPECT_EQ(in.params.seed, out.params.seed);
   EXPECT_EQ(in.params.speed, out.params.speed);
   EXPECT_EQ(in.params.direction, out.params.direction);
+  EXPECT_EQ(in.params.water_level, out.params.water_level);
   EXPECT_EQ(in.params.source, out.params.source);
 }
 
@@ -155,6 +157,9 @@ TEST(OceanCurrentfield, SetParameterByName)
   EXPECT_DOUBLE_EQ(180.0, p.direction);
   EXPECT_TRUE(ocean_current::SetParameter(p, "seed", 7.0));
   EXPECT_EQ(7u, p.seed);
+  EXPECT_TRUE(ocean_current::SetParameter(p, "water_level", -2.5))
+      << "the surface may sit below the world's origin";
+  EXPECT_DOUBLE_EQ(-2.5, p.water_level);
 
   EXPECT_FALSE(ocean_current::SetParameter(p, "speed", -1.0));
   EXPECT_FALSE(ocean_current::SetParameter(p, "seed", -1.0));

@@ -15,7 +15,7 @@ is one class registered under a name; the system that owns the recipe and
 the systems that ask for the current do not change.
 
 The model built in, `standard`, is a speed and the direction the current
-sets towards, uniform over the world, horizontal and constant. On the
+sets towards, uniform over the world and horizontal. On the
 kilometre and hour scales this simulation works at, that is the water.
 
 The system publishes the current at the world's origin as ground truth on
@@ -37,15 +37,16 @@ which ROS can bridge.
 | `<model>` | standard | The registered current model. |
 | `<speed>` | 0 | m/s. |
 | `<direction>` | 0 | Degrees clockwise from north the current sets towards: 90 sets east, towards +x. |
-| `<source>` | empty | An external source for a model that reads one, such as the file of a gridded current; unread by `standard`. |
+| `<water_level>` | 0 | World z of the water's surface, so a model that varies with depth knows where the surface is; unread by `standard`. |
+| `<source>` | empty | An external source for a model that reads one, such as the file of a gridded current. Opaque to the system, which only stores and replicates it; its meaning belongs to the model. Unread by `standard`. |
 | `<seed>` | 0 | Seed of anything random in a model; 0 draws one each run. `standard` has nothing random. |
 | `<publish_rate>` | 10 | Hz of simulation time for the ground truth. |
 
 ## Changing it while the world runs
 
 The current changes on the topic `/world/<world>/ocean_current/set`, a
-`gz.msgs.Param` whose keys are parameter names: `speed` and `direction` as
-doubles, `source` as a string, any of them in one message. A message is
+`gz.msgs.Param` whose keys are parameter names: `speed`, `direction` and
+`water_level` as doubles, `source` as a string, any of them in one message. A message is
 queued and applied at the next step, as a new recipe, so every consumer sees
 the change on the same step; a reset puts the world file's current back.
 From ROS, through the simulation launch's bridge:

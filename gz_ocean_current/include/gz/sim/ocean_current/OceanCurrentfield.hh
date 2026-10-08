@@ -33,9 +33,12 @@ namespace gz::sim::ocean_current
 /// * speed: speed of the current, m/s.
 /// * direction: direction the current sets towards, degrees clockwise from
 ///   true north, as charts draw it: 90 sets east.
+/// * water_level: world z of the water's surface, m, so a model that varies
+///   with depth knows where the surface is.
 #define GZ_OCEAN_CURRENT_PARAM_TABLE(X)   \
-  X(speed,     "speed")                   \
-  X(direction, "direction")
+  X(speed,       "speed")                 \
+  X(direction,   "direction")             \
+  X(water_level, "water_level")
 
 /// \brief What an ocean current model is built from.
 struct OceanCurrentParameters
@@ -47,10 +50,16 @@ struct OceanCurrentParameters
   /// north.
   double direction{0.0};
 
+  /// \brief World z of the water's surface, m. The standard model is the
+  /// same at every depth and does not read it; a model that varies with depth
+  /// measures depth from it.
+  double water_level{0.0};
+
   /// \brief An external source for a model that reads one, such as the file
-  /// of a gridded current. Empty for the model built in; here so that such
-  /// a model later changes neither the recipe nor the query consumers are
-  /// written against.
+  /// of a gridded current. Opaque to the ocean current system, which only
+  /// stores and replicates it: its meaning belongs to the model that reads
+  /// it. Empty for the model built in; here so that such a model later
+  /// changes neither the recipe nor the query consumers are written against.
   std::string source;
 
   /// \brief Seed of anything random in a model. The ocean current system

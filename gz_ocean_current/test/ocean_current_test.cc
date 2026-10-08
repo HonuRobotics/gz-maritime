@@ -288,6 +288,8 @@ TEST(OceanCurrentField, SpeedAndDirectionFromTheWorld)
   EXPECT_EQ("standard", world.state.recipe->model);
   EXPECT_NEAR(1.0, world.state.recipe->params.speed, 1e-9);
   EXPECT_NEAR(90.0, world.state.recipe->params.direction, 1e-9);
+  EXPECT_NEAR(0.25, world.state.recipe->params.water_level, 1e-9)
+      << "the water level is part of the recipe";
   EXPECT_NE(0u, world.state.recipe->params.seed)
       << "a 0 seed is resolved before the recipe is written";
   EXPECT_TRUE(world.state.recipe->params.source.empty());
@@ -347,6 +349,10 @@ TEST(OceanCurrentField, ChangedAtRunTimeOnItsTopic)
   ASSERT_TRUE(SetCurrent("ocean_currentfield", "speed", 0.0));
   ASSERT_TRUE(world.Run(2));
   EXPECT_NEAR(0.0, world.state.sampled.Length(), 1e-9);
+
+  ASSERT_TRUE(SetCurrent("ocean_currentfield", "water_level", -1.5));
+  ASSERT_TRUE(world.Run(2));
+  EXPECT_NEAR(-1.5, world.state.recipe->params.water_level, 1e-9);
 
   const auto before = world.state.recipe->generation;
   ASSERT_TRUE(SetCurrent("ocean_currentfield", "gust", 3.0));

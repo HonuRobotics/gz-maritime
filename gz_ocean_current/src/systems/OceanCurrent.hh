@@ -41,8 +41,8 @@ namespace gz::sim::maritime
   ///
   /// The current changes while the world runs on the topic
   /// `/world/<world>/ocean_current/set`, a gz.msgs.Param whose keys are
-  /// parameter names: `speed` and `direction` as doubles, `source` as a
-  /// string (ROS reaches it through ros_gz_bridge as
+  /// parameter names: `speed`, `direction` and `water_level` as doubles,
+  /// `source` as a string (ROS reaches it through ros_gz_bridge as
   /// ros_gz_interfaces/msg/ParamVec). A message is queued and applied at the
   /// next PreUpdate, as a new recipe, so a change lands on one known step.
   /// A reset puts the world file's current back.
@@ -54,7 +54,7 @@ namespace gz::sim::maritime
   /// World plugin parameters:
   ///
   /// * `<model>`: ocean current model, default `standard`: a speed and a
-  ///   direction, uniform, horizontal and constant.
+  ///   direction, uniform and horizontal.
   /// * `<speed>`: m/s, the speed of the current.
   /// * `<direction>`: degrees clockwise from true north, the direction the
   ///   current sets towards, as charts draw it: 90 sets east. This is the
@@ -62,8 +62,13 @@ namespace gz::sim::maritime
   ///   comes from. North is the world's, from its spherical coordinates, the
   ///   one its GPS uses; with ENU and a zero heading it is +y, so 90 sets
   ///   towards +x.
+  /// * `<water_level>`: world z of the water's surface, default 0, so a
+  ///   model that varies with depth knows where the surface is; unread by
+  ///   the standard model.
   /// * `<source>`: an external source for a model that reads one, such as
-  ///   the file of a gridded current; unread by the standard model.
+  ///   the file of a gridded current. Opaque to this system, which only
+  ///   stores and replicates it; its meaning belongs to the model. Unread by
+  ///   the standard model.
   /// * `<seed>`: seed of anything random in a model; 0 (default) draws a
   ///   new one each run. The standard model has nothing random.
   /// * `<publish_rate>`: Hz of simulation time for the ground truth,

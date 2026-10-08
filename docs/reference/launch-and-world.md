@@ -146,7 +146,7 @@ World name: `default`.
 | `gz-sim-imu-system`, `gz-sim-magnetometer-system`, `gz-sim-navsat-system`, `gz-sim-air-pressure-system` | IMU, magnetometer, GPS and barometer sensors |
 | `gz-maritime-buoyancy-system` | Seawater 1025 kg/m³ below z = 0, air 1 kg/m³ above; `<enable_by_default>false</enable_by_default>`, no `<enable>` list |
 | `gz-maritime-wind-system` | Still air by default (`<speed>0</speed>`) at a 10 m reference height, falling off towards the water with a 0.0002 m roughness length, changed at run time on the wind topic; pushes only marked collisions, with air at 1.225 kg/m³ and a drag coefficient of 1 unless a shape sets its own |
-| `gz-maritime-ocean-current-system` | Slack water by default (`<speed>0</speed>`); a constant, horizontal current set in the world file, kept on the world as a recipe any system can ask at a point and published as ground truth. Nothing feels it yet: the hydrodynamics reads it in a later change |
+| `gz-maritime-ocean-current-system` | Slack water by default (`<speed>0</speed>`); a uniform, horizontal current set in the world file and changed at run time on the ocean current topic, kept on the world as a recipe any system can ask at a point and published as ground truth. Nothing feels it yet: the hydrodynamics reads it in a later change |
 | `gz-sim-waves-fft-system` | Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out) |
 | `model://water_surface` | Draws the sea |
 | `model://landing_pad` at (8, -8) | A static 4 m deck 1 m above the water, the only solid ground; spawn a quad on it at z = 1.25 |
@@ -204,8 +204,9 @@ What a world says to the ocean current system.
 | Markup | Meaning |
 |---|---|
 | `<speed>`, `<direction>` | The current: m/s, and the direction it sets towards in degrees clockwise from north (90, setting east, flows towards +x). The opposite convention from the wind, which is given by where it comes from. Also keys on the ocean current topic, below. |
-| `<model>` | The current model the recipe names, `standard` by default: uniform, horizontal and constant. A new model is one class registered under a name; nothing else changes. |
-| `<source>`, `<seed>` | For a model that reads a file (a gridded current) or draws random numbers; `standard` uses neither. A 0 seed, the default, draws one each run. |
+| `<model>` | The current model the recipe names, `standard` by default: uniform and horizontal. A new model is one class registered under a name; nothing else changes. |
+| `<water_level>` | World z of the water's surface, 0 by default, so a model that varies with depth knows where the surface is; `standard` does not read it. |
+| `<source>`, `<seed>` | For a model that reads a file (a gridded current) or draws random numbers; `standard` uses neither. The source is opaque to the system, which only stores and replicates it; its meaning belongs to the model. A 0 seed, the default, draws one each run. |
 | `<publish_rate>` | Rate of the ground truth, 10 Hz by default. |
 
 The current is horizontal and uniform with the `standard` model, and
@@ -319,8 +320,8 @@ gz topic -e -t /world/default/wind_info -n 1
 
 The ocean current is set in the world file and changes while the simulation
 runs on the topic `/world/default/ocean_current/set`: a `gz.msgs.Param` with
-`speed` (m/s) or `direction` (degrees the current sets towards, clockwise
-from north, kept in [0, 360)), in any combination. The simulation launch
+`speed` (m/s), `direction` (degrees the current sets towards, clockwise
+from north, kept in [0, 360)) or `water_level` (m), in any combination. The simulation launch
 bridges it from ROS as `ros_gz_interfaces/msg/ParamVec`, with each key a
 double parameter. A change takes effect on the next step, for every vehicle
 at once. The current is published on `/world/default/ocean_current_info` as
