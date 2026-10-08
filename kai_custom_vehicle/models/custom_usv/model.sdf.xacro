@@ -146,9 +146,10 @@
          the magnitudes the BlueBoat uses: strong sway and yaw resistance,
          moderate surge, and heave, roll and pitch damping so the boat settles
          on the buoyancy instead of bobbing. Tune them against the real
-         vehicle. -->
-    <plugin filename="gz-sim-hydrodynamics-system"
-            name="gz::sim::systems::Hydrodynamics">
+         vehicle. gz_hydrodynamics damps against the water rather than the
+         ground, so the boat drifts with the world's ocean current. -->
+    <plugin filename="gz-maritime-hydrodynamics-system"
+            name="gz::sim::maritime::Hydrodynamics">
       <link_name>base_link</link_name>
       <water_density>${water_density}</water_density>
       <xU>-20</xU>    <yV>-40</yV>    <zW>-30</zW>
@@ -161,25 +162,12 @@
       <nRabsR>-30</nRabsR>
     </plugin>
 
-    <!-- Added mass: water accelerated along with the hull. Gazebo takes it as
-         <fluid_added_mass> inside a link's <inertial> (SDF 1.11 and later),
-         which cannot live in the URDF: URDF has no such element, and a merged
-         include cannot amend base_link's inertial from here. Left out, since
-         it is small for a boat this size at these speeds. In a link written
-         in SDF it would read, with values to be identified for the hull:
-
-         <inertial>
-           <mass>12</mass>
-           <fluid_added_mass>
-             <xx>0.6</xx>
-             <yy>6.0</yy>
-             <zz>12.0</zz>
-             <pp>0.1</pp>
-             <qq>0.5</qq>
-             <rr>0.5</rr>
-           </fluid_added_mass>
-         </inertial>
-    -->
+    <!-- Added mass: water accelerated along with the hull. It goes in the
+         plugin above as <xDotU>, <yDotV>, <zDotW>, <kDotP>, <mDotQ> and
+         <nDotR>, not as SDF <fluid_added_mass>, which only DART implements.
+         Left out, since it is small for a boat this size at these speeds,
+         and plugin added mass turns a step in the current into a force
+         spike. -->
 
     <!-- ===================== Sensors =====================
          They need the world to run the sensors, IMU, magnetometer and NavSat
