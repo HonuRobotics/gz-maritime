@@ -233,6 +233,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#buoyancy-markup">Buoyancy markup</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#wind-markup">Wind markup</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#wind-parameters">Wind parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ocean-current-parameters">Ocean current parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#thruster-command">Thruster command</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#services">Services</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#examples">Examples</a></li>
@@ -240,6 +241,10 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#wind">Wind</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#direction-and-units">Direction and units</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#ocean-current">Ocean current</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#id1">Direction and units</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#topics">Topics</a></li>
@@ -574,16 +579,19 @@ credited in <code class="docutils literal notranslate"><span class="pre">kai_gaz
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gz-maritime-wind-system</span></code></p></td>
 <td><p>Still air by default (<code class="docutils literal notranslate"><span class="pre">&lt;speed&gt;0&lt;/speed&gt;</span></code>) at a 10 m reference height, falling off towards the water with a 0.0002 m roughness length, changed at run time on the wind topic; pushes only marked collisions, with air at 1.225 kg/m³ and a drag coefficient of 1 unless a shape sets its own</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-waves-fft-system</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gz-maritime-ocean-current-system</span></code></p></td>
+<td><p>Slack water by default (<code class="docutils literal notranslate"><span class="pre">&lt;speed&gt;0&lt;/speed&gt;</span></code>); a uniform, horizontal current set in the world file and changed at run time on the ocean current topic, kept on the world as a recipe any system can ask at a point and published as ground truth. Nothing feels it yet: the hydrodynamics reads it in a later change</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-waves-fft-system</span></code></p></td>
 <td><p>Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out)</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">model://water_surface</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">model://water_surface</span></code></p></td>
 <td><p>Draws the sea</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">model://landing_pad</span></code> at (8, -8)</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">model://landing_pad</span></code> at (8, -8)</p></td>
 <td><p>A static 4 m deck 1 m above the water, the only solid ground; spawn a quad on it at z = 1.25</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;spherical_coordinates&gt;</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;spherical_coordinates&gt;</span></code></p></td>
 <td><p>36.693509° N, 121.936568° W, elevation 0, ENU</p></td>
 </tr>
 </tbody>
@@ -694,6 +702,51 @@ key on the wind topic, below.</p>
 field works, and writes it into gz-sim’s wind entity at the world’s origin.
 A system that needs the wind at a point asks <code class="docutils literal notranslate"><span class="pre">gz::sim::wind::WindAt</span></code>, or
 keeps a <code class="docutils literal notranslate"><span class="pre">gz::sim::wind::WindSampler</span></code>, from the <code class="docutils literal notranslate"><span class="pre">gz_wind</span></code> library.</p>
+</section>
+<section id="ocean-current-parameters">
+<h2>Ocean current parameters<a class="headerlink" href="#ocean-current-parameters" title="Link to this heading"></a></h2>
+<p>What a world says to the ocean current system.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Markup</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;speed&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;direction&gt;</span></code></p></td>
+<td><p>The current: m/s, and the direction it sets towards in degrees clockwise from north (90, setting east, flows towards +x). The opposite convention from the wind, which is given by where it comes from. Also keys on the ocean current topic, below.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;model&gt;</span></code></p></td>
+<td><p>The current model the recipe names, <code class="docutils literal notranslate"><span class="pre">standard</span></code> by default: uniform and horizontal. A new model is one class registered under a name; nothing else changes.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;water_level&gt;</span></code></p></td>
+<td><p>World z of the water’s surface, 0 by default, so a model that varies with depth knows where the surface is; <code class="docutils literal notranslate"><span class="pre">standard</span></code> does not read it.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;parameters&gt;</span></code></p></td>
+<td><p>The parameters a model owns, one element each, such as <code class="docutils literal notranslate"><span class="pre">&lt;source&gt;</span></code>, the file of a gridded current. Opaque to the system, which only stores and replicates them; the model accepts or refuses them. A leaf is its text; an element with children or attributes of its own, such as <code class="docutils literal notranslate"><span class="pre">&lt;layer&gt;&lt;depth&gt;10&lt;/depth&gt;&lt;/layer&gt;</span></code>, is its SDF text, for the model to parse. A name that repeats is a list, numbered in order: three <code class="docutils literal notranslate"><span class="pre">&lt;constituent&gt;</span></code> elements are <code class="docutils literal notranslate"><span class="pre">constituent.0</span></code>, <code class="docutils literal notranslate"><span class="pre">constituent.1</span></code> and <code class="docutils literal notranslate"><span class="pre">constituent.2</span></code>. <code class="docutils literal notranslate"><span class="pre">standard</span></code> takes none.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;seed&gt;</span></code></p></td>
+<td><p>For a model that draws random numbers; <code class="docutils literal notranslate"><span class="pre">standard</span></code> draws none. 1 by default, so a run repeats; 0 draws a new one each run.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;publish_rate&gt;</span></code></p></td>
+<td><p>Rate of the ground truth, 10 Hz by default.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Any other element is warned about and ignored, so a typo such as <code class="docutils literal notranslate"><span class="pre">&lt;speeed&gt;</span></code>
+does not leave slack water in silence. A <code class="docutils literal notranslate"><span class="pre">&lt;model&gt;</span></code> nobody registered, or one
+that refuses its parameters, is one error from the system, and the world has
+no current and no ground truth.</p>
+<p>The current is horizontal and uniform with the <code class="docutils literal notranslate"><span class="pre">standard</span></code> model, and
+constant between changes: on the kilometre and hour scales these worlds work at, that is the
+water. The system keeps it on the world entity as a recipe, the way the wind
+and the wave field work, written as a component change and nothing else, so
+every consumer, loaded with the world or spawned later, sees it on the same
+step. A system that asks the current every step keeps a
+<code class="docutils literal notranslate"><span class="pre">gz::sim::ocean_current::OceanCurrentSampler</span></code>, from the <code class="docutils literal notranslate"><span class="pre">gz_ocean_current</span></code>
+library; <code class="docutils literal notranslate"><span class="pre">gz::sim::ocean_current::OceanCurrentAt</span></code> builds the model on every
+call and suits an occasional query. The query is a point query: a consumer that spans a gradient
+integrates over its own extent with repeated queries.</p>
 </section>
 <section id="thruster-command">
 <h2>Thruster command<a class="headerlink" href="#thruster-command" title="Link to this heading"></a></h2>
@@ -812,6 +865,49 @@ in the world frame, not a direction: a west wind of 6 m/s reads
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gz<span class="w"> </span>topic<span class="w"> </span>-t<span class="w"> </span>/world/default/wind/set<span class="w"> </span>-m<span class="w"> </span>gz.msgs.Param<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-p<span class="w"> </span><span class="s1">'params {key: "direction" value {type: DOUBLE double_value: 180}}'</span>
 gz<span class="w"> </span>topic<span class="w"> </span>-e<span class="w"> </span>-t<span class="w"> </span>/world/default/wind_info<span class="w"> </span>-n<span class="w"> </span><span class="m">1</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="ocean-current">
+<h2>Ocean current<a class="headerlink" href="#ocean-current" title="Link to this heading"></a></h2>
+<p>The ocean current is set in the world file and changes while the simulation
+runs on the topic <code class="docutils literal notranslate"><span class="pre">/world/default/ocean_current/set</span></code>: a <code class="docutils literal notranslate"><span class="pre">gz.msgs.Param</span></code> with
+<code class="docutils literal notranslate"><span class="pre">speed</span></code> (m/s), <code class="docutils literal notranslate"><span class="pre">direction</span></code> (degrees the current sets towards, clockwise
+from north, kept in [0, 360)) or <code class="docutils literal notranslate"><span class="pre">water_level</span></code> (m), in any combination, each
+a double or an integer; any other key is a parameter the model owns and takes
+a string or a number. The simulation launch bridges it from ROS as
+<code class="docutils literal notranslate"><span class="pre">ros_gz_interfaces/msg/ParamVec</span></code>. A message is applied whole or not at all:
+one key out of range, of the wrong type, or refused by the model, and it
+changes nothing. The model itself cannot change at run time: a <code class="docutils literal notranslate"><span class="pre">model</span></code> key
+is refused. A change takes effect on the next step, for every vehicle
+at once. The current is published on <code class="docutils literal notranslate"><span class="pre">/world/default/ocean_current_info</span></code> as
+<code class="docutils literal notranslate"><span class="pre">gz.msgs.Twist</span></code>, which the simulation launch bridges to ROS as
+<code class="docutils literal notranslate"><span class="pre">geometry_msgs/msg/TwistStamped</span></code> in the <code class="docutils literal notranslate"><span class="pre">world</span></code> frame.</p>
+<section id="id1">
+<h3>Direction and units<a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Speed</strong> in metres per second.</p></li>
+<li><p><strong>Direction</strong> the current sets towards, in degrees clockwise from true
+north, as charts draw it and tide tables predict it: 0 sets north, 90 sets
+east. The wind is given the other way round, by where it comes from: a
+wind from 270 and a current setting 090 move a boat the same way.</p></li>
+<li><p><strong>North</strong> is the world’s, the same one the wind and the GPS use: with the
+<code class="docutils literal notranslate"><span class="pre">ENU</span></code> orientation and a <code class="docutils literal notranslate"><span class="pre">heading_deg</span></code> of 0, which every world here has,
+north is the world’s +y axis and east its +x axis.</p></li>
+<li><p><strong>The ground truth</strong> on <code class="docutils literal notranslate"><span class="pre">/world/default/ocean_current_info</span></code> is the water’s
+velocity in the world frame, not a direction: a 0.5 m/s current setting
+east reads <code class="docutils literal notranslate"><span class="pre">x:</span> <span class="pre">0.5,</span> <span class="pre">y:</span> <span class="pre">0</span></code> in these worlds.</p></li>
+</ul>
+<p>A 0.5 m/s current setting east, from ROS:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>topic<span class="w"> </span>pub<span class="w"> </span>--once<span class="w"> </span>/world/default/ocean_current/set<span class="w"> </span>ros_gz_interfaces/msg/ParamVec<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">"{params: [{name: speed, value: {type: 3, double_value: 0.5}}, {name: direction, value: {type: 3, double_value: 90.0}}]}"</span>
+</pre></div>
+</div>
+<p>From Gazebo, turning it to set south, and reading it back:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gz<span class="w"> </span>topic<span class="w"> </span>-t<span class="w"> </span>/world/default/ocean_current/set<span class="w"> </span>-m<span class="w"> </span>gz.msgs.Param<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-p<span class="w"> </span><span class="s1">'params {key: "direction" value {type: DOUBLE double_value: 180}}'</span>
+gz<span class="w"> </span>topic<span class="w"> </span>-e<span class="w"> </span>-t<span class="w"> </span>/world/default/ocean_current_info<span class="w"> </span>-n<span class="w"> </span><span class="m">1</span>
 </pre></div>
 </div>
 </section>
