@@ -3,7 +3,8 @@
   A world that names a current model the ocean current system does not
   know, "upwelling", registered by the test: 0.3 m/s straight up. The
   system reads the recipe and the consumers run the model unchanged. The
-  <parameters> block is the model's own, opaque to the system.
+  <parameters> block is the model's own, opaque to the system: a leaf, a
+  list (a repeated <constituent>) and a nested structure (<layer>).
 -->
 <sdf version="1.9">
   <world name="ocean_current_upwelling">
@@ -13,6 +14,13 @@
       <speed>0.3</speed>
       <parameters>
         <source>noaa_blended_currents.nc</source>
+        <constituent>M2 0.25 0</constituent>
+        <constituent>S2 0.1 30</constituent>
+        <constituent>K1 0.05 90</constituent>
+        <layer units="m">
+          <depth>10</depth>
+          <speed>0.2</speed>
+        </layer>
       </parameters>
     </plugin>
   </world>

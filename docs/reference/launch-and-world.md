@@ -206,7 +206,7 @@ What a world says to the ocean current system.
 | `<speed>`, `<direction>` | The current: m/s, and the direction it sets towards in degrees clockwise from north (90, setting east, flows towards +x). The opposite convention from the wind, which is given by where it comes from. Also keys on the ocean current topic, below. |
 | `<model>` | The current model the recipe names, `standard` by default: uniform and horizontal. A new model is one class registered under a name; nothing else changes. |
 | `<water_level>` | World z of the water's surface, 0 by default, so a model that varies with depth knows where the surface is; `standard` does not read it. |
-| `<parameters>` | The parameters a model owns, one element each, such as `<source>`, the file of a gridded current. Opaque to the system, which only stores and replicates them; the model accepts or refuses them. `standard` takes none. |
+| `<parameters>` | The parameters a model owns, one element each, such as `<source>`, the file of a gridded current. Opaque to the system, which only stores and replicates them; the model accepts or refuses them. A leaf is its text; an element with children or attributes of its own, such as `<layer><depth>10</depth></layer>`, is its SDF text, for the model to parse. A name that repeats is a list, numbered in order: three `<constituent>` elements are `constituent.0`, `constituent.1` and `constituent.2`. `standard` takes none. |
 | `<seed>` | For a model that draws random numbers; `standard` draws none. 1 by default, so a run repeats; 0 draws a new one each run. |
 | `<publish_rate>` | Rate of the ground truth, 10 Hz by default. |
 
@@ -220,10 +220,10 @@ constant between changes: on the kilometre and hour scales these worlds work at,
 water. The system keeps it on the world entity as a recipe, the way the wind
 and the wave field work, written as a component change and nothing else, so
 every consumer, loaded with the world or spawned later, sees it on the same
-step. A system that needs the current at a point asks
-`gz::sim::ocean_current::OceanCurrentAt`, or keeps a
+step. A system that asks the current every step keeps a
 `gz::sim::ocean_current::OceanCurrentSampler`, from the `gz_ocean_current`
-library. The query is a point query: a consumer that spans a gradient
+library; `gz::sim::ocean_current::OceanCurrentAt` builds the model on every
+call and suits an occasional query. The query is a point query: a consumer that spans a gradient
 integrates over its own extent with repeated queries.
 
 ## Thruster command
@@ -332,7 +332,8 @@ a double or an integer; any other key is a parameter the model owns and takes
 a string or a number. The simulation launch bridges it from ROS as
 `ros_gz_interfaces/msg/ParamVec`. A message is applied whole or not at all:
 one key out of range, of the wrong type, or refused by the model, and it
-changes nothing. A change takes effect on the next step, for every vehicle
+changes nothing. The model itself cannot change at run time: a `model` key
+is refused. A change takes effect on the next step, for every vehicle
 at once. The current is published on `/world/default/ocean_current_info` as
 `gz.msgs.Twist`, which the simulation launch bridges to ROS as
 `geometry_msgs/msg/TwistStamped` in the `world` frame.

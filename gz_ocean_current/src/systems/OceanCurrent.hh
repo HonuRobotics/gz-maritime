@@ -48,8 +48,8 @@ namespace gz::sim::maritime
   /// queued and applied at the next PreUpdate, as a new recipe, so a change
   /// lands on one known step. It is applied whole or not at all: one key out
   /// of range, of the wrong type, or refused by the model, and the message
-  /// changes nothing. It cannot change `<model>`. A reset puts the world
-  /// file's current back.
+  /// changes nothing. It cannot change `<model>`: a `model` key is refused.
+  /// A reset puts the world file's current back.
   ///
   /// The model is checked once, at the first step, since a plugin may
   /// register it after this system is configured: an unknown model, or one
@@ -77,16 +77,20 @@ namespace gz::sim::maritime
   /// * `<parameters>`: the parameters the model owns, one element each, such
   ///   as `<source>`, the file of a gridded current. Opaque to this system,
   ///   which only stores and replicates them as text; their meaning belongs
-  ///   to the model, which accepts or refuses them. The standard model takes
-  ///   none.
+  ///   to the model, which accepts or refuses them. A leaf is its text; an
+  ///   element with children or attributes of its own, such as
+  ///   `<layer><depth>10</depth></layer>`, is its SDF text, for the model to
+  ///   parse. A name that repeats is a list, numbered in order: three
+  ///   `<constituent>` elements are `constituent.0`, `constituent.1` and
+  ///   `constituent.2`. The standard model takes none.
   /// * `<seed>`: seed of anything random in a model, default 1 so a run
   ///   repeats; 0 draws a new one each run. The standard model has nothing
   ///   random.
+  /// * `<publish_rate>`: Hz of simulation time for the ground truth,
+  ///   default 10.
   ///
   /// Any other element is warned about and ignored, so a typo does not leave
   /// slack water in silence.
-  /// * `<publish_rate>`: Hz of simulation time for the ground truth,
-  ///   default 10.
   class OceanCurrent
     : public System,
       public ISystemConfigure,
