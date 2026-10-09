@@ -32,12 +32,14 @@ The work lands in three pull requests, and a fourth later:
 1. **A current the world owns** (§1, §4): the recipe, the model registry, the
    sampler, the world system, the `set` topic and the ground truth, in every
    world.
-2. **A hull that feels the current** (§2): Gazebo's Hydrodynamics vendored as
-   `gz_hydrodynamics`, taking the current from `OceanCurrentAt`, with the late
-   spawn fix as its own commit, meant for upstream.
-3. **The vehicles drift with the current** (§3): the custom USV, the BlueBoat
-   and the BlueROV2 switched to it, coefficients unchanged; the Blue Robotics
-   change in `bluerobotics_models`.
+2. **A hull that feels the current** (§2, and the custom USV of §3):
+   Gazebo's Hydrodynamics vendored as `gz_hydrodynamics`, keeping an
+   `OceanCurrentSampler`, in three commits (upstream verbatim, the world's
+   current, the late spawn fix meant for upstream), and the custom USV
+   switched to it with its end to end drift test.
+3. **The vehicles drift with the current** (§3): the BlueBoat and the
+   BlueROV2 switched to it, coefficients unchanged, in
+   `bluerobotics_models`.
 4. **Later, a geometric model** (§5): the load on collisions marked
    `gz:ocean_current="true"`, for vehicles without identified coefficients,
    and the upstream work that retires the vendored copy.
@@ -128,8 +130,9 @@ whose current came from a file.
 **Solution.** Vendor Gazebo's Hydrodynamics as `gz_hydrodynamics`, the way
 `gz_thruster` and `gz_buoyancy` are vendored, from the gz-sim release ROS
 ships, verbatim in its own commit so the delta reads on its own. One change:
-when the world has an ocean current recipe, the plugin takes ν_c from
-`OceanCurrentAt` at its link's centre of mass every step, so damping, added
+when the world has an ocean current recipe, the plugin keeps an
+`OceanCurrentSampler` and takes ν_c from it at its link's centre of mass
+every step, so damping, added
 mass and Coriolis all use the velocity relative to that water, Fossen's
 model as written. With no recipe in the world, its old inputs,
 `<default_current>`, `<lookup_current_*>` and the `/ocean_current` topic,
@@ -137,10 +140,11 @@ behave exactly as today. A vehicle keeps the coefficients it was identified
 with, needs no retune, and feels the current the day it is spawned.
 
 The late spawn fix goes in a separate commit, with its test, meant for
-upstream: read the world's environmental data whenever it is present instead
-of only while the world entity is new, and find the world by its component
-at the first step rather than from the model at configure time, since a
-model spawned at run time is not parented yet when it is configured.
+upstream. Upstream discovers the table with `EachNew<Environment>`, which
+only matches the world's component in the iteration it is created, so a
+model spawned later never sees it; that discovery is the whole bug. The fix
+reads the world's Environment component every step and rebuilds the lookup
+when its data changes (a reload) or clears it when the component goes.
 `PROVENANCE.md` lists both changes and states that the package is a fork
 until upstream has a current component, and is retired then.
 
@@ -161,8 +165,9 @@ Hydrodynamics, which ignores the world's current.
 
 **Solution.** Switch each to `gz-maritime-hydrodynamics-system`, with its
 coefficients unchanged, and add `gz_hydrodynamics` to its dependencies. In a
-slack world nothing changes. The custom USV's switch is in this repository;
-the BlueBoat's and the BlueROV2's are a pull request in `bluerobotics_models`,
+slack world nothing changes. The custom USV's switch is in this repository,
+in the pull request that vendors the plugin, with its drift test; the
+BlueBoat's and the BlueROV2's are a pull request in `bluerobotics_models`,
 which also corrects the BlueROV2's comment that recommends `<fluid_added_mass>`
 as the stable path for added mass (`bluerov2_gazebo/model.sdf.xacro:426-429`),
 to point to the plugin coefficients instead.

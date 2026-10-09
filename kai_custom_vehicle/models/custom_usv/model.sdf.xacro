@@ -147,11 +147,12 @@
          moderate surge, and heave, roll and pitch damping so the boat settles
          on the buoyancy instead of bobbing. Tune them against the real
          vehicle. gz_hydrodynamics damps against the water rather than the
-         ground, so the boat drifts with the world's ocean current. -->
+         ground, so the boat drifts with the world's ocean current. No
+         <water_density>: the plugin never reads it, the Fossen coefficients
+         carry their units. -->
     <plugin filename="gz-maritime-hydrodynamics-system"
             name="gz::sim::maritime::Hydrodynamics">
       <link_name>base_link</link_name>
-      <water_density>${water_density}</water_density>
       <xU>-20</xU>    <yV>-40</yV>    <zW>-30</zW>
       <kP>-20</kP>    <mQ>-20</mQ>    <nR>-15</nR>
       <xUabsU>-30</xUabsU>

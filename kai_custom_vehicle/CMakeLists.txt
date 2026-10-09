@@ -39,6 +39,11 @@ if(BUILD_TESTING)
   # even when every assertion passes.
   ament_add_pytest_test(test_two_instances test/test_two_instances.py
     TIMEOUT 300 NOCAPTURE)
+  # In a 0.5 m/s current: a boat with its engines off drifts with it, one
+  # spawned later drifts the same, and one holds station against it with the
+  # thrust its surge damping predicts.
+  ament_add_pytest_test(test_ocean_current test/test_ocean_current.py
+    TIMEOUT 600 NOCAPTURE)
 endif()
 
 ament_package()

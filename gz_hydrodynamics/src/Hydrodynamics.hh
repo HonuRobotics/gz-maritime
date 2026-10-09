@@ -153,10 +153,12 @@ namespace maritime
   ///
   /// When the world carries a gz-maritime ocean current (the
   /// `OceanCurrentfield` recipe, written by
-  /// `gz-maritime-ocean-current-system`), the plugin asks it at the link's
-  /// centre of mass every step through `ocean_current::OceanCurrentAt` and
-  /// damps against that; the world owns the current, so the tags and the
-  /// topic below are then ignored. Without one, they work as upstream.
+  /// `gz-maritime-ocean-current-system`), the plugin keeps an
+  /// `ocean_current::OceanCurrentSampler`, asks it at the link's centre of
+  /// mass every step and damps against that; the world owns the current, so
+  /// the tags and the topic below are then ignored, with a warning for a tag
+  /// set and for the first message on the topic. Without one, they work as
+  /// upstream.
   ///
   ///   * `<default_current>` - Constant current velocity in world
   ///     frame. [gz::math::Vector3d, default: 0 0 0, m/s]

@@ -14,6 +14,7 @@
  * limitations under the License.
  *
  */
+#include <atomic>
 #include <cmath>
 #include <string>
 
@@ -119,23 +120,29 @@ class gz::sim::maritime::HydrodynamicsPrivateData
   /// \brief Warned that the world's ocean current overrides the plugin's
   public: bool warnedOverride {false};
 
+  /// \brief A message came on the ocean current topic, which a world ocean
+  /// current overrides; set on the transport thread
+  public: std::atomic<bool> topicReceived {false};
+
+  /// \brief Warned that the world's ocean current overrides the topic
+  public: bool warnedTopic {false};
+
   /// \brief Ocean current callback
   public: void UpdateCurrent(const msgs::Vector3d &_msg);
 
   /////////////////////////////////////////////////
   /// \brief Sync the current table with the world's environmental data.
-  /// The world's Environment component is read whenever it is present, not
-  /// only while the world entity is new, so a vehicle spawned after the
-  /// first iteration sees the data, and a reload (a new data set on the
-  /// component) rebuilds the lookup sessions.
+  /// The world's Environment component is read every step, not discovered
+  /// with EachNew, which only matches it in the iteration it is created: a
+  /// plugin configured after that, on a vehicle spawned at run time, would
+  /// never see the table. A reload (a new data set on the component)
+  /// rebuilds the lookup sessions, and a removed component clears them.
   /// \param[in] _ecm - The Entity Component Manager
   /// \param[in] _currTime - The current time
   public: void SetWaterCurrentTable(
     const EntityComponentManager &_ecm,
     const std::chrono::steady_clock::duration &_currTime)
   {
-    // Found by its component, not by walking up from the model: a model
-    // spawned at run time may not be parented yet when it is configured.
     if (kNullEntity == this->world)
       this->world = worldEntity(_ecm);
     const auto *environment =
@@ -259,6 +266,7 @@ void HydrodynamicsPrivateData::UpdateCurrent(const msgs::Vector3d &_msg)
 {
   std::lock_guard<std::mutex> lock(this->mtx);
   this->currentVector = gz::msgs::Convert(_msg);
+  this->topicReceived = true;
 }
 
 /////////////////////////////////////////////////
@@ -532,6 +540,13 @@ void Hydrodynamics::PreUpdate(
     gzwarn << "Hydrodynamics: the world's ocean current overrides this "
            << "plugin's <default_current> and <lookup_current_*>\n";
     this->dataPtr->warnedOverride = true;
+  }
+  if (worldCurrent && this->dataPtr->topicReceived &&
+      !this->dataPtr->warnedTopic)
+  {
+    gzwarn << "Hydrodynamics: the world's ocean current overrides this "
+           << "plugin's ocean current topic; its messages are ignored\n";
+    this->dataPtr->warnedTopic = true;
   }
 
   if (_info.paused)

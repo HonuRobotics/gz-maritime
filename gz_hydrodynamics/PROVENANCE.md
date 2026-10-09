@@ -14,24 +14,28 @@ and nothing else. To see it against a newer upstream:
 ## The delta
 
 1. **The world's ocean current.** When the world carries the
-   `OceanCurrentfield` recipe of `gz_ocean_current`, the plugin asks
-   `OceanCurrentSampler::At` at the link's centre of mass every step and
-   damps against the velocity relative to that water, Fossen's model as
-   written. The world owns the current, so the plugin's `<default_current>`,
-   `<lookup_current_*>` and the `/ocean_current` topic are then ignored, with
-   a warning if the plugin set any. Without a recipe, upstream's behaviour is
+   `OceanCurrentfield` recipe of `gz_ocean_current`, the plugin keeps an
+   `OceanCurrentSampler`, synced every `PreUpdate`, asks it at the link's
+   centre of mass (`WorldInertialPose`) and damps against the velocity
+   relative to that water, ν − ν_c, in added mass, Coriolis and damping:
+   Fossen's model as written. The world owns the current, so the plugin's
+   `<default_current>`, `<lookup_current_*>` and its ocean current topic
+   (`/ocean_current`, or `/model/<namespace>/ocean_current`) are then
+   ignored: a warning once if the plugin set one of the tags, and once at the
+   first message on the topic. Without a recipe, upstream's behaviour is
    unchanged.
-2. **A current table for a vehicle spawned at run time.** Upstream finds the
-   table loaded by `EnvironmentPreload` with `EachNew<Environment>`, which
-   only matches the world entity in its first iteration, so a model spawned
-   later never sees it and sits still in a current loaded from a file. The
-   world's Environment component is read every `PreUpdate` instead, and the
-   lookup sessions are rebuilt when its data set changes (a reload). The
-   world entity is found by its component, at the first `PreUpdate`, not by
-   walking up from the model in `Configure`: in gz-sim 10 a model spawned at
-   run time is not parented yet when it is configured.
-   `ISystemPostUpdate`, whose only job was that discovery, goes. Sent upstream
-   as the first of the ocean current fixes.
+2. **A current table for a vehicle spawned at run time.** Upstream discovers
+   the table loaded by `EnvironmentPreload` with `EachNew<Environment>` in
+   `PostUpdate`, which only matches the world's component in the iteration
+   it is created; a plugin configured after that, on a model spawned at run
+   time, never sees the table, and the model sits still in a current loaded
+   from a file. That discovery is the whole bug. The world's Environment
+   component (on `worldEntity(_ecm)`) is read every `PreUpdate` instead; the
+   lookup sessions are rebuilt only when the data's shared pointer changes
+   (a reload through `EnvironmentPreload`'s topic), and cleared when the
+   component goes. `ISystemPostUpdate`, whose only job was that discovery,
+   goes. Its own commit, meant for upstream as the first of the ocean current
+   fixes.
 3. **The leaf namespace** `systems` → `maritime`, in the plugin and in
    `HydrodynamicsUtils.hh`, so the registered alias
    `gz::sim::maritime::Hydrodynamics` does not collide with gz-sim's own when
