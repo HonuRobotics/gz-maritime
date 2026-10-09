@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!--
+  A world turned 90 degrees against true north (heading_deg), with a 1 m/s
+  current setting east. North is the one its spherical coordinates and GPS
+  use, so the current flows geographic east, which is not +x here.
+-->
+<sdf version="1.9">
+  <world name="ocean_current_heading">
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <world_frame_orientation>ENU</world_frame_orientation>
+      <latitude_deg>36.69</latitude_deg>
+      <longitude_deg>-121.93</longitude_deg>
+      <elevation>0</elevation>
+      <heading_deg>90</heading_deg>
+    </spherical_coordinates>
+    <plugin filename="gz-maritime-ocean-current-system"
+            name="gz::sim::maritime::OceanCurrent">
+      <speed>1</speed>
+      <direction>90</direction>
+    </plugin>
+  </world>
+</sdf>

@@ -17,3 +17,19 @@
   ros_type_name: "geometry_msgs/msg/TwistStamped"
   gz_type_name: "gz.msgs.Twist"
   direction: GZ_TO_ROS
+
+# The ocean current, changed from ROS: speed (m/s), direction (degrees the
+# current sets towards, clockwise from north) and water_level (m) as named
+# double or integer parameters, any of them; any other name is a parameter
+# the current model owns, a string or a number.
+- topic_name: "/world/default/ocean_current/set"
+  ros_type_name: "ros_gz_interfaces/msg/ParamVec"
+  gz_type_name: "gz.msgs.Param"
+  direction: ROS_TO_GZ
+
+# The ocean current, as ground truth: the water's velocity in the world
+# frame.
+- topic_name: "/world/default/ocean_current_info"
+  ros_type_name: "geometry_msgs/msg/TwistStamped"
+  gz_type_name: "gz.msgs.Twist"
+  direction: GZ_TO_ROS

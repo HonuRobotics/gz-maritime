@@ -36,6 +36,11 @@ site under
   comes from, changed at run time on a topic bridged to ROS, and kept on the
   world so any system can ask the wind at a point, and windage on the
   collisions a vehicle marks `gz:wind="true"`.
+- [`gz_ocean_current`](gz_ocean_current/): the world's ocean current, a
+  speed and the direction it sets towards, set in the world file and
+  changed at run time on a topic bridged to ROS, kept on the world as a recipe naming a registered
+  current model, so any system can ask the current at a point and a new
+  model needs no change to anything else.
 - [`kai_gazebo`](kai_gazebo/), [`kai_bringup`](kai_bringup/) and
   [`kai_custom_vehicle`](kai_custom_vehicle/): the worlds, the simulation
   and spawn launches, and the example vehicle.
