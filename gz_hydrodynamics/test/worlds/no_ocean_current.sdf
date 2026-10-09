@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<!--
+  A world without a gz-maritime ocean current. The sphere sets its own
+  <default_current> of 0.5 m/s along +y, as upstream's plugin reads it.
+  No gravity and no buoyancy: the damping against the water is all that
+  moves the spheres, so each settles at the water's velocity.
+-->
+<sdf version="1.9">
+  <world name="no_ocean_current">
+    <gravity>0 0 0</gravity>
+    <physics name="1ms" type="dart">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <model name="sphere">
+      <pose>0 0 0 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>10</mass>
+          <inertia>
+            <ixx>0.1</ixx><iyy>0.1</iyy><izz>0.1</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><sphere><radius>0.25</radius></sphere></geometry>
+        </collision>
+      </link>
+      <plugin filename="gz-maritime-hydrodynamics-system"
+              name="gz::sim::maritime::Hydrodynamics">
+        <link_name>link</link_name>
+        <xU>-20</xU><yV>-20</yV><zW>-20</zW>
+        <kP>-1</kP><mQ>-1</mQ><nR>-1</nR>
+        <xUabsU>-20</xUabsU><yVabsV>-20</yVabsV><zWabsW>-20</zWabsW>
+        <default_current>0 0.5 0</default_current>
+      </plugin>
+    </model>
+  </world>
+</sdf>

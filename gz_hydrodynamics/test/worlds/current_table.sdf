@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<!--
+  A world whose current is a table loaded by EnvironmentPreload, 0.5 m/s
+  along +x everywhere, and no gz-maritime ocean current. A sphere spawned
+  at run time looks the table up through <lookup_current_*>.
+  No gravity and no buoyancy: the damping against the water is all that
+  moves it.
+-->
+<sdf version="1.9">
+  <world name="current_table">
+    <gravity>0 0 0</gravity>
+    <physics name="1ms" type="dart">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-environment-preload-system"
+            name="gz::sim::systems::EnvironmentPreload">
+      <data>current_table.csv</data>
+      <dimensions>
+        <time>timestamp</time>
+        <space>
+          <x>x</x>
+          <y>y</y>
+          <z>z</z>
+        </space>
+      </dimensions>
+    </plugin>
+  </world>
+</sdf>
