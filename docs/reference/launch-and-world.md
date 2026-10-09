@@ -151,6 +151,7 @@ World name: `default`.
 | `model://water_surface` | Draws the sea |
 | `model://landing_pad` at (8, -8) | A static 4 m deck 1 m above the water, the only solid ground; spawn a quad on it at z = 1.25 |
 | `<spherical_coordinates>` | 36.693509° N, 121.936568° W, elevation 0, ENU |
+| `<gui>`: `OceanCurrentPanel`, `WindPanel` | The ocean current and wind panels, docked on the right, arrows off; see [Change and see the wind and the current](../how-to/wind-and-current.md) |
 
 ## Buoyancy markup
 

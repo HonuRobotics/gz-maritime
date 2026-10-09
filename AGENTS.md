@@ -22,6 +22,7 @@ subsystems will be added over time.
 | `gz_wind/` | The world's wind, like the wave field: a `Windfield` recipe (model name, `<speed>`, `<direction>` it comes from, seeded spectral gusts on both that travel with the wind, a logarithmic profile with height) on the world entity, a model registry, and `WindSampler`/`WindAt` for any system that needs the wind at a point. The system writes the recipe, sets gz-sim's wind entity so rotors and wings feel it, takes changes on the `wind/set` topic (bridged to ROS), publishes `wind_info` ground truth, and pushes on marked collisions (`gz:wind="true"`, optional `gz:wind_cd`): quadratic drag on the part of each shape above the water, with the wind at that part. It also reads `anemometer` custom sensors (`type="custom" gz:type="anemometer"`): the apparent wind in the sensor frame as `gz.msgs.Twist`. |
 | `gz_ocean_current/` | The world's ocean current, built like the wind: an `OceanCurrentfield` recipe (model name, `<speed>`, the `<direction>` it sets towards, the `<water_level>`, a seed, and the parameters a model owns, such as `source`, opaque to the system, a generation) on the world entity, an `IOceanCurrentModel` registry, and `OceanCurrentSampler`/`OceanCurrentAt` for any system that needs the current at a point, loaded with the world or spawned later. The built in `standard` model is uniform and horizontal; a new model is one registered class. The system writes the recipe as a component change only, takes changes on the `ocean_current/set` topic (bridged to ROS), and publishes `ocean_current_info` ground truth. No load and no sensor: a hull feels it through `gz_hydrodynamics`. |
 | `gz_hydrodynamics/` | gz-sim's Hydrodynamics system, vendored so it damps against the water: when the world has a `gz_ocean_current` recipe it keeps an `OceanCurrentSampler` and asks it at the link's centre of mass every step, so added mass, Coriolis and damping all use the velocity relative to the water (the world owns the current; the plugin's `<default_current>`, `<lookup_current_*>` and topic are then ignored, with a warning), and it reads an `EnvironmentPreload` current table on a vehicle spawned at run time, which upstream does not. Library `gz-maritime-hydrodynamics-system`, alias `gz::sim::maritime::Hydrodynamics`; Fossen coefficients unchanged. A fork until upstream has a current component; see its `PROVENANCE.md`. |
+| `gz_maritime_gui/` | The Gazebo GUI for the environment: two GUI systems, `OceanCurrentPanel` and `WindPanel` (libraries of those names, installed in `lib/gz_maritime_gui` on `GZ_GUI_PLUGIN_PATH`). Each shows its field from its recipe in the GUI's ECM, changes it on its `set` topic, and draws it as a grid of arrows sampled with `OceanCurrentSampler`/`WindSampler`, a `LINE_LIST` marker through `MarkerManager`. A Qt-free core library (`gz_maritime_gui_core`: `Fields`, and `FieldLink`, what both panels share) holds the logic and the gtests; a pytest runs both plugins in an offscreen GUI. Every `kai_gazebo` world docks both, arrows off. |
 | `gz_thruster/` | gz-sim's Thruster system, vendored with a normalized command mode (`<use_normalized_cmd>`: a command in [-1, 1] scaled onto the thrust limits), the interface every vehicle here is driven with; intended to go upstream. |
 | `kai_gazebo/` | Worlds (`open_water.sdf` and the four VRX/VORC sites: `sydney_regatta`, `benderson_park`, `sand_island`, `la_spezia`; every world is named `default`), the landing pad and terrain models (Sand Island and La Spezia meshes fetched by the build, see `NOTICE`), resource-path hooks and the world tests. |
 | `kai_bringup/` | ROS 2 launch + `ros_gz_bridge` config. `simulation.launch.xml` is the simulation part only (server, GUI, `/clock`); `spawn_vehicle.launch.xml` puts one instance of any vehicle in, from its model xacro, bridge template and URDF (or its own generator), through `instantiate_vehicle.py`. Neither names a vehicle. |
@@ -75,6 +76,8 @@ colcon test --packages-select <pkg> && colcon test-result --verbose
 # instance script, and the example vehicle end to end (generation for two
 # names, two boats through the launches, a command moves one only):
 colcon test --packages-select gz_buoyancy gz_hydrodynamics gz_thruster kai_bringup kai_custom_vehicle
+# the wind and current GUI: the core gtests and both plugins in an offscreen GUI
+colcon test --packages-select gz_maritime_gui
 # docs, strict (needs network for the requirements):
 pip install -r docs/requirements.txt && sphinx-build -W docs docs/_build/html
 ```
@@ -162,6 +165,18 @@ the full rationale (section refs below).
   step in the current; a vehicle whose hydrodynamics carries plugin added
   mass turns that step into a force spike, so keep added mass out of a
   vehicle that may see one, or add a ramp before relying on it.
+- **The GUI reads the world and writes only through topics.** The
+  `OceanCurrentPanel` and `WindPanel` plugins read their recipe from the
+  GUI's ECM (or, loaded from the plugin menu after the first state, from a
+  private copy of the world's state service), never write into the GUI's
+  ECM, and change a field only with a `gz.msgs.Param` on its `set` topic, so
+  the server's rules stay the only rules. Each keeps its field's convention
+  on screen: the wind's direction is where it comes from, the current's
+  where it sets towards. A number field takes a point or a comma whatever
+  the locale; the plugin parses the text (`ParseNumber`), never Qt's
+  `DoubleValidator`, which takes only the locale's separator. A marker they
+  draw has a non-zero id: MarkerManager gives id 0 a new random id, which
+  would add a marker on every redraw.
 - **No instance name in a URDF, no `/clock` in a vehicle bridge.** The
   simulation launch bridges the clock once; a vehicle's `name` reaches its
   model topics and frame ids through xacro, its nodes through the namespace,

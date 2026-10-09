@@ -22,6 +22,7 @@ from its files.
 - [Several vehicles on one ocean](several-vehicles.md)
 - [Sail the competition sites](site-worlds.md)
 - [Use your own world](own-world.md)
+- [Change and see the wind and the current](wind-and-current.md)
 - [Troubleshooting](faq.md)
 
 ```{toctree}
@@ -36,5 +37,6 @@ sensors
 several-vehicles
 site-worlds
 own-world
+wind-and-current
 faq
 ```

@@ -429,6 +429,24 @@
           <property type="string" key="state">docked_collapsed</property>
         </gz-gui>
       </plugin>
+
+      <!-- Ocean current and wind panels (gz_maritime_gui): change each
+           field, and draw it as arrows, off until turned on in its panel. -->
+      <plugin filename="OceanCurrentPanel" name="Ocean current">
+        <gz-gui>
+          <title>Ocean current</title>
+          <property type="string" key="state">docked</property>
+        </gz-gui>
+        <show_arrows>false</show_arrows>
+      </plugin>
+
+      <plugin filename="WindPanel" name="Wind">
+        <gz-gui>
+          <title>Wind</title>
+          <property type="string" key="state">docked</property>
+        </gz-gui>
+        <show_arrows>false</show_arrows>
+      </plugin>
     </gui>
 
     <!-- Terrain: the VRX Nathan Benderson Park model from Fuel (downloaded

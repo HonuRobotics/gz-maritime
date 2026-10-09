@@ -42,6 +42,9 @@ site under
   changed at run time on a topic bridged to ROS, kept on the world as a recipe naming a registered
   current model, so any system can ask the current at a point and a new
   model needs no change to anything else.
+- [`gz_maritime_gui`](gz_maritime_gui/): Gazebo GUI panels for the ocean
+  current and the wind, each of which changes its field and draws it as
+  arrows on the water, sampled from the world as the vehicles feel it.
 - [`kai_gazebo`](kai_gazebo/), [`kai_bringup`](kai_bringup/) and
   [`kai_custom_vehicle`](kai_custom_vehicle/): the worlds, the simulation
   and spawn launches, and the example vehicle.

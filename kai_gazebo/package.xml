@@ -13,6 +13,8 @@
   <exec_depend>gz_buoyancy</exec_depend>
   <exec_depend>gz_wind</exec_depend>
   <exec_depend>gz_ocean_current</exec_depend>
+  <!-- The ocean current and wind panels in every world's GUI. -->
+  <exec_depend>gz_maritime_gui</exec_depend>
   <exec_depend>gz_waves_provider_fft</exec_depend>
   <exec_depend>gz_waves_provider_gerstner</exec_depend>
   <exec_depend>gz_waves_rendering</exec_depend>

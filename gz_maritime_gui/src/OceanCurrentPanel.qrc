@@ -1,0 +1,7 @@
+<!DOCTYPE RCC><RCC version="1.0">
+<qresource prefix="OceanCurrentPanel/">
+  <file>OceanCurrentPanel.qml</file>
+  <file>Compass.qml</file>
+  <file>NumberField.qml</file>
+</qresource>
+</RCC>
