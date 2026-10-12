@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!--
+  A world with an ocean current and no wind system, for the GUI test: the
+  plugin reads the current, finds no wind, asks the state service once, and
+  carries on.
+-->
+<sdf version="1.9">
+  <world name="default">
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-maritime-ocean-current-system"
+            name="gz::sim::maritime::OceanCurrent">
+      <speed>0.5</speed>
+      <direction>90</direction>
+    </plugin>
+  </world>
+</sdf>
