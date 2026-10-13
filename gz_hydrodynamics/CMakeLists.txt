@@ -85,10 +85,14 @@ if(BUILD_TESTING)
       gz-transport::gz-transport
       gz-msgs::gz-msgs)
     # The plugin library is loaded by name from the build tree so the test
-    # runs before install; the ocean current system comes from its package.
+    # runs before install. The ocean current system is installed next to
+    # gz_ocean_current's library, whose exported target gives the folder in
+    # a merged or an isolated install alike. A partition of its own keeps
+    # its topics apart from other packages' tests, which colcon runs in
+    # parallel.
     set_tests_properties(hydrodynamics_current_test PROPERTIES
       ENVIRONMENT
-      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:${gz_ocean_current_DIR}/../../../lib")
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$<TARGET_FILE_DIR:gz_ocean_current::gz_ocean_current>;GZ_PARTITION=gz_hydrodynamics_test")
   endif()
 endif()
 

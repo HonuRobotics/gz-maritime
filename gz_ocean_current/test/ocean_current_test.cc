@@ -425,6 +425,29 @@ TEST(OceanCurrentField, MessageIsAppliedWholeOrNotAtAll)
 }
 
 /////////////////////////////////////////////////
+/// The model cannot change at run time: a message with a `model` key is
+/// refused whole, rather than taken as a parameter the model owns.
+TEST(OceanCurrentField, ModelCannotChangeOnTheTopic)
+{
+  CurrentWorld world("ocean_currentfield.sdf");
+  ASSERT_TRUE(world.Run(1));
+
+  msgs::Param msg;
+  auto &model = (*msg.mutable_params())["model"];
+  model.set_type(msgs::Any::STRING);
+  model.set_string_value("upwelling");
+  auto &speed = (*msg.mutable_params())["speed"];
+  speed.set_type(msgs::Any::DOUBLE);
+  speed.set_double_value(2.0);
+  ASSERT_TRUE(Publish("ocean_currentfield", msg));
+  ASSERT_TRUE(world.Marker("ocean_currentfield"));
+  EXPECT_EQ("standard", world.state.recipe->model);
+  EXPECT_NEAR(1.0, world.state.recipe->params.speed, 1e-9)
+      << "the speed beside the model key is not applied";
+  EXPECT_TRUE(world.state.recipe->params.extra.empty());
+}
+
+/////////////////////////////////////////////////
 /// ROS sends `speed: 1` as an integer; the bridge makes it an INT32, which
 /// the topic takes as a number.
 TEST(OceanCurrentField, IntegerOnTheTopic)
@@ -510,6 +533,35 @@ TEST(OceanCurrentField, ModelFromTheWorldFile)
       << "the <parameters> block reaches the recipe";
   EXPECT_EQ("noaa_blended_currents.nc",
             world.state.recipe->params.extra.at("source"));
+}
+
+/////////////////////////////////////////////////
+/// A list in <parameters> keeps every entry, numbered in order, and a
+/// nested element reaches the model whole, as its SDF text.
+TEST(OceanCurrentField, ListAndNestedParameters)
+{
+  ocean_current::RegisterOceanCurrentModelFactory("upwelling",
+      [] { return std::make_unique<Upwelling>(); });
+  CurrentWorld world("ocean_current_upwelling.sdf");
+  ASSERT_TRUE(world.Run(1));
+  ASSERT_TRUE(world.state.recipe.has_value());
+  const auto &extra = world.state.recipe->params.extra;
+
+  EXPECT_EQ(0u, extra.count("constituent"));
+  ASSERT_EQ(1u, extra.count("constituent.0"));
+  ASSERT_EQ(1u, extra.count("constituent.1"));
+  ASSERT_EQ(1u, extra.count("constituent.2"));
+  EXPECT_EQ(0u, extra.count("constituent.3"));
+  EXPECT_EQ("M2 0.25 0", extra.at("constituent.0"));
+  EXPECT_EQ("S2 0.1 30", extra.at("constituent.1"));
+  EXPECT_EQ("K1 0.05 90", extra.at("constituent.2"));
+
+  ASSERT_EQ(1u, extra.count("layer"));
+  const std::string &layer = extra.at("layer");
+  EXPECT_NE(std::string::npos, layer.find("<layer")) << layer;
+  EXPECT_NE(std::string::npos, layer.find("units='m'")) << layer;
+  EXPECT_NE(std::string::npos, layer.find("<depth>10</depth>")) << layer;
+  EXPECT_NE(std::string::npos, layer.find("<speed>0.2</speed>")) << layer;
 }
 
 /////////////////////////////////////////////////
