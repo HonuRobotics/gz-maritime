@@ -18,6 +18,35 @@ The model built in, `standard`, is a speed and the direction the current
 sets towards, uniform over the world and horizontal. On the
 kilometre and hour scales this simulation works at, that is the water.
 
+The same system pushes on the shapes the water sees, a hydrodynamic model
+for a vehicle without identified coefficients. A vehicle marks them with
+`gz:ocean_current="true"` on a collision (a zero `collide_bitmask` keeps a
+dedicated shape out of contact, and a buoyancy box can carry the buoyancy
+and wind marks too: the wind takes the part above the water, the current the
+part below). The system finds those shapes on every model, spawned at any
+time under any name, and applies quadratic drag,
+`0.5 * rho * Cd * A * |v| * v` per shape axis, on the projected area of the
+part below `<water_level>`, at the centre of that part, with the current
+asked at that centre. The velocity is the water relative to the shape, so a
+boat with nothing else holding it drifts at the current's speed.
+`gz:ocean_current_cd` sets a shape's drag coefficient. The shape code is
+shared with the wind's windage, in `gz_marked_shapes`.
+
+Each face of a shape is cut by how vertical its axis is, so a shape on
+its side, such as a cylinder lying along the hull, is cut on the face the
+current sees and keeps its plan area whole. The cut is at the flat
+`<water_level>`, not the wave surface, like the windage and the buoyancy.
+
+A vehicle uses one model, its Hydrodynamics plugin or the marks, never
+both. The marks damp more than surge and sway: the plan area damps heave,
+drag on the part below the centre of mass rolls and pitches the hull, and a
+shape off the centre line yaws it, so any plugin damping beside them counts
+those axes twice. A Hydrodynamics plugin with yaw terms only (`nR`,
+`nRabsR`) is the most a marked vehicle may add, and only when no marked
+shape is off the centre line.
+The drag acts at the centre of each wet part, so a single centred box has
+no yaw damping at all; a hull of two pontoons does.
+
 The system publishes the current at the world's origin as ground truth on
 `/world/<world>/ocean_current_info`, a `gz.msgs.Twist` in the world frame,
 which ROS can bridge.
@@ -37,10 +66,12 @@ which ROS can bridge.
 | `<model>` | standard | The registered current model. |
 | `<speed>` | 0 | m/s. |
 | `<direction>` | 0 | Degrees clockwise from north the current sets towards: 90 sets east, towards +x. |
-| `<water_level>` | 0 | World z of the water's surface, so a model that varies with depth knows where the surface is; unread by `standard`. |
+| `<water_level>` | 0 | World z of the water's surface: where the load on marked shapes cuts them, and where a model that varies with depth puts the surface; `standard` does not read it. |
 | `<parameters>` | none | The parameters the model owns, one element each, such as `<source>`, the file of a gridded current. Opaque to the system, which only stores and replicates them as text; the model accepts or refuses them. A leaf is its text; an element with children or attributes of its own, such as `<layer><depth>10</depth></layer>`, is its SDF text, for the model to parse. A name that repeats is a list, numbered in order: three `<constituent>` elements are `constituent.0`, `constituent.1` and `constituent.2`. `standard` takes none. |
 | `<seed>` | 1 | Seed of anything random in a model, fixed by default so a run repeats; 0 draws a new one each run. `standard` has nothing random. |
 | `<publish_rate>` | 10 | Hz of simulation time for the ground truth. |
+| `<water_density>` | 1025 | kg/m^3, for the load on marked shapes. |
+| `<default_drag_coefficient>` | 1 | Cd for marked shapes without `gz:ocean_current_cd`. |
 
 Any other element is warned about and ignored, so a typo does not leave
 slack water in silence. The system checks the model once, at the first step
