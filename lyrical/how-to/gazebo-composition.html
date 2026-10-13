@@ -828,10 +828,9 @@ mode, only the plugin’s filename and name change.</p>
 <h2>Hydrodynamic damping<a class="headerlink" href="#hydrodynamic-damping" title="Link to this heading"></a></h2>
 <p>Water resists motion. The Hydrodynamics plugin applies that resistance to
 one link:</p>
-<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="nt">&lt;plugin</span><span class="w"> </span><span class="na">filename=</span><span class="s">"gz-sim-hydrodynamics-system"</span>
-<span class="w">            </span><span class="na">name=</span><span class="s">"gz::sim::systems::Hydrodynamics"</span><span class="nt">&gt;</span>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="nt">&lt;plugin</span><span class="w"> </span><span class="na">filename=</span><span class="s">"gz-maritime-hydrodynamics-system"</span>
+<span class="w">            </span><span class="na">name=</span><span class="s">"gz::sim::maritime::Hydrodynamics"</span><span class="nt">&gt;</span>
 <span class="w">      </span><span class="nt">&lt;link_name&gt;</span>base_link<span class="nt">&lt;/link_name&gt;</span>
-<span class="w">      </span><span class="nt">&lt;water_density&gt;</span>${water_density}<span class="nt">&lt;/water_density&gt;</span>
 <span class="w">      </span><span class="nt">&lt;xU&gt;</span>-20<span class="nt">&lt;/xU&gt;</span><span class="w">    </span><span class="nt">&lt;yV&gt;</span>-40<span class="nt">&lt;/yV&gt;</span><span class="w">    </span><span class="nt">&lt;zW&gt;</span>-30<span class="nt">&lt;/zW&gt;</span>
 <span class="w">      </span><span class="nt">&lt;kP&gt;</span>-20<span class="nt">&lt;/kP&gt;</span><span class="w">    </span><span class="nt">&lt;mQ&gt;</span>-20<span class="nt">&lt;/mQ&gt;</span><span class="w">    </span><span class="nt">&lt;nR&gt;</span>-15<span class="nt">&lt;/nR&gt;</span>
 <span class="w">      </span><span class="nt">&lt;xUabsU&gt;</span>-30<span class="nt">&lt;/xUabsU&gt;</span>
@@ -882,6 +881,13 @@ one link:</p>
 boat should resist sideways motion much more than forward motion, or it
 slides out of its turns. The custom USV’s values are placeholders borrowed
 from the BlueBoat; tune them for your vehicle.</p>
+<p>The plugin is <code class="docutils literal notranslate"><span class="pre">gz-maritime-hydrodynamics-system</span></code>, from <code class="docutils literal notranslate"><span class="pre">gz_hydrodynamics</span></code>:
+Gazebo’s Hydrodynamics with one change. It damps against the water rather
+than the ground, so the boat drifts with the world’s ocean current. gz-sim’s
+own <code class="docutils literal notranslate"><span class="pre">gz-sim-hydrodynamics-system</span></code> takes the same coefficients but doesn’t see
+the world’s current, so a boat that names it sits still in one. Put added
+mass in the plugin’s <code class="docutils literal notranslate"><span class="pre">&lt;xDotU&gt;</span></code> and the like, not in <code class="docutils literal notranslate"><span class="pre">&lt;fluid_added_mass&gt;</span></code>,
+which only DART implements.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>The damping acts in the air too, so a boat spawned well above the water falls
