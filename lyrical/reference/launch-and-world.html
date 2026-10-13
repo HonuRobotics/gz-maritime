@@ -233,6 +233,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#buoyancy-markup">Buoyancy markup</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#wind-markup">Wind markup</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#wind-parameters">Wind parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ocean-current-markup">Ocean current markup</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#ocean-current-parameters">Ocean current parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#thruster-command">Thruster command</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#services">Services</a><ul>
@@ -580,7 +581,7 @@ credited in <code class="docutils literal notranslate"><span class="pre">kai_gaz
 <td><p>Still air by default (<code class="docutils literal notranslate"><span class="pre">&lt;speed&gt;0&lt;/speed&gt;</span></code>) at a 10 m reference height, falling off towards the water with a 0.0002 m roughness length, changed at run time on the wind topic; pushes only marked collisions, with air at 1.225 kg/m³ and a drag coefficient of 1 unless a shape sets its own</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gz-maritime-ocean-current-system</span></code></p></td>
-<td><p>Slack water by default (<code class="docutils literal notranslate"><span class="pre">&lt;speed&gt;0&lt;/speed&gt;</span></code>); a uniform, horizontal current set in the world file and changed at run time on the ocean current topic, kept on the world as a recipe any system can ask at a point and published as ground truth. A vehicle feels it through <code class="docutils literal notranslate"><span class="pre">gz-maritime-hydrodynamics-system</span></code>; gz-sim’s own Hydrodynamics does not see it</p></td>
+<td><p>Slack water by default (<code class="docutils literal notranslate"><span class="pre">&lt;speed&gt;0&lt;/speed&gt;</span></code>); a uniform, horizontal current set in the world file and changed at run time on the ocean current topic, kept on the world as a recipe any system can ask at a point and published as ground truth. A vehicle feels it through <code class="docutils literal notranslate"><span class="pre">gz-maritime-hydrodynamics-system</span></code>, or through collisions it marks, with seawater at 1025 kg/m³ and a drag coefficient of 1 unless a shape sets its own; gz-sim’s own Hydrodynamics does not see it</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-waves-fft-system</span></code></p></td>
 <td><p>Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out)</p></td>
@@ -703,6 +704,45 @@ field works, and writes it into gz-sim’s wind entity at the world’s origin.
 A system that needs the wind at a point asks <code class="docutils literal notranslate"><span class="pre">gz::sim::wind::WindAt</span></code>, or
 keeps a <code class="docutils literal notranslate"><span class="pre">gz::sim::wind::WindSampler</span></code>, from the <code class="docutils literal notranslate"><span class="pre">gz_wind</span></code> library.</p>
 </section>
+<section id="ocean-current-markup">
+<h2>Ocean current markup<a class="headerlink" href="#ocean-current-markup" title="Link to this heading"></a></h2>
+<p>What a model says to the ocean current system.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Where</p></th>
+<th class="head"><p>Markup</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>A <code class="docutils literal notranslate"><span class="pre">&lt;collision&gt;</span></code> in a model</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">gz:ocean_current=&quot;true&quot;</span></code> (same <code class="docutils literal notranslate"><span class="pre">xmlns:gz</span></code> root attribute)</p></td>
+<td><p>The water pushes on this shape, by the part of it below the water, with quadratic drag on its projected area per axis, taking the current at the centre of that part and the shape’s own velocity there. <code class="docutils literal notranslate"><span class="pre">&quot;1&quot;</span></code> works too. A mesh counts as its bounding box. A buoyancy box can carry the buoyancy and wind marks too.</p></td>
+</tr>
+<tr class="row-odd"><td><p>The same <code class="docutils literal notranslate"><span class="pre">&lt;collision&gt;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">gz:ocean_current_cd=&quot;1.2&quot;</span></code></p></td>
+<td><p>Its drag coefficient; the plugin’s <code class="docutils literal notranslate"><span class="pre">&lt;default_drag_coefficient&gt;</span></code> otherwise.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The marks are a hydrodynamic model of their own, for a vehicle without
+identified coefficients: the water’s drag on the hull, relative to the
+water. A vehicle uses one model, its Hydrodynamics plugin or the marks,
+never both. The marks damp more than surge and sway: the plan area damps
+heave, drag on the part below the centre of mass rolls and pitches the
+hull, and a shape off the centre line yaws it, so any plugin damping beside
+them counts those axes twice. If a marked vehicle needs more yaw damping,
+a Hydrodynamics plugin with yaw terms only (<code class="docutils literal notranslate"><span class="pre">nR</span></code>, <code class="docutils literal notranslate"><span class="pre">nRabsR</span></code>) is the most it
+may add, and only when no marked shape is off the centre line. The drag
+acts at the centre of each wet part, so a single centred box has no yaw
+damping at all; a hull of two pontoons does.</p>
+<p>Each face of a shape is cut by how vertical its axis is, so a cylinder
+lying along the hull, the way a pontoon is modelled, has half its end cap
+wet when half of it is under, and its plan area stays whole. The cut is at
+the flat <code class="docutils literal notranslate"><span class="pre">&lt;water_level&gt;</span></code>, not the wave surface, like the windage and the
+buoyancy: a hull pitching in waves sees its wet part change with its own
+heave and pitch, not with the waves.</p>
+</section>
 <section id="ocean-current-parameters">
 <h2>Ocean current parameters<a class="headerlink" href="#ocean-current-parameters" title="Link to this heading"></a></h2>
 <p>What a world says to the ocean current system.</p>
@@ -720,7 +760,7 @@ keeps a <code class="docutils literal notranslate"><span class="pre">gz::sim::wi
 <td><p>The current model the recipe names, <code class="docutils literal notranslate"><span class="pre">standard</span></code> by default: uniform and horizontal. A new model is one class registered under a name; nothing else changes.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;water_level&gt;</span></code></p></td>
-<td><p>World z of the water’s surface, 0 by default, so a model that varies with depth knows where the surface is; <code class="docutils literal notranslate"><span class="pre">standard</span></code> does not read it.</p></td>
+<td><p>World z of the water’s surface, 0 by default: where the load on marked shapes cuts them, and where a model that varies with depth puts the surface; <code class="docutils literal notranslate"><span class="pre">standard</span></code> does not read it.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;parameters&gt;</span></code></p></td>
 <td><p>The parameters a model owns, one element each, such as <code class="docutils literal notranslate"><span class="pre">&lt;source&gt;</span></code>, the file of a gridded current. Opaque to the system, which only stores and replicates them; the model accepts or refuses them. A leaf is its text; an element with children or attributes of its own, such as <code class="docutils literal notranslate"><span class="pre">&lt;layer&gt;&lt;depth&gt;10&lt;/depth&gt;&lt;/layer&gt;</span></code>, is its SDF text, for the model to parse. A name that repeats is a list, numbered in order: three <code class="docutils literal notranslate"><span class="pre">&lt;constituent&gt;</span></code> elements are <code class="docutils literal notranslate"><span class="pre">constituent.0</span></code>, <code class="docutils literal notranslate"><span class="pre">constituent.1</span></code> and <code class="docutils literal notranslate"><span class="pre">constituent.2</span></code>. <code class="docutils literal notranslate"><span class="pre">standard</span></code> takes none.</p></td>
@@ -730,6 +770,9 @@ keeps a <code class="docutils literal notranslate"><span class="pre">gz::sim::wi
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;publish_rate&gt;</span></code></p></td>
 <td><p>Rate of the ground truth, 10 Hz by default.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;water_density&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;default_drag_coefficient&gt;</span></code></p></td>
+<td><p>For the load on marked shapes: 1025 kg/m³ and a drag coefficient of 1 by default. The load cuts each shape at <code class="docutils literal notranslate"><span class="pre">&lt;water_level&gt;</span></code>.</p></td>
 </tr>
 </tbody>
 </table>
