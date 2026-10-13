@@ -28,10 +28,11 @@ site under
   [`gz_waves_rendering`](gz_waves_rendering/): one simulated sea shared by
   physics and rendering, from a fast analytic model or a high fidelity
   spectral one. See [WAVES_DESIGN.md](WAVES_DESIGN.md).
-- [`gz_buoyancy`](gz_buoyancy/) and [`gz_thruster`](gz_thruster/): Gazebo's
-  buoyancy and thruster systems with the changes vehicles here rely on,
-  marked collisions and a normalized command, carried until a Gazebo release
-  ships them.
+- [`gz_buoyancy`](gz_buoyancy/), [`gz_thruster`](gz_thruster/) and
+  [`gz_hydrodynamics`](gz_hydrodynamics/): Gazebo's buoyancy, thruster and
+  hydrodynamics systems with the changes vehicles here rely on, marked
+  collisions, a normalized command and damping against the world's ocean
+  current, carried until a Gazebo release ships them.
 - [`gz_wind`](gz_wind/): the world's wind, a speed and the direction it
   comes from, changed at run time on a topic bridged to ROS, and kept on the
   world so any system can ask the wind at a point, and windage on the

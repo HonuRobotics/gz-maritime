@@ -158,7 +158,7 @@ one link:
 
 ```{literalinclude} ../../kai_custom_vehicle/models/custom_usv/model.sdf.xacro
 :language: xml
-:start-at: <plugin filename="gz-sim-hydrodynamics-system"
+:start-at: <plugin filename="gz-maritime-hydrodynamics-system"
 :end-at: </plugin>
 ```
 
@@ -177,6 +177,14 @@ The first of each pair grows with speed, the `abs` one with speed squared. A
 boat should resist sideways motion much more than forward motion, or it
 slides out of its turns. The custom USV's values are placeholders borrowed
 from the BlueBoat; tune them for your vehicle.
+
+The plugin is `gz-maritime-hydrodynamics-system`, from `gz_hydrodynamics`:
+Gazebo's Hydrodynamics with one change. It damps against the water rather
+than the ground, so the boat drifts with the world's ocean current. gz-sim's
+own `gz-sim-hydrodynamics-system` takes the same coefficients but doesn't see
+the world's current, so a boat that names it sits still in one. Put added
+mass in the plugin's `<xDotU>` and the like, not in `<fluid_added_mass>`,
+which only DART implements.
 
 ```{note}
 The damping acts in the air too, so a boat spawned well above the water falls
