@@ -335,7 +335,8 @@ TEST(MarkedLinks, Configure)
 
   MarkedLinks links(kMark, kCdMark);
   links.Configure(sdfOf("<rho>2</rho><default_drag_coefficient>3"
-                        "</default_drag_coefficient>"), "rho", 7.0);
+                        "</default_drag_coefficient>"), "Test", "rho",
+                  7.0);
   EXPECT_DOUBLE_EQ(2.0, links.Density());
   OneCollision one(marked);
   links.Find(one.ecm);
@@ -344,7 +345,8 @@ TEST(MarkedLinks, Configure)
 
   MarkedLinks invalid(kMark, kCdMark);
   invalid.Configure(sdfOf("<rho>-2</rho><default_drag_coefficient>-3"
-                          "</default_drag_coefficient>"), "rho", 7.0);
+                          "</default_drag_coefficient>"), "Test", "rho",
+                    7.0);
   EXPECT_DOUBLE_EQ(7.0, invalid.Density());
   OneCollision other(marked);
   invalid.Find(other.ecm);

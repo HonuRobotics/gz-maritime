@@ -172,11 +172,12 @@ the full rationale (section refs below).
   damping: the marks damp more than surge and sway (the plan area damps
   heave, drag below the centre of mass rolls and pitches the hull, and a
   shape off the centre line yaws it), so plugin damping beside them counts
-  those axes twice. A Hydrodynamics plugin with rotational terms only is
-  the most a marked vehicle may add, and only when no marked shape is off
-  centre. The drag acts at the centre of each wet part, so a single centred
-  shape gives no yaw damping at all. The cut is at the flat
-  `<water_level>`, not the wave surface, like the windage and the buoyancy.
+  those axes twice. A Hydrodynamics plugin with yaw terms only (`nR`,
+  `nRabsR`) is the most a marked vehicle may add, and only when no marked
+  shape is off the centre line. The drag acts at the centre of each wet
+  part, so a single centred shape gives no yaw damping at all. The cut is
+  at the flat `<water_level>`, not the wave surface, like the windage and
+  the buoyancy.
 - **No instance name in a URDF, no `/clock` in a vehicle bridge.** The
   simulation launch bridges the clock once; a vehicle's `name` reaches its
   model topics and frame ids through xacro, its nodes through the namespace,

@@ -135,9 +135,11 @@ class MarkedLinks
   /// SDF. An invalid value keeps the default, with an error: a negative
   /// density or coefficient would make the fluid pull.
   /// \param[in] _sdf The system's SDF.
+  /// \param[in] _system The system's name, for the errors.
   /// \param[in] _densityElement The element with the density, kg/m^3.
   /// \param[in] _defaultDensity Density without one, kg/m^3.
   public: void Configure(const std::shared_ptr<const sdf::Element> &_sdf,
+                         const std::string &_system,
                          const std::string &_densityElement,
                          double _defaultDensity);
 

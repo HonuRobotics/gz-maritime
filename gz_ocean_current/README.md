@@ -41,8 +41,9 @@ A vehicle uses one model, its Hydrodynamics plugin or the marks, never
 both. The marks damp more than surge and sway: the plan area damps heave,
 drag on the part below the centre of mass rolls and pitches the hull, and a
 shape off the centre line yaws it, so any plugin damping beside them counts
-those axes twice. A Hydrodynamics plugin with rotational terms only is the
-most a marked vehicle may add, and only when no marked shape is off centre.
+those axes twice. A Hydrodynamics plugin with yaw terms only (`nR`,
+`nRabsR`) is the most a marked vehicle may add, and only when no marked
+shape is off the centre line.
 The drag acts at the centre of each wet part, so a single centred box has
 no yaw damping at all; a hull of two pontoons does.
 

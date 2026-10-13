@@ -341,7 +341,7 @@ void OceanCurrent::Configure(const Entity &_entity,
   d.WriteRecipe(_ecm);
 
   // The load on marked shapes.
-  d.marked.Configure(_sdf, "water_density", 1025.0);
+  d.marked.Configure(_sdf, "OceanCurrent", "water_density", 1025.0);
 
   const double rate = _sdf->Get<double>("publish_rate", 10.0).first;
   if (rate > 0.0)

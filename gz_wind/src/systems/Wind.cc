@@ -368,7 +368,7 @@ void Wind::Configure(const Entity &_entity,
   d.worldEntity = _entity;
   d.windEntity = _ecm.EntityByComponents(components::Wind());
   // The windage on marked shapes.
-  d.marked.Configure(_sdf, "air_density", 1.225);
+  d.marked.Configure(_sdf, "Wind", "air_density", 1.225);
 
   // The world's <wind> is the starting point, in the world frame; the recipe
   // speaks of a speed and a direction from true north.

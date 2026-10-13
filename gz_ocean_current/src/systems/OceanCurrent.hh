@@ -78,10 +78,11 @@ namespace gz::sim::maritime
   /// model, its hydrodynamics plugin or the marks. The marks damp heave
   /// through the plan area, roll and pitch through drag below the centre of
   /// mass, and yaw through shapes off the centre line, so plugin damping
-  /// beside them counts those axes twice. A hydrodynamics plugin with
-  /// rotational terms only is the most a marked vehicle may add, and only
-  /// when no marked shape is off centre. The drag acts at the centre of each
-  /// wet part, so a single centred shape gives no yaw damping.
+  /// beside them counts those axes twice. A hydrodynamics plugin with yaw
+  /// terms only (`nR`, `nRabsR`) is the most a marked vehicle may add, and
+  /// only when no marked shape is off the centre line. The drag acts at the
+  /// centre of each wet part, so a single centred shape gives no yaw
+  /// damping.
   ///
   /// The system publishes the current at the world's origin as ground truth
   /// on `/world/<world>/ocean_current_info`, a gz.msgs.Twist in the world

@@ -225,6 +225,7 @@ MarkedLinks::MarkedLinks(std::string _mark, std::string _cdMark)
 
 //////////////////////////////////////////////////
 void MarkedLinks::Configure(const std::shared_ptr<const sdf::Element> &_sdf,
+                            const std::string &_system,
                             const std::string &_densityElement,
                             double _defaultDensity)
 {
@@ -234,14 +235,15 @@ void MarkedLinks::Configure(const std::shared_ptr<const sdf::Element> &_sdf,
   if (density > 0.0)
     this->density = density;
   else
-    gzerr << "<" << _densityElement << "> must be positive, using "
-          << _defaultDensity << "\n";
+    gzerr << _system << ": <" << _densityElement
+          << "> must be positive, using " << _defaultDensity << "\n";
 
   const double cd = _sdf->Get<double>("default_drag_coefficient", 1.0).first;
   if (cd >= 0.0)
     this->SetDefaultCd(cd);
   else
-    gzerr << "<default_drag_coefficient> cannot be negative, using 1\n";
+    gzerr << _system
+          << ": <default_drag_coefficient> cannot be negative, using 1\n";
 }
 
 //////////////////////////////////////////////////
