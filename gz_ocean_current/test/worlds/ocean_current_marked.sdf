@@ -102,5 +102,39 @@
         </collision>
       </link>
     </model>
+    <!-- Half under the water on their side: the face the current sees is
+         cut, whichever shape axis it is normal to. -->
+    <model name="pitched">
+      <pose>0 15 0 0 1.5707963267948966 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>10</mass>
+          <inertia>
+            <ixx>1000</ixx><iyy>1000</iyy><izz>1000</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="hull" gz:ocean_current="true">
+          <geometry><box><size>1 1 1</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+    <model name="lying">
+      <pose>0 18 0 0 1.5707963267948966 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>10</mass>
+          <inertia>
+            <ixx>1000</ixx><iyy>1000</iyy><izz>1000</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="hull" gz:ocean_current="true">
+          <geometry><cylinder><radius>0.5</radius><length>1</length></cylinder></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
   </world>
 </sdf>

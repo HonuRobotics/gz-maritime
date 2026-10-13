@@ -59,16 +59,22 @@ if(BUILD_TESTING)
   set(ament_cmake_uncrustify_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 
-  # The cut at the water level, without a world.
+  # The cut at the water level, the shapes and the links, without a world.
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(marked_shapes_test test/marked_shapes_test.cc)
   if(TARGET marked_shapes_test)
-    target_link_libraries(marked_shapes_test ${PROJECT_NAME})
+    target_compile_definitions(marked_shapes_test PRIVATE
+      "TEST_MEDIA_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/media\"")
+    target_link_libraries(marked_shapes_test ${PROJECT_NAME}
+      gz-common::gz-common)
   endif()
 endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
-ament_export_dependencies(gz_sim_vendor gz_math_vendor)
+# The library's public targets link gz-sim::core and gz-math::gz-math, so a
+# consumer's find_package(gz_marked_shapes) must find them too: the vendor
+# packages only put them on the path. gz-common stays private.
+ament_export_dependencies(gz_sim_vendor gz-sim gz_math_vendor gz-math)
 
 ament_package()

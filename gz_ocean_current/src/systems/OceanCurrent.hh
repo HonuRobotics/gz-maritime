@@ -69,12 +69,19 @@ namespace gz::sim::maritime
   /// marks too: the wind takes the part above the water, the current the
   /// part below.
   ///
+  /// Each face is cut by how vertical its axis is, so a shape on its side is
+  /// cut on the face the current sees. The cut is at the flat
+  /// `<water_level>`, not the wave surface.
+  ///
   /// The marks are a hydrodynamic model of their own, for a vehicle without
-  /// identified coefficients, not a supplement to one: a vehicle that marks
-  /// its hull drops the surge and sway terms from its hydrodynamics plugin,
-  /// which the marks now provide relative to the water, and keeps heave,
-  /// roll, pitch and yaw. Kept beside ground relative damping, the marked
-  /// load would make it drift at a fraction of the current.
+  /// identified coefficients, not a supplement to one: a vehicle uses one
+  /// model, its hydrodynamics plugin or the marks. The marks damp heave
+  /// through the plan area, roll and pitch through drag below the centre of
+  /// mass, and yaw through shapes off the centre line, so plugin damping
+  /// beside them counts those axes twice. A hydrodynamics plugin with
+  /// rotational terms only is the most a marked vehicle may add, and only
+  /// when no marked shape is off centre. The drag acts at the centre of each
+  /// wet part, so a single centred shape gives no yaw damping.
   ///
   /// The system publishes the current at the world's origin as ground truth
   /// on `/world/<world>/ocean_current_info`, a gz.msgs.Twist in the world

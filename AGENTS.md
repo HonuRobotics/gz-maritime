@@ -163,15 +163,20 @@ the full rationale (section refs below).
   step in the current; a vehicle whose hydrodynamics carries plugin added
   mass turns that step into a force spike, so keep added mass out of a
   vehicle that may see one, or add a ramp before relying on it.
-- **A hull feels the current once on each axis: Fossen or marks, never
-  both.** A model without identified coefficients marks the shapes the water
-  sees with `gz:ocean_current="true"` (a buoyancy box can carry the buoyancy
-  and wind marks too; the wind takes the part above the water, the current
-  the part below). A model that marks its hull drops the surge and sway
-  terms from its hydrodynamics plugin (`xU`, `xUabsU`, `yV`, `yVabsV` and
-  their cross terms) and keeps heave, roll, pitch and yaw: the plugin's
-  damping beside the marked load damps those axes twice, and the boat
-  drifts slower than the current.
+- **A hull feels the water through one model: Fossen or marks, never
+  both.** A model with identified coefficients keeps its Hydrodynamics
+  plugin and marks nothing for the current. A model without them marks the
+  shapes the water sees with `gz:ocean_current="true"` (a buoyancy box can
+  carry the buoyancy and wind marks too; the wind takes the part above the
+  water, the current the part below) and carries no linear or heave
+  damping: the marks damp more than surge and sway (the plan area damps
+  heave, drag below the centre of mass rolls and pitches the hull, and a
+  shape off the centre line yaws it), so plugin damping beside them counts
+  those axes twice. A Hydrodynamics plugin with rotational terms only is
+  the most a marked vehicle may add, and only when no marked shape is off
+  centre. The drag acts at the centre of each wet part, so a single centred
+  shape gives no yaw damping at all. The cut is at the flat
+  `<water_level>`, not the wave surface, like the windage and the buoyancy.
 - **No instance name in a URDF, no `/clock` in a vehicle bridge.** The
   simulation launch bridges the clock once; a vehicle's `name` reaches its
   model topics and frame ids through xacro, its nodes through the namespace,

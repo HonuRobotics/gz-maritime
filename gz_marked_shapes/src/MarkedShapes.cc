@@ -95,6 +95,21 @@ Part Cut(const math::Pose3d &_worldPose, const math::Vector3d &_half,
 }
 
 //////////////////////////////////////////////////
+math::Vector3d CutAreas(const math::Vector3d &_area,
+                        const math::Quaterniond &_rot, double _fraction)
+{
+  const math::Matrix3d rot(_rot);
+  math::Vector3d cut;
+  for (int i = 0; i < 3; ++i)
+  {
+    // How vertical shape axis i is in the world.
+    const double c = std::min(std::abs(rot(2, i)), 1.0);
+    cut[i] = _area[i] * (c + (1.0 - c) * _fraction);
+  }
+  return cut;
+}
+
+//////////////////////////////////////////////////
 bool Resolve(const EntityComponentManager &_ecm, const Entity _collision,
              const std::string &_mark, const std::string &_cdMark,
              double _defaultCd, Shape &_shape)
@@ -209,9 +224,36 @@ MarkedLinks::MarkedLinks(std::string _mark, std::string _cdMark)
 }
 
 //////////////////////////////////////////////////
+void MarkedLinks::Configure(const std::shared_ptr<const sdf::Element> &_sdf,
+                            const std::string &_densityElement,
+                            double _defaultDensity)
+{
+  this->density = _defaultDensity;
+  const double density =
+      _sdf->Get<double>(_densityElement, _defaultDensity).first;
+  if (density > 0.0)
+    this->density = density;
+  else
+    gzerr << "<" << _densityElement << "> must be positive, using "
+          << _defaultDensity << "\n";
+
+  const double cd = _sdf->Get<double>("default_drag_coefficient", 1.0).first;
+  if (cd >= 0.0)
+    this->SetDefaultCd(cd);
+  else
+    gzerr << "<default_drag_coefficient> cannot be negative, using 1\n";
+}
+
+//////////////////////////////////////////////////
 void MarkedLinks::SetDefaultCd(double _cd)
 {
   this->defaultCd = _cd;
+}
+
+//////////////////////////////////////////////////
+double MarkedLinks::Density() const
+{
+  return this->density;
 }
 
 //////////////////////////////////////////////////
@@ -281,7 +323,7 @@ void MarkedLinks::Reset()
 //////////////////////////////////////////////////
 void MarkedLinks::ApplyDrag(const UpdateInfo &_info,
     EntityComponentManager &_ecm, Side _side, double _waterLevel,
-    double _density, const FluidVelocity &_fluid)
+    const FluidVelocity &_fluid)
 {
   for (auto it = this->links.begin(); it != this->links.end();)
   {
@@ -318,12 +360,10 @@ void MarkedLinks::ApplyDrag(const UpdateInfo &_info,
       const math::Vector3d rel = worldPose.Rot().RotateVectorReverse(
           fluid - pointVel.value_or(math::Vector3d::Zero));
 
-      // Quadratic drag per shape axis. The water level cuts the areas a
-      // horizontal flow sees; the plan area is left whole.
-      const math::Vector3d area(shape.area.X() * part.fraction,
-                                shape.area.Y() * part.fraction,
-                                shape.area.Z());
-      const double q = 0.5 * _density * shape.cd;
+      // Quadratic drag per shape axis, on the areas of the part kept.
+      const math::Vector3d area =
+          CutAreas(shape.area, worldPose.Rot(), part.fraction);
+      const double q = 0.5 * this->density * shape.cd;
       const math::Vector3d force(
           q * area.X() * std::abs(rel.X()) * rel.X(),
           q * area.Y() * std::abs(rel.Y()) * rel.Y(),

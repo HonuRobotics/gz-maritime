@@ -208,11 +208,22 @@ What a model says to the ocean current system.
 
 The marks are a hydrodynamic model of their own, for a vehicle without
 identified coefficients: the water's drag on the hull, relative to the
-water. A model that marks its hull drops the surge and sway terms from its
-Hydrodynamics plugin (`xU`, `xUabsU`, `yV`, `yVabsV` and their cross terms)
-and keeps heave, roll, pitch and yaw. The plugin's damping beside the marks
-would damp those axes twice, and the boat would drift slower than the
-current.
+water. A vehicle uses one model, its Hydrodynamics plugin or the marks,
+never both. The marks damp more than surge and sway: the plan area damps
+heave, drag on the part below the centre of mass rolls and pitches the
+hull, and a shape off the centre line yaws it, so any plugin damping beside
+them counts those axes twice. If a marked vehicle needs more rotational
+damping, a Hydrodynamics plugin with rotational terms only is the most it
+may add, and only when no marked shape is off centre. The drag acts at the
+centre of each wet part, so a single centred box has no yaw damping at
+all; a hull of two pontoons does.
+
+Each face of a shape is cut by how vertical its axis is, so a cylinder
+lying along the hull, the way a pontoon is modelled, has half its end cap
+wet when half of it is under, and its plan area stays whole. The cut is at
+the flat `<water_level>`, not the wave surface, like the windage and the
+buoyancy: a hull pitching in waves sees its wet part change with its own
+heave and pitch, not with the waves.
 
 ## Ocean current parameters
 

@@ -157,9 +157,6 @@ class gz::sim::maritime::OceanCurrentPrivate
   /// drag of the water on them.
   public: marked_shapes::MarkedLinks marked{kMark, kCdMark};
 
-  /// \brief Water density, kg/m^3.
-  public: double waterDensity{1025.0};
-
   /// \brief Messages queued by the topic, applied at the next step.
   public: std::vector<msgs::Param> pending;
 
@@ -343,21 +340,8 @@ void OceanCurrent::Configure(const Entity &_entity,
   }
   d.WriteRecipe(_ecm);
 
-  // The load on marked shapes. An invalid value keeps the default: a
-  // negative density or coefficient would make the water pull.
-  const double density =
-      _sdf->Get<double>("water_density", d.waterDensity).first;
-  if (density > 0.0)
-    d.waterDensity = density;
-  else
-    gzerr << "OceanCurrent: <water_density> must be positive, using "
-          << d.waterDensity << "\n";
-  const double cd = _sdf->Get<double>("default_drag_coefficient", 1.0).first;
-  if (cd >= 0.0)
-    d.marked.SetDefaultCd(cd);
-  else
-    gzerr << "OceanCurrent: <default_drag_coefficient> cannot be negative, "
-          << "using 1\n";
+  // The load on marked shapes.
+  d.marked.Configure(_sdf, "water_density", 1025.0);
 
   const double rate = _sdf->Get<double>("publish_rate", 10.0).first;
   if (rate > 0.0)
@@ -438,7 +422,7 @@ void OceanCurrent::PreUpdate(const UpdateInfo &_info,
   if (!_info.paused)
   {
     d.marked.ApplyDrag(_info, _ecm, marked_shapes::Side::kBelow,
-        d.recipe.params.water_level, d.waterDensity,
+        d.recipe.params.water_level,
         [&d](const math::Vector3d &_point,
              const std::chrono::steady_clock::duration &_time)
         {

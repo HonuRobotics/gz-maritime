@@ -21,11 +21,15 @@
 
 #include <gz/msgs/boolean.pb.h>
 #include <gz/msgs/entity_factory.pb.h>
+#include <gz/msgs/param.pb.h>
 
+#include <chrono>
 #include <map>
 #include <string>
+#include <thread>
 
 #include <gz/common/Filesystem.hh>
+#include <gz/math/Helpers.hh>
 #include <gz/math/Vector3.hh>
 #include <gz/transport/Node.hh>
 
@@ -37,6 +41,9 @@
 #include <gz/sim/components/Model.hh>
 #include <gz/sim/components/Name.hh>
 #include <gz/sim/components/ParentEntity.hh>
+#include <gz/sim/components/World.hh>
+
+#include "gz/sim/components/OceanCurrentfield.hh"
 
 using namespace gz;
 using namespace sim;
@@ -81,6 +88,12 @@ class LoadWorld
     this->fixture.OnPostUpdate([this](const UpdateInfo &,
         const EntityComponentManager &_ecm)
     {
+      const Entity worldEntity = _ecm.EntityByComponents(components::World());
+      if (const auto *field =
+          _ecm.Component<components::OceanCurrentfield>(worldEntity))
+      {
+        this->waterLevel = field->Data().params.water_level;
+      }
       _ecm.Each<components::Model, components::Name>(
           [&](const Entity &_model, const components::Model *,
               const components::Name *_name) -> bool
@@ -110,7 +123,30 @@ class LoadWorld
 
   /// \brief World linear velocity of each model's link, by model name.
   public: std::map<std::string, math::Vector3d> velocity;
+
+  /// \brief The recipe's water level.
+  public: double waterLevel{0.0};
 };
+
+/// \brief Ask the ocean current system to change a numeric parameter.
+/// \param[in] _key Parameter name.
+/// \param[in] _value Its new value.
+/// \return True once the message was sent to a subscriber.
+bool SetCurrent(const std::string &_key, double _value)
+{
+  static transport::Node node;
+  auto pub = node.Advertise<msgs::Param>(
+      "/world/ocean_current_marked/ocean_current/set");
+  for (int i = 0; i < 100 && !pub.HasConnections(); ++i)
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  if (!pub.HasConnections())
+    return false;
+  msgs::Param msg;
+  auto &any = (*msg.mutable_params())[_key];
+  any.set_type(msgs::Any::DOUBLE);
+  any.set_double_value(_value);
+  return pub.Publish(msg);
+}
 
 /// \brief A marked box like the world's, to spawn at run time.
 const char kLateBox[] = R"(<?xml version="1.0"?>
@@ -207,4 +243,54 @@ TEST(OceanCurrentLoad, ShapeSpawnedLaterIsFound)
   ASSERT_EQ(1u, world.velocity.count("late"));
   EXPECT_NEAR(kU, world.velocity["late"].X(), kTol);
   EXPECT_NEAR(0.0, world.velocity["late"].Y(), 1e-6);
+}
+
+/////////////////////////////////////////////////
+/// A shape on its side is cut on the face the current sees: a box pitched
+/// onto its side and a cylinder lying along the current, each half under
+/// the water, take half their face, as the upright box does.
+TEST(OceanCurrentLoad, ShapeOnItsSide)
+{
+  LoadWorld world;
+  ASSERT_TRUE(world.Run(200));
+  EXPECT_NEAR(CatchUp(kK / 2.0, 0.2), world.velocity["pitched"].X(), kTol);
+  // The end cap of a 0.5 m radius cylinder, half of it wet: pi / 8 m^2.
+  EXPECT_NEAR(CatchUp(kK * GZ_PI / 8.0, 0.2), world.velocity["lying"].X(),
+              kTol);
+}
+
+/////////////////////////////////////////////////
+/// Changing <water_level> on the ocean current topic moves the cut: raised
+/// half a metre, the box half under the water is all under it, and keeps up
+/// with the one that always was.
+TEST(OceanCurrentLoad, WaterLevelOnTheTopicMovesTheCut)
+{
+  LoadWorld world;
+  ASSERT_TRUE(world.Run(1));
+  ASSERT_TRUE(SetCurrent("water_level", 0.5));
+  for (int i = 0; i < 2000 && world.waterLevel != 0.5; ++i)
+    ASSERT_TRUE(world.Run(1));
+  ASSERT_EQ(0.5, world.waterLevel) << "the change never arrived";
+
+  ASSERT_TRUE(world.Run(200));
+  EXPECT_NEAR(world.velocity["submerged"].X(), world.velocity["half"].X(),
+              kTol);
+  EXPECT_GT(world.velocity["half"].X(), CatchUp(kK / 2.0, 0.2) + 2 * kTol)
+      << "faster than the half wetted box it was";
+}
+
+/////////////////////////////////////////////////
+/// After a reset the marked shapes are found again and dragged again from
+/// rest.
+TEST(OceanCurrentLoad, MarkedSurvivesReset)
+{
+  LoadWorld world;
+  ASSERT_TRUE(world.Run(500));
+  ASSERT_GT(world.velocity["submerged"].X(), CatchUp(kK, 0.2));
+
+  world.fixture.Server()->ResetAll();
+  ASSERT_TRUE(world.Run(200));
+  EXPECT_NEAR(CatchUp(kK, 0.2), world.velocity["submerged"].X(), kTol);
+  EXPECT_NEAR(CatchUp(kK / 2.0, 0.2), world.velocity["half"].X(), kTol);
+  EXPECT_NEAR(0.0, world.velocity["unmarked"].Length(), 1e-9);
 }

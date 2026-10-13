@@ -164,9 +164,6 @@ class gz::sim::maritime::WindPrivate
   /// whichever system made it.
   public: std::vector<Entity> newSensors;
 
-  /// \brief Air density, kg/m^3.
-  public: double airDensity{1.225};
-
   /// \brief The recipe this system owns.
   public: wind::WindfieldData recipe;
 
@@ -370,20 +367,8 @@ void Wind::Configure(const Entity &_entity,
   auto &d = *this->dataPtr;
   d.worldEntity = _entity;
   d.windEntity = _ecm.EntityByComponents(components::Wind());
-  // An invalid value keeps the default: a negative coefficient would make
-  // the wind pull.
-  const double density = _sdf->Get<double>("air_density",
-                                           d.airDensity).first;
-  if (density > 0.0)
-    d.airDensity = density;
-  else
-    gzerr << "Wind: <air_density> must be positive, using "
-          << d.airDensity << "\n";
-  const double cd = _sdf->Get<double>("default_drag_coefficient", 1.0).first;
-  if (cd >= 0.0)
-    d.marked.SetDefaultCd(cd);
-  else
-    gzerr << "Wind: <default_drag_coefficient> cannot be negative, using 1\n";
+  // The windage on marked shapes.
+  d.marked.Configure(_sdf, "air_density", 1.225);
 
   // The world's <wind> is the starting point, in the world frame; the recipe
   // speaks of a speed and a direction from true north.
@@ -497,7 +482,7 @@ void Wind::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
   if (!_info.paused)
   {
     d.marked.ApplyDrag(_info, _ecm, marked_shapes::Side::kAbove,
-        d.recipe.params.water_level, d.airDensity,
+        d.recipe.params.water_level,
         [&d](const math::Vector3d &_point,
              const std::chrono::steady_clock::duration &_time)
         {

@@ -19,15 +19,18 @@
 
 #include <chrono>
 #include <functional>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include <gz/math/Pose3.hh>
+#include <gz/math/Quaternion.hh>
 #include <gz/math/Vector3.hh>
 #include <gz/sim/Entity.hh>
 #include <gz/sim/EntityComponentManager.hh>
 #include <gz/sim/System.hh>
+#include <sdf/Element.hh>
 
 namespace gz::sim::marked_shapes
 {
@@ -35,16 +38,16 @@ namespace gz::sim::marked_shapes
 struct Shape
 {
   /// \brief Pose of the shape in the link frame.
-  math::Pose3d pose;
+  public: math::Pose3d pose;
 
   /// \brief Half extents of the shape's bounding box in the shape frame.
-  math::Vector3d half;
+  public: math::Vector3d half;
 
   /// \brief Projected area of the whole shape along each shape axis, m^2.
-  math::Vector3d area;
+  public: math::Vector3d area;
 
   /// \brief Drag coefficient.
-  double cd{1.0};
+  public: double cd{1.0};
 };
 
 /// \brief Which side of the water level a fluid acts on.
@@ -61,13 +64,13 @@ enum class Side
 struct Part
 {
   /// \brief Whether any of the shape is on that side.
-  bool any{false};
+  public: bool any{false};
 
   /// \brief The share of the shape's height on that side, in [0, 1].
-  double fraction{0.0};
+  public: double fraction{0.0};
 
   /// \brief Centre of that part, world frame, m.
-  math::Vector3d centre;
+  public: math::Vector3d centre;
 };
 
 /// \brief Cut a shape's bounding box at the water level.
@@ -78,6 +81,19 @@ struct Part
 /// \return The part on that side.
 Part Cut(const math::Pose3d &_worldPose, const math::Vector3d &_half,
          double _waterLevel, Side _side);
+
+/// \brief The projected areas of the part of a shape a cut keeps, along
+/// each shape axis. A face is cut by the share of the height kept only as
+/// far as the axis normal to it lies flat: the face of a vertical axis is
+/// horizontal and stays whole, the face of a horizontal axis is cut, and an
+/// axis between them is weighted by how vertical it is, so a box or a
+/// cylinder on its side is cut the same as one standing up.
+/// \param[in] _area Projected area of the whole shape along each shape axis.
+/// \param[in] _rot Orientation of the shape in the world.
+/// \param[in] _fraction The share of the shape's height kept, in [0, 1].
+/// \return The areas of the part kept, along each shape axis.
+math::Vector3d CutAreas(const math::Vector3d &_area,
+                        const math::Quaterniond &_rot, double _fraction);
 
 /// \brief Resolve one collision into a shape, when it carries the mark.
 /// Boxes, cylinders, spheres, capsules and ellipsoids keep their shape; a
@@ -114,10 +130,25 @@ class MarkedLinks
   /// \param[in] _cdMark The optional per shape drag coefficient attribute.
   public: MarkedLinks(std::string _mark, std::string _cdMark);
 
+  /// \brief Read the fluid's density and the drag coefficient of shapes
+  /// that do not set their own, `<default_drag_coefficient>`, from a system's
+  /// SDF. An invalid value keeps the default, with an error: a negative
+  /// density or coefficient would make the fluid pull.
+  /// \param[in] _sdf The system's SDF.
+  /// \param[in] _densityElement The element with the density, kg/m^3.
+  /// \param[in] _defaultDensity Density without one, kg/m^3.
+  public: void Configure(const std::shared_ptr<const sdf::Element> &_sdf,
+                         const std::string &_densityElement,
+                         double _defaultDensity);
+
   /// \brief Set the drag coefficient of shapes that do not set their own.
   /// Takes effect for links found after the call.
   /// \param[in] _cd Drag coefficient.
   public: void SetDefaultCd(double _cd);
+
+  /// \brief The fluid's density.
+  /// \return kg/m^3.
+  public: double Density() const;
 
   /// \brief Find the marked shapes of every link not seen yet, or of every
   /// link after construction or a Reset.
@@ -134,20 +165,20 @@ class MarkedLinks
   /// \brief Push on the part of every marked shape on one side of the
   /// water: quadratic drag, 0.5 * rho * Cd * A * |v| * v per shape axis, on
   /// the fluid's velocity relative to the centre of that part, at that
-  /// centre. The water level cuts the areas a horizontal flow sees; the plan
-  /// area is left whole.
+  /// centre. The water level cuts the areas as CutAreas says, by how
+  /// vertical each shape axis is. The water level is flat: the cut does not
+  /// follow the waves.
   /// \param[in] _info Update info.
   /// \param[in] _ecm The entity component manager.
   /// \param[in] _side The side the fluid is on.
   /// \param[in] _waterLevel World z of the water.
-  /// \param[in] _density Density of the fluid, kg/m^3.
   /// \param[in] _fluid The fluid's velocity at a point.
   public: void ApplyDrag(const UpdateInfo &_info,
                          EntityComponentManager &_ecm, Side _side,
-                         double _waterLevel, double _density,
-                         const FluidVelocity &_fluid);
+                         double _waterLevel, const FluidVelocity &_fluid);
 
-  /// \brief The marked shapes, by link.
+  /// \brief The marked shapes, by link; a link removed from the world is
+  /// forgotten at the next ApplyDrag.
   /// \return The shapes.
   public: const std::unordered_map<Entity, std::vector<Shape>> &Links()
       const;
@@ -160,6 +191,9 @@ class MarkedLinks
 
   /// \brief Drag coefficient of shapes that do not set their own.
   private: double defaultCd{1.0};
+
+  /// \brief Density of the fluid, kg/m^3.
+  private: double density{1.0};
 
   /// \brief Marked shapes per link.
   private: std::unordered_map<Entity, std::vector<Shape>> links;

@@ -32,12 +32,19 @@ boat with nothing else holding it drifts at the current's speed.
 `gz:ocean_current_cd` sets a shape's drag coefficient. The shape code is
 shared with the wind's windage, in `gz_marked_shapes`.
 
-A vehicle uses one model on each axis, its Hydrodynamics plugin or the
-marks, never both: a vehicle that marks its hull drops the surge and sway
-terms from its Hydrodynamics plugin (`xU`, `xUabsU`, `yV`, `yVabsV`), which
-the marks now provide relative to the water, and keeps heave, roll, pitch
-and yaw. Kept beside the plugin's damping, the marked load would make it
-drift slower than the current.
+Each face of a shape is cut by how vertical its axis is, so a shape on
+its side, such as a cylinder lying along the hull, is cut on the face the
+current sees and keeps its plan area whole. The cut is at the flat
+`<water_level>`, not the wave surface, like the windage and the buoyancy.
+
+A vehicle uses one model, its Hydrodynamics plugin or the marks, never
+both. The marks damp more than surge and sway: the plan area damps heave,
+drag on the part below the centre of mass rolls and pitches the hull, and a
+shape off the centre line yaws it, so any plugin damping beside them counts
+those axes twice. A Hydrodynamics plugin with rotational terms only is the
+most a marked vehicle may add, and only when no marked shape is off centre.
+The drag acts at the centre of each wet part, so a single centred box has
+no yaw damping at all; a hull of two pontoons does.
 
 The system publishes the current at the world's origin as ground truth on
 `/world/<world>/ocean_current_info`, a `gz.msgs.Twist` in the world frame,
