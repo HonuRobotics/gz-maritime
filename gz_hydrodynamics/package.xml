@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>gz_hydrodynamics</name>
+  <version>0.0.0</version>
+  <description>
+    Gazebo's Hydrodynamics system, damping a vehicle against the water rather
+    than the ground: it reads the world's ocean current from gz_ocean_current
+    at the link's centre of mass, so every vehicle, loaded with the world or
+    spawned at run time, feels it with its Fossen coefficients unchanged. It
+    also reads a current table loaded by EnvironmentPreload on a vehicle
+    spawned after the first step, which upstream does not.
+
+    Vendored from gz-sim, a fork until upstream reads a current from the ECM;
+    see PROVENANCE.md.
+  </description>
+  <maintainer email="caguero@honurobotics.com">Carlos Agüero</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>gz_sim_vendor</depend>
+  <depend>gz_plugin_vendor</depend>
+  <depend>gz_math_vendor</depend>
+  <depend>gz_common_vendor</depend>
+  <depend>gz_transport_vendor</depend>
+  <depend>gz_msgs_vendor</depend>
+  <depend>gz_ocean_current</depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

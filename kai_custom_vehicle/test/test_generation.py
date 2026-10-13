@@ -251,7 +251,7 @@ def test_two_normalized_counter_rotating_thrusters(boat):
 
 def test_hydrodynamics_on_base_link(boat):
     """One Hydrodynamics plugin, on the link the displacement is fixed to."""
-    hydro = plugins(boat.model, 'gz-sim-hydrodynamics-system')
+    hydro = plugins(boat.model, 'gz-maritime-hydrodynamics-system')
     assert len(hydro) == 1
     assert hydro[0].find('link_name').text == 'base_link'
 

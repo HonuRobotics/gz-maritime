@@ -24,6 +24,7 @@
   <!-- The buoyancy and wind systems that read the model's marked collisions,
        and the thruster system with the normalized command. -->
   <exec_depend>gz_buoyancy</exec_depend>
+  <exec_depend>gz_hydrodynamics</exec_depend>
   <exec_depend>gz_wind</exec_depend>
   <exec_depend>gz_thruster</exec_depend>
   <exec_depend>xacro</exec_depend>
