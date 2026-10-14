@@ -3,8 +3,9 @@
 The Gazebo GUI for the maritime environment: three GUI plugins.
 `OceanCurrentPanel` and `WindPanel` each steer their field by hand or set it
 exactly, draw it on the water as flow trails or arrows coloured by speed,
-and show what each vehicle feels; the wind panel also flies wind socks.
-`ScenarioPanel` ramps both fields to named conditions and runs a demo. Planned in
+and show the water and the wind each vehicle meets; the wind panel also
+flies wind socks. `ScenarioPanel` steers both fields to named conditions
+and runs a demo. Planned in
 [MARITIME_GUI_PLAN.md](../MARITIME_GUI_PLAN.md); how to use them is in the
 docs, [Change and see the wind and the current](../docs/how-to/wind-and-current.md).
 
@@ -21,10 +22,15 @@ docs, [Change and see the wind and the current](../docs/how-to/wind-and-current.
   comma, whatever the locale: the panel parses the text itself, since Qt's
   number validator takes only the locale's separator.
 - **Steer** it by hand: drag the compass's arrow to turn the flow, slide or
-  scroll for its speed. The field ramps there, no faster than a set rate
-  (the current 0.5 m/s and 90° a second, the wind 5 m/s and 90° a second),
-  one `set` message every 100 ms, so it never jumps; only the last step is
-  tracked for the status line.
+  scroll for its speed. A rate limit on the controls: the panel sends a
+  `set` message every 100 ms of wall clock, no faster than a set rate (the
+  current 0.5 m/s and 90° a second, the wind 5 m/s and 90° a second), so the
+  drawing turns smoothly; only the last step is tracked for the status
+  line. Each message is still a step in the recipe, not a ramp in
+  simulation time, so it does not spare a vehicle with plugin added mass a
+  force spike. When the field moves to a value the panel did not send
+  (another panel, a second GUI, `gz topic`, ROS), the panel stops steering
+  and says so, so two controllers never take turns.
 - **Draw** it, sampled with the same `OceanCurrentSampler` or `WindSampler`
   the vehicles use: as flow trails, a few hundred particles drifting with
   the field in a soft disc, each leaving a trail that fades behind it, or as
@@ -32,9 +38,10 @@ docs, [Change and see the wind and the current](../docs/how-to/wind-and-current.
   white, the air indigo to yellow) up to a top speed shown on a legend. The
   current is drawn just above the water level, the wind at a height above
   the water.
-- **On the vehicles**, every model that is not static, spawned later
-  included: the water past the hull (the current less the vehicle's velocity
-  over the ground), the apparent wind (the wind 2 m up less that velocity),
+- **On the vehicles**, every model that is not static and has a link,
+  spawned later included, buoys too: the water past the hull at its origin
+  (the current there less the velocity of the model's origin over the
+  ground), the apparent wind (the wind 2 m up less that velocity),
   solid arrows crossed flat and upright so they read from any angle, and the
   track over the ground with a heading line. The GUI's ECM carries poses,
   not velocities, so the velocity is estimated from the poses
@@ -42,7 +49,7 @@ docs, [Change and see the wind and the current](../docs/how-to/wind-and-current.
 - **Wind socks** at the points a world places, striped, pointing downwind,
   drooping in light air and flying straight out from 7.7 m/s (15 knots).
 - **Scenarios**: presets (built in Calm, Tidal ebb, Fresh breeze and Squall,
-  or the configuration's own) ramped through the same steering, and a demo
+  or the configuration's own) steered to through the same steering, and a demo
   that steps through them on their dwell in simulation time.
 - Gazebo's renderer draws a line list in its material's colour and ignores
   colours given point by point, so a drawing is a set of `LINE_LIST`
@@ -73,11 +80,13 @@ It never writes into the GUI's ECM.
 | Path | What |
 |---|---|
 | `include/gz/sim/maritime_gui/Fields.hh`, `src/Fields.cc` | Reading the recipes, the `set` messages, the arrow grid and its marker, and the change tracker. |
-| `include/gz/sim/maritime_gui/Flow.hh`, `src/Flow.cc` | The colour maps, the colour bins, the flow trails (`ParticleField`) and the steering ramp (`Steering`). |
+| `include/gz/sim/maritime_gui/Flow.hh`, `src/Flow.cc` | The colour maps, the colour bins, the flow trails (`ParticleField`) and the steering, a rate limit on the controls (`Steering`). |
 | `include/gz/sim/maritime_gui/Vessels.hh`, `src/Vessels.cc` | The vehicles (`VesselTracker`), their solid arrows, tracks and headings. |
 | `include/gz/sim/maritime_gui/WindSock.hh`, `src/WindSock.cc` | The wind sock's axis and its markers. |
 | `include/gz/sim/maritime_gui/Presets.hh`, `src/Presets.cc` | The presets and the demo. |
-| `include/gz/sim/maritime_gui/FieldLink.hh`, `src/FieldLink.cc` | What both panels share: the world's name, the field's topic, the state service, steering, the drawing, the status line and number parsing. |
+| `include/gz/sim/maritime_gui/FieldSpec.hh`, `src/FieldSpec.cc` | Each field defined once: its topic name, steering rates, colours, arrow scale and trails. |
+| `include/gz/sim/maritime_gui/FieldControl.hh`, `src/FieldControl.cc` | A panel's control of a field: the world's name, the field's topic, the state service, tracking, steering, the status line and number parsing. |
+| `include/gz/sim/maritime_gui/FieldDrawing.hh`, `src/FieldDrawing.cc` | A panel's drawing of a field: arrows or trails, and the vehicles and socks beside them. |
 | `src/OceanCurrentPanel.*`, `src/WindPanel.*`, `src/ScenarioPanel.*` | The three GUI systems and their QML panels. |
 | `src/Compass.qml`, `src/Legend.qml`, `src/NumberField.qml` | The steering compass, the colour legend and the number field both panels use. |
 | `test/fields_test.cc` | gtests on the core. |
@@ -106,7 +115,7 @@ All optional, in the plugin's element of a `<gui>` block:
 | `<lifetime>` | both | 6 (current), 4 (wind) | s a particle lives, at most. |
 | `<speedup>` | both | 8 (current), 1 (wind) | The particles move this many times the flow. |
 | `<height>` | `WindPanel` | 3 | m above the water the wind is drawn at. |
-| `<on_vehicles>` | both | false | Draw what each vehicle feels. |
+| `<on_vehicles>` | both | false | Draw the water or the wind each vehicle meets at its origin. |
 | `<wind_sock>x y z</wind_sock>` | `WindPanel` | none | A wind sock's pole foot; repeat it. |
 | `<sock_height>` | `WindPanel` | 3 | m, the poles' height. |
 | `<show_socks>` | `WindPanel` | true | Fly the wind socks. |

@@ -34,7 +34,9 @@
 
 #include <QColor>
 
-#include "gz/sim/maritime_gui/FieldLink.hh"
+#include "gz/sim/maritime_gui/FieldControl.hh"
+#include "gz/sim/maritime_gui/FieldDrawing.hh"
+#include "gz/sim/maritime_gui/FieldSpec.hh"
 #include "gz/sim/maritime_gui/Flow.hh"
 #include "gz/sim/maritime_gui/Vessels.hh"
 #include "gz/sim/maritime_gui/WindSock.hh"
@@ -54,24 +56,11 @@ namespace
 
 class gz::sim::maritime_gui::WindPanelPrivate
 {
-  /// \brief The link to the world: topic, state service, drawing,
-  /// steering. Air colours up to 20 m/s; arrows of 0.3 m per m/s, so a
-  /// 10 m/s wind is 3 m, within the default 5 m spacing; trails at the
-  /// wind's own speed; steering at 5 m/s and 90 degrees a second.
-  public: FieldLink link{"wind", "WindPanel", Colormap::Air(20.0), 0.3,
-                         TrailDefaults(), Steering(5.0, 90.0)};
+  /// \brief The control of the field: topic, state service, steering.
+  public: FieldControl control{WindSpec(), "WindPanel"};
 
-  /// \brief The trails' defaults for the wind.
-  /// \return The settings.
-  public: static ParticleField::Settings TrailDefaults()
-  {
-    ParticleField::Settings s;
-    s.count = 400;
-    s.trailLength = 8;
-    s.lifetime = 4.0;
-    s.speedup = 1.0;
-    return s;
-  }
+  /// \brief The drawing of the field.
+  public: FieldDrawing drawing{WindSpec(), "WindPanel"};
 
   /// \brief The wind as last read, if the world has one.
   public: std::optional<WindValues> wind;
@@ -84,6 +73,9 @@ class gz::sim::maritime_gui::WindPanelPrivate
 
   /// \brief Whether steering was under way at the last update.
   public: bool steering{false};
+
+  /// \brief Whether steering stopped short at the last update.
+  public: bool yielded{false};
 
   /// \brief A field that is not a number, reported until the next Apply.
   public: std::string invalid;
@@ -126,7 +118,7 @@ void WindPanel::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
 {
   if (this->title.empty())
     this->title = "Wind";
-  this->dataPtr->link.LoadConfig(_pluginElem);
+  this->dataPtr->drawing.LoadConfig(_pluginElem);
   auto &d = *this->dataPtr;
   if (_pluginElem)
   {
@@ -164,10 +156,10 @@ void WindPanel::Update(const UpdateInfo &_info,
     EntityComponentManager &_ecm)
 {
   auto &d = *this->dataPtr;
-  d.link.Update(_ecm);
+  d.control.Update(_ecm);
 
   const bool inGui = ReadWind(_ecm).has_value();
-  const auto &source = d.link.Source(_ecm, inGui);
+  const auto &source = d.control.Source(_ecm, inGui);
   const auto wind = ReadWind(source);
 
   if (wind)
@@ -175,21 +167,24 @@ void WindPanel::Update(const UpdateInfo &_info,
     if (!d.wind || d.wind->generation != wind->generation)
     {
       if (!d.wind)
-        d.link.LogSource("wind", inGui, wind->generation);
+        d.control.LogSource("wind", inGui, wind->generation);
       d.wind = wind;
       emit this->WindChanged();
     }
-    const auto state = d.link.Track(wind->generation);
+    const auto state = d.control.Track(wind->generation);
     if (state != d.state)
     {
       d.state = state;
       emit this->StatusChanged();
     }
     d.sampler.Sync(source);
-    d.link.StepSteering(d.wind->speed, d.wind->direction, d.wind->generation);
-    if (d.link.IsSteering() != d.steering)
+    d.control.StepSteering(d.wind->speed, d.wind->direction,
+                           d.wind->generation);
+    if (d.control.IsSteering() != d.steering ||
+        d.control.Yielded() != d.yielded)
     {
-      d.steering = d.link.IsSteering();
+      d.steering = d.control.IsSteering();
+      d.yielded = d.control.Yielded();
       emit this->StatusChanged();
     }
   }
@@ -201,7 +196,7 @@ void WindPanel::Update(const UpdateInfo &_info,
 
   // Sampled where it is drawn, so the profile with height shows.
   const double level = d.wind ? d.wind->waterLevel : 0.0;
-  d.link.Draw(d.wind.has_value() && d.sampler.Valid(),
+  d.drawing.Draw(d.wind.has_value() && d.sampler.Valid(),
       d.wind ? d.wind->generation : 0u, d.sampler.TimeVarying(),
       level + d.height,
       [&](const math::Vector3d &_p)
@@ -214,9 +209,9 @@ void WindPanel::Update(const UpdateInfo &_info,
   // simulation time; they move with the gusts.
   const bool windy = d.wind.has_value() && d.sampler.Valid();
   if (!windy || !d.onVehicles)
-    d.link.ClearExtra("vessels");
+    d.drawing.ClearExtra("vessels");
   if (!windy || !d.showSocks)
-    d.link.ClearExtra("socks");
+    d.drawing.ClearExtra("socks");
   if (!windy || (!d.onVehicles && (!d.showSocks || d.socks.empty())))
   {
     d.extrasDrawn.reset();
@@ -235,7 +230,7 @@ void WindPanel::Update(const UpdateInfo &_info,
   if (d.onVehicles)
   {
     // The apparent wind, 2 m above the vehicle, where a sailor feels it.
-    d.link.DrawExtra("vessels", VesselArrows(d.vessels.Vessels(),
+    d.drawing.DrawExtra("vessels", VesselArrows(d.vessels.Vessels(),
         [&](const Vessel &_v)
         {
           math::Vector3d rel = d.sampler.At(
@@ -243,7 +238,7 @@ void WindPanel::Update(const UpdateInfo &_info,
               _v.velocity;
           rel.Z(0.0);
           return rel;
-        }, 2.0, kVesselWindScale, 0.35, d.link.Colors()).Markers("", 1));
+        }, 2.0, kVesselWindScale, 0.35, d.drawing.Colors()).Markers("", 1));
   }
   if (d.showSocks && !d.socks.empty())
   {
@@ -260,7 +255,7 @@ void WindPanel::Update(const UpdateInfo &_info,
         markers.push_back(std::move(m));
       }
     }
-    d.link.DrawExtra("socks", std::move(markers));
+    d.drawing.DrawExtra("socks", std::move(markers));
   }
 }
 
@@ -289,8 +284,8 @@ void WindPanel::Apply(const QVariantMap &_edits)
     emit this->StatusChanged();
     return;
   }
-  d.link.Send(msg, d.wind->generation);
-  d.state = d.link.Track(d.wind->generation);
+  d.control.Send(msg, d.wind->generation);
+  d.state = d.control.Track(d.wind->generation);
   emit this->StatusChanged();
 }
 
@@ -299,7 +294,7 @@ void WindPanel::SetExtent(const QString &_text)
 {
   double value{0.0};
   if (ParseNumber(_text.toStdString(), value) &&
-      this->dataPtr->link.SetExtent(value))
+      this->dataPtr->drawing.SetExtent(value))
   {
     emit this->ArrowsChanged();
   }
@@ -310,7 +305,7 @@ void WindPanel::SetSpacing(const QString &_text)
 {
   double value{0.0};
   if (ParseNumber(_text.toStdString(), value) &&
-      this->dataPtr->link.SetSpacing(value))
+      this->dataPtr->drawing.SetSpacing(value))
   {
     emit this->ArrowsChanged();
   }
@@ -323,7 +318,7 @@ void WindPanel::SetHeight(const QString &_text)
   if (ParseNumber(_text.toStdString(), value))
   {
     this->dataPtr->height = value;
-    this->dataPtr->link.Redraw();
+    this->dataPtr->drawing.Redraw();
     emit this->ArrowsChanged();
   }
 }
@@ -354,6 +349,8 @@ QString WindPanel::Status() const
   const auto &d = *this->dataPtr;
   if (d.steering)
     return "Steering...";
+  if (d.yielded)
+    return QString::fromStdString(YieldedText());
   if (!d.invalid.empty())
   {
     return QString::fromStdString("Not sent: " + d.invalid +
@@ -366,7 +363,7 @@ QString WindPanel::Status() const
 QString WindPanel::CurrentDisplay() const
 {
   return QString::fromStdString(
-      DisplayName(this->dataPtr->link.CurrentDisplay()));
+      DisplayName(this->dataPtr->drawing.CurrentDisplay()));
 }
 
 //////////////////////////////////////////////////
@@ -375,7 +372,7 @@ void WindPanel::SetDisplay(const QString &_display)
   Display display{Display::kOff};
   if (ParseDisplay(_display.toStdString(), display))
   {
-    this->dataPtr->link.SetDisplay(display);
+    this->dataPtr->drawing.SetDisplay(display);
     emit this->ArrowsChanged();
   }
 }
@@ -383,7 +380,7 @@ void WindPanel::SetDisplay(const QString &_display)
 //////////////////////////////////////////////////
 double WindPanel::MaxSpeed() const
 {
-  return this->dataPtr->link.Colors().MaxSpeed();
+  return this->dataPtr->drawing.Colors().MaxSpeed();
 }
 
 //////////////////////////////////////////////////
@@ -391,7 +388,7 @@ void WindPanel::SetMaxSpeed(const QString &_text)
 {
   double value{0.0};
   if (ParseNumber(_text.toStdString(), value) &&
-      this->dataPtr->link.SetMaxSpeed(value))
+      this->dataPtr->drawing.SetMaxSpeed(value))
   {
     emit this->ArrowsChanged();
   }
@@ -401,7 +398,7 @@ void WindPanel::SetMaxSpeed(const QString &_text)
 QStringList WindPanel::Legend() const
 {
   QStringList out;
-  for (const auto &c : this->dataPtr->link.Colors().Stops())
+  for (const auto &c : this->dataPtr->drawing.Colors().Stops())
     out << QColor::fromRgbF(c.R(), c.G(), c.B()).name();
   return out;
 }
@@ -412,7 +409,7 @@ void WindPanel::SteerFlow(double _speed, double _flowHeading)
   if (!std::isfinite(_speed) || !std::isfinite(_flowHeading))
     return;
   this->dataPtr->invalid.clear();
-  this->dataPtr->link.Steer(_speed, _flowHeading + 180.0);
+  this->dataPtr->control.Steer(_speed, _flowHeading + 180.0);
   this->dataPtr->steering = true;
   emit this->StatusChanged();
 }
@@ -420,13 +417,13 @@ void WindPanel::SteerFlow(double _speed, double _flowHeading)
 //////////////////////////////////////////////////
 double WindPanel::Extent() const
 {
-  return this->dataPtr->link.ArrowGrid().extent;
+  return this->dataPtr->drawing.ArrowGrid().extent;
 }
 
 //////////////////////////////////////////////////
 double WindPanel::Spacing() const
 {
-  return this->dataPtr->link.ArrowGrid().spacing;
+  return this->dataPtr->drawing.ArrowGrid().spacing;
 }
 
 //////////////////////////////////////////////////
@@ -438,7 +435,7 @@ double WindPanel::Height() const
 //////////////////////////////////////////////////
 double WindPanel::Scale() const
 {
-  return this->dataPtr->link.Scale();
+  return this->dataPtr->drawing.Scale();
 }
 
 //////////////////////////////////////////////////

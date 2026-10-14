@@ -33,9 +33,12 @@
 
 #include "gz/sim/maritime_gui/Flow.hh"
 
-/// \brief What each vehicle feels, without Qt: the vehicles found in the
-/// GUI's ECM, their velocity over the ground and their track, and the
-/// drawings of the water and the wind relative to each.
+/// \brief The water and the wind each vehicle meets, without Qt: the
+/// vehicles found in the GUI's ECM (every non-static model with a link,
+/// buoys included), the velocity of each model's origin over the ground
+/// from its poses, its track, and the drawings of the water and the wind
+/// relative to it at its origin. A picture, not the forces: those act at
+/// the centre of mass or on each marked shape.
 namespace gz::sim::maritime_gui
 {
 /// \brief One vehicle as the GUI sees it.

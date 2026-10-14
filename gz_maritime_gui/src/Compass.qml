@@ -20,7 +20,7 @@ import QtQuick
 // the water goes, whatever convention the numbers beside it follow. Drag the
 // arrow to turn the flow, and turn the mouse wheel over it to change the
 // speed; it emits steered() and shows the dragged heading until released,
-// then follows the world again as the field ramps there.
+// then follows the world again as the field steps there.
 Item {
   id: compass
   // Degrees clockwise from north the flow goes towards, from the world.

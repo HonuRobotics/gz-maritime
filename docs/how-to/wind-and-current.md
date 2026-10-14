@@ -4,8 +4,8 @@ Every world here docks three panels on the right of the Gazebo GUI,
 **Ocean current**, **Wind** and **Scenarios**. The first two show their
 field as the world has it now, let you steer it by hand or set it exactly,
 draw it on the water as flow trails or arrows coloured by speed, and show
-what each vehicle feels; the wind panel also flies wind socks. The third
-ramps both fields to named conditions and runs a demo. They need no ROS:
+the water and the wind each vehicle meets; the wind panel also flies wind
+socks. The third steers both fields to named conditions and runs a demo. They need no ROS:
 they work the same with `gz sim` on its own and with every launch.
 
 ```{figure} images/wind-and-current.jpg
@@ -24,11 +24,14 @@ water goes, whatever convention the numbers follow:
 - **move the slider**, or turn the mouse wheel over the compass, for its
   speed.
 
-The field does not jump: it ramps to where you point, the direction the
-short way round, the current at 0.5 m/s and 90° a second, the wind at 5 m/s
-and 90° a second. The trails, the vehicles and the numbers under the compass
-follow it as it turns. A jump in the current would be a force spike for a
-vehicle whose hydrodynamics carries added mass; a ramp is not.
+The panel steers the field to where you point in small steps, the direction
+the short way round, no faster than the current at 0.5 m/s and 90° a
+second, the wind at 5 m/s and 90° a second of wall clock, so the trails,
+the vehicles and the numbers under the compass turn smoothly. Each step is
+still a step for the server: it is not a ramp of the field in simulation
+time, and steps sent while the world is paused all land when it runs again.
+If something else changes the field while a panel steers it (another
+panel, a second GUI, `gz topic` or ROS), the panel stops and says so.
 
 ## Set them exactly
 
@@ -53,7 +56,8 @@ says which:
 
 | Status | Meaning |
 |---|---|
-| Steering... | The field is ramping to where the compass points. |
+| Steering... | The panel is stepping the field to where the compass points. |
+| Stopped steering | Something else changed the field while the panel steered it: another panel, a second GUI, `gz topic` or ROS. The panel left it there. |
 | Applied. | The world took the change. |
 | Not applied | The world kept its values: a value out of range, or refused by the model. The server's log says why. |
 | Not sent: ... is not a number | A field holds something that is not a number; nothing was sent. |
@@ -90,13 +94,15 @@ the water, 3 m by default, and sampled at that height, so the profile with
 height shows. Change the area's side, the arrows' spacing and the wind's
 height in the panel.
 
-## What each vehicle feels
+## What each vehicle meets
 
 Tick **On the vehicles** in a panel to draw, on every vehicle (every model
-that is not static), what it feels:
+that is not static and has a link, so a floating buoy counts too), the water
+and the wind at its origin:
 
-- **Ocean current:** the water flowing past its hull, a solid arrow 1 m above
-  it: the current less the vehicle's velocity over the ground. A boat
+- **Ocean current:** the water flowing past its hull at its origin, a solid
+  arrow 1 m above it: the current there less the vehicle's velocity over
+  the ground. A boat
   drifting with the current has none; a moored one, or one holding station,
   shows the whole current. Also its track over the ground, fading over the
   last 30 s, and a line along its heading, so a boat crabbing in a current
@@ -107,7 +113,9 @@ that is not static), what it feels:
 The arrows are coloured by speed like the field, and drawn twice, flat and
 upright, so they read from above and from a camera low over the water. The
 GUI only sees the vehicles' poses, so their velocity is estimated from how
-those change.
+those change. The arrows are a picture, not the forces: the hydrodynamics
+asks the current at the centre of mass, marked shapes at the centre of
+each wet part, and the windage at each marked shape.
 
 ```{figure} images/what-the-boat-feels.jpg
 :alt: A drifting box and a moored box on the water; the moored one carries a white arrow for the current flowing past it and a magenta arrow for the apparent wind, the drifting one only a magenta arrow and a white track behind it; a striped orange and white wind sock flies on the landing pad
@@ -127,7 +135,7 @@ it flies. **Wind socks** in the wind panel turns them off.
 
 ## Scenarios and the demo
 
-The **Scenarios** panel ramps both fields to named conditions in one click,
+The **Scenarios** panel steers both fields to named conditions in one click,
 through the same steering as the compasses:
 
 | Preset | Current | Wind |

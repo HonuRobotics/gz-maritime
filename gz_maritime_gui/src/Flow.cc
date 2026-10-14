@@ -41,13 +41,28 @@ namespace
   /// fade to nothing rather than to the darkest bin.
   constexpr double kInvisible{0.08};
 
+  /// \brief A colour from channels computed in float, each put back in
+  /// [0, 1] first: math::Color clamps too, but prints "Color values were
+  /// clamped" on every call, and an interpolation that lands on a stop can
+  /// round a hair past it.
+  /// \param[in] _r Red.
+  /// \param[in] _g Green.
+  /// \param[in] _b Blue.
+  /// \param[in] _a Alpha.
+  /// \return The colour.
+  math::Color Unit(float _r, float _g, float _b, float _a)
+  {
+    return math::Color(std::clamp(_r, 0.0f, 1.0f), std::clamp(_g, 0.0f, 1.0f),
+                       std::clamp(_b, 0.0f, 1.0f), std::clamp(_a, 0.0f, 1.0f));
+  }
+
   /// \brief A colour scaled towards black, alpha kept.
   /// \param[in] _c The colour.
   /// \param[in] _k The scale, 0 to 1.
   /// \return The scaled colour.
   math::Color Dim(const math::Color &_c, float _k)
   {
-    return math::Color(_c.R() * _k, _c.G() * _k, _c.B() * _k, _c.A());
+    return Unit(_c.R() * _k, _c.G() * _k, _c.B() * _k, _c.A());
   }
 
   /// \brief Wrap degrees into (-180, 180].
@@ -82,10 +97,10 @@ math::Color Colormap::At(double _speed) const
   const float f = static_cast<float>(t - static_cast<double>(i));
   const math::Color &a = this->stops[i];
   const math::Color &b = this->stops[i + 1];
-  return math::Color(a.R() + (b.R() - a.R()) * f,
-                     a.G() + (b.G() - a.G()) * f,
-                     a.B() + (b.B() - a.B()) * f,
-                     a.A() + (b.A() - a.A()) * f);
+  return Unit(a.R() + (b.R() - a.R()) * f,
+              a.G() + (b.G() - a.G()) * f,
+              a.B() + (b.B() - a.B()) * f,
+              a.A() + (b.A() - a.A()) * f);
 }
 
 //////////////////////////////////////////////////
@@ -417,6 +432,7 @@ void Steering::SetTarget(double _speed, double _direction)
     d += 360.0;
   this->target = std::make_pair(std::max(0.0, _speed), d);
   this->arrived = false;
+  this->yielded = false;
 }
 
 //////////////////////////////////////////////////
@@ -432,11 +448,51 @@ bool Steering::Arrived() const
 }
 
 //////////////////////////////////////////////////
+bool Steering::Yielded() const
+{
+  return this->yielded;
+}
+
+//////////////////////////////////////////////////
+void Steering::Stop()
+{
+  this->target.reset();
+  this->commanded.reset();
+  this->lastStep.reset();
+  this->sent.clear();
+  this->landed = false;
+}
+
+//////////////////////////////////////////////////
 std::optional<msgs::Param> Steering::Step(double _speed, double _direction,
     Clock::time_point _now)
 {
   if (!this->target)
     return std::nullopt;
+
+  // Whose value is the recipe's? Until one of ours lands, the recipe may
+  // still show another controller's ramp, which ours is taking over; once
+  // one has, anything else is someone moving the field after us.
+  if (this->commanded)
+  {
+    const bool ours = std::any_of(this->sent.begin(), this->sent.end(),
+        [&](const std::pair<double, double> &_v)
+        {
+          return std::abs(_v.first - _speed) < 1e-6 &&
+                 std::abs(Wrap180(_v.second - _direction)) < 1e-6;
+        });
+    if (ours)
+    {
+      this->landed = true;
+    }
+    else if (this->landed)
+    {
+      this->Stop();
+      this->yielded = true;
+      return std::nullopt;
+    }
+  }
+
   if (this->lastStep && _now - *this->lastStep < this->period)
     return std::nullopt;
 
@@ -464,6 +520,7 @@ std::optional<msgs::Param> Steering::Step(double _speed, double _direction,
 
   this->lastStep = _now;
   this->arrived = speed == toSpeed && direction == toDirection;
+  this->sent.emplace_back(speed, direction);
 
   msgs::Param msg;
   auto &s = (*msg.mutable_params())["speed"];
@@ -476,9 +533,7 @@ std::optional<msgs::Param> Steering::Step(double _speed, double _direction,
   if (this->arrived)
   {
     // Done; the next target starts again from the world's values.
-    this->target.reset();
-    this->commanded.reset();
-    this->lastStep.reset();
+    this->Stop();
   }
   return msg;
 }

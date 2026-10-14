@@ -26,13 +26,11 @@ the boat drift along them. Turn the current north from the panel, and the
 current arrows and the boat follow. A world that does not load the wind or
 the current system shows that part of the panel disabled.
 
-The work lands in three pull requests:
-
-1. **The panel** (§1, §2): the package, the plugin, reading the recipes and
-   changing them.
-2. **The arrows** (§3): the wind and the current drawn as markers.
-3. **Worlds and documentation** (§4): the plugin in every world's `<gui>`, the
-   docs, and the Blue Robotics worlds in `bluerobotics_models`.
+The work was planned as three pull requests (the panel, §1 and §2; the
+arrows, §3; worlds and documentation, §4) and landed as one, with §5 and
+§6, once the panels had to be tried together to be judged. The Blue
+Robotics worlds in `bluerobotics_models` are still to come, in that
+repository.
 
 ## 0. Before the first pull request: prove the recipes reach the GUI
 
@@ -80,10 +78,12 @@ never writes into the GUI's ECM.
   system packages' `GZ_SIM_SYSTEM_PLUGIN_PATH` one;
 - a plain C++ library, `gz_maritime_gui_core`, with no Qt: reading the
   recipes, building `set` messages, sampling the grid and building the
-  markers (`Fields`), and what both panels share, the world's name, the
-  field's topic, the state service, the arrows and number parsing
-  (`FieldLink`). Each plugin is a thin layer over it, and the gtests cover
-  it;
+  markers (`Fields`), each field's rates, colours and scales defined once
+  (`FieldSpec`), and what the panels share, split in two: the control of a
+  field, the world's name, the field's topic, the state service, tracking,
+  steering and number parsing (`FieldControl`), and its drawing, the arrows
+  and the trails (`FieldDrawing`). Each plugin is a thin layer over them,
+  and the gtests cover them;
 - dependencies: `gz_sim_vendor` (component `gui`), `gz_gui_vendor`,
   `gz_transport_vendor`, `gz_msgs_vendor`, `gz_wind`, `gz_ocean_current`, Qt 6
   through gz-gui.
@@ -205,11 +205,17 @@ a field means typing numbers in its convention and pressing Apply.
   orange to yellow, up to a top speed set in the panel and shown on a
   legend. Distinct maps keep the two fields apart where they overlap.
 - **Steering by hand** (`Steering`): drag the compass's arrow to turn the
-  flow, slide or scroll for its speed. The field ramps towards the target no
-  faster than a rate (the current 0.5 m/s and 90° a second, the wind 5 m/s
-  and 90° a second), the direction the short way round, one `set` message
-  every 100 ms; only the last is tracked for the status line. A ramp also
-  spares a vehicle with plugin added mass the force spike of a step.
+  flow, slide or scroll for its speed. A rate limit on the controls, so the
+  arrows and the trails turn smoothly: the panel steps the field towards
+  the target no faster than a rate (the current 0.5 m/s and 90° a second,
+  the wind 5 m/s and 90° a second, `FieldSpec`), the direction the short
+  way round, one `set` message every 100 ms of wall clock; only the last is
+  tracked for the status line. Each message is still a step for the server,
+  so it does not spare a vehicle with plugin added mass a force spike; a
+  ramp of the field itself belongs in the server (below). Steering stops
+  when the field moves to a value it did not send, once one of its own has
+  landed, so two controllers (two panels, two GUIs, a panel and `gz topic`)
+  never take turns, and the last to start wins.
 
 **Found on the way.** Gazebo's renderer draws a line list in its material's
 colour and ignores the colours given point by point (`MarkerManager` passes
@@ -229,7 +235,8 @@ points per field, the markers keep up under a software renderer.
   vehicle, spawned later included. The GUI's ECM carries poses, not
   velocities, so its velocity over the ground is estimated from its poses
   over at least 0.1 s of simulation time, smoothed. The current panel draws
-  the water past each hull (the current less that velocity) 1 m above it,
+  the water past each hull at its origin (the current there less that
+  velocity) 1 m above it,
   and its track and heading; the wind panel draws its apparent wind (the
   wind 2 m up less that velocity) 2 m above it. The arrows are solid
   triangles, crossed flat and upright, since a flat arrow is a sliver from a
@@ -239,7 +246,7 @@ points per field, the markers keep up under a software renderer.
   straight out from 7.7 m/s (15 knots), sampled where they fly, ten times a
   second of simulation time. `open_water.sdf` flies one on the landing pad.
 - **Scenarios** (`ScenarioPanel`, `Presets`, `Demo`): a third panel with a
-  button per preset, ramping both fields there through `Steering` (the
+  button per preset, steering both fields there through `Steering` (the
   gusts set at once), and a demo stepping through them on their dwell in
   simulation time.
 
@@ -254,4 +261,8 @@ its dwell.
 A RViz view (later, the same arrows forwarded to ROS), editing a model's
 `<parameters>`, presets saved to a file, a probe that reads the field at a
 clicked point, the anemometer's reading in the panel, the waves' controls, and
-a ramp between two values (a change on a `set` topic is a step).
+a ramp between two values in the server: a change on a `set` topic is a
+step, and the panels' steering only limits the rate of their controls. A
+real ramp is its own pull request: the system interpolates the recipe every
+step, in simulation time, towards a target, so every client, `gz topic`,
+ROS and the panels, gets it.

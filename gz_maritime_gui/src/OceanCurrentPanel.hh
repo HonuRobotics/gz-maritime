@@ -41,7 +41,8 @@ namespace gz::sim::maritime_gui
   /// decimal point or a decimal comma, whatever the locale.
   ///
   /// The compass steers it by hand: drag the arrow to turn the flow, move
-  /// the slider for its speed, and the field ramps there in small steps.
+  /// the slider for its speed, and the panel steps the field there, rate
+  /// limited, stopping if something else moves the field.
   ///
   /// It draws the current as a grid of blue arrows just above the water,
   /// sampled from the recipe with OceanCurrentSampler, as a LINE_LIST marker

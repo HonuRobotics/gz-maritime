@@ -31,7 +31,9 @@
 
 #include <QColor>
 
-#include "gz/sim/maritime_gui/FieldLink.hh"
+#include "gz/sim/maritime_gui/FieldControl.hh"
+#include "gz/sim/maritime_gui/FieldDrawing.hh"
+#include "gz/sim/maritime_gui/FieldSpec.hh"
 #include "gz/sim/maritime_gui/Flow.hh"
 #include "gz/sim/maritime_gui/Vessels.hh"
 #include "gz/sim/maritime_gui/Fields.hh"
@@ -50,25 +52,11 @@ namespace
 
 class gz::sim::maritime_gui::OceanCurrentPanelPrivate
 {
-  /// \brief The link to the world: topic, state service, drawing,
-  /// steering. Water colours up to 1 m/s; arrows of 4 m per m/s, so a
-  /// 0.5 m/s current is 2 m; trails sped up eight times, so a slow current
-  /// still visibly flows; steering at 0.5 m/s and 90 degrees a second.
-  public: FieldLink link{"ocean_current", "OceanCurrentPanel",
-                         Colormap::Water(1.0), 4.0,
-                         TrailDefaults(), Steering(0.5, 90.0)};
+  /// \brief The control of the field: topic, state service, steering.
+  public: FieldControl control{OceanCurrentSpec(), "OceanCurrentPanel"};
 
-  /// \brief The trails' defaults for the current.
-  /// \return The settings.
-  public: static ParticleField::Settings TrailDefaults()
-  {
-    ParticleField::Settings s;
-    s.count = 400;
-    s.trailLength = 8;
-    s.lifetime = 6.0;
-    s.speedup = 8.0;
-    return s;
-  }
+  /// \brief The drawing of the field.
+  public: FieldDrawing drawing{OceanCurrentSpec(), "OceanCurrentPanel"};
 
   /// \brief The current as last read, if the world has one.
   public: std::optional<CurrentValues> current;
@@ -78,6 +66,9 @@ class gz::sim::maritime_gui::OceanCurrentPanelPrivate
 
   /// \brief Whether steering was under way at the last update.
   public: bool steering{false};
+
+  /// \brief Whether steering stopped short at the last update.
+  public: bool yielded{false};
 
   /// \brief A field that is not a number, reported until the next Apply.
   public: std::string invalid;
@@ -109,7 +100,7 @@ void OceanCurrentPanel::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
 {
   if (this->title.empty())
     this->title = "Ocean current";
-  this->dataPtr->link.LoadConfig(_pluginElem);
+  this->dataPtr->drawing.LoadConfig(_pluginElem);
   if (_pluginElem)
   {
     if (const auto *elem = _pluginElem->FirstChildElement("on_vehicles"))
@@ -124,10 +115,10 @@ void OceanCurrentPanel::Update(const UpdateInfo &_info,
     EntityComponentManager &_ecm)
 {
   auto &d = *this->dataPtr;
-  d.link.Update(_ecm);
+  d.control.Update(_ecm);
 
   const bool inGui = ReadCurrent(_ecm).has_value();
-  const auto &source = d.link.Source(_ecm, inGui);
+  const auto &source = d.control.Source(_ecm, inGui);
   const auto current = ReadCurrent(source);
 
   if (current)
@@ -135,22 +126,24 @@ void OceanCurrentPanel::Update(const UpdateInfo &_info,
     if (!d.current || d.current->generation != current->generation)
     {
       if (!d.current)
-        d.link.LogSource("ocean current", inGui, current->generation);
+        d.control.LogSource("ocean current", inGui, current->generation);
       d.current = current;
       emit this->CurrentChanged();
     }
-    const auto state = d.link.Track(current->generation);
+    const auto state = d.control.Track(current->generation);
     if (state != d.state)
     {
       d.state = state;
       emit this->StatusChanged();
     }
     d.sampler.Sync(source);
-    d.link.StepSteering(d.current->speed, d.current->direction,
+    d.control.StepSteering(d.current->speed, d.current->direction,
                         d.current->generation);
-    if (d.link.IsSteering() != d.steering)
+    if (d.control.IsSteering() != d.steering ||
+        d.control.Yielded() != d.yielded)
     {
-      d.steering = d.link.IsSteering();
+      d.steering = d.control.IsSteering();
+      d.yielded = d.control.Yielded();
       emit this->StatusChanged();
     }
   }
@@ -162,7 +155,7 @@ void OceanCurrentPanel::Update(const UpdateInfo &_info,
 
   // Sampled at the water's surface, drawn just above it.
   const double level = d.current ? d.current->waterLevel : 0.0;
-  d.link.Draw(d.current.has_value() && d.sampler.Valid(),
+  d.drawing.Draw(d.current.has_value() && d.sampler.Valid(),
       d.current ? d.current->generation : 0u, d.sampler.TimeVarying(),
       level + kAboveWater,
       [&](const math::Vector3d &_p)
@@ -175,7 +168,7 @@ void OceanCurrentPanel::Update(const UpdateInfo &_info,
   // ten times a second of simulation time.
   if (!d.onVehicles || !d.current || !d.sampler.Valid())
   {
-    d.link.ClearExtra("vessels");
+    d.drawing.ClearExtra("vessels");
     d.vesselsDrawn.reset();
     return;
   }
@@ -195,10 +188,10 @@ void OceanCurrentPanel::Update(const UpdateInfo &_info,
             _v.velocity;
         rel.Z(0.0);
         return rel;
-      }, 1.0, d.link.Scale(), 0.25, d.link.Colors()).Markers("", 1);
+      }, 1.0, d.drawing.Scale(), 0.25, d.drawing.Colors()).Markers("", 1);
   for (auto &m : TracksAndHeadings(vessels, level + 0.12, 3.0).Markers("", 101))
     markers.push_back(std::move(m));
-  d.link.DrawExtra("vessels", std::move(markers));
+  d.drawing.DrawExtra("vessels", std::move(markers));
 }
 
 //////////////////////////////////////////////////
@@ -226,8 +219,8 @@ void OceanCurrentPanel::Apply(const QVariantMap &_edits)
     emit this->StatusChanged();
     return;
   }
-  d.link.Send(msg, d.current->generation);
-  d.state = d.link.Track(d.current->generation);
+  d.control.Send(msg, d.current->generation);
+  d.state = d.control.Track(d.current->generation);
   emit this->StatusChanged();
 }
 
@@ -236,7 +229,7 @@ void OceanCurrentPanel::SetExtent(const QString &_text)
 {
   double value{0.0};
   if (ParseNumber(_text.toStdString(), value) &&
-      this->dataPtr->link.SetExtent(value))
+      this->dataPtr->drawing.SetExtent(value))
   {
     emit this->ArrowsChanged();
   }
@@ -247,7 +240,7 @@ void OceanCurrentPanel::SetSpacing(const QString &_text)
 {
   double value{0.0};
   if (ParseNumber(_text.toStdString(), value) &&
-      this->dataPtr->link.SetSpacing(value))
+      this->dataPtr->drawing.SetSpacing(value))
   {
     emit this->ArrowsChanged();
   }
@@ -279,6 +272,8 @@ QString OceanCurrentPanel::Status() const
   const auto &d = *this->dataPtr;
   if (d.steering)
     return "Steering...";
+  if (d.yielded)
+    return QString::fromStdString(YieldedText());
   if (!d.invalid.empty())
   {
     return QString::fromStdString("Not sent: " + d.invalid +
@@ -291,7 +286,7 @@ QString OceanCurrentPanel::Status() const
 QString OceanCurrentPanel::CurrentDisplay() const
 {
   return QString::fromStdString(
-      DisplayName(this->dataPtr->link.CurrentDisplay()));
+      DisplayName(this->dataPtr->drawing.CurrentDisplay()));
 }
 
 //////////////////////////////////////////////////
@@ -300,7 +295,7 @@ void OceanCurrentPanel::SetDisplay(const QString &_display)
   Display display{Display::kOff};
   if (ParseDisplay(_display.toStdString(), display))
   {
-    this->dataPtr->link.SetDisplay(display);
+    this->dataPtr->drawing.SetDisplay(display);
     emit this->ArrowsChanged();
   }
 }
@@ -308,7 +303,7 @@ void OceanCurrentPanel::SetDisplay(const QString &_display)
 //////////////////////////////////////////////////
 double OceanCurrentPanel::MaxSpeed() const
 {
-  return this->dataPtr->link.Colors().MaxSpeed();
+  return this->dataPtr->drawing.Colors().MaxSpeed();
 }
 
 //////////////////////////////////////////////////
@@ -316,7 +311,7 @@ void OceanCurrentPanel::SetMaxSpeed(const QString &_text)
 {
   double value{0.0};
   if (ParseNumber(_text.toStdString(), value) &&
-      this->dataPtr->link.SetMaxSpeed(value))
+      this->dataPtr->drawing.SetMaxSpeed(value))
   {
     emit this->ArrowsChanged();
   }
@@ -326,7 +321,7 @@ void OceanCurrentPanel::SetMaxSpeed(const QString &_text)
 QStringList OceanCurrentPanel::Legend() const
 {
   QStringList out;
-  for (const auto &c : this->dataPtr->link.Colors().Stops())
+  for (const auto &c : this->dataPtr->drawing.Colors().Stops())
     out << QColor::fromRgbF(c.R(), c.G(), c.B()).name();
   return out;
 }
@@ -337,7 +332,7 @@ void OceanCurrentPanel::SteerFlow(double _speed, double _flowHeading)
   if (!std::isfinite(_speed) || !std::isfinite(_flowHeading))
     return;
   this->dataPtr->invalid.clear();
-  this->dataPtr->link.Steer(_speed, _flowHeading);
+  this->dataPtr->control.Steer(_speed, _flowHeading);
   this->dataPtr->steering = true;
   emit this->StatusChanged();
 }
@@ -345,19 +340,19 @@ void OceanCurrentPanel::SteerFlow(double _speed, double _flowHeading)
 //////////////////////////////////////////////////
 double OceanCurrentPanel::Extent() const
 {
-  return this->dataPtr->link.ArrowGrid().extent;
+  return this->dataPtr->drawing.ArrowGrid().extent;
 }
 
 //////////////////////////////////////////////////
 double OceanCurrentPanel::Spacing() const
 {
-  return this->dataPtr->link.ArrowGrid().spacing;
+  return this->dataPtr->drawing.ArrowGrid().spacing;
 }
 
 //////////////////////////////////////////////////
 double OceanCurrentPanel::Scale() const
 {
-  return this->dataPtr->link.Scale();
+  return this->dataPtr->drawing.Scale();
 }
 
 //////////////////////////////////////////////////

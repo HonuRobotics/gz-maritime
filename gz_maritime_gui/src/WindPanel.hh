@@ -41,7 +41,8 @@ namespace gz::sim::maritime_gui
   /// point or a decimal comma, whatever the locale.
   ///
   /// The compass steers it by hand: drag the arrow to turn the flow, move
-  /// the slider for its speed, and the field ramps there in small steps.
+  /// the slider for its speed, and the panel steps the field there, rate
+  /// limited, stopping if something else moves the field.
   ///
   /// It draws the wind as a grid of yellow arrows at a height above the
   /// water, sampled there with WindSampler so the profile with height

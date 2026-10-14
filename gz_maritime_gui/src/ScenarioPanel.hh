@@ -31,13 +31,13 @@ namespace gz::sim::maritime_gui
   /// \brief Named conditions for the ocean current and the wind, one click
   /// each, and a demo that steps through them.
   ///
-  /// A GUI system with a button per preset. A click ramps both fields to the
-  /// preset, the same way the compasses steer them: no faster than a rate
-  /// (the current 0.5 m/s and 90 degrees a second, the wind 5 m/s and 90
-  /// degrees a second), in `set` messages ten times a second; the wind's
-  /// gusts are set at once. The demo steps through the presets in order,
-  /// staying on each for its dwell in simulation time, and starts again
-  /// after the last, for a talk or a stand.
+  /// A GUI system with a button per preset. A click steers both fields to
+  /// the preset, the same way the compasses steer them: no faster than the
+  /// field's rates (FieldSpec), in `set` messages ten times a second, each
+  /// a step for the server; the wind's gusts are set at once. Steering stops
+  /// if something else moves a field. The demo steps through the presets in
+  /// order, staying on each for its dwell in simulation time, and starts
+  /// again after the last, for a talk or a stand.
   ///
   /// Configuration, all optional:
   ///
@@ -76,7 +76,7 @@ namespace gz::sim::maritime_gui
     public: void Update(const UpdateInfo &_info,
                         EntityComponentManager &_ecm) override;
 
-    /// \brief Ramp both fields to a preset.
+    /// \brief Steer both fields to a preset.
     /// \param[in] _index The preset.
     public: Q_INVOKABLE void ApplyPreset(int _index);
 

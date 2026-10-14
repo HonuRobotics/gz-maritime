@@ -115,7 +115,7 @@ ScrollView {
       Label {
         Layout.fillWidth: true
         text: "Drag the arrow to turn the flow, slide or scroll for its " +
-            "speed; the ocean current ramps there."
+            "speed; the ocean current steps there."
         font.pixelSize: 11
         color: "grey"
         wrapMode: Text.WordWrap

@@ -31,12 +31,15 @@ find_package(tinyxml2 REQUIRED)
 # --------------------------------------------------------------------------
 # Core library, no Qt: reading the wind and the ocean current from their
 # recipes, the messages that change them, the arrows that draw them, telling
-# a refused change from an applied one, and a field's link to the world (its
-# topic, the state service, its arrows) that both panels share.
+# a refused change from an applied one, each field's rates and colours, and
+# a panel's control of a field (its topic, the state service, steering) and
+# its drawing, apart.
 # --------------------------------------------------------------------------
 add_library(${PROJECT_NAME}_core SHARED
   src/Fields.cc
-  src/FieldLink.cc
+  src/FieldControl.cc
+  src/FieldDrawing.cc
+  src/FieldSpec.cc
   src/Flow.cc
   src/Presets.cc
   src/Vessels.cc
@@ -105,6 +108,15 @@ if(BUILD_TESTING)
   ament_add_gtest(fields_test test/fields_test.cc)
   if(TARGET fields_test)
     target_link_libraries(fields_test ${PROJECT_NAME}_core tinyxml2::tinyxml2)
+  endif()
+
+  # A panel's control of a field, against a fake server and state service.
+  ament_add_gtest(field_control_test test/field_control_test.cc)
+  if(TARGET field_control_test)
+    target_link_libraries(field_control_test ${PROJECT_NAME}_core
+      gz-transport::core)
+    set_tests_properties(field_control_test PROPERTIES
+      ENVIRONMENT "GZ_PARTITION=gz_maritime_gui_field_control_test")
   endif()
 
   # The plugin in a running GUI, from the build tree.

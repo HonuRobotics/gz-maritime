@@ -60,7 +60,7 @@ ColumnLayout {
   }
   Label {
     Layout.fillWidth: true
-    text: "A preset ramps the current and the wind to it; the demo steps " +
+    text: "A preset steers the current and the wind to it; the demo steps " +
         "through them, staying on each a while of simulation time."
     font.pixelSize: 11
     color: "grey"

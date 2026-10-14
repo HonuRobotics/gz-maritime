@@ -25,7 +25,8 @@
 
 #include <gz/plugin/Register.hh>
 
-#include "gz/sim/maritime_gui/FieldLink.hh"
+#include "gz/sim/maritime_gui/FieldControl.hh"
+#include "gz/sim/maritime_gui/FieldSpec.hh"
 #include "gz/sim/maritime_gui/Fields.hh"
 #include "gz/sim/maritime_gui/Flow.hh"
 #include "gz/sim/maritime_gui/Presets.hh"
@@ -36,13 +37,10 @@ using namespace maritime_gui;
 
 class gz::sim::maritime_gui::ScenarioPanelPrivate
 {
-  /// \brief The links to the two fields: topics, state service, steering.
-  /// They draw nothing: the field panels do.
-  public: FieldLink current{"ocean_current", "ScenarioPanel",
-                            Colormap::Water(1.0), 4.0,
-                            ParticleField::Settings(), Steering(0.5, 90.0)};
-  public: FieldLink wind{"wind", "ScenarioPanel", Colormap::Air(20.0), 0.3,
-                         ParticleField::Settings(), Steering(5.0, 90.0)};
+  /// \brief The control of the two fields: topics, state service,
+  /// steering. The field panels draw them.
+  public: FieldControl current{OceanCurrentSpec(), "ScenarioPanel"};
+  public: FieldControl wind{WindSpec(), "ScenarioPanel"};
 
   /// \brief The presets.
   public: std::vector<Preset> presets{DefaultPresets()};
@@ -59,6 +57,9 @@ class gz::sim::maritime_gui::ScenarioPanelPrivate
 
   /// \brief Whether a ramp was under way at the last update.
   public: bool steering{false};
+
+  /// \brief Whether a ramp stopped short at the last update.
+  public: bool yielded{false};
 
   /// \brief Whether the world had a field at the last update.
   public: bool available{false};
@@ -120,11 +121,14 @@ void ScenarioPanel::Update(const UpdateInfo &_info,
                         d.windValues->generation);
   }
   const bool steering = d.current.IsSteering() || d.wind.IsSteering();
+  const bool yielded = d.current.Yielded() || d.wind.Yielded();
   const bool available = d.currentValues.has_value() ||
       d.windValues.has_value();
-  if (steering != d.steering || available != d.available)
+  if (steering != d.steering || yielded != d.yielded ||
+      available != d.available)
   {
     d.steering = steering;
+    d.yielded = yielded;
     d.available = available;
     emit this->StateChanged();
   }
@@ -147,7 +151,7 @@ void ScenarioPanel::ApplyPreset(int _index)
   }
   if (p.gusts && d.windValues)
   {
-    // The gusts' statistics change at once; the wind itself ramps.
+    // The gusts' statistics change at once; the wind itself is steered.
     msgs::Param msg;
     auto &s = (*msg.mutable_params())["speed_gust"];
     s.set_type(msgs::Any::DOUBLE);
@@ -204,7 +208,12 @@ QString ScenarioPanel::Status() const
   if (d.active)
   {
     const auto &name = d.presets[*d.active].name;
-    s = d.steering ? "Ramping to " + name + "..." : name + ".";
+    if (d.steering)
+      s = "Steering to " + name + "...";
+    else if (d.yielded)
+      s = name + " stopped: a field was changed elsewhere.";
+    else
+      s = name + ".";
   }
   if (d.demo.Running())
     s += s.empty() ? "Demo running." : " Demo running.";

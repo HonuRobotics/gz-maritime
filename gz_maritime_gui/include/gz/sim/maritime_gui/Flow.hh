@@ -34,8 +34,8 @@
 #include "gz/sim/maritime_gui/Fields.hh"
 
 /// \brief The livelier half of the maritime GUI, without Qt: colour by
-/// speed, flow trails that drift with a field, and steering a field by hand
-/// with a smooth ramp.
+/// speed, flow trails that drift with a field, and steering a field by hand,
+/// rate limited.
 namespace gz::sim::maritime_gui
 {
 /// \brief A colour map from speed to colour: stops evenly spaced from 0 to
@@ -287,9 +287,16 @@ class ParticleField
 
 /// \brief Steers a field towards a target set by hand, in small steps: the
 /// speed and the direction move towards the target no faster than their
-/// rates, one `set` message per period, so the field ramps instead of
-/// jumping (a jump is a force spike for a vehicle with added mass). The
-/// direction takes the shorter way round.
+/// rates, one `set` message per period of the wall clock, so the controls,
+/// the arrows and the trails turn smoothly. A rate limit on the controls,
+/// not a ramp of the field: each message is still a step in the recipe at
+/// the server's next step, and a message sent while the world is paused
+/// waits for it. The direction takes the shorter way round.
+///
+/// Another controller (a second panel, a second GUI, `gz topic`, ROS) may
+/// steer the same field. Once a value it sent has reached the recipe, a
+/// value it did not send means someone else moved the field, and it stops
+/// (Yielded): the last to start wins, and the two never take turns.
 class Steering
 {
   /// \brief The clock the steps run on.
@@ -324,6 +331,14 @@ class Steering
   /// \return True if it did.
   public: bool Arrived() const;
 
+  /// \brief Whether it stopped short of the target because the field was
+  /// moved by someone else, until the next target.
+  /// \return True if it did.
+  public: bool Yielded() const;
+
+  /// \brief Forget the target and what was sent.
+  private: void Stop();
+
   /// \brief Fastest change of speed, m/s per second.
   private: double speedRate;
 
@@ -344,6 +359,15 @@ class Steering
 
   /// \brief Whether the last step reached the target.
   private: bool arrived{false};
+
+  /// \brief The values sent since steering started.
+  private: std::vector<std::pair<double, double>> sent;
+
+  /// \brief Whether one of them has reached the recipe.
+  private: bool landed{false};
+
+  /// \brief Whether it stopped because someone else moved the field.
+  private: bool yielded{false};
 };
 }  // namespace gz::sim::maritime_gui
 

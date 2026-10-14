@@ -14,27 +14,20 @@
  * limitations under the License.
  *
  */
-#include "gz/sim/maritime_gui/FieldLink.hh"
+#include "gz/sim/maritime_gui/FieldDrawing.hh"
 
 #include <tinyxml2.h>
 
 #include <algorithm>
 #include <cmath>
-#include <locale>
-#include <mutex>
 #include <map>
 #include <optional>
 #include <set>
-#include <sstream>
 
 #include <gz/common/Console.hh>
 #include <gz/msgs/boolean.pb.h>
 #include <gz/msgs/marker_v.pb.h>
-#include <gz/msgs/serialized_map.pb.h>
 #include <gz/transport/Node.hh>
-
-#include <gz/sim/components/Name.hh>
-#include <gz/sim/components/World.hh>
 
 namespace gz::sim::maritime_gui
 {
@@ -52,10 +45,6 @@ namespace
   /// particles do not jump.
   constexpr double kMaxTrailStep{0.2};
 
-  /// \brief Updates without a recipe before the link asks the world's state
-  /// service, about a second at the GUI's update rate.
-  constexpr int kFetchAfter{30};
-
   /// \brief Period of simulation time between two redraws of a field that
   /// changes on its own.
   constexpr std::chrono::milliseconds kRedrawPeriod{200};
@@ -72,7 +61,7 @@ namespace
   }
 }
 
-class FieldLinkPrivate
+class FieldDrawingPrivate
 {
   /// \brief Send a marker to MarkerManager. Its service is one way: it
   /// takes a marker and answers nothing.
@@ -161,28 +150,11 @@ class FieldLinkPrivate
   /// \brief Simulation time the trails last moved to.
   public: std::optional<std::chrono::steady_clock::duration> trailTime;
 
-  /// \brief Steering by hand.
-  public: std::optional<maritime_gui::Steering> steering;
-
   /// \brief m of arrow per m/s.
   public: double scale{1.0};
 
-  /// \brief Transport node.
-  public: transport::Node node;
-
-  /// \brief The `set` topic's publisher, advertised as soon as the world's
-  /// name is known: a message published right after advertising is lost,
-  /// before the subscriber is discovered.
-  public: std::optional<transport::Node::Publisher> publisher;
-
-  /// \brief The world's name, once the ECM has it.
-  public: std::string worldName;
-
   /// \brief MarkerManager's service.
   public: std::string markerService{"/marker"};
-
-  /// \brief What became of the last change sent.
-  public: ChangeTracker tracker;
 
   /// \brief The grid.
   public: Grid grid;
@@ -210,44 +182,25 @@ class FieldLinkPrivate
   /// \brief Simulation time of the last drawing.
   public: std::chrono::steady_clock::duration lastDraw{0};
 
-  /// \brief Updates without the recipe in the GUI's ECM.
-  public: int missing{0};
-
-  /// \brief Whether the state service was asked.
-  public: bool fetchAsked{false};
-
-  /// \brief The state service's answer, until an update applies it.
-  public: std::optional<msgs::SerializedStepMap> fetched;
-
-  /// \brief A copy of the world from the state service.
-  public: std::unique_ptr<EntityComponentManager> snapshot;
-
-  /// \brief An empty ECM, for a source before any copy came.
-  public: EntityComponentManager empty;
-
-  /// \brief Guards `fetched` across the transport and Qt threads.
-  public: std::mutex mutex;
+  /// \brief Transport node, for MarkerManager. Last, so it is destroyed
+  /// first.
+  public: transport::Node node;
 };
 
 //////////////////////////////////////////////////
-FieldLink::FieldLink(const std::string &_field, const std::string &_log,
-    const Colormap &_colormap, double _scale,
-    const ParticleField::Settings &_trails,
-    const maritime_gui::Steering &_steering)
-  : dataPtr(std::make_unique<FieldLinkPrivate>())
+FieldDrawing::FieldDrawing(const FieldSpec &_spec, const std::string &_log)
+  : dataPtr(std::make_unique<FieldDrawingPrivate>())
 {
   auto &d = *this->dataPtr;
-  d.field = _field;
   d.log = _log;
-  d.ns = "gz_maritime_gui/" + _field;
-  d.colormap = _colormap;
-  d.scale = _scale;
-  d.trails = _trails;
-  d.steering = _steering;
+  d.ns = "gz_maritime_gui/" + _spec.name;
+  d.colormap = _spec.colormap;
+  d.scale = _spec.scale;
+  d.trails = _spec.trails;
 }
 
 //////////////////////////////////////////////////
-FieldLink::~FieldLink()
+FieldDrawing::~FieldDrawing()
 {
   // Closing the panel takes its drawing off the scene.
   auto &d = *this->dataPtr;
@@ -258,7 +211,7 @@ FieldLink::~FieldLink()
 }
 
 //////////////////////////////////////////////////
-void FieldLink::LoadConfig(const tinyxml2::XMLElement *_elem)
+void FieldDrawing::LoadConfig(const tinyxml2::XMLElement *_elem)
 {
   if (!_elem)
     return;
@@ -310,120 +263,7 @@ void FieldLink::LoadConfig(const tinyxml2::XMLElement *_elem)
 }
 
 //////////////////////////////////////////////////
-void FieldLink::Update(const EntityComponentManager &_ecm)
-{
-  auto &d = *this->dataPtr;
-  if (d.worldName.empty())
-  {
-    const Entity world = _ecm.EntityByComponents(components::World());
-    if (const auto *name = _ecm.Component<components::Name>(world))
-    {
-      d.worldName = name->Data();
-      d.publisher = d.node.Advertise<msgs::Param>(
-          "/world/" + d.worldName + "/" + d.field + "/set");
-    }
-  }
-
-  const std::lock_guard<std::mutex> lock(d.mutex);
-  if (d.fetched)
-  {
-    d.snapshot = std::make_unique<EntityComponentManager>();
-    d.snapshot->SetState(d.fetched->state());
-    d.fetched.reset();
-  }
-}
-
-//////////////////////////////////////////////////
-const EntityComponentManager &FieldLink::Source(
-    const EntityComponentManager &_ecm, bool _inGui)
-{
-  auto &d = *this->dataPtr;
-  if (_inGui)
-    return _ecm;
-
-  // A plugin loaded after the GUI received the world's first state never
-  // got the recipe; ask once for the whole state.
-  if (!d.fetchAsked && ++d.missing > kFetchAfter && !d.worldName.empty())
-  {
-    d.fetchAsked = true;
-    gzdbg << d.log << ": no recipe in the GUI's state yet; asking the "
-          << "world's state service\n";
-    std::function<void(const msgs::SerializedStepMap &, const bool)> cb =
-        [&d](const msgs::SerializedStepMap &_rep, const bool _result)
-        {
-          if (!_result)
-            return;
-          const std::lock_guard<std::mutex> lock(d.mutex);
-          d.fetched = _rep;
-        };
-    d.node.Request("/world/" + d.worldName + "/state", cb);
-  }
-  return d.snapshot ? *d.snapshot : d.empty;
-}
-
-//////////////////////////////////////////////////
-void FieldLink::LogSource(const std::string &_what, bool _fromGui,
-    std::uint64_t _generation) const
-{
-  gzdbg << this->dataPtr->log << ": " << _what << " from the "
-        << (_fromGui ? "GUI's state" : "state service") << ", generation "
-        << _generation << "\n";
-}
-
-//////////////////////////////////////////////////
-void FieldLink::Send(const msgs::Param &_msg, std::uint64_t _generation)
-{
-  auto &d = *this->dataPtr;
-  if (!d.publisher || !d.publisher->HasConnections() ||
-      !d.publisher->Publish(_msg))
-  {
-    d.tracker.NotSent();
-    return;
-  }
-  d.tracker.Sent(_generation, ChangeTracker::Clock::now());
-}
-
-//////////////////////////////////////////////////
-ChangeTracker::State FieldLink::Track(std::uint64_t _generation)
-{
-  return this->dataPtr->tracker.Update(_generation,
-                                       ChangeTracker::Clock::now());
-}
-
-//////////////////////////////////////////////////
-void FieldLink::Steer(double _speed, double _direction)
-{
-  this->dataPtr->steering->SetTarget(_speed, _direction);
-}
-
-//////////////////////////////////////////////////
-void FieldLink::StepSteering(double _speed, double _direction,
-    std::uint64_t _generation)
-{
-  auto &d = *this->dataPtr;
-  const auto msg = d.steering->Step(_speed, _direction,
-                                    maritime_gui::Steering::Clock::now());
-  if (!msg)
-    return;
-  if (d.steering->Arrived())
-  {
-    // The last step is tracked like a change from Apply.
-    this->Send(*msg, _generation);
-  }
-  else if (d.publisher && d.publisher->HasConnections())
-  {
-    d.publisher->Publish(*msg);
-  }
-}
-
-//////////////////////////////////////////////////
-bool FieldLink::IsSteering() const
-{
-  return this->dataPtr->steering->Active();
-}
-
-//////////////////////////////////////////////////
-void FieldLink::Draw(bool _available, std::uint64_t _generation,
+void FieldDrawing::Draw(bool _available, std::uint64_t _generation,
     bool _timeVarying, double _z,
     const std::function<math::Vector3d(const math::Vector3d &)> &_velocity,
     const std::chrono::steady_clock::duration &_simTime)
@@ -483,7 +323,7 @@ void FieldLink::Draw(bool _available, std::uint64_t _generation,
 }
 
 //////////////////////////////////////////////////
-void FieldLink::DrawExtra(const std::string &_kind,
+void FieldDrawing::DrawExtra(const std::string &_kind,
     std::vector<msgs::Marker> _markers)
 {
   auto &d = *this->dataPtr;
@@ -511,7 +351,7 @@ void FieldLink::DrawExtra(const std::string &_kind,
 }
 
 //////////////////////////////////////////////////
-void FieldLink::ClearExtra(const std::string &_kind)
+void FieldDrawing::ClearExtra(const std::string &_kind)
 {
   auto &d = *this->dataPtr;
   auto it = d.extraDrawn.find(_kind);
@@ -520,26 +360,26 @@ void FieldLink::ClearExtra(const std::string &_kind)
 }
 
 //////////////////////////////////////////////////
-Display FieldLink::CurrentDisplay() const
+Display FieldDrawing::CurrentDisplay() const
 {
   return this->dataPtr->display;
 }
 
 //////////////////////////////////////////////////
-void FieldLink::SetDisplay(Display _display)
+void FieldDrawing::SetDisplay(Display _display)
 {
   this->dataPtr->display = _display;
   this->dataPtr->dirty = true;
 }
 
 //////////////////////////////////////////////////
-const Colormap &FieldLink::Colors() const
+const Colormap &FieldDrawing::Colors() const
 {
   return this->dataPtr->colormap;
 }
 
 //////////////////////////////////////////////////
-bool FieldLink::SetMaxSpeed(double _maxSpeed)
+bool FieldDrawing::SetMaxSpeed(double _maxSpeed)
 {
   if (!(_maxSpeed > 0.0) || !std::isfinite(_maxSpeed))
     return false;
@@ -549,13 +389,13 @@ bool FieldLink::SetMaxSpeed(double _maxSpeed)
 }
 
 //////////////////////////////////////////////////
-const Grid &FieldLink::ArrowGrid() const
+const Grid &FieldDrawing::ArrowGrid() const
 {
   return this->dataPtr->grid;
 }
 
 //////////////////////////////////////////////////
-bool FieldLink::SetExtent(double _extent)
+bool FieldDrawing::SetExtent(double _extent)
 {
   if (!(_extent >= 0.0) || !std::isfinite(_extent))
     return false;
@@ -565,7 +405,7 @@ bool FieldLink::SetExtent(double _extent)
 }
 
 //////////////////////////////////////////////////
-bool FieldLink::SetSpacing(double _spacing)
+bool FieldDrawing::SetSpacing(double _spacing)
 {
   if (!(_spacing > 0.0) || !std::isfinite(_spacing))
     return false;
@@ -575,13 +415,13 @@ bool FieldLink::SetSpacing(double _spacing)
 }
 
 //////////////////////////////////////////////////
-double FieldLink::Scale() const
+double FieldDrawing::Scale() const
 {
   return this->dataPtr->scale;
 }
 
 //////////////////////////////////////////////////
-void FieldLink::Redraw()
+void FieldDrawing::Redraw()
 {
   this->dataPtr->dirty = true;
 }
@@ -611,40 +451,4 @@ std::string DisplayName(Display _display)
   }
 }
 
-//////////////////////////////////////////////////
-std::string StatusText(ChangeTracker::State _state)
-{
-  switch (_state)
-  {
-    case ChangeTracker::State::kPending:
-      return "Sending...";
-    case ChangeTracker::State::kApplied:
-      return "Applied.";
-    case ChangeTracker::State::kRefused:
-      return "Not applied: the server kept its values; its log says why.";
-    case ChangeTracker::State::kUnheard:
-      return "Not sent: nothing is listening on the topic yet.";
-    default:
-      return "";
-  }
-}
-
-//////////////////////////////////////////////////
-bool ParseNumber(const std::string &_text, double &_value)
-{
-  std::string text = _text;
-  std::replace(text.begin(), text.end(), ',', '.');
-  // The classic locale, so the process's (which Qt sets from the
-  // environment) cannot make a decimal point unreadable.
-  std::istringstream is(text);
-  is.imbue(std::locale::classic());
-  double v{0.0};
-  if (!(is >> v))
-    return false;
-  is >> std::ws;
-  if (!is.eof() || !std::isfinite(v))
-    return false;
-  _value = v;
-  return true;
-}
 }  // namespace gz::sim::maritime_gui

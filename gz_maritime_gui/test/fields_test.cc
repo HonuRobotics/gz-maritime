@@ -25,6 +25,7 @@
 #include <chrono>
 #include <clocale>
 #include <map>
+#include <optional>
 #include <string>
 
 #include <gz/sim/EntityComponentManager.hh>
@@ -38,7 +39,8 @@
 #include <gz/sim/components/Windfield.hh>
 #include <gz/sim/components/World.hh>
 
-#include "gz/sim/maritime_gui/FieldLink.hh"
+#include "gz/sim/maritime_gui/FieldControl.hh"
+#include "gz/sim/maritime_gui/FieldSpec.hh"
 #include "gz/sim/maritime_gui/Fields.hh"
 #include "gz/sim/maritime_gui/Flow.hh"
 #include "gz/sim/maritime_gui/Presets.hh"
@@ -532,6 +534,117 @@ TEST(Flow, SteeringRamps)
   ASSERT_TRUE(msg.has_value());
   EXPECT_NEAR(1.0, msg->params().at("speed").double_value(), 1e-9);
   EXPECT_TRUE(steer.Arrived());
+}
+
+/////////////////////////////////////////////////
+/// Another controller moving the field after one of ours landed stops the
+/// steering, and it stays stopped until the next target.
+TEST(Flow, SteeringYieldsToAnotherController)
+{
+  using Clock = Steering::Clock;
+  using std::chrono::milliseconds;
+  Steering steer(1.0, 90.0, milliseconds(100));
+  auto t = Clock::now();
+  steer.SetTarget(1.0, 0.0);
+  auto msg = steer.Step(0.0, 0.0, t);
+  ASSERT_TRUE(msg.has_value());
+  const double first = msg->params().at("speed").double_value();
+
+  // The recipe still shows the world's value, then ours: carry on.
+  t += milliseconds(100);
+  ASSERT_TRUE(steer.Step(0.0, 0.0, t).has_value());
+  t += milliseconds(100);
+  ASSERT_TRUE(steer.Step(first, 0.0, t).has_value());
+  EXPECT_FALSE(steer.Yielded());
+
+  // Someone sets 0.7 m/s from 45 degrees: stop, and send nothing more.
+  t += milliseconds(100);
+  EXPECT_FALSE(steer.Step(0.7, 45.0, t).has_value());
+  EXPECT_FALSE(steer.Active());
+  EXPECT_TRUE(steer.Yielded());
+  EXPECT_FALSE(steer.Arrived());
+  t += milliseconds(100);
+  EXPECT_FALSE(steer.Step(0.7, 45.0, t).has_value());
+
+  // A new target steers again, from the world's values.
+  steer.SetTarget(0.7, 50.0);
+  EXPECT_FALSE(steer.Yielded());
+  t += milliseconds(100);
+  msg = steer.Step(0.7, 45.0, t);
+  ASSERT_TRUE(msg.has_value());
+  EXPECT_NEAR(50.0, msg->params().at("direction").double_value(), 1e-9);
+}
+
+/////////////////////////////////////////////////
+/// Taking over a field another controller is still ramping: its values
+/// show until ours land, and do not stop us; then it is the other one that
+/// sees a value it did not send. The last to start wins.
+TEST(Flow, LastControllerToStartWins)
+{
+  using Clock = Steering::Clock;
+  using std::chrono::milliseconds;
+  Steering older(1.0, 90.0, milliseconds(100));
+  Steering newer(1.0, 90.0, milliseconds(100));
+  auto t = Clock::now();
+
+  // The recipe the world holds, as the last message to arrive set it.
+  double speed{0.0};
+  double direction{0.0};
+  auto apply = [&](const std::optional<msgs::Param> &_msg)
+  {
+    if (!_msg)
+      return;
+    speed = _msg->params().at("speed").double_value();
+    direction = _msg->params().at("direction").double_value();
+  };
+
+  older.SetTarget(1.0, 0.0);
+  apply(older.Step(speed, direction, t));
+  t += milliseconds(100);
+  apply(older.Step(speed, direction, t));
+
+  // The newer one starts while the older is half way, and both step until
+  // one of them gives way.
+  newer.SetTarget(0.0, 180.0);
+  for (int i = 0; i < 40 && (older.Active() || newer.Active()); ++i)
+  {
+    t += milliseconds(100);
+    const auto fromOlder = older.Step(speed, direction, t);
+    const auto fromNewer = newer.Step(speed, direction, t);
+    apply(fromOlder);
+    apply(fromNewer);
+  }
+  EXPECT_TRUE(older.Yielded());
+  EXPECT_FALSE(newer.Yielded());
+  EXPECT_TRUE(newer.Arrived());
+  EXPECT_NEAR(0.0, speed, 1e-9);
+  EXPECT_NEAR(180.0, direction, 1e-9);
+}
+
+/////////////////////////////////////////////////
+/// Each field's rates, colours and scales are defined once.
+TEST(Flow, FieldSpecs)
+{
+  const auto current = OceanCurrentSpec();
+  EXPECT_EQ("ocean_current", current.name);
+  EXPECT_DOUBLE_EQ(0.5, current.speedRate);
+  EXPECT_DOUBLE_EQ(1.0, current.colormap.MaxSpeed());
+  EXPECT_DOUBLE_EQ(4.0, current.scale);
+  EXPECT_DOUBLE_EQ(8.0, current.trails.speedup);
+  const auto wind = WindSpec();
+  EXPECT_EQ("wind", wind.name);
+  EXPECT_DOUBLE_EQ(5.0, wind.speedRate);
+  EXPECT_DOUBLE_EQ(20.0, wind.colormap.MaxSpeed());
+  EXPECT_DOUBLE_EQ(0.3, wind.scale);
+  EXPECT_DOUBLE_EQ(1.0, wind.trails.speedup);
+
+  // The steering they make runs at their rates: 0.5 m/s a second is 0.05
+  // m/s in the first 0.1 s step.
+  auto steer = current.MakeSteering();
+  steer.SetTarget(1.0, 0.0);
+  const auto msg = steer.Step(0.0, 0.0, Steering::Clock::now());
+  ASSERT_TRUE(msg.has_value());
+  EXPECT_NEAR(0.05, msg->params().at("speed").double_value(), 1e-9);
 }
 
 namespace
