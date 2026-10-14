@@ -119,6 +119,15 @@ if(BUILD_TESTING)
       ENVIRONMENT "GZ_PARTITION=gz_maritime_gui_field_control_test")
   endif()
 
+  # A panel's drawing of a field, against a fake MarkerManager.
+  ament_add_gtest(field_drawing_test test/field_drawing_test.cc)
+  if(TARGET field_drawing_test)
+    target_link_libraries(field_drawing_test ${PROJECT_NAME}_core
+      gz-transport::core tinyxml2::tinyxml2)
+    set_tests_properties(field_drawing_test PROPERTIES
+      ENVIRONMENT "GZ_PARTITION=gz_maritime_gui_field_drawing_test")
+  endif()
+
   # The plugin in a running GUI, from the build tree.
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(test_gui_reads_recipes test/test_gui_reads_recipes.py
