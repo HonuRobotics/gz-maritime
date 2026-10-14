@@ -41,7 +41,11 @@ site under
   speed and the direction it sets towards, set in the world file and
   changed at run time on a topic bridged to ROS, kept on the world as a recipe naming a registered
   current model, so any system can ask the current at a point and a new
-  model needs no change to anything else.
+  model needs no change to anything else, and the water's drag on the
+  collisions a vehicle marks `gz:ocean_current="true"`.
+- [`gz_marked_shapes`](gz_marked_shapes/): the marked collisions the wind
+  and the ocean current push on, their areas and the cut at the water
+  level, shared by both.
 - [`gz_maritime_gui`](gz_maritime_gui/): Gazebo GUI panels for the ocean
   current and the wind, each of which changes its field and draws it as
   arrows on the water, sampled from the world as the vehicles feel it.

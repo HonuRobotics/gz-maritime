@@ -17,7 +17,9 @@ The system finds those shapes on every model, spawned at any time under any
 name, and applies quadratic drag, `0.5 * rho * Cd * A * |v| * v` per shape
 axis, on the projected area of the part above the water, at the centre of
 that part, with the wind asked at that centre, so a tall shape heels and
-turns its link. The velocity is the wind relative to the shape, so a boat
+turns its link. Each face is cut by how vertical its axis is, so a shape
+on its side is cut on the face the wind sees; the cut is at the flat
+`<water_level>`, not the wave surface. The velocity is the wind relative to the shape, so a boat
 running with the wind feels less of it. `gz:wind_cd` sets a shape's drag
 coefficient. A mark is read as a bool, so `"1"` works too. Boxes,
 cylinders, spheres, capsules and ellipsoids keep their shape; a mesh counts
