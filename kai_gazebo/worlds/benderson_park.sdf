@@ -3,8 +3,10 @@
   Nathan Benderson Park, Sarasota, Florida: the RobotX 2022 venue, a
   2 km rowing lake with its finish tower, beside Interstate 75.
 
-  The finest terrain, every building with pitched roofs on the homes, every
-  tree, 4096 pixel ground and an 8192 pixel sky, and shadows.
+  This is the full tier, the default: the finest terrain, every building
+  with pitched roofs on the homes, every tree, 4096 pixel ground and an 8192
+  pixel sky, and shadows. benderson_park_lite.sdf is the lite tier, with
+  the same collisions and coordinates.
 
   The water is a rowing lake: fresh, flat and sheltered, so keep the
   sea state between 0 and 2.
@@ -440,7 +442,7 @@
     </gui>
 
     <!-- The site, one static model in the world frame: terrain, shore,
-         buildings, trees and the sky dome, drawn in full. Its
+         buildings, trees and the sky dome, drawn at the full tier. Its
          collisions are boxes (the shore, the land near the water, the
          piers and breakwaters and the buildings near the origin). -->
     <include>
