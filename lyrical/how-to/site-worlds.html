@@ -394,11 +394,22 @@ water is fresh, so buoyancy uses 1000 kg/m³.</p>
 </tr>
 </tbody>
 </table>
+<p><code class="docutils literal notranslate"><span class="pre">benderson_park_lite.sdf</span></code> is a lighter tier of the same world, for CI,
+integrated GPUs or many vehicles and cameras. Its collisions, coordinates
+and systems are the same, so a vehicle behaves the same in both; it draws
+less: coarse terrain, flat roofs, no trees, 2048 px ground and a 4096 px
+sky, no shadows, and the animated water out to 900 m from the middle of
+the lake rather than 1.5 km. Its site model is a separate download, about
+3 MB:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>simulation.launch.xml<span class="w"> </span>world:<span class="o">=</span>benderson_park_lite.sdf
+</pre></div>
+</div>
 <p>The world has an optional seabed, modelled from the depths the venue
 publishes (at least 3.5 m, dredged for rowing) and sloping up to the
 banks, for underwater vehicles, sonars and DVLs. It is off by default;
-uncomment its include at the end of <code class="docutils literal notranslate"><span class="pre">benderson_park.sdf</span></code> and the first
-launch downloads it too, about 5 MB.</p>
+uncomment its include at the end of <code class="docutils literal notranslate"><span class="pre">benderson_park.sdf</span></code> or
+<code class="docutils literal notranslate"><span class="pre">benderson_park_lite.sdf</span></code> and the first launch downloads it too, about
+5 MB.</p>
 </section>
 <section id="sand-island">
 <h2>Sand Island<a class="headerlink" href="#sand-island" title="Link to this heading"></a></h2>
