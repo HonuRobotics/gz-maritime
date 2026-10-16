@@ -145,6 +145,8 @@ surface is only drawn. See
   ROV and a drone in one simulation, each commanded on its own.
 - [Sail the competition sites](../how-to/site-worlds.md): the same boat on
   five real venues, from a rowing lake to the RobotX 2026 bay in Singapore.
+- [Dive in the aquatic centre](../how-to/aquatic-centre.md): an indoor pool
+  with a 15 m pit, for the BlueROV2 and the BlueBoat.
 - [The custom USV](../vehicles/custom-usv.md): its topics, frames and
   files.
 - [Bring your own vehicle](../how-to/own-vehicle.md): build a vehicle like it.

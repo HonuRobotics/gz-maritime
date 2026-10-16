@@ -185,6 +185,10 @@
 <li class="toctree-l4"><a class="reference internal" href="../how-to/site-worlds.html#what-to-know">What to know</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/aquatic-centre.html">Dive in the aquatic centre</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/aquatic-centre.html#what-to-know">What to know</a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="../how-to/own-world.html">Use your own world</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/own-world.html#what-a-world-needs">What a world needs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/own-world.html#the-buoyancy-system">The buoyancy system</a></li>
@@ -486,13 +490,13 @@ description topic, TF Prefix) to <code class="docutils literal notranslate"><spa
 </section>
 <section id="worlds">
 <h2>Worlds<a class="headerlink" href="#worlds" title="Link to this heading"></a></h2>
-<p>Six worlds share one contract: the systems every vehicle needs, the
+<p>Seven worlds share one contract: the systems every vehicle needs, the
 gz-maritime buoyancy reading marked collisions, the waterline at z = 0 and
 the wave field for the drawn sea. Pass any of them to the simulation launch
 as <code class="docutils literal notranslate"><span class="pre">world:=&lt;name&gt;.sdf</span></code>; the spawn launch then puts vehicles into it by name.
 Four of them are venues of the Virtual RobotX competition (VRX) and the
 Virtual Ocean Robotics Challenge (VORC), and one is the venue of the
-Maritime RobotX Challenge 2026.
+Maritime RobotX Challenge 2026; the last is an indoor pool.
 All of them are named <code class="docutils literal notranslate"><span class="pre">default</span></code> inside, so the services below work on
 every one.</p>
 <table class="docutils align-default">
@@ -541,10 +545,16 @@ every one.</p>
 <td><p>the four courses around the origin; course A at x -45, y 12, heading 0.55</p></td>
 <td><p>Freshwater reservoir, 0 to 2</p></td>
 </tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">aquatic_centre.sdf</span></code></p></td>
+<td><p>An indoor aquatic centre: an Olympic pool and a diving well with a 15 m pit</p></td>
+<td><p>A hall, from Fuel on first use (about 3 MB)</p></td>
+<td><p>lane 4 at x -20, y -1.25; the diving well at x 45, z -2.5</p></td>
+<td><p>Still pool, no drawn sea, 0</p></td>
+</tr>
 </tbody>
 </table>
-<p>Every world starts at sea state 1, Sand Island at 3, and takes any of the
-ten codes, but the last column says what fits the site: a rowing lake never
+<p>Every world starts at sea state 1, Sand Island at 3 and the indoor pool
+at 0, and takes any of the ten codes (the pool draws no sea), but the last column says what fits the site: a rowing lake never
 sees more than wind chop (code 2 is 0.3 m waves), while the open water
 world and the sea sites, Sand Island and La Spezia, take them all. At the
 sea sites the code sets the open sea, and a shelter map on their water
