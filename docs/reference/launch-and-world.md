@@ -116,7 +116,7 @@ every one.
 | `sydney_regatta.sdf` | Sydney International Regatta Centre, VRX 2022 to 2024 | Fuel, fetched on first use (about 140 MB) | around x -530, y 170; start at x -532, y 162 | Rowing lake, 0 to 2 |
 | `benderson_park.sdf` | Nathan Benderson Park, Sarasota, RobotX 2022 | Fuel, fetched on first use (about 220 MB) | the lake runs along y; start at the origin, heading 1.57 | Rowing lake, 0 to 2 |
 | `sand_island.sdf` | Sand Island, Honolulu, RobotX 2016 and 2018, VRX 2019 | Built from open data, from Fuel on first use (about 9 MB); optional seabed; also `sand_island_lite.sdf`, lighter, about 5 MB | start at x 60, y 120 | Harbour channel and open ocean, any (calmer in the channel) |
-| `la_spezia.sdf` | La Spezia, VORC 2020 | Built from open data, from Fuel on first use (about 14 MB); optional seabed | start at x 10, y -372 | Port and gulf, any (calm in the port) |
+| `la_spezia.sdf` | La Spezia, VORC 2020 | Built from open data, from Fuel on first use (about 14 MB); optional seabed; also `la_spezia_lite.sdf`, lighter, about 7 MB | start at x 10, y -372 | Port and gulf, any (calm in the port) |
 
 Every world starts at sea state 1, Sand Island at 3, and takes any of the
 ten codes, but the last column says what fits the site: a rowing lake never
