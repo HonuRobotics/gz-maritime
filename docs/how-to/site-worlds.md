@@ -66,11 +66,23 @@ and the water is fresh, so buoyancy uses 1000 kg/m³.
 A landing pad sits off the start point, for the X500 of the
 [multi vehicle demo](several-vehicles.md), which runs here by default.
 
+`sydney_regatta_lite.sdf` is a lighter tier of the same world, for CI,
+integrated GPUs or many vehicles and cameras. Its collisions, coordinates
+and systems are the same, so a vehicle behaves the same in both; it draws
+less: coarse terrain, flat roofs, no trees, 2048 px ground and a 4096 px
+sky, no shadows, and the animated water out to 900 m from the middle of
+the water rather than 1.5 km. Its site model is a separate download, about
+4 MB:
+
+```bash
+ros2 launch kai_bringup simulation.launch.xml world:=sydney_regatta_lite.sdf
+```
+
 The world has an optional seabed, modelled from the depth the venue
 publishes (5 m) and sloping up to the banks, for underwater vehicles,
 sonars and DVLs. It is off by default; uncomment its include at the end of
-`sydney_regatta.sdf` and the first launch downloads it too, about
-5 MB.
+`sydney_regatta.sdf` or `sydney_regatta_lite.sdf` and the first launch
+downloads it too, about 5 MB.
 
 ## Nathan Benderson Park
 
