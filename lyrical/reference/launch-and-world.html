@@ -522,10 +522,10 @@ every one.</p>
 <td><p>Rowing lake, 0 to 2</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">sand_island.sdf</span></code></p></td>
-<td><p>Sand Island, Honolulu, RobotX 2018 and VRX 2019</p></td>
-<td><p>VRX mesh, fetched by the build; the shore camp from Fuel</p></td>
-<td><p>start at x 158, y 108</p></td>
-<td><p>Sheltered lagoon, 0 to 3</p></td>
+<td><p>Sand Island, Honolulu, RobotX 2016 and 2018, VRX 2019</p></td>
+<td><p>Built from open data, from Fuel on first use (about 9 MB); optional seabed</p></td>
+<td><p>start at x 60, y 120</p></td>
+<td><p>Harbour channel and open ocean, any (calmer in the channel)</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">la_spezia.sdf</span></code></p></td>
 <td><p>La Spezia marina, VORC 2020</p></td>
@@ -535,19 +535,25 @@ every one.</p>
 </tr>
 </tbody>
 </table>
-<p>Every world starts at sea state 1 and takes any of the ten codes, but the
+<p>Every world starts at sea state 1, Sand Island at 3, and takes any of the ten codes, but the
 last column says what fits the site: a rowing lake never sees more than
 wind chop (code 2 is 0.3 m waves), a sheltered lagoon or gulf at most a
-slight sea (code 3 is about 0.9 m), and the open water world takes them
-all. Change it with the wave service below.</p>
+slight sea (code 3 is about 0.9 m), and the open water world and Sand
+Island take them all. At Sand Island the code sets the open ocean (3 by
+default, a slight sea), and a
+shelter map on its water scales the waves down where land, the reef and
+the piers shelter it. Change it with the wave service below.</p>
 <p>The site worlds place the water surface model once, at the centre of their
 water, and size the drawn sea with <code class="docutils literal notranslate"><span class="pre">&lt;tiles_radius&gt;</span></code> in their wave source:
 the model draws that many 200 m tiles around itself in every direction,
 sharing one wave field, and the terrain hides them wherever there is land.
-Open water keeps the model’s own radius, a 1 km square. Buoyancy does not
-depend on any of that.
-The terrain models are Apache 2.0 assets from VRX and VORC,
-credited in <code class="docutils literal notranslate"><span class="pre">kai_gazebo/NOTICE</span></code>.</p>
+Open water keeps the model’s own radius, a 1 km square. Sand Island’s
+water model also fades the waves out over the last tile (<code class="docutils literal notranslate"><span class="pre">&lt;fadeEdges&gt;</span></code>)
+and carries a shelter map (<code class="docutils literal notranslate"><span class="pre">&lt;textures&gt;&lt;shelterMap&gt;</span></code>, with
+<code class="docutils literal notranslate"><span class="pre">&lt;shelterOrigin&gt;</span></code> and <code class="docutils literal notranslate"><span class="pre">&lt;shelterSize&gt;</span></code> in its <code class="docutils literal notranslate"><span class="pre">&lt;parameters&gt;</span></code>): a greyscale
+image over a world rectangle, white where the open sea’s full waves
+reach, black against a quay. Buoyancy does not depend on any of that.
+The site models are credited in <code class="docutils literal notranslate"><span class="pre">kai_gazebo/NOTICE</span></code>.</p>
 </section>
 <section id="the-open-water-sdf-world">
 <h2>The <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code> world<a class="headerlink" href="#the-open-water-sdf-world" title="Link to this heading"></a></h2>
