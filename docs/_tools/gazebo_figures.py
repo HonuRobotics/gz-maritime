@@ -151,6 +151,16 @@ FIGURES = {
         # Past the sky dome, 3.8 km out.
         'far': 5000,
     },
+    # The aquatic centre from its opening view, the BlueBoat in lane 4.
+    'aquatic-centre': {
+        'out': DOCS / 'how-to' / 'images' / 'aquatic-centre.jpg',
+        'world': 'aquatic_centre',
+        'vehicles': [('model://blueboat', 'blueboat', '-20 -1.25 0.05 0 0 0')],
+        'sea_state': 0,
+        'camera': '-31 -17 8 0 0.2 0.5',
+        'fov': SITE_FOV,
+        'at': [10],
+    },
     'several-vehicles': {
         'out': DOCS / 'how-to' / 'images' / 'several-vehicles.jpg',
         'world': 'sydney_regatta',

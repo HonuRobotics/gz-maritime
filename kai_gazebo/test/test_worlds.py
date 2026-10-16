@@ -16,7 +16,7 @@ The worlds are well formed, pass the SDF check and run headless.
 
 Every world is parsed and checked for the contract the docs state: the
 name every command relies on, the systems every vehicle needs, gz-maritime's
-buoyancy naming nobody, a wave source and the drawn sea. The world with no
+buoyancy naming nobody, a wave source and the drawn sea (none indoors). The world with no
 Fuel model in it, the open sea, also passes the SDF checker with every
 include resolved and runs for a few hundred steps without rendering, so a
 broken mesh path or a plugin that fails to load shows up here rather than
@@ -37,7 +37,9 @@ import pytest
 WORLDS = Path(get_package_share_directory('kai_gazebo')) / 'worlds'
 ALL = ('open_water', 'sydney_regatta', 'sydney_regatta_lite', 'benderson_park',
        'benderson_park_lite', 'sand_island', 'sand_island_lite', 'la_spezia', 'la_spezia_lite',
-       'marina_bay', 'marina_bay_lite')
+       'marina_bay', 'marina_bay_lite', 'aquatic_centre')
+# Worlds indoors, whose water is their own model's: no drawn sea.
+INDOOR = ('aquatic_centre',)
 # Worlds with no Fuel model in them, so they load with no network and no cache.
 LOCAL = ('open_water',)
 REQUIRED_SYSTEMS = (
@@ -73,8 +75,13 @@ def test_world_keeps_the_contract(world):
     assert buoyancy.find('enable') is None, 'the world must name no vehicle'
     assert w.find('spherical_coordinates/latitude_deg') is not None
     uris = [i.find('uri').text for i in w.findall('include')]
-    # The drawn sea is the water surface model, or a site's variant of it.
-    assert any(u.startswith('model://water_surface') for u in uris), 'no drawn sea'
+    drawn = any(u.startswith('model://water_surface') for u in uris)
+    if world in INDOOR:
+        # A drawn sea would run through the hall's walls.
+        assert not drawn, 'a drawn sea indoors'
+    else:
+        # The drawn sea is the water surface model, or a site's variant of it.
+        assert drawn, 'no drawn sea'
 
 
 @pytest.mark.parametrize('world', LOCAL)
