@@ -35,7 +35,8 @@ from ament_index_python.packages import get_package_share_directory
 import pytest
 
 WORLDS = Path(get_package_share_directory('kai_gazebo')) / 'worlds'
-ALL = ('open_water', 'sydney_regatta', 'benderson_park', 'sand_island', 'la_spezia')
+ALL = ('open_water', 'sydney_regatta', 'benderson_park', 'sand_island', 'sand_island_lite',
+       'la_spezia')
 # Worlds with no Fuel model in them, so they load with no network and no cache.
 LOCAL = ('open_water', 'la_spezia')
 LOCAL_TERRAIN = ('la_spezia',)

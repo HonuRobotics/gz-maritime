@@ -4,8 +4,10 @@
   harbour channel between Sand Island and Kalihi, with downtown
   Honolulu, the port and the Koolau range behind.
 
-  The finest terrain, every building with pitched roofs on the homes, every
-  tree, 4096 pixel ground and an 8192 pixel sky, and shadows.
+  This is the full tier, the default: the finest terrain, every building
+  with pitched roofs on the homes, every tree, 4096 pixel ground and an 8192
+  pixel sky, and shadows. sand_island_lite.sdf is the lite tier, with the
+  same collisions and coordinates.
 
   The water is the harbour channel and, south of Sand Island, the open
   ocean, so any sea state fits: it sets the open ocean, and the land
@@ -443,7 +445,7 @@
     </gui>
 
     <!-- The site, one static model in the world frame: terrain, shore,
-         buildings, trees and the sky dome, drawn in full. Its
+         buildings, trees and the sky dome, drawn at the full tier. Its
          collisions are boxes (the shore, the land near the water, the
          piers and breakwaters and the buildings near the origin). -->
     <include>

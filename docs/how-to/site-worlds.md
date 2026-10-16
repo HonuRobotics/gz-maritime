@@ -112,10 +112,23 @@ ocean; a shelter map on the water scales the waves down where land, the
 reef and the piers shelter it, so the channel stays calmer and the quays
 calm (see below).
 
+`sand_island_lite.sdf` is a lighter tier of the same world, for CI,
+integrated GPUs or many vehicles and cameras. Its collisions, coordinates
+and systems are the same, so a vehicle behaves the same in both; it draws
+less: coarse terrain, flat roofs, no trees, 2048 px ground and a 4096 px
+sky, no shadows, and the animated water out to 900 m from the middle of
+the water rather than 1.7 km. Its site model is a separate download, about
+5 MB:
+
+```bash
+ros2 launch kai_bringup simulation.launch.xml world:=sand_island_lite.sdf
+```
+
 The world has an optional seabed, from NOAA's topobathymetric model of
 Hawaii, for underwater vehicles, sonars and DVLs, or a hull grounding on
 the shallows. It is off by default; uncomment its include at the end of
-`sand_island.sdf` and the first launch downloads it too, about 6 MB.
+`sand_island.sdf` or `sand_island_lite.sdf` and the first launch downloads
+it too, about 6 MB.
 
 ## La Spezia
 
