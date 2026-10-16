@@ -20,9 +20,8 @@ buoyancy naming nobody, a wave source and the drawn sea. The world with no
 Fuel model in it, the open sea, also passes the SDF checker with every
 include resolved and runs for a few hundred steps without rendering, so a
 broken mesh path or a plugin that fails to load shows up here rather than
-at the first launch. The site worlds need Fuel (the Sydney
-terrain, the Benderson Park, Sand Island and La Spezia sites), a download
-on first use that has no place in a unit test; the sites' water, which
+at the first launch. The site worlds need Fuel (each site's model), a
+download on first use that has no place in a unit test; the sites' water, which
 ships here, is checked on its own.
 """
 
@@ -98,7 +97,7 @@ def test_world_runs_headless(world):
         assert bad not in out.stdout + out.stderr, f'{world}: {bad} in the server output'
 
 
-@pytest.mark.parametrize('site', ('benderson_park', 'sand_island', 'la_spezia'))
+@pytest.mark.parametrize('site', ('sydney_regatta', 'benderson_park', 'sand_island', 'la_spezia'))
 def test_site_water_is_sheltered(site):
     """The water draws gz_waves_rendering's mesh, sheltered by its map, fading at its edge."""
     models = Path(get_package_share_directory('kai_gazebo')) / 'models'

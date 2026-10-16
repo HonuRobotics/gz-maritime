@@ -27,8 +27,7 @@ copy of open water, for the picture only:
 Needs a sourced workspace with gz-maritime and bluerobotics_models built, a
 GPU with an X display, the gz-transport Python bindings
 (python3-gz-transport15 on Jetty, python3-gz-transport14 on Ionic) and, for
-the site figures, the Sydney Regatta and Benderson Park terrains in the Fuel
-cache (run each world once).
+the site figures, the sites in the Fuel cache (run each world once).
 
     python3 docs/_tools/gazebo_figures.py            # every figure
     python3 docs/_tools/gazebo_figures.py first-simulation
@@ -110,11 +109,12 @@ FIGURES = {
     'sydney-regatta': {
         'out': DOCS / 'how-to' / 'images' / 'sydney-regatta.jpg',
         'world': 'sydney_regatta',
-        'vehicles': [(USV, 'usv', '-532 162 0 0 0 1')],
+        'vehicles': [(USV, 'usv', '-532 180 0 0 0 0')],
         'sea_state': 1,
-        'camera': '-478.1 148.2 13.2 0 0.25 2.94',
+        'camera': '-518 183 2.5 0 0.06 3.0',
         'fov': SITE_FOV,
         'at': [10],
+        'far': 5000,
     },
     'benderson-park': {
         'out': DOCS / 'how-to' / 'images' / 'benderson-park.jpg',
@@ -141,13 +141,14 @@ FIGURES = {
     'several-vehicles': {
         'out': DOCS / 'how-to' / 'images' / 'several-vehicles.jpg',
         'world': 'sydney_regatta',
-        'vehicles': [('model://blueboat', 'blueboat', '-532 162 0.05 0 0 1'),
-                     ('model://bluerov2', 'bluerov2', '-528.8 167 -1 0 0 1'),
-                     ('model://x500', 'x500', '-540 168 1.25 0 0 0')],
+        'vehicles': [('model://blueboat', 'blueboat', '-532 180 0.05 0 0 0'),
+                     ('model://bluerov2', 'bluerov2', '-526 180 -1 0 0 0'),
+                     ('model://x500', 'x500', '-545 192 1.25 0 0 0')],
         'sea_state': 1,
-        'camera': '-522 152 4 0 0.2 2.35',
+        'camera': '-522 172 4 0 0.2 2.35',
         'fov': 1.0,
         'at': [10],
+        'far': 5000,
     },
     'la-spezia': {
         'out': DOCS / 'how-to' / 'images' / 'la-spezia.jpg',
