@@ -16,13 +16,14 @@ The worlds are well formed, pass the SDF check and run headless.
 
 Every world is parsed and checked for the contract the docs state: the
 name every command relies on, the systems every vehicle needs, gz-maritime's
-buoyancy naming nobody, a wave source and the drawn sea. The worlds with no
-Fuel model in them, the open sea and La Spezia, also pass the SDF checker
-with every include resolved, and La Spezia runs for a few hundred steps
-without rendering, so a broken mesh path or a plugin that fails to load
-shows up here rather than at the first launch. The other three need Fuel
-(the Sydney and Benderson Park terrains, the Sand Island site), a
-download on first use that has no place in a unit test.
+buoyancy naming nobody, a wave source and the drawn sea. The world with no
+Fuel model in it, the open sea, also passes the SDF checker with every
+include resolved and runs for a few hundred steps without rendering, so a
+broken mesh path or a plugin that fails to load shows up here rather than
+at the first launch. The site worlds need Fuel (the Sydney and Benderson
+Park terrains, the Sand Island and La Spezia sites), a download on first
+use that has no place in a unit test; the sea sites' water, which ships
+here, is checked on its own.
 """
 
 import os
@@ -38,8 +39,7 @@ WORLDS = Path(get_package_share_directory('kai_gazebo')) / 'worlds'
 ALL = ('open_water', 'sydney_regatta', 'benderson_park', 'sand_island', 'sand_island_lite',
        'la_spezia')
 # Worlds with no Fuel model in them, so they load with no network and no cache.
-LOCAL = ('open_water', 'la_spezia')
-LOCAL_TERRAIN = ('la_spezia',)
+LOCAL = ('open_water',)
 REQUIRED_SYSTEMS = (
     'gz-sim-physics-system', 'gz-sim-user-commands-system',
     'gz-sim-scene-broadcaster-system', 'gz-sim-sensors-system',
@@ -86,9 +86,9 @@ def test_world_passes_the_sdf_check(world):
         f'{world}:\n{out.stdout[-2000:]}\n{out.stderr[-2000:]}'
 
 
-@pytest.mark.parametrize('world', LOCAL_TERRAIN)
-def test_world_with_local_terrain_runs_headless(world):
-    """The server loads the terrain and its plugins and steps the world."""
+@pytest.mark.parametrize('world', LOCAL)
+def test_world_runs_headless(world):
+    """The server loads the world's models and plugins and steps the world."""
     env = dict(os.environ, GZ_PARTITION=f'test_{uuid.uuid4().hex[:8]}')
     out = subprocess.run(['gz', 'sim', '-s', '-r', '--iterations', '200',
                           str(WORLDS / f'{world}.sdf')],
@@ -98,10 +98,11 @@ def test_world_with_local_terrain_runs_headless(world):
         assert bad not in out.stdout + out.stderr, f'{world}: {bad} in the server output'
 
 
-def test_sand_island_water_is_sheltered():
+@pytest.mark.parametrize('site', ('sand_island', 'la_spezia'))
+def test_sea_site_water_is_sheltered(site):
     """The water draws gz_waves_rendering's mesh, sheltered by its map, fading at its edge."""
     models = Path(get_package_share_directory('kai_gazebo')) / 'models'
-    root = ET.parse(models / 'water_surface_sand_island' / 'model.sdf').getroot()
+    root = ET.parse(models / f'water_surface_{site}' / 'model.sdf').getroot()
     uri = root.find('model/link/visual/geometry/mesh/uri').text
     assert uri == 'model://water_surface/meshes/water.dae'
     share = Path(get_package_share_directory('gz_waves_rendering')) / 'models'
@@ -109,7 +110,7 @@ def test_sand_island_water_is_sheltered():
     plugin = root.find('model/link/visual/plugin')
     for texture in ('cubeMap', 'shelterMap'):
         path = plugin.find(f'textures/{texture}').text
-        assert (models / 'water_surface_sand_island' / path).is_file(), path
+        assert (models / f'water_surface_{site}' / path).is_file(), path
     params = plugin.find('shader/parameters')
     assert min(float(v) for v in params.find('shelterSize').text.split()) > 0
     assert params.find('fadeEdges').text == 'true'

@@ -3,12 +3,13 @@ kai_gazebo ships worlds built on terrain models from other projects:
 - Sydney International Regatta Centre and Nathan Benderson Park: models
   from the Virtual RobotX competition (osrf/vrx), Apache 2.0, fetched from Fuel
   (https://app.gazebosim.org/openrobotics) at run time.
-- Sand Island: the site and its optional seabed are models on Gazebo Fuel
-  (https://app.gazebosim.org/honuRobotics: sand_island and
-  sand_island_seabed), fetched at run time, and its water
-  (models/water_surface_sand_island) ships here, all by Honu Robotics under
-  the Creative Commons Attribution 4.0 International License. They are
-  built from:
+- Sand Island and La Spezia: each site and its optional seabed are models
+  on Gazebo Fuel (https://app.gazebosim.org/honurobotics: sand_island,
+  sand_island_seabed, la_spezia and la_spezia_seabed), fetched at run time,
+  and their water (models/water_surface_sand_island and
+  water_surface_la_spezia) ships here, all by Honu Robotics under the
+  Creative Commons Attribution 4.0 International License. They are built
+  from:
   - OpenStreetMap: the shoreline, land cover, buildings, bridges, piers,
     breakwaters, cranes, trees and seamarks. Map data (c) OpenStreetMap
     contributors, available under the Open Database License (ODbL) 1.0,
@@ -17,16 +18,21 @@ kai_gazebo ships worlds built on terrain models from other projects:
   - Sentinel-2 cloudless (https://s2maps.eu) by EOX IT Services GmbH
     (contains modified Copernicus Sentinel data 2016), under the Creative
     Commons Attribution 4.0 International License: the colour of the ground
-    and of the far field in the sky.
+    and of the far field in the skies.
   - The AWS Terrain Tiles (https://registry.opendata.aws/terrain-tiles/),
     Mapzen's Terrarium elevation: SRTM, USGS 3DEP and NED, GMTED2010, ETOPO1
     and others, see https://github.com/tilezen/joerd/blob/master/docs/attribution.md.
-  - Poly Haven's sunflowers_puresky (https://polyhaven.com), CC0, turned
-    and with the far field painted in.
-  - The seabed: NOAA NCEI's Continuously Updated Digital Elevation Model
-    (CUDEM), 1/9 arc second topobathymetric tiles, Hawaii (2021),
-    https://www.ncei.noaa.gov/products/coastal-elevation-models, a work of
-    the US Government, in the public domain.
-- La Spezia marina: the Virtual Ocean Robotics Challenge (VORC) terrain mesh
-  and texture (osrf/vorc, vorc_gazebo/models/marina), Apache 2.0, fetched
-  at build time from a pinned commit.
+  - Poly Haven skies (https://polyhaven.com), CC0: sunflowers_puresky at
+    Sand Island and kloofendal_38d_partly_cloudy_puresky at La Spezia,
+    turned and with the far field painted in.
+  - Sand Island's seabed: NOAA NCEI's Continuously Updated Digital
+    Elevation Model (CUDEM), 1/9 arc second topobathymetric tiles, Hawaii
+    (2021), https://www.ncei.noaa.gov/products/coastal-elevation-models, a
+    work of the US Government, in the public domain.
+  - La Spezia's seabed: Regione Liguria's detailed isobaths (Piano di
+    Tutela dell'Ambiente Marino e Costiero, multibeam surveys 2010 to 2019),
+    https://geoportal.regione.liguria.it, under the Creative Commons
+    Attribution 4.0 International License; elsewhere in the gulf and the
+    port the bed is modelled from published depths (the Port Regulatory
+    Plan of La Spezia, the Port Authority of the Eastern Ligurian Sea,
+    marina guides). Plausible, not surveyed: not for navigation.
