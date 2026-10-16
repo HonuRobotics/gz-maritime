@@ -41,3 +41,24 @@ kai_gazebo ships worlds built on site models made from open data:
     port the bed is modelled from published depths (the Port Regulatory
     Plan of La Spezia, the Port Authority of the Eastern Ligurian Sea,
     marina guides). Plausible, not surveyed: not for navigation.
+- Marina Bay, Singapore: the site, the Singapore Flyer's wheel and the
+  optional seabed are models on Gazebo Fuel
+  (https://app.gazebosim.org/honurobotics: marina_bay, marina_bay_flyer and
+  marina_bay_seabed), fetched at run time, and its water
+  (models/water_surface_day) ships here, all by Honu Robotics under the
+  Creative Commons Attribution 4.0 International License. They are built
+  from:
+  - OpenStreetMap: the shoreline, land cover, buildings, bridges and trees.
+    Map data (c) OpenStreetMap contributors, available under the Open
+    Database License (ODbL) 1.0, https://www.openstreetmap.org/copyright.
+    The meshes are a Produced Work of that data.
+  - The organisers' published site plan: the RobotX pontoon and course
+    positions.
+  - Poly Haven's kloofendal_48d_partly_cloudy_puresky
+    (https://polyhaven.com), CC0, regraded and cropped.
+  - The seabed: modelled, as no survey of Marina Reservoir is open; the
+    reservoir at the depths reported for its water sampling sites, about 5
+    to 7 m, and the strait south of the barrage from GEBCO 2025's general
+    depths (https://www.gebco.net, public domain). Plausible, not surveyed:
+    not for navigation.
+  The textures and the modelled landmarks are procedural.

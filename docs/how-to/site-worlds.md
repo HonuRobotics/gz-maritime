@@ -1,8 +1,9 @@
 # Sail the competition sites
 
-Besides the open water world, gz-maritime ships four real venues: the three
-sites of the Virtual RobotX competition (VRX) and the one of the Virtual
-Ocean Robotics Challenge (VORC), adapted to this ocean. They keep the same
+Besides the open water world, gz-maritime ships five real venues: the three
+sites of the Virtual RobotX competition (VRX), the one of the Virtual Ocean
+Robotics Challenge (VORC), and Marina Bay in Singapore, where the Maritime
+RobotX Challenge 2026 is held. They keep the same
 world contract as `open_water.sdf`, so every launch file, spawn command and
 service works on them unchanged. Pass one to the simulation launch and
 spawn a vehicle at the start point the site recommends:
@@ -221,14 +222,57 @@ and DVLs. It is off by default; uncomment its include at the end of
 `la_spezia.sdf` or `la_spezia_lite.sdf` and the first launch downloads it
 too, about 5 MB.
 
+## Marina Bay
+
+```{figure} images/marina-bay.jpg
+:alt: The Promontory's lawn in the foreground, the RobotX pontoon reaching into the bay, and Marina Bay Sands with its SkyPark across the water
+
+The Marina Bay world at its opening view, over the Promontory.
+```
+
+The venue of the Maritime RobotX Challenge 2026 (8 to 14 November 2026):
+the Promontory at Marina Bay, Singapore, with the floating pontoon off its
+east corner and the four courses, A to D, between the pontoon and the Marina
+Boulevard seawall. Around it is the bay and the city out to 2.3 km: the
+seawalls and bridges, more than 5000 buildings and 7000 trees from
+OpenStreetMap, and the landmarks modelled on their own, Marina Bay Sands
+and its SkyPark, the ArtScience Museum, the Esplanade's domes, the Singapore
+Flyer (its wheel turns, once every 105 s), the Helix Bridge and the
+Supertree Grove. The pontoon and the courses
+are placed from the organisers' site plan; the course elements themselves
+are not in the world, so add your own.
+
+The world's origin is the middle of the courses. The water is the Marina
+Reservoir, fresh water behind the Marina Barrage, so buoyancy uses
+1000 kg/m³, and there is no tide.
+
+| | |
+|---|---|
+| Launch | `ros2 launch kai_bringup simulation.launch.xml world:=marina_bay.sdf` |
+| Start points | course A `x:=-45 y:=12`, B `x:=-15 y:=-8`, C `x:=15 y:=-28`, D `x:=45 y:=-48`, each `yaw:=0.55` |
+| Water | A freshwater reservoir in the city |
+| Sea states | 0 to 2 |
+
+The sky is a photographed one, Poly Haven's tropical looking cumulus with the
+sun where the world's sun is, on a dome in the site model: Gazebo draws only
+its built-in sky, whatever `<sky><cubemap_uri>` says. The water reflects the
+same sky and the skyline around the bay.
+
+The site lives on [Gazebo Fuel](https://app.gazebosim.org/honurobotics):
+the first launch downloads it, about 11 MB, with the Flyer's wheel, and
+later ones use the cache. The world has an optional seabed, modelled from
+the reservoir's reported depths, for underwater vehicles, sonars and DVLs.
+It is off by default; uncomment its include at the end of `marina_bay.sdf`
+and the first launch downloads it too, about 4 MB.
+
 ## What to know
 
 - **The shore is solid where it matters.** The sites collide through boxes,
   which every physics engine handles cheaply: the shore within 900 m of the
   origin, the land within 250 m, the piers, breakwaters and moored boats
-  within 700 m and the buildings within 450 m. Farther out there is nothing
-  to hit. The water has no floor: a sinking vehicle keeps sinking, as on
-  open water.
+  within 700 m and the buildings within 450 m (500 m at Marina Bay). Farther
+  out there is nothing to hit. The water has no floor: a sinking vehicle
+  keeps sinking, as on open water.
 - **The water is one model.** Each site includes the water surface once, at
   the centre of its water, and sets `<tiles_radius>` in its wave source to
   say how far the sea is drawn around it, in 200 m tiles; the terrain hides
@@ -237,16 +281,16 @@ too, about 5 MB.
 - **First use needs the network.** The sites come from Fuel the first
   time they load; after that they are cached. Building gz-maritime needs no
   network.
-- **The water is sheltered.** Each site's water model, which ships with
-  `kai_gazebo`, carries a shelter map,
-  the share of the open sea's waves that reaches each point: the full sea
-  state offshore, less in a channel or a port, none against a quay, a bank
-  or a beach. The
-  waves also fade out over the last tile of the drawn sea, where a static
-  water plane carries on. It changes only what is drawn.
+- **The water is sheltered.** The water models of the VRX and VORC sites,
+  which ship with `kai_gazebo`, carry a shelter map, the share of the open
+  sea's waves that reaches each point: the full sea state offshore, less in
+  a channel or a port, none against a quay, a bank or a beach. The waves
+  also fade out over the last tile of the drawn sea, where a static water
+  plane carries on. It changes only what is drawn. Marina Bay's water, a
+  reservoir with little fetch, has none.
 - **Credits.** The sites are CC BY 4.0, built from OpenStreetMap (ODbL),
   Sentinel-2 cloudless imagery (CC BY 4.0), the AWS Terrain Tiles and Poly
-  Haven skies (CC0). All are credited in `kai_gazebo/NOTICE`.
+  Haven skies (CC0); Marina Bay from OpenStreetMap and a Poly Haven sky. All are credited in `kai_gazebo/NOTICE`.
 
 The worlds table in the
 [reference](../reference/launch-and-world.md#worlds) has the same facts in
