@@ -324,15 +324,20 @@ open sea, and their sheltered water gets a share of it.</p>
 <section id="sydney-international-regatta-centre">
 <h2>Sydney International Regatta Centre<a class="headerlink" href="#sydney-international-regatta-centre" title="Link to this heading"></a></h2>
 <figure class="align-default" id="id1">
-<img alt="A rowing lake seen from its shore, with trees and a boathouse on the far bank and the custom USV on the water" src="../_images/sydney-regatta.jpg" />
+<img alt="A rowing lake seen from above its finish line, eucalypts on the banks and the Blue Mountains on the horizon" src="../_images/sydney-regatta.jpg" />
 <figcaption>
 <p><span class="caption-text">The Sydney Regatta world at its opening view.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
 </figcaption>
 </figure>
-<p>The VRX venue from 2022 to 2024: the man made rowing course at Penrith
-Lakes, near Sydney, with its pontoon, shore and buildings. The terrain is
-the VRX model from Fuel, about 140 MB, downloaded the first time the world
-loads and cached under <code class="docutils literal notranslate"><span class="pre">~/.gz/fuel</span></code>.</p>
+<p>The VRX venue from 2022 to 2024: the 2.3 km rowing course of the 2000
+Olympics at Penrith Lakes, near Sydney, among the other lakes of the old
+quarries, with the regatta centre’s grandstand and towers, the Nepean River
+and Penrith around it, and the Blue Mountains rising to the west. It is
+built from open data and its models live on
+<a class="reference external" href="https://app.gazebosim.org/honurobotics">Gazebo Fuel</a>: the first launch
+downloads the site, about 12 MB, and later ones use the cache. The world
+keeps the VRX world’s coordinates; the start point moves onto the course,
+and the water is fresh, so buoyancy uses 1000 kg/m³.</p>
 <table class="docutils align-default">
 <thead>
 <tr class="row-odd"><th class="head"><p></p></th>
@@ -344,7 +349,7 @@ loads and cached under <code class="docutils literal notranslate"><span class="p
 <td><p><code class="docutils literal notranslate"><span class="pre">ros2</span> <span class="pre">launch</span> <span class="pre">kai_bringup</span> <span class="pre">simulation.launch.xml</span> <span class="pre">world:=sydney_regatta.sdf</span></code></p></td>
 </tr>
 <tr class="row-odd"><td><p>Start point</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">x:=-532</span> <span class="pre">y:=162</span> <span class="pre">yaw:=1</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">x:=-532</span> <span class="pre">y:=180</span> <span class="pre">yaw:=0</span></code></p></td>
 </tr>
 <tr class="row-even"><td><p>Water</p></td>
 <td><p>A freshwater lake, flat and sheltered</p></td>
@@ -356,6 +361,11 @@ loads and cached under <code class="docutils literal notranslate"><span class="p
 </table>
 <p>A landing pad sits off the start point, for the X500 of the
 <a class="reference internal" href="several-vehicles.html"><span class="std std-doc">multi vehicle demo</span></a>, which runs here by default.</p>
+<p>The world has an optional seabed, modelled from the depth the venue
+publishes (5 m) and sloping up to the banks, for underwater vehicles,
+sonars and DVLs. It is off by default; uncomment its include at the end of
+<code class="docutils literal notranslate"><span class="pre">sydney_regatta.sdf</span></code> and the first launch downloads it too, about
+5 MB.</p>
 </section>
 <section id="nathan-benderson-park">
 <h2>Nathan Benderson Park<a class="headerlink" href="#nathan-benderson-park" title="Link to this heading"></a></h2>
@@ -528,30 +538,30 @@ too, about 5 MB.</p>
 <section id="what-to-know">
 <h2>What to know<a class="headerlink" href="#what-to-know" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><strong>Terrain is solid.</strong> Every site’s terrain mesh is its collision too, so a
-vehicle driven into the shore grounds on it. The water has no floor: a
-sinking vehicle keeps sinking, as on open water.</p></li>
+<li><p><strong>The shore is solid where it matters.</strong> The sites collide through boxes,
+which every physics engine handles cheaply: the shore within 900 m of the
+origin, the land within 250 m, the piers, breakwaters and moored boats
+within 700 m and the buildings within 450 m. Farther out there is nothing
+to hit. The water has no floor: a sinking vehicle keeps sinking, as on
+open water.</p></li>
 <li><p><strong>The water is one model.</strong> Each site includes the water surface once, at
 the centre of its water, and sets <code class="docutils literal notranslate"><span class="pre">&lt;tiles_radius&gt;</span></code> in its wave source to
 say how far the sea is drawn around it, in 200 m tiles; the terrain hides
 it wherever there is land. Buoyancy does not depend on the drawn water:
 vehicles float on the flat z = 0 plane everywhere.</p></li>
-<li><p><strong>First use needs the network.</strong> The Sydney terrain and the Benderson
-Park, Sand Island and La Spezia sites come from Fuel the first time they
-load; after that they are cached. Building gz-maritime needs no
+<li><p><strong>First use needs the network.</strong> The sites come from Fuel the first
+time they load; after that they are cached. Building gz-maritime needs no
 network.</p></li>
-<li><p><strong>The water is sheltered.</strong> The Benderson Park, Sand Island and La
-Spezia water models, which ship with <code class="docutils literal notranslate"><span class="pre">kai_gazebo</span></code>, carry a shelter map,
+<li><p><strong>The water is sheltered.</strong> Each site’s water model, which ships with
+<code class="docutils literal notranslate"><span class="pre">kai_gazebo</span></code>, carries a shelter map,
 the share of the open sea’s waves that reaches each point: the full sea
 state offshore, less in a channel or a port, none against a quay, a bank
 or a beach. The
 waves also fade out over the last tile of the drawn sea, where a static
 water plane carries on. It changes only what is drawn.</p></li>
-<li><p><strong>Credits.</strong> The Sydney terrain is an Apache 2.0 asset from VRX;
-Benderson Park, Sand Island and La Spezia are CC BY 4.0, built from
-OpenStreetMap (ODbL), Sentinel-2 cloudless imagery (CC BY 4.0), the AWS
-Terrain Tiles and Poly Haven skies (CC0). All are credited in
-<code class="docutils literal notranslate"><span class="pre">kai_gazebo/NOTICE</span></code>.</p></li>
+<li><p><strong>Credits.</strong> The sites are CC BY 4.0, built from OpenStreetMap (ODbL),
+Sentinel-2 cloudless imagery (CC BY 4.0), the AWS Terrain Tiles and Poly
+Haven skies (CC0). All are credited in <code class="docutils literal notranslate"><span class="pre">kai_gazebo/NOTICE</span></code>.</p></li>
 </ul>
 <p>The worlds table in the
 <a class="reference internal" href="../reference/launch-and-world.html#worlds"><span class="std std-ref">reference</span></a> has the same facts in

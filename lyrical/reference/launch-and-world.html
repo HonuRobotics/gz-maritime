@@ -399,7 +399,7 @@ walks through it.</p>
 <tbody>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">world</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">sydney_regatta.sdf</span></code></p></td>
-<td><p>World file, as for the simulation launch, among those the demo has poses for: <code class="docutils literal notranslate"><span class="pre">sydney_regatta.sdf</span></code> (off the start point) or <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code> (around the origin).</p></td>
+<td><p>World file, as for the simulation launch, among those the demo has poses for: <code class="docutils literal notranslate"><span class="pre">sydney_regatta.sdf</span></code> (at the start point) or <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code> (around the origin).</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gazebo_gui</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">true</span></code></p></td>
@@ -511,9 +511,9 @@ every one.</p>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">sydney_regatta.sdf</span></code></p></td>
 <td><p>Sydney International Regatta Centre, VRX 2022 to 2024</p></td>
-<td><p>Fuel, fetched on first use (about 140 MB)</p></td>
-<td><p>around x -530, y 170; start at x -532, y 162</p></td>
-<td><p>Rowing lake, 0 to 2</p></td>
+<td><p>Built from open data, from Fuel on first use (about 12 MB); optional seabed</p></td>
+<td><p>around x -530, y 180; start at x -532, y 180</p></td>
+<td><p>Rowing lake, fresh water, 0 to 2</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">benderson_park.sdf</span></code></p></td>
 <td><p>Nathan Benderson Park, Sarasota, RobotX 2022</p></td>
@@ -546,12 +546,12 @@ Change it with the wave service below.</p>
 water, and size the drawn sea with <code class="docutils literal notranslate"><span class="pre">&lt;tiles_radius&gt;</span></code> in their wave source:
 the model draws that many 200 m tiles around itself in every direction,
 sharing one wave field, and the terrain hides them wherever there is land.
-Open water keeps the model’s own radius, a 1 km square. The Benderson
-Park, Sand Island and La Spezia water models also fade the waves out over
-the last tile (<code class="docutils literal notranslate"><span class="pre">&lt;fadeEdges&gt;</span></code>) and carry a shelter map
-(<code class="docutils literal notranslate"><span class="pre">&lt;textures&gt;&lt;shelterMap&gt;</span></code>, with <code class="docutils literal notranslate"><span class="pre">&lt;shelterOrigin&gt;</span></code> and <code class="docutils literal notranslate"><span class="pre">&lt;shelterSize&gt;</span></code> in
-its <code class="docutils literal notranslate"><span class="pre">&lt;parameters&gt;</span></code>): a greyscale image over a world rectangle, white where
-the open sea’s full waves reach, black against a quay. Buoyancy does not depend on any of that.
+Open water keeps the model’s own radius, a 1 km square. The sites’ water
+models also fade the waves out over the last tile (<code class="docutils literal notranslate"><span class="pre">&lt;fadeEdges&gt;</span></code>) and carry
+a shelter map (<code class="docutils literal notranslate"><span class="pre">&lt;textures&gt;&lt;shelterMap&gt;</span></code>, with <code class="docutils literal notranslate"><span class="pre">&lt;shelterOrigin&gt;</span></code> and
+<code class="docutils literal notranslate"><span class="pre">&lt;shelterSize&gt;</span></code> in its <code class="docutils literal notranslate"><span class="pre">&lt;parameters&gt;</span></code>): a greyscale image over a world
+rectangle, white where the open sea’s full waves reach, black against a
+quay. Buoyancy does not depend on any of that.
 The site models are credited in <code class="docutils literal notranslate"><span class="pre">kai_gazebo/NOTICE</span></code>.</p>
 </section>
 <section id="the-open-water-sdf-world">
