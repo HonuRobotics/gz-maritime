@@ -1,14 +1,32 @@
-kai_gazebo ships worlds built on terrain models from other projects, all
-under the Apache License, Version 2.0:
+kai_gazebo ships worlds built on terrain models from other projects:
 
 - Sydney International Regatta Centre and Nathan Benderson Park: models
-  from the Virtual RobotX competition (osrf/vrx), fetched from Fuel
+  from the Virtual RobotX competition (osrf/vrx), Apache 2.0, fetched from Fuel
   (https://app.gazebosim.org/openrobotics) at run time.
-- Sand Island: the Virtual RobotX (VRX) 2019 terrain mesh and texture
-  (osrf/vrx, gazebo_classic branch, vrx_gazebo/models/sandisland), fetched at
-  build time from a pinned commit; its shore camp (post, antenna,
-  ground_station with tent, foldable_table and foldable_chair) from Fuel at
-  run time.
+- Sand Island: the site and its optional seabed are models on Gazebo Fuel
+  (https://app.gazebosim.org/honuRobotics: sand_island and
+  sand_island_seabed), fetched at run time, and its water
+  (models/water_surface_sand_island) ships here, all by Honu Robotics under
+  the Creative Commons Attribution 4.0 International License. They are
+  built from:
+  - OpenStreetMap: the shoreline, land cover, buildings, bridges, piers,
+    breakwaters, cranes, trees and seamarks. Map data (c) OpenStreetMap
+    contributors, available under the Open Database License (ODbL) 1.0,
+    https://www.openstreetmap.org/copyright. The meshes are a Produced Work
+    of that data.
+  - Sentinel-2 cloudless (https://s2maps.eu) by EOX IT Services GmbH
+    (contains modified Copernicus Sentinel data 2016), under the Creative
+    Commons Attribution 4.0 International License: the colour of the ground
+    and of the far field in the sky.
+  - The AWS Terrain Tiles (https://registry.opendata.aws/terrain-tiles/),
+    Mapzen's Terrarium elevation: SRTM, USGS 3DEP and NED, GMTED2010, ETOPO1
+    and others, see https://github.com/tilezen/joerd/blob/master/docs/attribution.md.
+  - Poly Haven's sunflowers_puresky (https://polyhaven.com), CC0, turned
+    and with the far field painted in.
+  - The seabed: NOAA NCEI's Continuously Updated Digital Elevation Model
+    (CUDEM), 1/9 arc second topobathymetric tiles, Hawaii (2021),
+    https://www.ncei.noaa.gov/products/coastal-elevation-models, a work of
+    the US Government, in the public domain.
 - La Spezia marina: the Virtual Ocean Robotics Challenge (VORC) terrain mesh
-  and texture (osrf/vorc, vorc_gazebo/models/marina), fetched at build time
-  from a pinned commit.
+  and texture (osrf/vorc, vorc_gazebo/models/marina), Apache 2.0, fetched
+  at build time from a pinned commit.

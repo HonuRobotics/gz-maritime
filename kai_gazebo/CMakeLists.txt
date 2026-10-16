@@ -20,12 +20,11 @@ install(DIRECTORY
   models
   DESTINATION share/${PROJECT_NAME})
 
-# Terrain meshes of the Sand Island and La Spezia worlds. They are Virtual
-# RobotX (VRX) and Virtual Ocean Robotics Challenge (VORC) assets (Apache
-# 2.0), tens of megabytes each, so they are not kept in this repository: the
-# build fetches them from pinned commits, checks their hashes and installs
-# them next to the models that reference them. The Sydney Regatta and
-# Benderson Park terrains come from Fuel at run time.
+# Terrain mesh of the La Spezia world. It is a Virtual Ocean Robotics
+# Challenge (VORC) asset (Apache 2.0), tens of megabytes, so it is not kept in
+# this repository: the build fetches it from a pinned commit, checks its hash
+# and installs it next to the model that references it. The Sydney Regatta,
+# Benderson Park and Sand Island sites come from Fuel at run time.
 function(kai_fetch_asset url sha256 destination)
   # A file already there is trusted only if its hash matches: a partial or
   # stale download, or a bumped pin, triggers a new download.
@@ -58,15 +57,8 @@ function(kai_fetch_asset url sha256 destination)
   file(RENAME ${partial} ${destination})
 endfunction()
 
-set(vrx_classic https://raw.githubusercontent.com/osrf/vrx/c9b9388/vrx_gazebo/models/sandisland)
 set(vorc https://raw.githubusercontent.com/osrf/vorc/bc71dd4/vorc_gazebo/models/marina/meshes)
 set(assets ${CMAKE_CURRENT_BINARY_DIR}/assets)
-kai_fetch_asset(${vrx_classic}/meshes/sandisland.dae
-  89985538d8ed0cf195ac88984c17cbf559e4420013c44b0aefa6f24092d61aa8
-  ${assets}/sandisland/meshes/sandisland.dae)
-kai_fetch_asset(${vrx_classic}/materials/textures/sandisland.png
-  342bb8260467d9e233071c21079c52c84bce29350c5ddafc13bf6c00300030d1
-  ${assets}/sandisland/meshes/sandisland.png)
 kai_fetch_asset(${vorc}/terrain.dae
   0df3826427eba276adf34795e79f9702b4707a73d50a8dc68204232c4cdffe8e
   ${assets}/la_spezia/meshes/terrain.dae)
