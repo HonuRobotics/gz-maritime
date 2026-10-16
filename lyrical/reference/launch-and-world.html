@@ -528,28 +528,27 @@ every one.</p>
 <td><p>Harbour channel and open ocean, any (calmer in the channel)</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">la_spezia.sdf</span></code></p></td>
-<td><p>La Spezia marina, VORC 2020</p></td>
-<td><p>VORC mesh, fetched by the build</p></td>
+<td><p>La Spezia, VORC 2020</p></td>
+<td><p>Built from open data, from Fuel on first use (about 14 MB); optional seabed</p></td>
 <td><p>start at x 10, y -372</p></td>
-<td><p>Marina and gulf, 0 to 3</p></td>
+<td><p>Port and gulf, any (calm in the port)</p></td>
 </tr>
 </tbody>
 </table>
-<p>Every world starts at sea state 1, Sand Island at 3, and takes any of the ten codes, but the
-last column says what fits the site: a rowing lake never sees more than
-wind chop (code 2 is 0.3 m waves), a sheltered lagoon or gulf at most a
-slight sea (code 3 is about 0.9 m), and the open water world and Sand
-Island take them all. At Sand Island the code sets the open ocean (3 by
-default, a slight sea), and a
-shelter map on its water scales the waves down where land, the reef and
-the piers shelter it. Change it with the wave service below.</p>
+<p>Every world starts at sea state 1, Sand Island at 3, and takes any of the
+ten codes, but the last column says what fits the site: a rowing lake never
+sees more than wind chop (code 2 is 0.3 m waves), while the open water
+world and the sea sites, Sand Island and La Spezia, take them all. At the
+sea sites the code sets the open sea, and a shelter map on their water
+scales the waves down where land, reefs, breakwaters and piers shelter it.
+Change it with the wave service below.</p>
 <p>The site worlds place the water surface model once, at the centre of their
 water, and size the drawn sea with <code class="docutils literal notranslate"><span class="pre">&lt;tiles_radius&gt;</span></code> in their wave source:
 the model draws that many 200 m tiles around itself in every direction,
 sharing one wave field, and the terrain hides them wherever there is land.
-Open water keeps the model’s own radius, a 1 km square. Sand Island’s
-water model also fades the waves out over the last tile (<code class="docutils literal notranslate"><span class="pre">&lt;fadeEdges&gt;</span></code>)
-and carries a shelter map (<code class="docutils literal notranslate"><span class="pre">&lt;textures&gt;&lt;shelterMap&gt;</span></code>, with
+Open water keeps the model’s own radius, a 1 km square. The Sand Island
+and La Spezia water models also fade the waves out over the last tile (<code class="docutils literal notranslate"><span class="pre">&lt;fadeEdges&gt;</span></code>)
+and carry a shelter map (<code class="docutils literal notranslate"><span class="pre">&lt;textures&gt;&lt;shelterMap&gt;</span></code>, with
 <code class="docutils literal notranslate"><span class="pre">&lt;shelterOrigin&gt;</span></code> and <code class="docutils literal notranslate"><span class="pre">&lt;shelterSize&gt;</span></code> in its <code class="docutils literal notranslate"><span class="pre">&lt;parameters&gt;</span></code>): a greyscale
 image over a world rectangle, white where the open sea’s full waves
 reach, black against a quay. Buoyancy does not depend on any of that.

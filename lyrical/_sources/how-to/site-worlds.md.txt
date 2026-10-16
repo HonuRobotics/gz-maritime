@@ -35,8 +35,8 @@ gz service -s /world/default/wave/set_parameters --reqtype gz.msgs.Param \
 The sea state goes from 0 (glassy) to 9, and each site says below which
 range fits its water. A rowing lake never sees more than wind chop, and a
 lagoon or a gulf at most a slight sea; higher codes are open sea and look
-wrong between shores. Sand Island takes any code: it sets the open ocean,
-and its sheltered water gets a share of it.
+wrong between shores. Sand Island and La Spezia take any code: it sets the
+open sea, and their sheltered water gets a share of it.
 
 ## Sydney International Regatta Centre
 
@@ -133,22 +133,34 @@ it too, about 6 MB.
 ## La Spezia
 
 ```{figure} images/la-spezia.jpg
-:alt: A marina seen from over the sea, a pier pointing at the viewer, quays and a town behind it and hills above
+:alt: The port of La Spezia from over the gulf, terracotta roofs climbing wooded hills, quay cranes and marinas
 
 The La Spezia world at its opening view, from over the gulf.
 ```
 
-The VORC 2020 venue: the marina in the Gulf of La Spezia, Italy, with its
-breakwaters and quays. The terrain mesh comes from the VORC repository and
-is fetched by the build. Inside the breakwaters the water is calm; the gulf
-beyond them sees a slight sea at most.
+The VORC 2020 venue: the port of La Spezia, Italy, at the head of its gulf,
+with the city's terracotta roofs climbing the wooded hills, the naval
+arsenal, the container terminal and its cranes, and marinas packed with
+boats. It is built from open data and its models live on
+[Gazebo Fuel](https://app.gazebosim.org/honurobotics): the first launch
+downloads the site, about 14 MB, and later ones use the cache. The world
+keeps the VORC world's coordinates.
 
 | | |
 |---|---|
 | Launch | `ros2 launch kai_bringup simulation.launch.xml world:=la_spezia.sdf` |
-| Start point | `x:=10 y:=-372 yaw:=0.3816` |
-| Water | The marina and the gulf |
-| Sea states | 0 to 2 in the marina, up to 3 in the gulf |
+| Start point | `x:=10 y:=-372 yaw:=0.38` |
+| Water | The port and the gulf, salt |
+| Sea states | any; calm in the port |
+
+The sea state sets the open gulf; a shelter map on the water scales the
+waves down inside the breakwaters, so the port stays calm and the quays
+calmer still (see below).
+
+The world has an optional seabed, from Regione Liguria's multibeam
+isobaths and the port's published depths, for underwater vehicles, sonars
+and DVLs. It is off by default; uncomment its include at the end of
+`la_spezia.sdf` and the first launch downloads it too, about 5 MB.
 
 ## What to know
 
@@ -161,19 +173,19 @@ beyond them sees a slight sea at most.
   it wherever there is land. Buoyancy does not depend on the drawn water:
   vehicles float on the flat z = 0 plane everywhere.
 - **First use needs the network.** The Sydney and Benderson Park terrains
-  and the Sand Island site come from Fuel the first time they load; after
-  that they are cached. The La Spezia mesh is fetched by the build, so
-  building gz-maritime needs the network once too.
-- **Sand Island's water is sheltered.** Its water model, which ships with
-  `kai_gazebo`, carries a shelter map,
-  the share of the open sea's waves that reaches each point: the full sea
-  state offshore, less in the channel, none against a quay or a beach. The
+  and the Sand Island and La Spezia sites come from Fuel the first time
+  they load; after that they are cached. Building gz-maritime needs no
+  network.
+- **The sea sites' water is sheltered.** The Sand Island and La Spezia
+  water models, which ship with `kai_gazebo`, carry a shelter map, the
+  share of the open sea's waves that reaches each point: the full sea state
+  offshore, less in a channel or a port, none against a quay or a beach. The
   waves also fade out over the last tile of the drawn sea, where a static
   water plane carries on. It changes only what is drawn.
-- **Credits.** The Sydney, Benderson Park and La Spezia terrains are
-  Apache 2.0 assets from VRX and VORC; Sand Island is CC BY 4.0, built from
+- **Credits.** The Sydney and Benderson Park terrains are Apache 2.0
+  assets from VRX; Sand Island and La Spezia are CC BY 4.0, built from
   OpenStreetMap (ODbL), Sentinel-2 cloudless imagery (CC BY 4.0), the AWS
-  Terrain Tiles and a Poly Haven sky (CC0). All are credited in
+  Terrain Tiles and Poly Haven skies (CC0). All are credited in
   `kai_gazebo/NOTICE`.
 
 The worlds table in the

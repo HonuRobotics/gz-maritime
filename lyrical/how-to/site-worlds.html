@@ -319,8 +319,8 @@ wave service and the other world services take the same path everywhere:</p>
 <p>The sea state goes from 0 (glassy) to 9, and each site says below which
 range fits its water. A rowing lake never sees more than wind chop, and a
 lagoon or a gulf at most a slight sea; higher codes are open sea and look
-wrong between shores. Sand Island takes any code: it sets the open ocean,
-and its sheltered water gets a share of it.</p>
+wrong between shores. Sand Island and La Spezia take any code: it sets the
+open sea, and their sheltered water gets a share of it.</p>
 <section id="sydney-international-regatta-centre">
 <h2>Sydney International Regatta Centre<a class="headerlink" href="#sydney-international-regatta-centre" title="Link to this heading"></a></h2>
 <figure class="align-default" id="id1">
@@ -453,15 +453,18 @@ it too, about 6 MB.</p>
 <section id="la-spezia">
 <h2>La Spezia<a class="headerlink" href="#la-spezia" title="Link to this heading"></a></h2>
 <figure class="align-default" id="id4">
-<img alt="A marina seen from over the sea, a pier pointing at the viewer, quays and a town behind it and hills above" src="../_images/la-spezia.jpg" />
+<img alt="The port of La Spezia from over the gulf, terracotta roofs climbing wooded hills, quay cranes and marinas" src="../_images/la-spezia.jpg" />
 <figcaption>
 <p><span class="caption-text">The La Spezia world at its opening view, from over the gulf.</span><a class="headerlink" href="#id4" title="Link to this image"></a></p>
 </figcaption>
 </figure>
-<p>The VORC 2020 venue: the marina in the Gulf of La Spezia, Italy, with its
-breakwaters and quays. The terrain mesh comes from the VORC repository and
-is fetched by the build. Inside the breakwaters the water is calm; the gulf
-beyond them sees a slight sea at most.</p>
+<p>The VORC 2020 venue: the port of La Spezia, Italy, at the head of its gulf,
+with the city’s terracotta roofs climbing the wooded hills, the naval
+arsenal, the container terminal and its cranes, and marinas packed with
+boats. It is built from open data and its models live on
+<a class="reference external" href="https://app.gazebosim.org/honurobotics">Gazebo Fuel</a>: the first launch
+downloads the site, about 14 MB, and later ones use the cache. The world
+keeps the VORC world’s coordinates.</p>
 <table class="docutils align-default">
 <thead>
 <tr class="row-odd"><th class="head"><p></p></th>
@@ -473,16 +476,23 @@ beyond them sees a slight sea at most.</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">ros2</span> <span class="pre">launch</span> <span class="pre">kai_bringup</span> <span class="pre">simulation.launch.xml</span> <span class="pre">world:=la_spezia.sdf</span></code></p></td>
 </tr>
 <tr class="row-odd"><td><p>Start point</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">x:=10</span> <span class="pre">y:=-372</span> <span class="pre">yaw:=0.3816</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">x:=10</span> <span class="pre">y:=-372</span> <span class="pre">yaw:=0.38</span></code></p></td>
 </tr>
 <tr class="row-even"><td><p>Water</p></td>
-<td><p>The marina and the gulf</p></td>
+<td><p>The port and the gulf, salt</p></td>
 </tr>
 <tr class="row-odd"><td><p>Sea states</p></td>
-<td><p>0 to 2 in the marina, up to 3 in the gulf</p></td>
+<td><p>any; calm in the port</p></td>
 </tr>
 </tbody>
 </table>
+<p>The sea state sets the open gulf; a shelter map on the water scales the
+waves down inside the breakwaters, so the port stays calm and the quays
+calmer still (see below).</p>
+<p>The world has an optional seabed, from Regione Liguria’s multibeam
+isobaths and the port’s published depths, for underwater vehicles, sonars
+and DVLs. It is off by default; uncomment its include at the end of
+<code class="docutils literal notranslate"><span class="pre">la_spezia.sdf</span></code> and the first launch downloads it too, about 5 MB.</p>
 </section>
 <section id="what-to-know">
 <h2>What to know<a class="headerlink" href="#what-to-know" title="Link to this heading"></a></h2>
@@ -496,19 +506,19 @@ say how far the sea is drawn around it, in 200 m tiles; the terrain hides
 it wherever there is land. Buoyancy does not depend on the drawn water:
 vehicles float on the flat z = 0 plane everywhere.</p></li>
 <li><p><strong>First use needs the network.</strong> The Sydney and Benderson Park terrains
-and the Sand Island site come from Fuel the first time they load; after
-that they are cached. The La Spezia mesh is fetched by the build, so
-building gz-maritime needs the network once too.</p></li>
-<li><p><strong>Sand Island’s water is sheltered.</strong> Its water model, which ships with
-<code class="docutils literal notranslate"><span class="pre">kai_gazebo</span></code>, carries a shelter map,
-the share of the open sea’s waves that reaches each point: the full sea
-state offshore, less in the channel, none against a quay or a beach. The
+and the Sand Island and La Spezia sites come from Fuel the first time
+they load; after that they are cached. Building gz-maritime needs no
+network.</p></li>
+<li><p><strong>The sea sites’ water is sheltered.</strong> The Sand Island and La Spezia
+water models, which ship with <code class="docutils literal notranslate"><span class="pre">kai_gazebo</span></code>, carry a shelter map, the
+share of the open sea’s waves that reaches each point: the full sea state
+offshore, less in a channel or a port, none against a quay or a beach. The
 waves also fade out over the last tile of the drawn sea, where a static
 water plane carries on. It changes only what is drawn.</p></li>
-<li><p><strong>Credits.</strong> The Sydney, Benderson Park and La Spezia terrains are
-Apache 2.0 assets from VRX and VORC; Sand Island is CC BY 4.0, built from
+<li><p><strong>Credits.</strong> The Sydney and Benderson Park terrains are Apache 2.0
+assets from VRX; Sand Island and La Spezia are CC BY 4.0, built from
 OpenStreetMap (ODbL), Sentinel-2 cloudless imagery (CC BY 4.0), the AWS
-Terrain Tiles and a Poly Haven sky (CC0). All are credited in
+Terrain Tiles and Poly Haven skies (CC0). All are credited in
 <code class="docutils literal notranslate"><span class="pre">kai_gazebo/NOTICE</span></code>.</p></li>
 </ul>
 <p>The worlds table in the
