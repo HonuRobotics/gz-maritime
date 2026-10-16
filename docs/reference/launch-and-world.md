@@ -118,7 +118,7 @@ every one.
 | `benderson_park.sdf` | Nathan Benderson Park, Sarasota, RobotX 2022 | Built from open data, from Fuel on first use (about 11 MB); optional seabed; also `benderson_park_lite.sdf`, lighter, about 3 MB | the lake runs along y; start at the origin, heading 1.57 | Rowing lake, fresh water, 0 to 2 |
 | `sand_island.sdf` | Sand Island, Honolulu, RobotX 2016 and 2018, VRX 2019 | Built from open data, from Fuel on first use (about 9 MB); optional seabed; also `sand_island_lite.sdf`, lighter, about 5 MB | start at x 60, y 120 | Harbour channel and open ocean, any (calmer in the channel) |
 | `la_spezia.sdf` | La Spezia, VORC 2020 | Built from open data, from Fuel on first use (about 14 MB); optional seabed; also `la_spezia_lite.sdf`, lighter, about 7 MB | start at x 10, y -372 | Port and gulf, any (calm in the port) |
-| `marina_bay.sdf` | Marina Bay, Singapore, RobotX 2026 | Built from OpenStreetMap, from Fuel on first use (about 11 MB); optional seabed | the four courses around the origin; course A at x -45, y 12, heading 0.55 | Freshwater reservoir, 0 to 2 |
+| `marina_bay.sdf` | Marina Bay, Singapore, RobotX 2026 | Built from OpenStreetMap, from Fuel on first use (about 11 MB); optional seabed; also `marina_bay_lite.sdf`, lighter, about 8 MB | the four courses around the origin; course A at x -45, y 12, heading 0.55 | Freshwater reservoir, 0 to 2 |
 
 Every world starts at sea state 1, Sand Island at 3, and takes any of the
 ten codes, but the last column says what fits the site: a rowing lake never

@@ -263,7 +263,22 @@ the first launch downloads it, about 11 MB, with the Flyer's wheel, and
 later ones use the cache. The world has an optional seabed, modelled from
 the reservoir's reported depths, for underwater vehicles, sonars and DVLs.
 It is off by default; uncomment its include at the end of `marina_bay.sdf`
-and the first launch downloads it too, about 4 MB.
+or `marina_bay_lite.sdf` and the first launch downloads it too, about 4 MB.
+
+`marina_bay_lite.sdf` is the day world's lite tier, as the sites have: the
+same venue, start points and collisions, but no trees, the ground and sky
+at half size (182 MB of textures on the GPU against 388), no shadows, and
+the animated water only out to 700 m from the bay's middle, the static
+water plane past it. From the opening view it renders 15 to 19% faster on
+the laptop's integrated GPU (53 against 45 frames per second at 1080p, 95
+against 82 at 640 by 360), and 8 to 15% on the discrete one, where the
+camera's copies bound the frame rate:
+
+```bash
+ros2 launch kai_bringup simulation.launch.xml world:=marina_bay_lite.sdf
+```
+
+Its site model is a separate download, about 8 MB.
 
 ## What to know
 
