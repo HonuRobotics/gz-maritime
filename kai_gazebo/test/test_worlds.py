@@ -36,7 +36,8 @@ import pytest
 
 WORLDS = Path(get_package_share_directory('kai_gazebo')) / 'worlds'
 ALL = ('open_water', 'sydney_regatta', 'sydney_regatta_lite', 'benderson_park',
-       'benderson_park_lite', 'sand_island', 'sand_island_lite', 'la_spezia', 'la_spezia_lite')
+       'benderson_park_lite', 'sand_island', 'sand_island_lite', 'la_spezia', 'la_spezia_lite',
+       'marina_bay')
 # Worlds with no Fuel model in them, so they load with no network and no cache.
 LOCAL = ('open_water',)
 REQUIRED_SYSTEMS = (
@@ -112,4 +113,18 @@ def test_site_water_is_sheltered(site):
         assert (models / f'water_surface_{site}' / path).is_file(), path
     params = plugin.find('shader/parameters')
     assert min(float(v) for v in params.find('shelterSize').text.split()) > 0
+    assert params.find('fadeEdges').text == 'true'
+
+
+def test_marina_bay_water_has_its_mesh_and_sky():
+    """The day water draws gz_waves_rendering's mesh, reflects the bay's sky, fades at its edge."""
+    models = Path(get_package_share_directory('kai_gazebo')) / 'models'
+    root = ET.parse(models / 'water_surface_day' / 'model.sdf').getroot()
+    uri = root.find('model/link/visual/geometry/mesh/uri').text
+    assert uri == 'model://water_surface/meshes/water.dae'
+    share = Path(get_package_share_directory('gz_waves_rendering')) / 'models'
+    assert (share / uri.removeprefix('model://')).is_file()
+    cube = root.find('model/link/visual/plugin/textures/cubeMap').text
+    assert (models / 'water_surface_day' / cube).is_file(), cube
+    params = root.find('model/link/visual/plugin/shader/parameters')
     assert params.find('fadeEdges').text == 'true'

@@ -144,7 +144,7 @@ surface is only drawn. See
 - [Several vehicles on one ocean](../how-to/several-vehicles.md): a boat, an
   ROV and a drone in one simulation, each commanded on its own.
 - [Sail the competition sites](../how-to/site-worlds.md): the same boat on
-  four real venues, from a rowing lake to a marina.
+  five real venues, from a rowing lake to the RobotX 2026 bay in Singapore.
 - [The custom USV](../vehicles/custom-usv.md): its topics, frames and
   files.
 - [Bring your own vehicle](../how-to/own-vehicle.md): build a vehicle like it.

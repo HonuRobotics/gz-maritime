@@ -138,6 +138,19 @@ FIGURES = {
     },
     # The multi vehicle demo at Sydney: the boat off the start point, the
     # ROV under the surface ahead of it, the X500 on the pad.
+    # Marina Bay from its opening view: the Promontory's lawn, the RobotX
+    # pontoon and courses, Marina Bay Sands across the water.
+    'marina-bay': {
+        'out': DOCS / 'how-to' / 'images' / 'marina-bay.jpg',
+        'world': 'marina_bay',
+        'vehicles': [(USV, 'usv', '-45 12 0 0 0 0.55')],
+        'sea_state': 1,
+        'camera': '-210 95 32 0 0.12 0.15',
+        'fov': SITE_FOV,
+        'at': [10],
+        # Past the sky dome, 3.8 km out.
+        'far': 5000,
+    },
     'several-vehicles': {
         'out': DOCS / 'how-to' / 'images' / 'several-vehicles.jpg',
         'world': 'sydney_regatta',
