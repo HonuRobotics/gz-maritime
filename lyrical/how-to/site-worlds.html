@@ -434,10 +434,21 @@ draws it.</p>
 ocean; a shelter map on the water scales the waves down where land, the
 reef and the piers shelter it, so the channel stays calmer and the quays
 calm (see below).</p>
+<p><code class="docutils literal notranslate"><span class="pre">sand_island_lite.sdf</span></code> is a lighter tier of the same world, for CI,
+integrated GPUs or many vehicles and cameras. Its collisions, coordinates
+and systems are the same, so a vehicle behaves the same in both; it draws
+less: coarse terrain, flat roofs, no trees, 2048 px ground and a 4096 px
+sky, no shadows, and the animated water out to 900 m from the middle of
+the water rather than 1.7 km. Its site model is a separate download, about
+5 MB:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>simulation.launch.xml<span class="w"> </span>world:<span class="o">=</span>sand_island_lite.sdf
+</pre></div>
+</div>
 <p>The world has an optional seabed, from NOAA’s topobathymetric model of
 Hawaii, for underwater vehicles, sonars and DVLs, or a hull grounding on
 the shallows. It is off by default; uncomment its include at the end of
-<code class="docutils literal notranslate"><span class="pre">sand_island.sdf</span></code> and the first launch downloads it too, about 6 MB.</p>
+<code class="docutils literal notranslate"><span class="pre">sand_island.sdf</span></code> or <code class="docutils literal notranslate"><span class="pre">sand_island_lite.sdf</span></code> and the first launch downloads
+it too, about 6 MB.</p>
 </section>
 <section id="la-spezia">
 <h2>La Spezia<a class="headerlink" href="#la-spezia" title="Link to this heading"></a></h2>
