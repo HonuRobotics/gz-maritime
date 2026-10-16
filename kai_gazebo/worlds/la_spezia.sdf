@@ -1,21 +1,32 @@
 <?xml version="1.0"?>
 <!--
-  La Spezia marina: the Virtual Ocean Robotics Challenge (VORC) 2020 venue
-  in the Gulf of La Spezia, Italy: the marina with its breakwaters and
-  quays, on a terrain mesh fetched at build time from the VORC repository.
+  La Spezia, Italy: the Virtual Ocean Robotics Challenge (VORC) 2020
+  venue, the port and marinas at the head of the Gulf of La Spezia,
+  ringed by wooded hills.
 
-  The water is the marina inside its breakwaters and, beyond them, the Gulf
-  of La Spezia, so sea states 0 to 2 fit the marina and up to 3 the gulf (a
-  slight sea of about 0.9 m); the open Ligurian Sea is not in this world.
+  The finest terrain, every building with pitched roofs on the homes, every
+  tree, 4096 pixel ground and an 8192 pixel sky, and shadows.
+
+  The water is the port inside its breakwaters and the gulf beyond, so
+  any sea state fits: it sets the open gulf, and the breakwaters and
+  quays shelter the port, calm against the quays.
 
   The same world contract as open_water.sdf (the systems every vehicle
   needs, gz-maritime's buoyancy reading marked collisions, the waterline at
-  z = 0, the wave field for the drawn sea), with this site's terrain and
-  coordinates. Vehicles are spawned into it by name; a good start point is
-  10 -372 0.1 0 0 0.3816:
+  z = 0, the wave field for the drawn sea), with this site's coordinates
+  (the origin of the VRX or VORC world it replaces). A good start point is
+  10 -372 0 0 0 0.38:
 
       ros2 launch kai_bringup simulation.launch.xml world:=la_spezia.sdf
       ros2 launch kai_bringup spawn_vehicle.launch.xml name:=boat_a x:=10 y:=-372 ...
+
+  The site and its seabed are models on Gazebo Fuel
+  (https://app.gazebosim.org/honurobotics, CC BY 4.0), downloaded the first
+  time the world loads and cached after that. The water ships with
+  kai_gazebo, next to gz_waves_rendering's shaders it uses. Terrain, shore
+  and city from OpenStreetMap (c) OpenStreetMap contributors, ODbL 1.0,
+  Sentinel-2 cloudless 2016 by EOX (CC BY 4.0) and the AWS Terrain Tiles;
+  see kai_gazebo/NOTICE.
 -->
 <sdf version="1.12">
   <world name="default">
@@ -32,39 +43,37 @@
     <spherical_coordinates>
       <surface_model>EARTH_WGS84</surface_model>
       <world_frame_orientation>ENU</world_frame_orientation>
-      <latitude_deg>44.09525149</latitude_deg>
-      <longitude_deg>9.823435727</longitude_deg>
+      <latitude_deg>44.095251</latitude_deg>
+      <longitude_deg>9.823436</longitude_deg>
       <elevation>0</elevation>
       <heading_deg>0</heading_deg>
     </spherical_coordinates>
 
-    <!-- Scene: neutral white ambient, as in the Virtual RobotX (VRX)
-         worlds, so the terrain textures keep their colours (open
-         water uses a cyan ambient tuned for the sea alone, which
-         turns sand green), plus a procedural sky: the <sky> element
-         tells gz-rendering to draw its built-in sky cube (sun,
-         horizon transition) so the water has something to reflect and
-         the background isn't a flat colour. -->
+    <!-- Scene: a soft ambient, the light of the sky, low enough that the
+         sun shapes the land and the buildings, the same for camera sensors
+         and the GUI. No <sky>: gz-rendering draws only its built-in sky
+         cube, whatever <cubemap_uri> says; the sky is a photographed one on
+         a dome in the site model, and the background colour shows only
+         past its edge (cameras whose far clip is under 3.8 km). -->
     <scene>
-      <ambient>1.0 1.0 1.0</ambient>
-      <background>0.0 0.7 0.8</background>
-      <sky></sky>
+      <ambient>0.6 0.62 0.66</ambient>
+      <background>0.62 0.72 0.86</background>
       <grid>false</grid>
     </scene>
 
-    <!-- Directional light (sun, attenuated by water) -->
+    <!-- The sun where it is in the sky dome's photograph: azimuth 200 degrees, 38 degrees up. -->
     <light type="directional" name="sun">
       <cast_shadows>true</cast_shadows>
-      <pose>0 0 20 0 0 0</pose>
-      <diffuse>1 1 1 1</diffuse>
-      <specular>0.5 0.5 0.5 1</specular>
+      <pose>0 0 200 0 0 0</pose>
+      <diffuse>1 0.97 0.92 1</diffuse>
+      <specular>0.6 0.6 0.6 1</specular>
       <attenuation>
-        <range>1000</range>
+        <range>10000</range>
         <constant>0.9</constant>
-        <linear>0.01</linear>
-        <quadratic>0.001</quadratic>
+        <linear>0.0</linear>
+        <quadratic>0.0</quadratic>
       </attenuation>
-      <direction>-0.5 0.1 -0.9</direction>
+      <direction>0.270 0.740 -0.616</direction>
     </light>
 
     <!-- Core systems -->
@@ -112,7 +121,7 @@
       name="gz::sim::systems::AirPressure">
     </plugin>
 
-    <!-- Buoyancy (gz_buoyancy): graded, seawater (1025 kg/m^3) below z = 0
+    <!-- Buoyancy (gz_buoyancy): graded, sea water (1025 kg/m^3) below z = 0
          and air (1 kg/m^3) above. The interface is the FLAT z = 0 plane, not
          the wave surface: for vehicle physics the waves are visual only.
          Coupling buoyancy to the waves is the job of the future
@@ -208,10 +217,10 @@
              0 = glassy). For a hand-tuned sea, comment <sea_state> and uncomment
              the advanced block (delete the two comment markers wrapping it). -->
         <sea_state>1</sea_state>
-        <!-- How far the sea is drawn around the water surface model, in
-             200 m tiles: 7 is a 3 km square. Open water leaves it at the
-             model's own 2, a 1 km square. -->
-        <tiles_radius>7</tiles_radius>
+        <!-- How far the water is drawn around the water surface model, in
+             200 m tiles: 8 is a 3.4 km square. Past it the
+             site's far water plane takes over. -->
+        <tiles_radius>8</tiles_radius>
 
         <!-- Advanced / manual setup (a working configuration). <period> sets
              wind speed; <gain> is the amplitude multiplier (9.5 = dramatic and
@@ -265,11 +274,10 @@
         </gz-gui>
         <engine>ogre2</engine>
         <scene>scene</scene>
-        <ambient_light>0.4 0.4 0.4</ambient_light>
+        <ambient_light>0.6 0.62 0.66</ambient_light>
         <background_color>0.0 0.7 0.8</background_color>
-        <!-- From over the sea towards the marina: a pier below, the
-             quays and the hills behind. -->
-        <camera_pose>200 -480 55 0 0.55 -2.65</camera_pose>
+        <!-- Over the gulf, looking north west to the port, the city and the hills. -->
+        <camera_pose>250 -650 40 0 0.1 2.4</camera_pose>
         <camera_clip>
           <near>0.1</near>
           <far>50000</far>
@@ -433,24 +441,29 @@
       </plugin>
     </gui>
 
-    <!-- Terrain: the VORC marina mesh (kai_gazebo/models/la_spezia, fetched
-         at build time from the VORC repository). Static; its collision is
-         the marina. -->
+    <!-- The site, one static model in the world frame: terrain, shore,
+         buildings, trees and the sky dome, drawn in full. Its
+         collisions are boxes (the shore, the land near the water, the
+         piers and breakwaters and the buildings near the origin). -->
     <include>
-      <pose>0 0 0 0 0 0</pose>
-      <uri>model://la_spezia</uri>
+      <uri>https://fuel.gazebosim.org/1.0/honuRobotics/models/la_spezia</uri>
     </include>
 
-    <!-- The drawn sea: one include of the water surface model at the
-         centre of the water. The wave source's <tiles_radius> above
-         makes it draw a 3 km square, the marina and the gulf beyond
-         it, and the terrain hides it wherever there is land. Buoyancy
-         does not depend on this: it is the flat z = 0 plane
-         everywhere. -->
+    <!-- The drawn water: one water surface model at the middle of the
+         water. Buoyancy does not depend on it: it is the flat z = 0 plane
+         everywhere, and the land hides the water under it. -->
     <include>
       <pose>200 -300 0 0 0 0</pose>
-      <uri>model://water_surface</uri>
+      <uri>model://water_surface_la_spezia</uri>
     </include>
+
+    <!-- The seabed, from bathymetry: optional, for underwater vehicles,
+         sonars and DVLs, or a hull grounding on the shallows. -->
+    <!--
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/honuRobotics/models/la_spezia_seabed</uri>
+    </include>
+    -->
 
   </world>
 </sdf>

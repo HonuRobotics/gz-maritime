@@ -151,11 +151,12 @@ FIGURES = {
     'la-spezia': {
         'out': DOCS / 'how-to' / 'images' / 'la-spezia.jpg',
         'world': 'la_spezia',
-        'vehicles': [(USV, 'usv', '10 -372 0 0 0 0.3816')],
+        'vehicles': [(USV, 'usv', '10 -372 0 0 0 0.38')],
         'sea_state': 2,
-        'camera': '200 -480 55 0 0.2 -2.65',
+        'camera': '17 -385 3 0 0.05 2.0',
         'fov': SITE_FOV,
         'at': [10],
+        'far': 5000,
     },
 }
 
