@@ -64,15 +64,19 @@ A landing pad sits off the start point, for the X500 of the
 ## Nathan Benderson Park
 
 ```{figure} images/benderson-park.jpg
-:alt: A long rowing lake lined with trees, with a grandstand building on its shore, seen from above the north bank
+:alt: A long rowing lake under cumulus clouds, its finish tower at the far end and Interstate 75 along its east bank
 
 The Benderson Park world at its opening view.
 ```
 
-The RobotX 2022 venue in Sarasota, Florida: a man made rowing lake with
-its grandstand and island. The terrain is the VRX model from Fuel, about
-220 MB, downloaded on first use like Sydney's. The lake runs along y, so a
-vehicle at the origin heading 1.57 looks down the course.
+The RobotX 2022 venue in Sarasota, Florida: the 2 km rowing lake with its
+finish tower on the island at the north end, Interstate 75 along its east
+bank and the wetlands and lakes of Lakewood Ranch around it. It is built
+from open data and its models live on
+[Gazebo Fuel](https://app.gazebosim.org/honurobotics): the first launch
+downloads the site, about 11 MB, and later ones use the cache. The lake runs
+along y, so a vehicle at the origin heading 1.57 looks up the course. The
+water is fresh, so buoyancy uses 1000 kg/m³.
 
 | | |
 |---|---|
@@ -80,6 +84,12 @@ vehicle at the origin heading 1.57 looks down the course.
 | Start point | `x:=0 y:=0 yaw:=1.57` |
 | Water | A freshwater lake, flat and sheltered |
 | Sea states | 0 to 2 |
+
+The world has an optional seabed, modelled from the depths the venue
+publishes (at least 3.5 m, dredged for rowing) and sloping up to the
+banks, for underwater vehicles, sonars and DVLs. It is off by default;
+uncomment its include at the end of `benderson_park.sdf` and the first
+launch downloads it too, about 5 MB.
 
 ## Sand Island
 
@@ -185,18 +195,19 @@ too, about 5 MB.
   say how far the sea is drawn around it, in 200 m tiles; the terrain hides
   it wherever there is land. Buoyancy does not depend on the drawn water:
   vehicles float on the flat z = 0 plane everywhere.
-- **First use needs the network.** The Sydney and Benderson Park terrains
-  and the Sand Island and La Spezia sites come from Fuel the first time
-  they load; after that they are cached. Building gz-maritime needs no
+- **First use needs the network.** The Sydney terrain and the Benderson
+  Park, Sand Island and La Spezia sites come from Fuel the first time they
+  load; after that they are cached. Building gz-maritime needs no
   network.
-- **The sea sites' water is sheltered.** The Sand Island and La Spezia
-  water models, which ship with `kai_gazebo`, carry a shelter map, the
-  share of the open sea's waves that reaches each point: the full sea state
-  offshore, less in a channel or a port, none against a quay or a beach. The
+- **The water is sheltered.** The Benderson Park, Sand Island and La
+  Spezia water models, which ship with `kai_gazebo`, carry a shelter map,
+  the share of the open sea's waves that reaches each point: the full sea
+  state offshore, less in a channel or a port, none against a quay, a bank
+  or a beach. The
   waves also fade out over the last tile of the drawn sea, where a static
   water plane carries on. It changes only what is drawn.
-- **Credits.** The Sydney and Benderson Park terrains are Apache 2.0
-  assets from VRX; Sand Island and La Spezia are CC BY 4.0, built from
+- **Credits.** The Sydney terrain is an Apache 2.0 asset from VRX;
+  Benderson Park, Sand Island and La Spezia are CC BY 4.0, built from
   OpenStreetMap (ODbL), Sentinel-2 cloudless imagery (CC BY 4.0), the AWS
   Terrain Tiles and Poly Haven skies (CC0). All are credited in
   `kai_gazebo/NOTICE`.

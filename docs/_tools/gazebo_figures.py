@@ -121,9 +121,10 @@ FIGURES = {
         'world': 'benderson_park',
         'vehicles': [(USV, 'usv', '0 0 0 0 0 1.57')],
         'sea_state': 1,
-        'camera': '-193 1175 30 0 0.12 -1.18',
+        'camera': '-6 -13 2.5 0 0.04 1.25',
         'fov': SITE_FOV,
         'at': [10],
+        'far': 5000,
     },
     'sand-island': {
         'out': DOCS / 'how-to' / 'images' / 'sand-island.jpg',
