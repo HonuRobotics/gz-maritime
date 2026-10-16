@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>gz_maritime_gui</name>
+  <version>0.1.0</version>
+  <description>Gazebo Sim GUI for the maritime environment: a panel that changes the world's wind and ocean current on their topics, and arrows that draw both fields in the 3D scene, sampled from their recipes.</description>
+  <maintainer email="acordero@honurobotics.com">Alejandro Hernandez Cordero</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>gz_sim_vendor</depend>
+  <depend>gz_gui_vendor</depend>
+  <depend>gz_transport_vendor</depend>
+  <depend>gz_msgs_vendor</depend>
+  <!-- The plugins' configuration. -->
+  <depend>tinyxml2</depend>
+  <!-- The recipes the plugin reads and samples. -->
+  <depend>gz_wind</depend>
+  <depend>gz_ocean_current</depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

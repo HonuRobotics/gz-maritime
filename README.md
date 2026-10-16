@@ -46,6 +46,9 @@ site under
 - [`gz_marked_shapes`](gz_marked_shapes/): the marked collisions the wind
   and the ocean current push on, their areas and the cut at the water
   level, shared by both.
+- [`gz_maritime_gui`](gz_maritime_gui/): Gazebo GUI panels for the ocean
+  current and the wind, each of which changes its field and draws it as
+  arrows on the water, sampled from the world with the vehicles' own code.
 - [`kai_gazebo`](kai_gazebo/), [`kai_bringup`](kai_bringup/) and
   [`kai_custom_vehicle`](kai_custom_vehicle/): the worlds, the simulation
   and spawn launches, and the example vehicle.
