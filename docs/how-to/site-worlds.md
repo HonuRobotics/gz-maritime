@@ -85,11 +85,24 @@ water is fresh, so buoyancy uses 1000 kg/m³.
 | Water | A freshwater lake, flat and sheltered |
 | Sea states | 0 to 2 |
 
+`benderson_park_lite.sdf` is a lighter tier of the same world, for CI,
+integrated GPUs or many vehicles and cameras. Its collisions, coordinates
+and systems are the same, so a vehicle behaves the same in both; it draws
+less: coarse terrain, flat roofs, no trees, 2048 px ground and a 4096 px
+sky, no shadows, and the animated water out to 900 m from the middle of
+the lake rather than 1.5 km. Its site model is a separate download, about
+3 MB:
+
+```bash
+ros2 launch kai_bringup simulation.launch.xml world:=benderson_park_lite.sdf
+```
+
 The world has an optional seabed, modelled from the depths the venue
 publishes (at least 3.5 m, dredged for rowing) and sloping up to the
 banks, for underwater vehicles, sonars and DVLs. It is off by default;
-uncomment its include at the end of `benderson_park.sdf` and the first
-launch downloads it too, about 5 MB.
+uncomment its include at the end of `benderson_park.sdf` or
+`benderson_park_lite.sdf` and the first launch downloads it too, about
+5 MB.
 
 ## Sand Island
 
