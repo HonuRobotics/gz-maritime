@@ -157,10 +157,23 @@ The sea state sets the open gulf; a shelter map on the water scales the
 waves down inside the breakwaters, so the port stays calm and the quays
 calmer still (see below).
 
+`la_spezia_lite.sdf` is a lighter tier of the same world, for CI,
+integrated GPUs or many vehicles and cameras. Its collisions, coordinates
+and systems are the same, so a vehicle behaves the same in both; it draws
+less: coarse terrain, flat roofs, no trees, 2048 px ground and a 4096 px
+sky, no shadows, and the animated water out to 900 m from the middle of
+the water rather than 1.7 km. Its site model is a separate download, about
+7 MB:
+
+```bash
+ros2 launch kai_bringup simulation.launch.xml world:=la_spezia_lite.sdf
+```
+
 The world has an optional seabed, from Regione Liguria's multibeam
 isobaths and the port's published depths, for underwater vehicles, sonars
 and DVLs. It is off by default; uncomment its include at the end of
-`la_spezia.sdf` and the first launch downloads it too, about 5 MB.
+`la_spezia.sdf` or `la_spezia_lite.sdf` and the first launch downloads it
+too, about 5 MB.
 
 ## What to know
 

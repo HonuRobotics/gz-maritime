@@ -37,7 +37,7 @@ import pytest
 
 WORLDS = Path(get_package_share_directory('kai_gazebo')) / 'worlds'
 ALL = ('open_water', 'sydney_regatta', 'benderson_park', 'sand_island', 'sand_island_lite',
-       'la_spezia')
+       'la_spezia', 'la_spezia_lite')
 # Worlds with no Fuel model in them, so they load with no network and no cache.
 LOCAL = ('open_water',)
 REQUIRED_SYSTEMS = (

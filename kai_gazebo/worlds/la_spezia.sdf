@@ -4,8 +4,10 @@
   venue, the port and marinas at the head of the Gulf of La Spezia,
   ringed by wooded hills.
 
-  The finest terrain, every building with pitched roofs on the homes, every
-  tree, 4096 pixel ground and an 8192 pixel sky, and shadows.
+  This is the full tier, the default: the finest terrain, every building
+  with pitched roofs on the homes, every tree, 4096 pixel ground and an 8192
+  pixel sky, and shadows. la_spezia_lite.sdf is the lite tier, with the
+  same collisions and coordinates.
 
   The water is the port inside its breakwaters and the gulf beyond, so
   any sea state fits: it sets the open gulf, and the breakwaters and
@@ -442,7 +444,7 @@
     </gui>
 
     <!-- The site, one static model in the world frame: terrain, shore,
-         buildings, trees and the sky dome, drawn in full. Its
+         buildings, trees and the sky dome, drawn at the full tier. Its
          collisions are boxes (the shore, the land near the water, the
          piers and breakwaters and the buildings near the origin). -->
     <include>
