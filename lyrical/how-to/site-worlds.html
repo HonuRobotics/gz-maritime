@@ -361,11 +361,21 @@ and the water is fresh, so buoyancy uses 1000 kg/m³.</p>
 </table>
 <p>A landing pad sits off the start point, for the X500 of the
 <a class="reference internal" href="several-vehicles.html"><span class="std std-doc">multi vehicle demo</span></a>, which runs here by default.</p>
+<p><code class="docutils literal notranslate"><span class="pre">sydney_regatta_lite.sdf</span></code> is a lighter tier of the same world, for CI,
+integrated GPUs or many vehicles and cameras. Its collisions, coordinates
+and systems are the same, so a vehicle behaves the same in both; it draws
+less: coarse terrain, flat roofs, no trees, 2048 px ground and a 4096 px
+sky, no shadows, and the animated water out to 900 m from the middle of
+the water rather than 1.5 km. Its site model is a separate download, about
+4 MB:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>simulation.launch.xml<span class="w"> </span>world:<span class="o">=</span>sydney_regatta_lite.sdf
+</pre></div>
+</div>
 <p>The world has an optional seabed, modelled from the depth the venue
 publishes (5 m) and sloping up to the banks, for underwater vehicles,
 sonars and DVLs. It is off by default; uncomment its include at the end of
-<code class="docutils literal notranslate"><span class="pre">sydney_regatta.sdf</span></code> and the first launch downloads it too, about
-5 MB.</p>
+<code class="docutils literal notranslate"><span class="pre">sydney_regatta.sdf</span></code> or <code class="docutils literal notranslate"><span class="pre">sydney_regatta_lite.sdf</span></code> and the first launch
+downloads it too, about 5 MB.</p>
 </section>
 <section id="nathan-benderson-park">
 <h2>Nathan Benderson Park<a class="headerlink" href="#nathan-benderson-park" title="Link to this heading"></a></h2>
