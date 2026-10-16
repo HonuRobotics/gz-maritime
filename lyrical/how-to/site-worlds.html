@@ -489,10 +489,21 @@ keeps the VORC world’s coordinates.</p>
 <p>The sea state sets the open gulf; a shelter map on the water scales the
 waves down inside the breakwaters, so the port stays calm and the quays
 calmer still (see below).</p>
+<p><code class="docutils literal notranslate"><span class="pre">la_spezia_lite.sdf</span></code> is a lighter tier of the same world, for CI,
+integrated GPUs or many vehicles and cameras. Its collisions, coordinates
+and systems are the same, so a vehicle behaves the same in both; it draws
+less: coarse terrain, flat roofs, no trees, 2048 px ground and a 4096 px
+sky, no shadows, and the animated water out to 900 m from the middle of
+the water rather than 1.7 km. Its site model is a separate download, about
+7 MB:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>simulation.launch.xml<span class="w"> </span>world:<span class="o">=</span>la_spezia_lite.sdf
+</pre></div>
+</div>
 <p>The world has an optional seabed, from Regione Liguria’s multibeam
 isobaths and the port’s published depths, for underwater vehicles, sonars
 and DVLs. It is off by default; uncomment its include at the end of
-<code class="docutils literal notranslate"><span class="pre">la_spezia.sdf</span></code> and the first launch downloads it too, about 5 MB.</p>
+<code class="docutils literal notranslate"><span class="pre">la_spezia.sdf</span></code> or <code class="docutils literal notranslate"><span class="pre">la_spezia_lite.sdf</span></code> and the first launch downloads it
+too, about 5 MB.</p>
 </section>
 <section id="what-to-know">
 <h2>What to know<a class="headerlink" href="#what-to-know" title="Link to this heading"></a></h2>
