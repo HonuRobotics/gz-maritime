@@ -62,3 +62,9 @@ kai_gazebo ships worlds built on site models made from open data:
     depths (https://www.gebco.net, public domain). Plausible, not surveyed:
     not for navigation.
   The textures and the modelled landmarks are procedural.
+- The aquatic centre: the hall, its pools and their water, a model on
+  Gazebo Fuel (https://app.gazebosim.org/honurobotics: aquatic_centre),
+  fetched at run time, by Honu Robotics under the Creative Commons
+  Attribution 4.0 International License. It is procedural, except the sky
+  outside the glass: Poly Haven's kloofendal_38d_partly_cloudy_puresky
+  (https://polyhaven.com), CC0.

@@ -1,0 +1,393 @@
+<?xml version="1.0"?>
+<!--
+  The aquatic centre: an indoor Olympic competition pool (50 by 25 m, ten
+  2.5 m lanes marked on its floor, 3 m deep) and a diving well (25 by 25 m,
+  5 m deep, with a 6 by 6 m pit to 15 m against its west wall, x 33 to 39,
+  y -3 to 3, under a 10, 7.5 and 5 m platform tower and four springboards),
+  in a hall with stands, a glazed south wall and a video board: clear,
+  still water with hard walls and a floor, for underwater vehicles, sonars
+  and DVLs, and for a surface vehicle in the lanes. There are no lane
+  ropes, so a vehicle has the pool's whole width.
+
+  The water's middle is the origin, x along the pools; lane 0 is the
+  southern one, its centre at y -11.25, every lane 2.5 m north of the
+  last. Good start points:
+
+      the competition pool, lane 4   -20 -1.25  0
+      the diving well, mid water      45  0    -2.5
+      the pit                         36  0   -12
+
+  The same world contract as open_water.sdf (the systems every vehicle
+  needs, gz-maritime's buoyancy reading marked collisions, the waterline at
+  z = 0, a wave source), indoors: no wind, no current, and no drawn sea;
+  the pool's water is in the model.
+
+      ros2 launch kai_bringup simulation.launch.xml world:=aquatic_centre.sdf
+      ros2 launch kai_bringup spawn_vehicle.launch.xml name:=boat_a x:=-20 y:=-1.25 ...
+
+  The hall is a model on Gazebo Fuel (https://app.gazebosim.org/honurobotics,
+  CC BY 4.0), downloaded the first time the world loads and cached after
+  that. It is procedural; the sky outside the glass is Poly Haven's, CC0.
+  See kai_gazebo/NOTICE.
+-->
+<sdf version="1.12">
+  <world name="default">
+
+    <!-- Physics -->
+    <physics name="default_physics" type="dart">
+      <max_step_size>0.004</max_step_size>
+      <!-- <real_time_factor>0</real_time_factor> -->
+    </physics>
+
+    <!-- Spherical coordinates, required by the magnetometer system (World
+         Magnetic Model at this lat/lon) and by the NavSat system (fixes
+         relative to this origin). The hall is no real venue; these are the
+         open water world's. Indoors a GPS would get no fix, but the NavSat
+         system does not know that. -->
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <world_frame_orientation>ENU</world_frame_orientation>
+      <latitude_deg>36.693509</latitude_deg>
+      <longitude_deg>-121.936568</longitude_deg>
+      <elevation>0</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+
+    <!-- Scene: a neutral ambient, the hall's diffuse daylight. No <sky>:
+         the sky outside the glass is a dome in the model. -->
+    <scene>
+      <ambient>0.42 0.44 0.46</ambient>
+      <background>0.62 0.72 0.86</background>
+      <grid>false</grid>
+    </scene>
+
+    <!-- The afternoon sun, through the glazed south wall onto the deck and
+         the water. -->
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 30 0 0 0</pose>
+      <diffuse>0.8 0.76 0.69 1</diffuse>
+      <specular>0.4 0.4 0.4 1</specular>
+      <direction>-0.35 0.62 -0.7</direction>
+    </light>
+
+    <!-- Core systems -->
+    <plugin
+      filename="gz-sim-physics-system"
+      name="gz::sim::systems::Physics">
+    </plugin>
+
+    <plugin
+      filename="gz-sim-user-commands-system"
+      name="gz::sim::systems::UserCommands">
+    </plugin>
+
+    <plugin
+      filename="gz-sim-scene-broadcaster-system"
+      name="gz::sim::systems::SceneBroadcaster">
+    </plugin>
+
+    <!-- Renders the vehicles' cameras, sonars and echosounders. -->
+    <plugin
+      filename="gz-sim-sensors-system"
+      name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <plugin
+      filename="gz-sim-magnetometer-system"
+      name="gz::sim::systems::Magnetometer">
+      <use_units_gauss>false</use_units_gauss>
+      <use_earth_frame_ned>false</use_earth_frame_ned>
+    </plugin>
+
+    <plugin
+      filename="gz-sim-imu-system"
+      name="gz::sim::systems::Imu">
+    </plugin>
+
+    <plugin
+      filename="gz-sim-navsat-system"
+      name="gz::sim::systems::NavSat">
+    </plugin>
+
+    <!-- Barometers: the air pressure system, for aerial vehicles such as the
+         X500 that carry an air_pressure sensor. -->
+    <plugin
+      filename="gz-sim-air-pressure-system"
+      name="gz::sim::systems::AirPressure">
+    </plugin>
+
+    <!-- Buoyancy (gz_buoyancy): graded, water below z = 0 at sea water's
+         1025 kg/m^3, though a pool is fresh: the Blue Robotics vehicles are
+         trimmed for sea water, as on every other salt world, and in 1000 the
+         neutral BlueROV2 would sink. Air (1 kg/m^3) above
+         and air (1 kg/m^3) above. The interface is the FLAT z = 0 plane, not
+         the wave surface: for vehicle physics the waves are visual only.
+         Coupling buoyancy to the waves is the job of the future
+         gz_waves_buoyancy consumer (WAVES_DESIGN.md §11).
+
+         This world names no vehicle. <enable_by_default> false and no
+         <enable> list: the world only describes the fluid, and a link floats
+         by the collisions it marks as buoyancy geometry with
+         gz:buoyancy="true" (gz-sim commit 229ec07e), whatever name its
+         model was spawned under. A vehicle's contact geometry stays contact
+         geometry, and a mark needs a zero <collide_bitmask> so the
+         displacement volume touches nothing. gz_buoyancy carries that change
+         until a Gazebo release with it reaches ROS; then this block switches
+         to gz-sim-buoyancy-system / gz::sim::systems::Buoyancy unchanged. -->
+    <plugin
+      filename="gz-maritime-buoyancy-system"
+      name="gz::sim::maritime::Buoyancy">
+      <graded_buoyancy>
+        <default_density>1025</default_density>
+        <density_change>
+          <above_depth>0</above_depth>
+          <density>1</density>
+        </density_change>
+      </graded_buoyancy>
+      <enable_by_default>false</enable_by_default>
+    </plugin>
+
+    <!-- Wind (gz_wind). The world owns the wind: <speed> in m/s at 10 m and
+         the <direction> it comes from, in degrees clockwise from north (270
+         is a wind from the west). Change it while running on the topic
+         /world/default/wind/set (keys speed and direction), bridged to ROS
+         by the simulation launch. The system keeps the wind as a recipe on
+         the world, writes it where Gazebo's rotor, wing and air speed systems
+         read it, publishes it on /world/default/wind_info, and pushes on
+         the collisions a vehicle marks gz:wind="true", by the part of each
+         shape above the water. Like buoyancy, the world names no vehicle.
+         Gusts on
+         the speed and the direction (<speed_gust>, <direction_gust> and
+         their times, <seed>) are listed in the reference docs. -->
+    <plugin
+      filename="gz-maritime-wind-system"
+      name="gz::sim::maritime::Wind">
+      <speed>0</speed>
+      <direction>0</direction>
+      <!-- The speed is at 10 m, as in weather reports; over the sea the wind
+           falls off towards the water with this roughness length. -->
+      <reference_height>10</reference_height>
+      <roughness_length>0.0002</roughness_length>
+    </plugin>
+
+    <!-- Ocean current (gz_ocean_current). The world owns the current: <speed>
+         in m/s and the <direction> it sets towards, in degrees clockwise from
+         north (90 sets east, towards +x; the opposite convention from the
+         wind, which is given by where it comes from). Set here, and changed
+         while running on the topic /world/default/ocean_current/set (keys
+         speed and direction), bridged to ROS by the simulation launch. The
+         system keeps it as a recipe on the world, which any system asks at
+         a point, and publishes it on /world/default/ocean_current_info.
+         Slack by default.
+         Indoors: no current, no wind. -->
+    <plugin
+      filename="gz-maritime-ocean-current-system"
+      name="gz::sim::maritime::OceanCurrent">
+      <speed>0</speed>
+      <direction>0</direction>
+    </plugin>
+
+    <!-- Wave source, for the contract: the services and any system that
+         asks the wave field find one. Sea state 0, and no water surface
+         model draws it: the pool's water is the hall model's own, flat, and
+         a drawn sea would run through the walls. -->
+    <plugin filename="gz-sim-waves-fft-system"
+            name="gz::sim::systems::FftWaves">
+      <update_rate>30</update_rate>
+      <wave>
+        <sea_state>0</sea_state>
+        <tiles_radius>1</tiles_radius>
+      </wave>
+    </plugin>
+
+    <!-- GUI -->
+    <gui fullscreen="0">
+      <!-- 3D scene -->
+      <plugin filename="MinimalScene" name="3D View">
+        <gz-gui>
+          <title>3D View</title>
+          <property type="bool" key="showTitleBar">false</property>
+          <property type="string" key="state">docked</property>
+        </gz-gui>
+        <engine>ogre2</engine>
+        <scene>scene</scene>
+        <ambient_light>0.62 0.64 0.68</ambient_light>
+        <background_color>0.0 0.7 0.8</background_color>
+        <!-- Over the competition pool's start end, looking down the lanes
+             to the diving well and the platform tower. -->
+        <camera_pose>-31 -17 8 0 0.2 0.5</camera_pose>
+        <camera_clip>
+          <near>0.1</near>
+          <far>500</far>
+        </camera_clip>
+      </plugin>
+
+      <!-- Scene management plugins -->
+      <plugin filename="EntityContextMenuPlugin" name="Entity context menu">
+        <gz-gui>
+          <property key="state" type="string">floating</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <plugin filename="GzSceneManager" name="Scene Manager">
+        <gz-gui>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <plugin filename="InteractiveViewControl" name="Interactive view control">
+        <gz-gui>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <plugin filename="CameraTracking" name="Camera Tracking">
+        <gz-gui>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <plugin filename="MarkerManager" name="Marker manager">
+        <gz-gui>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+        <warn_on_action_failure>false</warn_on_action_failure>
+      </plugin>
+
+      <plugin filename="SelectEntities" name="Select Entities">
+        <gz-gui>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <plugin filename="VisualizationCapabilities" name="Visualization Capabilities">
+        <gz-gui>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <plugin filename="Spawn" name="Spawn Entities">
+        <gz-gui>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <!-- World control -->
+      <plugin filename="WorldControl" name="World control">
+        <gz-gui>
+          <title>World control</title>
+          <property type="bool" key="showTitleBar">false</property>
+          <property type="bool" key="resizable">false</property>
+          <property type="double" key="height">72</property>
+          <property type="double" key="z">1</property>
+          <property type="string" key="state">floating</property>
+          <anchors target="3D View">
+            <line own="left" target="left"/>
+            <line own="bottom" target="bottom"/>
+          </anchors>
+        </gz-gui>
+        <play_pause>true</play_pause>
+        <step>true</step>
+        <start_paused>false</start_paused>
+      </plugin>
+
+      <!-- World statistics -->
+      <plugin filename="WorldStats" name="World stats">
+        <gz-gui>
+          <title>World stats</title>
+          <property type="bool" key="showTitleBar">false</property>
+          <property type="bool" key="resizable">false</property>
+          <property type="double" key="height">110</property>
+          <property type="double" key="width">290</property>
+          <property type="double" key="z">1</property>
+          <property type="string" key="state">floating</property>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="bottom" target="bottom"/>
+          </anchors>
+        </gz-gui>
+        <sim_time>true</sim_time>
+        <real_time>true</real_time>
+        <real_time_factor>true</real_time_factor>
+        <iterations>true</iterations>
+      </plugin>
+
+      <plugin filename="ComponentInspector" name="Component Inspector">
+        <gz-gui>
+          <title>Inspector</title>
+          <property type="string" key="state">docked_collapsed</property>
+        </gz-gui>
+      </plugin>
+    </gui>
+
+    <!-- The hall, the pools and their water, one static model in the world
+         frame. Its collisions are boxes: the pools' walls and floors, the
+         deck, the stands, the tower, the springboards and the starting
+         blocks, and the hall's walls and roof. -->
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/honuRobotics/models/aquatic_centre</uri>
+    </include>
+
+  </world>
+</sdf>
