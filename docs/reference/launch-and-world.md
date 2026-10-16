@@ -44,7 +44,7 @@ walks through it.
 
 | Argument | Default | Description |
 |---|---|---|
-| `world` | `sydney_regatta.sdf` | World file, as for the simulation launch, among those the demo has poses for: `sydney_regatta.sdf` (off the start point) or `open_water.sdf` (around the origin). |
+| `world` | `sydney_regatta.sdf` | World file, as for the simulation launch, among those the demo has poses for: `sydney_regatta.sdf` (at the start point) or `open_water.sdf` (around the origin). |
 | `gazebo_gui` | `true` | Start the Gazebo GUI. |
 | `use_composition` | `true` | Run Gazebo, the bridges and the state publishers in one container. |
 
@@ -113,7 +113,7 @@ every one.
 | World | Site | Terrain | Where to start | Water and sea states |
 |---|---|---|---|---|
 | `open_water.sdf` | Open sea, Monterey Bay coordinates | None; a landing pad at (8, -8) | Spawn anywhere | Open sea, any |
-| `sydney_regatta.sdf` | Sydney International Regatta Centre, VRX 2022 to 2024 | Fuel, fetched on first use (about 140 MB) | around x -530, y 170; start at x -532, y 162 | Rowing lake, 0 to 2 |
+| `sydney_regatta.sdf` | Sydney International Regatta Centre, VRX 2022 to 2024 | Built from open data, from Fuel on first use (about 12 MB); optional seabed | around x -530, y 180; start at x -532, y 180 | Rowing lake, fresh water, 0 to 2 |
 | `benderson_park.sdf` | Nathan Benderson Park, Sarasota, RobotX 2022 | Built from open data, from Fuel on first use (about 11 MB); optional seabed; also `benderson_park_lite.sdf`, lighter, about 3 MB | the lake runs along y; start at the origin, heading 1.57 | Rowing lake, fresh water, 0 to 2 |
 | `sand_island.sdf` | Sand Island, Honolulu, RobotX 2016 and 2018, VRX 2019 | Built from open data, from Fuel on first use (about 9 MB); optional seabed; also `sand_island_lite.sdf`, lighter, about 5 MB | start at x 60, y 120 | Harbour channel and open ocean, any (calmer in the channel) |
 | `la_spezia.sdf` | La Spezia, VORC 2020 | Built from open data, from Fuel on first use (about 14 MB); optional seabed; also `la_spezia_lite.sdf`, lighter, about 7 MB | start at x 10, y -372 | Port and gulf, any (calm in the port) |
@@ -130,12 +130,12 @@ The site worlds place the water surface model once, at the centre of their
 water, and size the drawn sea with `<tiles_radius>` in their wave source:
 the model draws that many 200 m tiles around itself in every direction,
 sharing one wave field, and the terrain hides them wherever there is land.
-Open water keeps the model's own radius, a 1 km square. The Benderson
-Park, Sand Island and La Spezia water models also fade the waves out over
-the last tile (`<fadeEdges>`) and carry a shelter map
-(`<textures><shelterMap>`, with `<shelterOrigin>` and `<shelterSize>` in
-its `<parameters>`): a greyscale image over a world rectangle, white where
-the open sea's full waves reach, black against a quay. Buoyancy does not depend on any of that.
+Open water keeps the model's own radius, a 1 km square. The sites' water
+models also fade the waves out over the last tile (`<fadeEdges>`) and carry
+a shelter map (`<textures><shelterMap>`, with `<shelterOrigin>` and
+`<shelterSize>` in its `<parameters>`): a greyscale image over a world
+rectangle, white where the open sea's full waves reach, black against a
+quay. Buoyancy does not depend on any of that.
 The site models are credited in `kai_gazebo/NOTICE`.
 
 ## The `open_water.sdf` world

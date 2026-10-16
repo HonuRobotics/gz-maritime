@@ -7,7 +7,7 @@ name, a sensor and an actuator of one vehicle, a gamepad bound to one
 vehicle, and a second copy of a vehicle joining the others.
 
 ```{figure} images/several-vehicles.jpg
-:alt: The BlueBoat afloat off the Sydney Regatta shore, with the X500 on a landing pad behind it and the boathouse on the far bank
+:alt: The BlueBoat afloat on the Sydney Regatta course, with the X500 on a landing pad behind it and the regatta centre on the bank
 
 The demo at Sydney Regatta: the BlueBoat off the start point, the BlueROV2
 under the surface ahead of it, the X500 on the landing pad.
@@ -15,8 +15,8 @@ under the surface ahead of it, the X500 on the landing pad.
 
 You need [bluerobotics_models](https://github.com/HonuRobotics/bluerobotics_models)
 and [holybro_models](https://github.com/HonuRobotics/holybro_models) built
-in the workspace, and every terminal sourced. The Sydney terrain downloads
-from Fuel the first time it loads, about 140 MB.
+in the workspace, and every terminal sourced. The Sydney site downloads
+from Fuel the first time it loads, about 12 MB.
 
 ## 1. Bring it up
 
