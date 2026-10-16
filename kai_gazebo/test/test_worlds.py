@@ -21,7 +21,7 @@ Fuel model in them, the open sea and La Spezia, also pass the SDF checker
 with every include resolved, and La Spezia runs for a few hundred steps
 without rendering, so a broken mesh path or a plugin that fails to load
 shows up here rather than at the first launch. The other three need Fuel
-(the Sydney and Benderson Park terrains, the Sand Island shore camp), a
+(the Sydney and Benderson Park terrains, the Sand Island site), a
 download on first use that has no place in a unit test.
 """
 
@@ -37,7 +37,6 @@ import pytest
 WORLDS = Path(get_package_share_directory('kai_gazebo')) / 'worlds'
 ALL = ('open_water', 'sydney_regatta', 'benderson_park', 'sand_island', 'la_spezia')
 # Worlds with no Fuel model in them, so they load with no network and no cache.
-# Sand Island's terrain is local, but its shore camp comes from Fuel.
 LOCAL = ('open_water', 'la_spezia')
 LOCAL_TERRAIN = ('la_spezia',)
 REQUIRED_SYSTEMS = (
@@ -73,7 +72,8 @@ def test_world_keeps_the_contract(world):
     assert buoyancy.find('enable') is None, 'the world must name no vehicle'
     assert w.find('spherical_coordinates/latitude_deg') is not None
     uris = [i.find('uri').text for i in w.findall('include')]
-    assert any(u == 'model://water_surface' for u in uris), 'no drawn sea'
+    # The drawn sea is the water surface model, or a site's variant of it.
+    assert any(u.startswith('model://water_surface') for u in uris), 'no drawn sea'
 
 
 @pytest.mark.parametrize('world', LOCAL)
@@ -95,3 +95,20 @@ def test_world_with_local_terrain_runs_headless(world):
     assert out.returncode == 0, f'{world} did not run:\n{out.stdout[-2000:]}\n{out.stderr[-2000:]}'
     for bad in ('Unable to find', 'Failed to load', 'Error parsing'):
         assert bad not in out.stdout + out.stderr, f'{world}: {bad} in the server output'
+
+
+def test_sand_island_water_is_sheltered():
+    """The water draws gz_waves_rendering's mesh, sheltered by its map, fading at its edge."""
+    models = Path(get_package_share_directory('kai_gazebo')) / 'models'
+    root = ET.parse(models / 'water_surface_sand_island' / 'model.sdf').getroot()
+    uri = root.find('model/link/visual/geometry/mesh/uri').text
+    assert uri == 'model://water_surface/meshes/water.dae'
+    share = Path(get_package_share_directory('gz_waves_rendering')) / 'models'
+    assert (share / uri.removeprefix('model://')).is_file()
+    plugin = root.find('model/link/visual/plugin')
+    for texture in ('cubeMap', 'shelterMap'):
+        path = plugin.find(f'textures/{texture}').text
+        assert (models / 'water_surface_sand_island' / path).is_file(), path
+    params = plugin.find('shader/parameters')
+    assert min(float(v) for v in params.find('shelterSize').text.split()) > 0
+    assert params.find('fadeEdges').text == 'true'

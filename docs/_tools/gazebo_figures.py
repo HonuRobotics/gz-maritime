@@ -128,11 +128,12 @@ FIGURES = {
     'sand-island': {
         'out': DOCS / 'how-to' / 'images' / 'sand-island.jpg',
         'world': 'sand_island',
-        'vehicles': [(USV, 'usv', '158 108 0 0 0 -2.76')],
+        'vehicles': [(USV, 'usv', '60 120 0 0 0 -2.76')],
         'sea_state': 2,
-        'camera': '173 122 4 0 0.22 -1.2',
+        'camera': '50 106 2.5 0 0.02 0.95',
         'fov': SITE_FOV,
         'at': [10],
+        'far': 5000,
     },
     # The multi vehicle demo at Sydney: the boat off the start point, the
     # ROV under the surface ahead of it, the X500 on the pad.
@@ -169,7 +170,7 @@ CAMERA = """
           <camera>
             <horizontal_fov>{fov}</horizontal_fov>
             <image><width>1600</width><height>900</height></image>
-            <clip><near>0.05</near><far>1000</far></clip>
+            <clip><near>0.05</near><far>{far}</far></clip>
           </camera>
         </sensor>
       </link>
@@ -189,7 +190,8 @@ def figure_world(_figure):
         f'<include><uri>{v[0]}</uri><name>{v[1]}</name>'
         + (f'<pose>{v[2]}</pose>' if len(v) > 2 else '') + '</include>'
         for v in _figure['vehicles'])
-    extra += CAMERA.format(pose=_figure['camera'], fov=_figure['fov'])
+    extra += CAMERA.format(
+        pose=_figure['camera'], fov=_figure['fov'], far=_figure.get('far', 1000))
     return world.replace('</world>', extra + '</world>', 1)
 
 

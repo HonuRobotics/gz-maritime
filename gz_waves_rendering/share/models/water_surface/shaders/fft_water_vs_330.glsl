@@ -38,6 +38,24 @@ uniform float tileSize;
 uniform int   gridSize;
 uniform sampler2D heightMap;
 
+// Sheltering (optional). shelterMap holds, in its red channel, the share
+// of the open sea's waves that reach each point of a world rectangle
+// (shelterOrigin is its south west corner, shelterSize its size, in
+// metres; the image north up): 1 in open water, 0 against a quay or deep
+// inside a harbour.
+// The displacement and the foam are scaled by it. Outside the rectangle,
+// or with useShelterMap 0, the sea is open everywhere.
+uniform int  useShelterMap;
+uniform sampler2D shelterMap;
+uniform vec2 shelterOrigin;
+uniform vec2 shelterSize;
+// Edge fade (optional): with fadeHalfExtent > 0, the waves die out over
+// the outermost fadeWidth metres of the square of tiles centred on
+// tilesCentre, so the drawn sea meets a flat surface beyond it cleanly.
+uniform vec2  tilesCentre;
+uniform float fadeHalfExtent;
+uniform float fadeWidth;
+
 out block
 {
   mat3 rotMatrix;
@@ -48,6 +66,8 @@ out block
   // in the FS so triangle interpolation across a tile boundary
   // doesn't sweep the UV backwards through the texture.
   vec2 baseXY;
+  // The share of the open sea's waves drawn here (sheltering, edge fade).
+  float shelter;
 } outVs;
 
 out gl_PerVertex
@@ -60,12 +80,31 @@ out gl_PerVertex
 // instance the same mesh as multiple tiles without each tile
 // rendering the same wavefield patch — the FFT field is naturally
 // periodic across world space.
-vec3 SampleDisplaced(vec2 worldXY)
+vec3 SampleDisplaced(vec2 worldXY, float s)
 {
   vec2 uv = fract(worldXY / tileSize);
   vec4 hd = texture(heightMap, uv);
   // Dx/Dy are the final displacement (engine-side choppiness already applied).
-  return vec3(worldXY + hd.gb, hd.r);
+  return vec3(worldXY + s * hd.gb, s * hd.r);
+}
+
+// The share of the open sea's waves that reaches a world XY.
+float Shelter(vec2 worldXY)
+{
+  float s = 1.0;
+  if (useShelterMap != 0)
+  {
+    vec2 uv = (worldXY - shelterOrigin) / shelterSize;
+    if (all(greaterThanEqual(uv, vec2(0.0))) && all(lessThanEqual(uv, vec2(1.0))))
+      s = texture(shelterMap, vec2(uv.x, 1.0 - uv.y)).r;  // the image is north up
+  }
+  if (fadeHalfExtent > 0.0)
+  {
+    vec2 d = abs(worldXY - tilesCentre);
+    float inside = fadeHalfExtent - max(d.x, d.y);
+    s *= clamp(inside / max(fadeWidth, 1.0), 0.0, 1.0);
+  }
+  return s;
 }
 
 void main()
@@ -73,7 +112,8 @@ void main()
   vec4 P = vertex;
   vec2 worldXY = (world_matrix * vec4(vertex.xy, 0.0, 1.0)).xy;
 
-  vec3 disp = SampleDisplaced(worldXY);
+  float s = Shelter(worldXY);
+  vec3 disp = SampleDisplaced(worldXY, s);
   // Apply only the spatial displacement deltas (Dx, Dy, η) so the
   // mesh's model-space position picks up the right local offset
   // before the world transform turns it into world coordinates.
@@ -84,10 +124,10 @@ void main()
   // samples of the heightmap (the only path; analytic slope maps were
   // never wired up on the CPU side).
   float texel = tileSize / float(gridSize);
-  vec3 px = SampleDisplaced(worldXY + vec2( texel, 0.0));
-  vec3 nx = SampleDisplaced(worldXY + vec2(-texel, 0.0));
-  vec3 py = SampleDisplaced(worldXY + vec2(0.0,  texel));
-  vec3 ny = SampleDisplaced(worldXY + vec2(0.0, -texel));
+  vec3 px = SampleDisplaced(worldXY + vec2( texel, 0.0), s);
+  vec3 nx = SampleDisplaced(worldXY + vec2(-texel, 0.0), s);
+  vec3 py = SampleDisplaced(worldXY + vec2(0.0,  texel), s);
+  vec3 ny = SampleDisplaced(worldXY + vec2(0.0, -texel), s);
   vec3 dxv = (px - nx) * 0.5;
   vec3 dyv = (py - ny) * 0.5;
   vec3 N = normalize(cross(dxv, dyv));
@@ -116,4 +156,5 @@ void main()
   // (worldXY, before the chop offset) so neighbouring samples for
   // the foam mask are taken in the source domain.
   outVs.baseXY = worldXY;
+  outVs.shelter = s;
 }

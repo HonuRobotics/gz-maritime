@@ -1,22 +1,32 @@
 <?xml version="1.0"?>
 <!--
-  Sand Island: the RobotX 2018 venue in Honolulu, Hawaii, from the Virtual
-  RobotX (VRX) 2019 world: the island shore with its mooring posts and the
-  ground station tents, on a terrain mesh fetched at build time from the VRX
-  repository.
+  Sand Island, Honolulu, Hawaii: the RobotX 2016 and 2018 venue, on the
+  harbour channel between Sand Island and Kalihi, with downtown
+  Honolulu, the port and the Koolau range behind.
 
-  The water is Keehi Lagoon, the sheltered harbour water between the island
-  and the reef, so sea states 0 to 3 fit (ripples to a slight sea of about
-  0.9 m); the ocean swell stays outside the reef.
+  The finest terrain, every building with pitched roofs on the homes, every
+  tree, 4096 pixel ground and an 8192 pixel sky, and shadows.
+
+  The water is the harbour channel and, south of Sand Island, the open
+  ocean, so any sea state fits: it sets the open ocean, and the land
+  shelters the channel and the harbour, calm against the quays.
 
   The same world contract as open_water.sdf (the systems every vehicle
   needs, gz-maritime's buoyancy reading marked collisions, the waterline at
-  z = 0, the wave field for the drawn sea), with this site's terrain and
-  coordinates. Vehicles are spawned into it by name; a good start point is
-  158 108 0.1 0 0 -2.76:
+  z = 0, the wave field for the drawn sea), with this site's coordinates
+  (the origin of the VRX or VORC world it replaces). A good start point is
+  60 120 0 0 0 -2.76:
 
       ros2 launch kai_bringup simulation.launch.xml world:=sand_island.sdf
-      ros2 launch kai_bringup spawn_vehicle.launch.xml name:=boat_a x:=158 y:=108 ...
+      ros2 launch kai_bringup spawn_vehicle.launch.xml name:=boat_a x:=60 y:=120 ...
+
+  The site and its seabed are models on Gazebo Fuel
+  (https://app.gazebosim.org/honuRobotics, CC BY 4.0), downloaded the first
+  time the world loads and cached after that. The water ships with
+  kai_gazebo, next to gz_waves_rendering's shaders it uses. Terrain, shore and city from
+  OpenStreetMap (c) OpenStreetMap contributors, ODbL 1.0, Sentinel-2
+  cloudless 2016 by EOX (CC BY 4.0) and the AWS Terrain Tiles; see
+  kai_gazebo/NOTICE.
 -->
 <sdf version="1.12">
   <world name="default">
@@ -33,38 +43,37 @@
     <spherical_coordinates>
       <surface_model>EARTH_WGS84</surface_model>
       <world_frame_orientation>ENU</world_frame_orientation>
-      <latitude_deg>21.30996</latitude_deg>
-      <longitude_deg>-157.8901</longitude_deg>
+      <latitude_deg>21.309960</latitude_deg>
+      <longitude_deg>-157.890100</longitude_deg>
       <elevation>0</elevation>
       <heading_deg>0</heading_deg>
     </spherical_coordinates>
 
-    <!-- Scene: neutral white ambient, as in the VRX worlds, so the terrain
-         textures keep their colours (open water uses a cyan ambient tuned for
-         the sea alone, which turns sand green), plus a procedural sky: the
-         <sky> element tells gz-rendering to draw its built-in sky cube (sun,
-         horizon transition) so the water has something to reflect and the
-         background isn't a flat colour. -->
+    <!-- Scene: a soft ambient, the light of the sky, low enough that the
+         sun shapes the land and the buildings, the same for camera sensors
+         and the GUI. No <sky>: gz-rendering draws only its built-in sky
+         cube, whatever <cubemap_uri> says; the sky is a photographed one on
+         a dome in the site model, and the background colour shows only
+         past its edge (cameras whose far clip is under 3.8 km). -->
     <scene>
-      <ambient>1.0 1.0 1.0</ambient>
-      <background>0.0 0.7 0.8</background>
-      <sky></sky>
+      <ambient>0.6 0.62 0.66</ambient>
+      <background>0.62 0.72 0.86</background>
       <grid>false</grid>
     </scene>
 
-    <!-- Directional light (sun, attenuated by water) -->
+    <!-- The sun where it is in the sky dome's photograph: azimuth 235 degrees, 43 degrees up. -->
     <light type="directional" name="sun">
       <cast_shadows>true</cast_shadows>
-      <pose>0 0 20 0 0 0</pose>
-      <diffuse>1 1 1 1</diffuse>
-      <specular>0.5 0.5 0.5 1</specular>
+      <pose>0 0 200 0 0 0</pose>
+      <diffuse>1 0.97 0.92 1</diffuse>
+      <specular>0.6 0.6 0.6 1</specular>
       <attenuation>
-        <range>1000</range>
+        <range>10000</range>
         <constant>0.9</constant>
-        <linear>0.01</linear>
-        <quadratic>0.001</quadratic>
+        <linear>0.0</linear>
+        <quadratic>0.0</quadratic>
       </attenuation>
-      <direction>-0.5 0.1 -0.9</direction>
+      <direction>0.599 0.419 -0.682</direction>
     </light>
 
     <!-- Core systems -->
@@ -112,7 +121,7 @@
       name="gz::sim::systems::AirPressure">
     </plugin>
 
-    <!-- Buoyancy (gz_buoyancy): graded, seawater (1025 kg/m^3) below z = 0
+    <!-- Buoyancy (gz_buoyancy): graded, sea water (1025 kg/m^3) below z = 0
          and air (1 kg/m^3) above. The interface is the FLAT z = 0 plane, not
          the wave surface: for vehicle physics the waves are visual only.
          Coupling buoyancy to the waves is the job of the future
@@ -208,10 +217,10 @@
              0 = glassy). For a hand-tuned sea, comment <sea_state> and uncomment
              the advanced block (delete the two comment markers wrapping it). -->
         <sea_state>1</sea_state>
-        <!-- How far the sea is drawn around the water surface model, in
-             200 m tiles: 7 is a 3 km square. Open water leaves it at the
-             model's own 2, a 1 km square. -->
-        <tiles_radius>7</tiles_radius>
+        <!-- How far the water is drawn around the water surface model, in
+             200 m tiles: 8 is a 3.4 km square. Past it the
+             site's far water plane takes over. -->
+        <tiles_radius>8</tiles_radius>
 
         <!-- Advanced / manual setup (a working configuration). <period> sets
              wind speed; <gain> is the amplitude multiplier (9.5 = dramatic and
@@ -265,11 +274,10 @@
         </gz-gui>
         <engine>ogre2</engine>
         <scene>scene</scene>
-        <ambient_light>0.4 0.4 0.4</ambient_light>
+        <ambient_light>0.6 0.62 0.66</ambient_light>
         <background_color>0.0 0.7 0.8</background_color>
-        <!-- Along the shore camp: the tents on the left, the mooring
-             posts and the water on the right. -->
-        <camera_pose>173 122 4 0 0.22 -1.2</camera_pose>
+        <!-- Off Sand Island, looking north east across the harbour to downtown Honolulu. -->
+        <camera_pose>-60 -250 20 0 0.06 0.75</camera_pose>
         <camera_clip>
           <near>0.1</near>
           <far>50000</far>
@@ -433,88 +441,29 @@
       </plugin>
     </gui>
 
-    <!-- Terrain: the VRX 2019 Sand Island mesh (kai_gazebo/models/sandisland,
-         fetched at build time from the VRX gazebo_classic branch). Static;
-         its collision is the island. -->
+    <!-- The site, one static model in the world frame: terrain, shore,
+         buildings, trees and the sky dome, drawn in full. Its
+         collisions are boxes (the shore, the land near the water, the
+         piers and breakwaters and the buildings near the origin). -->
     <include>
-      <pose>0 0 0 0 0 0</pose>
-      <uri>model://sandisland</uri>
+      <uri>https://fuel.gazebosim.org/1.0/honuRobotics/models/sand_island</uri>
     </include>
 
-    <!-- The shore camp from the VRX 2019 world, at its original poses:
-         three mooring posts for the boat, the antenna of the ground station
-         and eight tents with their tables and chairs. All Fuel models,
-         fetched on first use and cached. -->
+    <!-- The drawn water: one water surface model at the middle of the
+         water. Buoyancy does not depend on it: it is the flat z = 0 plane
+         everywhere, and the land hides the water under it. -->
     <include>
-      <name>post_0</name>
-      <pose>169.22 112.06 0.47 0.046 -0.157 0</pose>
-      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/post</uri>
-    </include>
-    <include>
-      <name>post_1</name>
-      <pose>173.558 100.809 0.42 0.046 -0.157 0</pose>
-      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/post</uri>
-    </include>
-    <include>
-      <name>post_2</name>
-      <pose>177.64 90.86 0.3 0.046 -0.157 0</pose>
-      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/post</uri>
-    </include>
-    <include>
-      <pose>175.69 114.29 1.37 0 0 2.00</pose>
-      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/antenna</uri>
-    </include>
-    <include>
-      <name>ground_station_0</name>
-      <pose>177.61 117.2 1.55 0 0 3.54</pose>
-      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/ground_station</uri>
-    </include>
-    <include>
-      <name>ground_station_1</name>
-      <pose>179.16 113.73 1.55 0 0 3.54</pose>
-      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/ground_station</uri>
-    </include>
-    <include>
-      <name>ground_station_2</name>
-      <pose>180.61 110.31 1.55 0 0 3.54</pose>
-      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/ground_station</uri>
-    </include>
-    <include>
-      <name>ground_station_3</name>
-      <pose>182.05 106.83 1.55 0 0 3.54</pose>
-      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/ground_station</uri>
-    </include>
-    <include>
-      <name>ground_station_4</name>
-      <pose>183.71 103.14 1.55 0 0 3.54</pose>
-      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/ground_station</uri>
-    </include>
-    <include>
-      <name>ground_station_5</name>
-      <pose>185.28 99.51 1.55 0 0 3.54</pose>
-      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/ground_station</uri>
-    </include>
-    <include>
-      <name>ground_station_6</name>
-      <pose>186.8 96.02 1.55 0 0 3.54</pose>
-      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/ground_station</uri>
-    </include>
-    <include>
-      <name>ground_station_7</name>
-      <pose>188.17 92.45 1.55 0 0 3.54</pose>
-      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/ground_station</uri>
+      <pose>200 0 0 0 0 0</pose>
+      <uri>model://water_surface_sand_island</uri>
     </include>
 
-    <!-- The drawn sea: one include of the water surface model at the
-         centre of the water. The wave source's <tiles_radius> above
-         makes it draw a 3 km square, the lagoon and the sea beyond
-         it, and the terrain hides it wherever there is land. Buoyancy
-         does not depend on this: it is the flat z = 0 plane
-         everywhere. -->
+    <!-- The seabed, from bathymetry: optional, for underwater vehicles,
+         sonars and DVLs, or a hull grounding on the shallows. -->
+    <!--
     <include>
-      <pose>0 0 0 0 0 0</pose>
-      <uri>model://water_surface</uri>
+      <uri>https://fuel.gazebosim.org/1.0/honuRobotics/models/sand_island_seabed</uri>
     </include>
+    -->
 
   </world>
 </sdf>

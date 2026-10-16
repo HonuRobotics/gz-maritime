@@ -59,6 +59,7 @@ in block
   vec3 eyeVec;
   vec2 bumpCoord;
   vec2 baseXY;
+  float shelter;
 } inPs;
 
 out vec4 fragColor;
@@ -137,7 +138,8 @@ void main()
 
   // Foam overlay: blend toward white where the Tessendorf Jacobian
   // identifies a compression zone.
-  float foam = ComputeFoamMask() * foamStrength;
+  // Sheltered water breaks less: foam scales with the waves drawn.
+  float foam = ComputeFoamMask() * foamStrength * inPs.shelter;
   color.rgb = mix(color.rgb, vec3(1.0), foam);
 
   // Opaque surface: alpha 1.0 keeps the water out of the transparent
