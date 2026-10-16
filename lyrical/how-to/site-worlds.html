@@ -181,6 +181,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#nathan-benderson-park">Nathan Benderson Park</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#sand-island">Sand Island</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#la-spezia">La Spezia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#marina-bay">Marina Bay</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#what-to-know">What to know</a></li>
 </ul>
 </li>
@@ -292,9 +293,10 @@
              
   <section id="sail-the-competition-sites">
 <h1>Sail the competition sites<a class="headerlink" href="#sail-the-competition-sites" title="Link to this heading"></a></h1>
-<p>Besides the open water world, gz-maritime ships four real venues: the three
-sites of the Virtual RobotX competition (VRX) and the one of the Virtual
-Ocean Robotics Challenge (VORC), adapted to this ocean. They keep the same
+<p>Besides the open water world, gz-maritime ships five real venues: the three
+sites of the Virtual RobotX competition (VRX), the one of the Virtual Ocean
+Robotics Challenge (VORC), and Marina Bay in Singapore, where the Maritime
+RobotX Challenge 2026 is held. They keep the same
 world contract as <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code>, so every launch file, spawn command and
 service works on them unchanged. Pass one to the simulation launch and
 spawn a vehicle at the start point the site recommends:</p>
@@ -545,15 +547,69 @@ and DVLs. It is off by default; uncomment its include at the end of
 <code class="docutils literal notranslate"><span class="pre">la_spezia.sdf</span></code> or <code class="docutils literal notranslate"><span class="pre">la_spezia_lite.sdf</span></code> and the first launch downloads it
 too, about 5 MB.</p>
 </section>
+<section id="marina-bay">
+<h2>Marina Bay<a class="headerlink" href="#marina-bay" title="Link to this heading"></a></h2>
+<figure class="align-default" id="id5">
+<img alt="The Promontory's lawn in the foreground, the RobotX pontoon reaching into the bay, and Marina Bay Sands with its SkyPark across the water" src="../_images/marina-bay.jpg" />
+<figcaption>
+<p><span class="caption-text">The Marina Bay world at its opening view, over the Promontory.</span><a class="headerlink" href="#id5" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>The venue of the Maritime RobotX Challenge 2026 (8 to 14 November 2026):
+the Promontory at Marina Bay, Singapore, with the floating pontoon off its
+east corner and the four courses, A to D, between the pontoon and the Marina
+Boulevard seawall. Around it is the bay and the city out to 2.3 km: the
+seawalls and bridges, more than 5000 buildings and 7000 trees from
+OpenStreetMap, and the landmarks modelled on their own, Marina Bay Sands
+and its SkyPark, the ArtScience Museum, the Esplanade’s domes, the Singapore
+Flyer (its wheel turns, once every 105 s), the Helix Bridge and the
+Supertree Grove. The pontoon and the courses
+are placed from the organisers’ site plan; the course elements themselves
+are not in the world, so add your own.</p>
+<p>The world’s origin is the middle of the courses. The water is the Marina
+Reservoir, fresh water behind the Marina Barrage, so buoyancy uses
+1000 kg/m³, and there is no tide.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p></p></th>
+<th class="head"><p></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Launch</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ros2</span> <span class="pre">launch</span> <span class="pre">kai_bringup</span> <span class="pre">simulation.launch.xml</span> <span class="pre">world:=marina_bay.sdf</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Start points</p></td>
+<td><p>course A <code class="docutils literal notranslate"><span class="pre">x:=-45</span> <span class="pre">y:=12</span></code>, B <code class="docutils literal notranslate"><span class="pre">x:=-15</span> <span class="pre">y:=-8</span></code>, C <code class="docutils literal notranslate"><span class="pre">x:=15</span> <span class="pre">y:=-28</span></code>, D <code class="docutils literal notranslate"><span class="pre">x:=45</span> <span class="pre">y:=-48</span></code>, each <code class="docutils literal notranslate"><span class="pre">yaw:=0.55</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Water</p></td>
+<td><p>A freshwater reservoir in the city</p></td>
+</tr>
+<tr class="row-odd"><td><p>Sea states</p></td>
+<td><p>0 to 2</p></td>
+</tr>
+</tbody>
+</table>
+<p>The sky is a photographed one, Poly Haven’s tropical looking cumulus with the
+sun where the world’s sun is, on a dome in the site model: Gazebo draws only
+its built-in sky, whatever <code class="docutils literal notranslate"><span class="pre">&lt;sky&gt;&lt;cubemap_uri&gt;</span></code> says. The water reflects the
+same sky and the skyline around the bay.</p>
+<p>The site lives on <a class="reference external" href="https://app.gazebosim.org/honurobotics">Gazebo Fuel</a>:
+the first launch downloads it, about 11 MB, with the Flyer’s wheel, and
+later ones use the cache. The world has an optional seabed, modelled from
+the reservoir’s reported depths, for underwater vehicles, sonars and DVLs.
+It is off by default; uncomment its include at the end of <code class="docutils literal notranslate"><span class="pre">marina_bay.sdf</span></code>
+and the first launch downloads it too, about 4 MB.</p>
+</section>
 <section id="what-to-know">
 <h2>What to know<a class="headerlink" href="#what-to-know" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><strong>The shore is solid where it matters.</strong> The sites collide through boxes,
 which every physics engine handles cheaply: the shore within 900 m of the
 origin, the land within 250 m, the piers, breakwaters and moored boats
-within 700 m and the buildings within 450 m. Farther out there is nothing
-to hit. The water has no floor: a sinking vehicle keeps sinking, as on
-open water.</p></li>
+within 700 m and the buildings within 450 m (500 m at Marina Bay). Farther
+out there is nothing to hit. The water has no floor: a sinking vehicle
+keeps sinking, as on open water.</p></li>
 <li><p><strong>The water is one model.</strong> Each site includes the water surface once, at
 the centre of its water, and sets <code class="docutils literal notranslate"><span class="pre">&lt;tiles_radius&gt;</span></code> in its wave source to
 say how far the sea is drawn around it, in 200 m tiles; the terrain hides
@@ -562,16 +618,16 @@ vehicles float on the flat z = 0 plane everywhere.</p></li>
 <li><p><strong>First use needs the network.</strong> The sites come from Fuel the first
 time they load; after that they are cached. Building gz-maritime needs no
 network.</p></li>
-<li><p><strong>The water is sheltered.</strong> Each site’s water model, which ships with
-<code class="docutils literal notranslate"><span class="pre">kai_gazebo</span></code>, carries a shelter map,
-the share of the open sea’s waves that reaches each point: the full sea
-state offshore, less in a channel or a port, none against a quay, a bank
-or a beach. The
-waves also fade out over the last tile of the drawn sea, where a static
-water plane carries on. It changes only what is drawn.</p></li>
+<li><p><strong>The water is sheltered.</strong> The water models of the VRX and VORC sites,
+which ship with <code class="docutils literal notranslate"><span class="pre">kai_gazebo</span></code>, carry a shelter map, the share of the open
+sea’s waves that reaches each point: the full sea state offshore, less in
+a channel or a port, none against a quay, a bank or a beach. The waves
+also fade out over the last tile of the drawn sea, where a static water
+plane carries on. It changes only what is drawn. Marina Bay’s water, a
+reservoir with little fetch, has none.</p></li>
 <li><p><strong>Credits.</strong> The sites are CC BY 4.0, built from OpenStreetMap (ODbL),
 Sentinel-2 cloudless imagery (CC BY 4.0), the AWS Terrain Tiles and Poly
-Haven skies (CC0). All are credited in <code class="docutils literal notranslate"><span class="pre">kai_gazebo/NOTICE</span></code>.</p></li>
+Haven skies (CC0); Marina Bay from OpenStreetMap and a Poly Haven sky. All are credited in <code class="docutils literal notranslate"><span class="pre">kai_gazebo/NOTICE</span></code>.</p></li>
 </ul>
 <p>The worlds table in the
 <a class="reference internal" href="../reference/launch-and-world.html#worlds"><span class="std std-ref">reference</span></a> has the same facts in
