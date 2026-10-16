@@ -95,7 +95,7 @@ terminal's cranes, the marinas, downtown Honolulu and the Koolau range
 behind it, and the reef and the ocean to the south. It is built from open
 data (OpenStreetMap, satellite imagery and elevation) and its models live
 on [Gazebo Fuel](https://app.gazebosim.org/honuRobotics): the first launch
-downloads the site, about 20 MB, and later ones use the
+downloads the site, about 9 MB, and later ones use the
 cache. The world keeps the VRX world's coordinates, but the start point has
 moved onto the water: the VRX one is on Sand Island's shore as the map
 draws it.
@@ -114,7 +114,7 @@ stays calmer and the quays calm (see below).
 The world has an optional seabed, from NOAA's topobathymetric model of
 Hawaii, for underwater vehicles, sonars and DVLs, or a hull grounding on
 the shallows. It is off by default; uncomment its include at the end of
-`sand_island.sdf` and the first launch downloads it too, about 8 MB.
+`sand_island.sdf` and the first launch downloads it too, about 6 MB.
 
 ## La Spezia
 
