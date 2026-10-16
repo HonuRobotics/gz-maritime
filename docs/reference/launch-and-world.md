@@ -118,11 +118,12 @@ every one.
 | `sand_island.sdf` | Sand Island, Honolulu, RobotX 2016 and 2018, VRX 2019 | Built from open data, from Fuel on first use (about 9 MB); optional seabed | start at x 60, y 120 | Harbour channel and open ocean, any (calmer in the channel) |
 | `la_spezia.sdf` | La Spezia marina, VORC 2020 | VORC mesh, fetched by the build | start at x 10, y -372 | Marina and gulf, 0 to 3 |
 
-Every world starts at sea state 1 and takes any of the ten codes, but the
+Every world starts at sea state 1, Sand Island at 3, and takes any of the ten codes, but the
 last column says what fits the site: a rowing lake never sees more than
 wind chop (code 2 is 0.3 m waves), a sheltered lagoon or gulf at most a
 slight sea (code 3 is about 0.9 m), and the open water world and Sand
-Island take them all. At Sand Island the code sets the open ocean, and a
+Island take them all. At Sand Island the code sets the open ocean (3 by
+default, a slight sea), and a
 shelter map on its water scales the waves down where land, the reef and
 the piers shelter it. Change it with the wave service below.
 

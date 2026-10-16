@@ -107,9 +107,10 @@ draws it.
 | Water | The harbour channel and the open ocean, salt |
 | Sea states | any; 0 to 3 in the channel |
 
-The sea state sets the open ocean; a shelter map on the water scales the
-waves down where land, the reef and the piers shelter it, so the channel
-stays calmer and the quays calm (see below).
+The world starts at sea state 3, a slight sea. The sea state sets the open
+ocean; a shelter map on the water scales the waves down where land, the
+reef and the piers shelter it, so the channel stays calmer and the quays
+calm (see below).
 
 The world has an optional seabed, from NOAA's topobathymetric model of
 Hawaii, for underwater vehicles, sonars and DVLs, or a hull grounding on

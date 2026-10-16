@@ -202,10 +202,11 @@
          waves) is the commented alternative below. Full parameter lists and the
          <sea_state> precedence rules live in each plugin's documentation.
 
-         Both blocks set sea state 1 (rippled, Hs 5 cm). Vehicles float on the
-         flat z = 0 plane of the buoyancy system above, not on this surface, so
-         a rougher sea only shows waves passing through hulls that do not ride
-         them. Not 0: a glassy sea mirrors the sky and reads as white. Raise it
+         Both blocks set sea state 3 (slight, Hs about 0.9 m) on the open
+         ocean, which the shelter map on the water scales down in the channel
+         and the harbour. Vehicles float on the flat z = 0 plane of the
+         buoyancy system above, not on this surface, so a rougher sea only
+         shows waves passing through hulls that do not ride them. Change it
          at runtime through /world/default/wave/set_parameters (gz.msgs.Param,
          key sea_state; WAVES_DESIGN.md §8). -->
     <plugin filename="gz-sim-waves-fft-system"
@@ -216,7 +217,7 @@
              overrides <period>/<gain> (1 = rippled, 3 = slight, 5 = rough,
              0 = glassy). For a hand-tuned sea, comment <sea_state> and uncomment
              the advanced block (delete the two comment markers wrapping it). -->
-        <sea_state>1</sea_state>
+        <sea_state>3</sea_state>
         <!-- How far the water is drawn around the water surface model, in
              200 m tiles: 8 is a 3.4 km square. Past it the
              site's far water plane takes over. -->
@@ -252,7 +253,7 @@
             name="gz::sim::systems::GerstnerWaves">
       <update_rate>30</update_rate>
       <wave>
-        <sea_state>1</sea_state>
+        <sea_state>3</sea_state>
         <model>PMS</model>
         <number>3</number>
         <angle>0.4</angle>
