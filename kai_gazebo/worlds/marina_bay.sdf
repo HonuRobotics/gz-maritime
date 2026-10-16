@@ -6,6 +6,8 @@
   landmarks (Marina Bay Sands, the ArtScience Museum, the Esplanade, the
   Singapore Flyer, the Helix Bridge, the Supertree Grove), and the RobotX
   pontoon off the Promontory, all in the marina_bay model.
+  marina_bay_lite.sdf is its lite tier, with the same collisions and
+  coordinates.
 
   The water is the Marina Reservoir: fresh, behind the Marina Barrage, with
   no tide and little fetch, so keep the sea state between 0 and 2.
