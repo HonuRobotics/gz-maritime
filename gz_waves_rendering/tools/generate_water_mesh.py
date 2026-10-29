@@ -7,17 +7,25 @@
 Generate a dense procedural water-surface mesh as a COLLADA file.
 
 The original `water.dae` shipped with VRX is an LOD-style mesh whose finest
-vertex spacing is ~18.75m. With the FFT wavefield producing detail down to
-a fraction of a metre (cell_count=256, tile_size=100), the renderer's
+vertex spacing is ~18.75m, too coarse for the FFT wavefield: the renderer's
 triangle interpolation collapses most of the wave shape into faceted
 polygons. This script emits a uniformly-tessellated plane whose vertex
-spacing is fine enough to resolve the FFT field.
+spacing resolves the FFT field.
+
+The wavefield's heightmap is the finest detail the mesh can show: one
+sample every tile_size / grid_size metres, 1.5625m with the FFT defaults
+(200m, 128). The fine ripples come from the bump map, not the mesh. A 1m
+spacing samples the default heightmap finer than its texels, so it looks
+the same as a 0.5m mesh (renders at sea state 6 differ by about one grey
+level) at a quarter of the triangles, which nearly doubles the frame rate
+on an integrated GPU with the tiles out to the horizon. A sea configured
+with a finer heightmap wants a finer mesh: regenerate it with --segments.
 
 Usage:
-    python3 generate_water_mesh.py [--size 200] [--segments 400] [--out water.dae]
+    python3 generate_water_mesh.py [--size 200] [--segments 200] [--out water.dae]
 
-The defaults produce a 200m x 200m mesh with 0.5m vertex spacing (~160k
-vertices, ~320k triangles).
+The defaults produce a 200m x 200m mesh with 1m vertex spacing (~40k
+vertices, ~80k triangles).
 """
 
 from __future__ import annotations
@@ -154,8 +162,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
     parser.add_argument('--size', type=float, default=200.0,
                         help='Side length of the plane in metres (default: 200)')
-    parser.add_argument('--segments', type=int, default=400,
-                        help='Subdivisions per axis (default: 400 → 0.5m spacing)')
+    parser.add_argument('--segments', type=int, default=200,
+                        help='Subdivisions per axis (default: 200 → 1m spacing)')
     parser.add_argument('--out', type=Path, default=Path('water.dae'),
                         help='Output path (default: ./water.dae)')
     args = parser.parse_args()

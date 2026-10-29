@@ -27,8 +27,7 @@ copy of open water, for the picture only:
 Needs a sourced workspace with gz-maritime and bluerobotics_models built, a
 GPU with an X display, the gz-transport Python bindings
 (python3-gz-transport15 on Jetty, python3-gz-transport14 on Ionic) and, for
-the site figures, the Sydney Regatta and Benderson Park terrains in the Fuel
-cache (run each world once).
+the site figures, the sites in the Fuel cache (run each world once).
 
     python3 docs/_tools/gazebo_figures.py            # every figure
     python3 docs/_tools/gazebo_figures.py first-simulation
@@ -110,51 +109,79 @@ FIGURES = {
     'sydney-regatta': {
         'out': DOCS / 'how-to' / 'images' / 'sydney-regatta.jpg',
         'world': 'sydney_regatta',
-        'vehicles': [(USV, 'usv', '-532 162 0 0 0 1')],
+        'vehicles': [(USV, 'usv', '-532 180 0 0 0 0')],
         'sea_state': 1,
-        'camera': '-478.1 148.2 13.2 0 0.25 2.94',
+        'camera': '-518 183 2.5 0 0.06 3.0',
         'fov': SITE_FOV,
         'at': [10],
+        'far': 5000,
     },
     'benderson-park': {
         'out': DOCS / 'how-to' / 'images' / 'benderson-park.jpg',
         'world': 'benderson_park',
         'vehicles': [(USV, 'usv', '0 0 0 0 0 1.57')],
         'sea_state': 1,
-        'camera': '-193 1175 30 0 0.12 -1.18',
+        'camera': '-6 -13 2.5 0 0.04 1.25',
         'fov': SITE_FOV,
         'at': [10],
+        'far': 5000,
     },
     'sand-island': {
         'out': DOCS / 'how-to' / 'images' / 'sand-island.jpg',
         'world': 'sand_island',
-        'vehicles': [(USV, 'usv', '158 108 0 0 0 -2.76')],
+        'vehicles': [(USV, 'usv', '60 120 0 0 0 -2.76')],
         'sea_state': 2,
-        'camera': '173 122 4 0 0.22 -1.2',
+        'camera': '50 106 2.5 0 0.02 0.95',
         'fov': SITE_FOV,
         'at': [10],
+        'far': 5000,
     },
     # The multi vehicle demo at Sydney: the boat off the start point, the
     # ROV under the surface ahead of it, the X500 on the pad.
+    # Marina Bay from its opening view: the Promontory's lawn, the RobotX
+    # pontoon and courses, Marina Bay Sands across the water.
+    'marina-bay': {
+        'out': DOCS / 'how-to' / 'images' / 'marina-bay.jpg',
+        'world': 'marina_bay',
+        'vehicles': [(USV, 'usv', '-45 12 0 0 0 0.55')],
+        'sea_state': 1,
+        'camera': '-210 95 32 0 0.12 0.15',
+        'fov': SITE_FOV,
+        'at': [10],
+        # Past the sky dome, 3.8 km out.
+        'far': 5000,
+    },
+    # The aquatic centre from its opening view, the BlueBoat in lane 4.
+    'aquatic-centre': {
+        'out': DOCS / 'how-to' / 'images' / 'aquatic-centre.jpg',
+        'world': 'aquatic_centre',
+        'vehicles': [('model://blueboat', 'blueboat', '-20 -1.25 0.05 0 0 0')],
+        'sea_state': 0,
+        'camera': '-31 -17 8 0 0.2 0.5',
+        'fov': SITE_FOV,
+        'at': [10],
+    },
     'several-vehicles': {
         'out': DOCS / 'how-to' / 'images' / 'several-vehicles.jpg',
         'world': 'sydney_regatta',
-        'vehicles': [('model://blueboat', 'blueboat', '-532 162 0.05 0 0 1'),
-                     ('model://bluerov2', 'bluerov2', '-528.8 167 -1 0 0 1'),
-                     ('model://x500', 'x500', '-540 168 1.25 0 0 0')],
+        'vehicles': [('model://blueboat', 'blueboat', '-532 180 0.05 0 0 0'),
+                     ('model://bluerov2', 'bluerov2', '-526 180 -1 0 0 0'),
+                     ('model://x500', 'x500', '-545 192 1.25 0 0 0')],
         'sea_state': 1,
-        'camera': '-522 152 4 0 0.2 2.35',
+        'camera': '-522 172 4 0 0.2 2.35',
         'fov': 1.0,
         'at': [10],
+        'far': 5000,
     },
     'la-spezia': {
         'out': DOCS / 'how-to' / 'images' / 'la-spezia.jpg',
         'world': 'la_spezia',
-        'vehicles': [(USV, 'usv', '10 -372 0 0 0 0.3816')],
+        'vehicles': [(USV, 'usv', '10 -372 0 0 0 0.38')],
         'sea_state': 2,
-        'camera': '200 -480 55 0 0.2 -2.65',
+        'camera': '17 -385 3 0 0.05 2.0',
         'fov': SITE_FOV,
         'at': [10],
+        'far': 5000,
     },
 }
 
@@ -169,7 +196,7 @@ CAMERA = """
           <camera>
             <horizontal_fov>{fov}</horizontal_fov>
             <image><width>1600</width><height>900</height></image>
-            <clip><near>0.05</near><far>1000</far></clip>
+            <clip><near>0.05</near><far>{far}</far></clip>
           </camera>
         </sensor>
       </link>
@@ -189,7 +216,8 @@ def figure_world(_figure):
         f'<include><uri>{v[0]}</uri><name>{v[1]}</name>'
         + (f'<pose>{v[2]}</pose>' if len(v) > 2 else '') + '</include>'
         for v in _figure['vehicles'])
-    extra += CAMERA.format(pose=_figure['camera'], fov=_figure['fov'])
+    extra += CAMERA.format(
+        pose=_figure['camera'], fov=_figure['fov'], far=_figure.get('far', 1000))
     return world.replace('</world>', extra + '</world>', 1)
 
 

@@ -63,6 +63,9 @@ The ROV drops in from half a metre up. It is trimmed almost exactly neutral
 (2 g of net buoyancy), so it settles under the surface and stays roughly
 where it stopped.
 
+For a pool with walls and a floor, the diving well and its 15 m pit, see
+[Dive in the aquatic centre](../how-to/aquatic-centre.md).
+
 ## Several vehicles on one ocean
 
 [Several vehicles on one ocean](../how-to/several-vehicles.md) walks through

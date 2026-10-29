@@ -44,7 +44,7 @@ walks through it.
 
 | Argument | Default | Description |
 |---|---|---|
-| `world` | `sydney_regatta.sdf` | World file, as for the simulation launch, among those the demo has poses for: `sydney_regatta.sdf` (off the start point) or `open_water.sdf` (around the origin). |
+| `world` | `sydney_regatta.sdf` | World file, as for the simulation launch, among those the demo has poses for: `sydney_regatta.sdf` (at the start point) or `open_water.sdf` (around the origin). |
 | `gazebo_gui` | `true` | Start the Gazebo GUI. |
 | `use_composition` | `true` | Run Gazebo, the bridges and the state publishers in one container. |
 
@@ -101,37 +101,45 @@ description topic, TF Prefix) to `FILE` and prints the path.
 
 ## Worlds
 
-Five worlds share one contract: the systems every vehicle needs, the
+Seven worlds share one contract: the systems every vehicle needs, the
 gz-maritime buoyancy reading marked collisions, the waterline at z = 0 and
 the wave field for the drawn sea. Pass any of them to the simulation launch
 as `world:=<name>.sdf`; the spawn launch then puts vehicles into it by name.
 Four of them are venues of the Virtual RobotX competition (VRX) and the
-Virtual Ocean Robotics Challenge (VORC).
+Virtual Ocean Robotics Challenge (VORC), and one is the venue of the
+Maritime RobotX Challenge 2026; the last is an indoor pool.
 All of them are named `default` inside, so the services below work on
 every one.
 
 | World | Site | Terrain | Where to start | Water and sea states |
 |---|---|---|---|---|
 | `open_water.sdf` | Open sea, Monterey Bay coordinates | None; a landing pad at (8, -8) | Spawn anywhere | Open sea, any |
-| `sydney_regatta.sdf` | Sydney International Regatta Centre, VRX 2022 to 2024 | Fuel, fetched on first use (about 140 MB) | around x -530, y 170; start at x -532, y 162 | Rowing lake, 0 to 2 |
-| `benderson_park.sdf` | Nathan Benderson Park, Sarasota, RobotX 2022 | Fuel, fetched on first use (about 220 MB) | the lake runs along y; start at the origin, heading 1.57 | Rowing lake, 0 to 2 |
-| `sand_island.sdf` | Sand Island, Honolulu, RobotX 2018 and VRX 2019 | VRX mesh, fetched by the build; the shore camp from Fuel | start at x 158, y 108 | Sheltered lagoon, 0 to 3 |
-| `la_spezia.sdf` | La Spezia marina, VORC 2020 | VORC mesh, fetched by the build | start at x 10, y -372 | Marina and gulf, 0 to 3 |
+| `sydney_regatta.sdf` | Sydney International Regatta Centre, VRX 2022 to 2024 | Built from open data, from Fuel on first use (about 12 MB); optional seabed; also `sydney_regatta_lite.sdf`, lighter, about 4 MB | around x -530, y 180; start at x -532, y 180 | Rowing lake, fresh water, 0 to 2 |
+| `benderson_park.sdf` | Nathan Benderson Park, Sarasota, RobotX 2022 | Built from open data, from Fuel on first use (about 11 MB); optional seabed; also `benderson_park_lite.sdf`, lighter, about 3 MB | the lake runs along y; start at the origin, heading 1.57 | Rowing lake, fresh water, 0 to 2 |
+| `sand_island.sdf` | Sand Island, Honolulu, RobotX 2016 and 2018, VRX 2019 | Built from open data, from Fuel on first use (about 9 MB); optional seabed; also `sand_island_lite.sdf`, lighter, about 5 MB | start at x 60, y 120 | Harbour channel and open ocean, any (calmer in the channel) |
+| `la_spezia.sdf` | La Spezia, VORC 2020 | Built from open data, from Fuel on first use (about 14 MB); optional seabed; also `la_spezia_lite.sdf`, lighter, about 7 MB | start at x 10, y -372 | Port and gulf, any (calm in the port) |
+| `marina_bay.sdf` | Marina Bay, Singapore, RobotX 2026 | Built from OpenStreetMap, from Fuel on first use (about 11 MB); optional seabed; also `marina_bay_lite.sdf`, lighter, about 8 MB | the four courses around the origin; course A at x -45, y 12, heading 0.55 | Freshwater reservoir, 0 to 2 |
+| `aquatic_centre.sdf` | An indoor aquatic centre: an Olympic pool and a diving well with a 15 m pit | A hall, from Fuel on first use (about 3 MB) | lane 4 at x -20, y -1.25; the diving well at x 45, z -2.5 | Still pool, no drawn sea, 0 |
 
-Every world starts at sea state 1 and takes any of the ten codes, but the
-last column says what fits the site: a rowing lake never sees more than
-wind chop (code 2 is 0.3 m waves), a sheltered lagoon or gulf at most a
-slight sea (code 3 is about 0.9 m), and the open water world takes them
-all. Change it with the wave service below.
+Every world starts at sea state 1, Sand Island at 3 and the indoor pool
+at 0, and takes any of the ten codes (the pool draws no sea), but the last column says what fits the site: a rowing lake never
+sees more than wind chop (code 2 is 0.3 m waves), while the open water
+world and the sea sites, Sand Island and La Spezia, take them all. At the
+sea sites the code sets the open sea, and a shelter map on their water
+scales the waves down where land, reefs, breakwaters and piers shelter it.
+Change it with the wave service below.
 
 The site worlds place the water surface model once, at the centre of their
 water, and size the drawn sea with `<tiles_radius>` in their wave source:
 the model draws that many 200 m tiles around itself in every direction,
 sharing one wave field, and the terrain hides them wherever there is land.
-Open water keeps the model's own radius, a 1 km square. Buoyancy does not
-depend on any of that.
-The terrain models are Apache 2.0 assets from VRX and VORC,
-credited in `kai_gazebo/NOTICE`.
+Open water keeps the model's own radius, a 1 km square. The sites' water
+models also fade the waves out over the last tile (`<fadeEdges>`) and carry
+a shelter map (`<textures><shelterMap>`, with `<shelterOrigin>` and
+`<shelterSize>` in its `<parameters>`): a greyscale image over a world
+rectangle, white where the open sea's full waves reach, black against a
+quay. Buoyancy does not depend on any of that.
+The site models are credited in `kai_gazebo/NOTICE`.
 
 ## The `open_water.sdf` world
 

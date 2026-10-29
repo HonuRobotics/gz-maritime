@@ -46,8 +46,23 @@ namespace gz::sim::systems
   ///   - `<shader>/<parameters>/<foamThreshold>` (float, 0.25): half-width of the foam ramp in folding-metric space.
   ///   - `<shader>/<parameters>/<shallowColor>` (rgba, 0 0.1 0.3 1): shallow-water tint.
   ///   - `<shader>/<parameters>/<deepColor>` (rgba, 0 0.05 0.2 1): deep-water tint.
+  ///   - `<shader>/<parameters>/<shelterOrigin>` (vec2 [m], 0 0): world XY of the
+  ///     shelter map's south west corner.
+  ///   - `<shader>/<parameters>/<shelterSize>` (vec2 [m], 1 1): world extent of
+  ///     the shelter map, east and north.
+  ///   - `<shader>/<parameters>/<fadeEdges>` (bool, false): fade the waves out
+  ///     over the outermost `<fadeWidth>` of the square of tiles, so the drawn
+  ///     sea meets a flat surface beyond it without a step.
+  ///   - `<shader>/<parameters>/<fadeWidth>` (float [m], 200): the fade's width.
   ///   - `<textures>/<bumpMap>` (path): normal-perturbation texture.
   ///   - `<textures>/<cubeMap>` (path): reflection cubemap.
+  ///   - `<textures>/<shelterMap>` (path, none): a greyscale image over the
+  ///     shelter rectangle (north up), the share of the open sea's waves that
+  ///     reaches each point: white in open water, black against a quay or
+  ///     inside a harbour. It scales the drawn displacement and foam, so one
+  ///     sea state gives a rough sea offshore and calm water in port. Outside
+  ///     the rectangle the sea is open. Buoyancy is unaffected (it floats
+  ///     vehicles on the flat z = 0 plane).
   ///   - `<tiles_radius>` (int, 2): render the tile at (2r+1)^2 offsets; 0 disables.
   ///     A `<tiles_radius>` in the world's wave source overrides it, so a
   ///     world sizes its drawn sea without a model of its own.

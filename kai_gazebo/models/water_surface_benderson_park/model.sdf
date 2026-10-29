@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<!--
+  The water surface at Nathan Benderson Park, for the benderson_park worlds: gz_waves_rendering's
+  water_surface model (the same mesh, shaders, wave normals and colours, by
+  model://water_surface), reflecting textures/benderson_park_sky.dds, the site's sky
+  and skyline, instead of the generic sky, and sheltered by
+  textures/benderson_park_shelter.png (tools/sites/shelter.py): a sea state's full
+  waves offshore, calm water in port and against the shore. The cubemap is
+  rendered from the middle of the site's water. It ships here rather than on
+  Fuel: gz-sim resolves a Fuel model's model:// mesh inside that model, so
+  model://water_surface would not be found.
+-->
+<sdf version="1.10">
+  <model name="water_surface_benderson_park">
+    <static>true</static>
+    <link name="link">
+      <visual name="water">
+        <geometry>
+          <mesh>
+            <uri>model://water_surface/meshes/water.dae</uri>
+          </mesh>
+        </geometry>
+        <plugin filename="gz-sim-water-visual-system"
+                name="gz::sim::systems::WaterVisual">
+          <shader>
+            <fft_vertex>model://water_surface/shaders/fft_water_vs_330.glsl</fft_vertex>
+            <fragment>model://water_surface/shaders/water_fs_330.glsl</fragment>
+            <parameters>
+              <rescale>0.5</rescale>
+              <bumpScale>64 64</bumpScale>
+              <bumpSpeed>0.01 0.01</bumpSpeed>
+              <hdrMultiplier>0.4</hdrMultiplier>
+              <fresnelPower>5.0</fresnelPower>
+              <shallowColor>0.02 0.12 0.14 1.0</shallowColor>
+              <deepColor>0.01 0.06 0.08 1.0</deepColor>
+              <!-- The shelter map covers the site's square; the waves fade
+                   out over the last tile, where the far water takes over. -->
+              <shelterOrigin>-2500 -2500</shelterOrigin>
+              <shelterSize>5000 5000</shelterSize>
+              <fadeEdges>true</fadeEdges>
+              <fadeWidth>200</fadeWidth>
+            </parameters>
+          </shader>
+          <textures>
+            <bumpMap>model://water_surface/textures/wave_normals.dds</bumpMap>
+            <cubeMap>textures/benderson_park_sky.dds</cubeMap>
+            <shelterMap>textures/benderson_park_shelter.png</shelterMap>
+          </textures>
+        </plugin>
+        <!-- The GUI's registrars for the wave engines; see water_surface_day. -->
+        <plugin filename="gz-sim-waves-gerstner-gui"
+                name="gz::sim::systems::GerstnerWavesGui"/>
+        <plugin filename="gz-sim-waves-fft-gui"
+                name="gz::sim::systems::FftWavesGui"/>
+      </visual>
+    </link>
+  </model>
+</sdf>

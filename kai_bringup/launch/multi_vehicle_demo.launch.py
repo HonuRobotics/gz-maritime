@@ -43,9 +43,9 @@ from launch_ros.substitutions import FindPackagePrefix, FindPackageShare
 # landing gear.
 POSES = {
     'sydney_regatta.sdf': {
-        'blueboat': (-532, 162, 0.05, 1.0),
-        'bluerov2': (-528.8, 167.0, -1, 1.0),
-        'x500': (-540, 168, 1.25, 0),
+        'blueboat': (-532, 180, 0.05, 0.0),
+        'bluerov2': (-526, 180, -1, 0.0),
+        'x500': (-545, 192, 1.25, 0),
     },
     'open_water.sdf': {
         'blueboat': (0, 0, 0.05, 0),

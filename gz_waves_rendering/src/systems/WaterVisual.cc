@@ -25,7 +25,6 @@
 #include <gz/math/Color.hh>
 #include <gz/math/Vector2.hh>
 #include <gz/plugin/Register.hh>
-#include <filesystem>
 
 #include <gz/rendering/Material.hh>
 #include <gz/rendering/Mesh.hh>
@@ -39,12 +38,14 @@
 #include <gz/transport/Node.hh>
 
 #include <gz/sim/EntityComponentManager.hh>
+#include <gz/sim/components/Geometry.hh>
 #include <gz/sim/components/Name.hh>
 #include <gz/sim/components/SourceFilePath.hh>
 #include <gz/sim/rendering/Events.hh>
 #include <gz/sim/Util.hh>
 
 #include <sdf/Element.hh>
+#include <sdf/Mesh.hh>
 
 #include "gz/sim/components/Wavefield.hh"
 #include "gz/sim/waves/WaveSimulation.hh"
@@ -102,13 +103,20 @@ class WaterVisual::Implementation
   public: std::string fragmentShaderUri;    ///< Water surface fragment shader
   public: std::string bumpMapPath;
   public: std::string cubeMapPath;
+  public: std::string shelterMapPath;      ///< Optional; empty = open sea everywhere
   public: std::string visualName;
   public: std::string modelPath;
+  /// \brief The central visual's mesh, resolved, which the tiles repeat.
+  public: std::string tileMeshPath;
   // Baseline parameters — defaults aligned with asv_wave_sim's reference
   // scene so a fresh setup gets the same visual neighbourhood. Each can
   // still be overridden in the model.sdf <parameters> block.
   public: gz::math::Vector2d bumpScale{64.0, 64.0};
   public: gz::math::Vector2d bumpSpeed{0.01, 0.01};
+  // The world rectangle the shelter map covers: its south west corner and
+  // its size [m].
+  public: gz::math::Vector2d shelterOrigin{0.0, 0.0};
+  public: gz::math::Vector2d shelterSize{1.0, 1.0};
   public: Entity visualEntity{kNullEntity};
 
   // Tile instancing. The procedural water mesh is 200m × 200m; to cover the
@@ -154,6 +162,7 @@ class WaterVisual::Implementation
   public: float roughness{0.0f};
   public: float foamStrength{0.7f};       ///< Foam blend toward white (grid foam)
   public: float foamThreshold{0.25f};     ///< Foam ramp half-width (grid foam)
+  public: float fadeWidth{200.0f};        ///< Edge fade width [m], with fadeEdges
   public: float cachedTau{2.0f};          ///< guarded by mutex_
   public: float currentSimTime{0.0f};     ///< guarded by mutex_
   public: float cachedTileSize{200.0f};   ///< grid cache, guarded by mutex_
@@ -165,6 +174,8 @@ class WaterVisual::Implementation
 
   // ---- 1-byte-aligned: flags ----
   public: bool haveWavefield{false};  ///< guarded by mutex_
+  /// \brief Fade the waves out towards the edge of the square of tiles.
+  public: bool fadeEdges{false};
   /// \brief gz-sim's `GuiRunner` loads this system *twice* for the same
   /// entity (once via the model SDF, once via the visual SDF — known
   /// upstream issue mentioned in asv_wave_sim#177). The two instances
@@ -302,13 +313,13 @@ bool WaterVisual::Implementation::ResolveVisual()
     // mesh resource (Ogre caches the COLLADA load by URI). The
     // wavefield is periodic in world XY, so neighbour tiles continue
     // the same wave pattern without seams.
-    if (this->tilesRadius > 0 && !this->modelPath.empty())
+    if (this->tilesRadius > 0 && this->tileMeshPath.empty())
     {
-      // modelPath is the path to the model.sdf itself; take its parent
-      // directory to anchor the mesh URI.
-      const std::string meshPath =
-          std::filesystem::path(this->modelPath).parent_path().string() +
-          "/meshes/water.dae";
+      gzerr << "[WaterVisual] the visual has no mesh to repeat; "
+            << "no tiles around it\n";
+    }
+    else if (this->tilesRadius > 0)
+    {
       const auto basePos = this->visual->WorldPosition();
       const int r = this->tilesRadius;
       gzmsg << "[WaterVisual] spawning tile instances: radius=" << r
@@ -325,7 +336,7 @@ bool WaterVisual::Implementation::ResolveVisual()
               std::to_string(i) + "_" + std::to_string(j);
           const gz::rendering::VisualPtr tile = this->scene->CreateVisual(tileName);
           if (!tile) continue;
-          const gz::rendering::MeshDescriptor desc(meshPath);
+          const gz::rendering::MeshDescriptor desc(this->tileMeshPath);
           const gz::rendering::MeshPtr mesh = this->scene->CreateMesh(desc);
           if (!mesh)
           {
@@ -378,6 +389,37 @@ void WaterVisual::Implementation::UploadUniforms()
     (*vsParams)["bumpSpeed"].UpdateBuffer(v);
   }
   (*vsParams)["tau"] = this->cachedTau;
+
+  // Sheltering: the share of the open sea's waves that reaches each point,
+  // from an optional greyscale map over a world rectangle.
+  (*vsParams)["useShelterMap"] = this->shelterMapPath.empty() ? 0 : 1;
+  {
+    float o[2] = {static_cast<float>(this->shelterOrigin.X()),
+                  static_cast<float>(this->shelterOrigin.Y())};
+    (*vsParams)["shelterOrigin"].InitializeBuffer(2);
+    (*vsParams)["shelterOrigin"].UpdateBuffer(o);
+    float s[2] = {static_cast<float>(this->shelterSize.X()),
+                  static_cast<float>(this->shelterSize.Y())};
+    (*vsParams)["shelterSize"].InitializeBuffer(2);
+    (*vsParams)["shelterSize"].UpdateBuffer(s);
+  }
+  if (!this->shelterMapPath.empty())
+  {
+    (*vsParams)["shelterMap"].SetTexture(
+      this->shelterMapPath,
+      gz::rendering::ShaderParam::ParamType::PARAM_TEXTURE);
+  }
+  // Edge fade: the waves die out over the outermost fadeWidth of the square
+  // of tiles, so the drawn sea meets whatever lies beyond it on the level.
+  {
+    const auto c = this->visual->WorldPosition();
+    float v[2] = {static_cast<float>(c.X()), static_cast<float>(c.Y())};
+    (*vsParams)["tilesCentre"].InitializeBuffer(2);
+    (*vsParams)["tilesCentre"].UpdateBuffer(v);
+    (*vsParams)["fadeHalfExtent"] = this->fadeEdges ?
+      static_cast<float>((this->tilesRadius + 0.5) * this->tileMeshSize) : 0.0f;
+    (*vsParams)["fadeWidth"] = this->fadeWidth;
+  }
 
   // Grid-path uniforms. The material always uses the grid vertex shader,
   // so these bindings are always valid.
@@ -631,6 +673,13 @@ void WaterVisual::Configure(
     return gz::common::findFile(asFullPath(uri, this->dataPtr->modelPath));
   };
 
+  // The tiles repeat the visual's own mesh, wherever its URI points.
+  if (auto *geometry = _ecm.Component<components::Geometry>(_entity);
+      geometry && geometry->Data().MeshShape())
+  {
+    this->dataPtr->tileMeshPath = resolve(geometry->Data().MeshShape()->Uri());
+  }
+
   auto shader = sdf->GetElement("shader");
   this->dataPtr->fragmentShaderUri =
     resolve(shader->GetElement("fragment")->Get<std::string>());
@@ -660,6 +709,14 @@ void WaterVisual::Configure(
       this->dataPtr->shallowColor = p->Get<gz::math::Color>("shallowColor");
     if (p->HasElement("deepColor"))
       this->dataPtr->deepColor = p->Get<gz::math::Color>("deepColor");
+    if (p->HasElement("shelterOrigin"))
+      this->dataPtr->shelterOrigin = p->Get<gz::math::Vector2d>("shelterOrigin");
+    if (p->HasElement("shelterSize"))
+      this->dataPtr->shelterSize = p->Get<gz::math::Vector2d>("shelterSize");
+    if (p->HasElement("fadeEdges"))
+      this->dataPtr->fadeEdges = p->Get<bool>("fadeEdges");
+    if (p->HasElement("fadeWidth"))
+      this->dataPtr->fadeWidth = p->Get<float>("fadeWidth");
   }
 
   if (sdf->HasElement("textures"))
@@ -669,6 +726,13 @@ void WaterVisual::Configure(
       this->dataPtr->bumpMapPath = resolve(t->Get<std::string>("bumpMap"));
     if (t->HasElement("cubeMap"))
       this->dataPtr->cubeMapPath = resolve(t->Get<std::string>("cubeMap"));
+    if (t->HasElement("shelterMap"))
+    {
+      this->dataPtr->shelterMapPath = resolve(t->Get<std::string>("shelterMap"));
+      if (this->dataPtr->shelterMapPath.empty())
+        gzerr << "[WaterVisual] shelterMap [" << t->Get<std::string>("shelterMap")
+              << "] not found; the sea is open everywhere\n";
+    }
   }
 
   // Tile instancing radius: render the water mesh at

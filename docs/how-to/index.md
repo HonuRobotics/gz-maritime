@@ -21,6 +21,7 @@ from its files.
 
 - [Several vehicles on one ocean](several-vehicles.md)
 - [Sail the competition sites](site-worlds.md)
+- [Dive in the aquatic centre](aquatic-centre.md)
 - [Use your own world](own-world.md)
 - [Change and see the wind and the current](wind-and-current.md)
 - [Troubleshooting](faq.md)
@@ -36,6 +37,7 @@ spawn-and-drive
 sensors
 several-vehicles
 site-worlds
+aquatic-centre
 own-world
 wind-and-current
 faq

@@ -16,13 +16,13 @@ The worlds are well formed, pass the SDF check and run headless.
 
 Every world is parsed and checked for the contract the docs state: the
 name every command relies on, the systems every vehicle needs, gz-maritime's
-buoyancy naming nobody, a wave source and the drawn sea. The worlds with no
-Fuel model in them, the open sea and La Spezia, also pass the SDF checker
-with every include resolved, and La Spezia runs for a few hundred steps
-without rendering, so a broken mesh path or a plugin that fails to load
-shows up here rather than at the first launch. The other three need Fuel
-(the Sydney and Benderson Park terrains, the Sand Island shore camp), a
-download on first use that has no place in a unit test.
+buoyancy naming nobody, a wave source and the drawn sea (none indoors). The world with no
+Fuel model in it, the open sea, also passes the SDF checker with every
+include resolved and runs for a few hundred steps without rendering, so a
+broken mesh path or a plugin that fails to load shows up here rather than
+at the first launch. The site worlds need Fuel (each site's model), a
+download on first use that has no place in a unit test; the sites' water, which
+ships here, is checked on its own.
 """
 
 import os
@@ -35,11 +35,13 @@ from ament_index_python.packages import get_package_share_directory
 import pytest
 
 WORLDS = Path(get_package_share_directory('kai_gazebo')) / 'worlds'
-ALL = ('open_water', 'sydney_regatta', 'benderson_park', 'sand_island', 'la_spezia')
+ALL = ('open_water', 'sydney_regatta', 'sydney_regatta_lite', 'benderson_park',
+       'benderson_park_lite', 'sand_island', 'sand_island_lite', 'la_spezia', 'la_spezia_lite',
+       'marina_bay', 'marina_bay_lite', 'aquatic_centre')
+# Worlds indoors, whose water is their own model's: no drawn sea.
+INDOOR = ('aquatic_centre',)
 # Worlds with no Fuel model in them, so they load with no network and no cache.
-# Sand Island's terrain is local, but its shore camp comes from Fuel.
-LOCAL = ('open_water', 'la_spezia')
-LOCAL_TERRAIN = ('la_spezia',)
+LOCAL = ('open_water',)
 REQUIRED_SYSTEMS = (
     'gz-sim-physics-system', 'gz-sim-user-commands-system',
     'gz-sim-scene-broadcaster-system', 'gz-sim-sensors-system',
@@ -73,7 +75,13 @@ def test_world_keeps_the_contract(world):
     assert buoyancy.find('enable') is None, 'the world must name no vehicle'
     assert w.find('spherical_coordinates/latitude_deg') is not None
     uris = [i.find('uri').text for i in w.findall('include')]
-    assert any(u == 'model://water_surface' for u in uris), 'no drawn sea'
+    drawn = any(u.startswith('model://water_surface') for u in uris)
+    if world in INDOOR:
+        # A drawn sea would run through the hall's walls.
+        assert not drawn, 'a drawn sea indoors'
+    else:
+        # The drawn sea is the water surface model, or a site's variant of it.
+        assert drawn, 'no drawn sea'
 
 
 @pytest.mark.parametrize('world', LOCAL)
@@ -85,9 +93,9 @@ def test_world_passes_the_sdf_check(world):
         f'{world}:\n{out.stdout[-2000:]}\n{out.stderr[-2000:]}'
 
 
-@pytest.mark.parametrize('world', LOCAL_TERRAIN)
-def test_world_with_local_terrain_runs_headless(world):
-    """The server loads the terrain and its plugins and steps the world."""
+@pytest.mark.parametrize('world', LOCAL)
+def test_world_runs_headless(world):
+    """The server loads the world's models and plugins and steps the world."""
     env = dict(os.environ, GZ_PARTITION=f'test_{uuid.uuid4().hex[:8]}')
     out = subprocess.run(['gz', 'sim', '-s', '-r', '--iterations', '200',
                           str(WORLDS / f'{world}.sdf')],
@@ -95,3 +103,35 @@ def test_world_with_local_terrain_runs_headless(world):
     assert out.returncode == 0, f'{world} did not run:\n{out.stdout[-2000:]}\n{out.stderr[-2000:]}'
     for bad in ('Unable to find', 'Failed to load', 'Error parsing'):
         assert bad not in out.stdout + out.stderr, f'{world}: {bad} in the server output'
+
+
+@pytest.mark.parametrize('site', ('sydney_regatta', 'benderson_park', 'sand_island', 'la_spezia'))
+def test_site_water_is_sheltered(site):
+    """The water draws gz_waves_rendering's mesh, sheltered by its map, fading at its edge."""
+    models = Path(get_package_share_directory('kai_gazebo')) / 'models'
+    root = ET.parse(models / f'water_surface_{site}' / 'model.sdf').getroot()
+    uri = root.find('model/link/visual/geometry/mesh/uri').text
+    assert uri == 'model://water_surface/meshes/water.dae'
+    share = Path(get_package_share_directory('gz_waves_rendering')) / 'models'
+    assert (share / uri.removeprefix('model://')).is_file()
+    plugin = root.find('model/link/visual/plugin')
+    for texture in ('cubeMap', 'shelterMap'):
+        path = plugin.find(f'textures/{texture}').text
+        assert (models / f'water_surface_{site}' / path).is_file(), path
+    params = plugin.find('shader/parameters')
+    assert min(float(v) for v in params.find('shelterSize').text.split()) > 0
+    assert params.find('fadeEdges').text == 'true'
+
+
+def test_marina_bay_water_has_its_mesh_and_sky():
+    """The day water draws gz_waves_rendering's mesh, reflects the bay's sky, fades at its edge."""
+    models = Path(get_package_share_directory('kai_gazebo')) / 'models'
+    root = ET.parse(models / 'water_surface_day' / 'model.sdf').getroot()
+    uri = root.find('model/link/visual/geometry/mesh/uri').text
+    assert uri == 'model://water_surface/meshes/water.dae'
+    share = Path(get_package_share_directory('gz_waves_rendering')) / 'models'
+    assert (share / uri.removeprefix('model://')).is_file()
+    cube = root.find('model/link/visual/plugin/textures/cubeMap').text
+    assert (models / 'water_surface_day' / cube).is_file(), cube
+    params = root.find('model/link/visual/plugin/shader/parameters')
+    assert params.find('fadeEdges').text == 'true'

@@ -1,14 +1,70 @@
-kai_gazebo ships worlds built on terrain models from other projects, all
-under the Apache License, Version 2.0:
+kai_gazebo ships worlds built on site models made from open data:
 
-- Sydney International Regatta Centre and Nathan Benderson Park: models
-  from the Virtual RobotX competition (osrf/vrx), fetched from Fuel
-  (https://app.gazebosim.org/openrobotics) at run time.
-- Sand Island: the Virtual RobotX (VRX) 2019 terrain mesh and texture
-  (osrf/vrx, gazebo_classic branch, vrx_gazebo/models/sandisland), fetched at
-  build time from a pinned commit; its shore camp (post, antenna,
-  ground_station with tent, foldable_table and foldable_chair) from Fuel at
-  run time.
-- La Spezia marina: the Virtual Ocean Robotics Challenge (VORC) terrain mesh
-  and texture (osrf/vorc, vorc_gazebo/models/marina), fetched at build time
-  from a pinned commit.
+- Sydney International Regatta Centre, Nathan Benderson Park, Sand Island
+  and La Spezia: each site and its optional seabed are models on Gazebo
+  Fuel (https://app.gazebosim.org/honurobotics: sydney_regatta,
+  sydney_regatta_seabed, benderson_park, benderson_park_seabed,
+  sand_island, sand_island_seabed, la_spezia and la_spezia_seabed),
+  fetched at run time, and their water (models/water_surface_sydney_regatta,
+  water_surface_benderson_park, water_surface_sand_island and
+  water_surface_la_spezia) ships here, all by Honu Robotics under the
+  Creative Commons Attribution 4.0 International License. They are built
+  from:
+  - OpenStreetMap: the shoreline, land cover, buildings, bridges, piers,
+    breakwaters, cranes, trees and seamarks. Map data (c) OpenStreetMap
+    contributors, available under the Open Database License (ODbL) 1.0,
+    https://www.openstreetmap.org/copyright. The meshes are a Produced Work
+    of that data.
+  - Sentinel-2 cloudless (https://s2maps.eu) by EOX IT Services GmbH
+    (contains modified Copernicus Sentinel data 2016), under the Creative
+    Commons Attribution 4.0 International License: the colour of the ground
+    and of the far field in the skies.
+  - The AWS Terrain Tiles (https://registry.opendata.aws/terrain-tiles/),
+    Mapzen's Terrarium elevation: SRTM, USGS 3DEP and NED, GMTED2010, ETOPO1
+    and others, see https://github.com/tilezen/joerd/blob/master/docs/attribution.md.
+  - Poly Haven skies (https://polyhaven.com), CC0: rustig_koppie_puresky at
+    Sydney Regatta, farm_field_puresky at Benderson Park, sunflowers_puresky at Sand Island and
+    kloofendal_38d_partly_cloudy_puresky at La Spezia, turned and with the
+    far field painted in.
+  - Sydney Regatta's and Benderson Park's seabeds: modelled, as no survey
+    of the lakes is open; flat at the depths the venues publish (5 m, NSW
+    Office of Sport; at least 3.5 m, dredged to FISA's depth), sloping up
+    to the banks. Plausible, not surveyed.
+  - Sand Island's seabed: NOAA NCEI's Continuously Updated Digital
+    Elevation Model (CUDEM), 1/9 arc second topobathymetric tiles, Hawaii
+    (2021), https://www.ncei.noaa.gov/products/coastal-elevation-models, a
+    work of the US Government, in the public domain.
+  - La Spezia's seabed: Regione Liguria's detailed isobaths (Piano di
+    Tutela dell'Ambiente Marino e Costiero, multibeam surveys 2010 to 2019),
+    https://geoportal.regione.liguria.it, under the Creative Commons
+    Attribution 4.0 International License; elsewhere in the gulf and the
+    port the bed is modelled from published depths (the Port Regulatory
+    Plan of La Spezia, the Port Authority of the Eastern Ligurian Sea,
+    marina guides). Plausible, not surveyed: not for navigation.
+- Marina Bay, Singapore: the site, the Singapore Flyer's wheel and the
+  optional seabed are models on Gazebo Fuel
+  (https://app.gazebosim.org/honurobotics: marina_bay, marina_bay_flyer and
+  marina_bay_seabed), fetched at run time, and its water
+  (models/water_surface_day) ships here, all by Honu Robotics under the
+  Creative Commons Attribution 4.0 International License. They are built
+  from:
+  - OpenStreetMap: the shoreline, land cover, buildings, bridges and trees.
+    Map data (c) OpenStreetMap contributors, available under the Open
+    Database License (ODbL) 1.0, https://www.openstreetmap.org/copyright.
+    The meshes are a Produced Work of that data.
+  - The organisers' published site plan: the RobotX pontoon and course
+    positions.
+  - Poly Haven's kloofendal_48d_partly_cloudy_puresky
+    (https://polyhaven.com), CC0, regraded and cropped.
+  - The seabed: modelled, as no survey of Marina Reservoir is open; the
+    reservoir at the depths reported for its water sampling sites, about 5
+    to 7 m, and the strait south of the barrage from GEBCO 2025's general
+    depths (https://www.gebco.net, public domain). Plausible, not surveyed:
+    not for navigation.
+  The textures and the modelled landmarks are procedural.
+- The aquatic centre: the hall, its pools and their water, a model on
+  Gazebo Fuel (https://app.gazebosim.org/honurobotics: aquatic_centre),
+  fetched at run time, by Honu Robotics under the Creative Commons
+  Attribution 4.0 International License. It is procedural, except the sky
+  outside the glass: Poly Haven's kloofendal_38d_partly_cloudy_puresky
+  (https://polyhaven.com), CC0.
