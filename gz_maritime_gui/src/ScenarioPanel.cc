@@ -16,12 +16,12 @@
  */
 #include "ScenarioPanel.hh"
 
-#include <tinyxml2.h>
-
 #include <optional>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <tinyxml2.h>
 
 #include <gz/plugin/Register.hh>
 
@@ -60,6 +60,11 @@ class gz::sim::maritime_gui::ScenarioPanelPrivate
 
   /// \brief Whether a ramp stopped short at the last update.
   public: bool yielded{false};
+
+  /// \brief What became of the last change each field was sent: a ramp's
+  /// last step, or the gusts.
+  public: ChangeTracker::State currentState{ChangeTracker::State::kIdle};
+  public: ChangeTracker::State windState{ChangeTracker::State::kIdle};
 
   /// \brief Whether the world had a field at the last update.
   public: bool available{false};
@@ -102,34 +107,50 @@ void ScenarioPanel::Update(const UpdateInfo &_info,
   d.current.Update(_ecm);
   d.wind.Update(_ecm);
 
-  d.currentValues = ReadCurrent(d.current.Source(
-      _ecm, ReadCurrent(_ecm).has_value()));
-  d.windValues = ReadWind(d.wind.Source(_ecm, ReadWind(_ecm).has_value()));
+  // Each recipe from the GUI's ECM, or from the state service's copy.
+  d.currentValues = ReadCurrent(_ecm);
+  if (!d.currentValues)
+    d.currentValues = ReadCurrent(d.current.Source(_ecm, false));
+  d.windValues = ReadWind(_ecm);
+  if (!d.windValues)
+    d.windValues = ReadWind(d.wind.Source(_ecm, false));
+  const bool available = d.currentValues.has_value() ||
+      d.windValues.has_value();
 
-  // The demo moves on in simulation time.
-  if (const auto next = d.demo.Update(d.presets, _info.simTime))
-    this->ApplyPreset(static_cast<int>(*next));
+  // The demo moves on in simulation time, once there is a field to steer:
+  // started before the recipes arrive, it would spend its first dwell on
+  // a preset that steered nothing.
+  if (available)
+  {
+    if (const auto next = d.demo.Update(d.presets, _info.simTime))
+      this->ApplyPreset(static_cast<int>(*next));
+  }
 
+  auto currentState = d.currentState;
+  auto windState = d.windState;
   if (d.currentValues)
   {
     d.current.StepSteering(d.currentValues->speed,
         d.currentValues->direction, d.currentValues->generation);
+    currentState = d.current.Track(d.currentValues->generation);
   }
   if (d.windValues)
   {
     d.wind.StepSteering(d.windValues->speed, d.windValues->direction,
                         d.windValues->generation);
+    windState = d.wind.Track(d.windValues->generation);
   }
   const bool steering = d.current.IsSteering() || d.wind.IsSteering();
   const bool yielded = d.current.Yielded() || d.wind.Yielded();
-  const bool available = d.currentValues.has_value() ||
-      d.windValues.has_value();
   if (steering != d.steering || yielded != d.yielded ||
-      available != d.available)
+      available != d.available || currentState != d.currentState ||
+      windState != d.windState)
   {
     d.steering = steering;
     d.yielded = yielded;
     d.available = available;
+    d.currentState = currentState;
+    d.windState = windState;
     emit this->StateChanged();
   }
 }
@@ -159,7 +180,9 @@ void ScenarioPanel::ApplyPreset(int _index)
     auto &g = (*msg.mutable_params())["direction_gust"];
     g.set_type(msgs::Any::DOUBLE);
     g.set_double_value(p.gusts->direction);
+    // Tracked like any change, so a refused or unheard one shows.
     d.wind.Send(msg, d.windValues->generation);
+    d.windState = d.wind.Track(d.windValues->generation);
   }
   d.active = static_cast<std::size_t>(_index);
   d.steering = d.current.IsSteering() || d.wind.IsSteering();
@@ -214,6 +237,16 @@ QString ScenarioPanel::Status() const
       s = name + " stopped: a field was changed elsewhere.";
     else
       s = name + ".";
+  }
+  // A change the server refused, or nobody heard, whichever field.
+  for (const auto state : {d.currentState, d.windState})
+  {
+    if (state == ChangeTracker::State::kRefused ||
+        state == ChangeTracker::State::kUnheard)
+    {
+      s += (s.empty() ? "" : " ") + StatusText(state);
+      break;
+    }
   }
   if (d.demo.Running())
     s += s.empty() ? "Demo running." : " Demo running.";

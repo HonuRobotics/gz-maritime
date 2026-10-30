@@ -176,6 +176,10 @@ class FieldDrawingPrivate
   /// \brief A setting changed since the last drawing.
   public: bool dirty{true};
 
+  /// \brief Only the colours changed: the arrows are redrawn, the trails
+  /// take the new colours at their next frame without starting again.
+  public: bool recolor{false};
+
   /// \brief The recipe generation last drawn.
   public: std::uint64_t drawnGeneration{0};
 
@@ -271,6 +275,15 @@ void FieldDrawing::Draw(bool _available, std::uint64_t _generation,
   auto &d = *this->dataPtr;
   const Display display = _available ? d.display : Display::kOff;
 
+  // Simulation time going back is a world reset: the timers would wait
+  // for it to catch up, so they start again from the new time.
+  if (_simTime < d.lastDraw || (d.trailTime && _simTime < *d.trailTime))
+  {
+    d.lastDraw = _simTime;
+    d.trailTime.reset();
+    d.arrowsShown = false;
+  }
+
   // Take off what this display does not draw.
   if (display != Display::kArrows)
   {
@@ -285,7 +298,7 @@ void FieldDrawing::Draw(bool _available, std::uint64_t _generation,
 
   if (display == Display::kArrows)
   {
-    const bool due = d.dirty || !d.arrowsShown ||
+    const bool due = d.dirty || d.recolor || !d.arrowsShown ||
         _generation != d.drawnGeneration ||
         (_timeVarying && _simTime - d.lastDraw >= kRedrawPeriod);
     if (!due)
@@ -294,6 +307,7 @@ void FieldDrawing::Draw(bool _available, std::uint64_t _generation,
                              d.colormap), d.ArrowsNs(), d.arrowsDrawn);
     d.arrowsShown = true;
     d.dirty = false;
+    d.recolor = false;
     d.drawnGeneration = _generation;
     d.lastDraw = _simTime;
   }
@@ -319,6 +333,7 @@ void FieldDrawing::Draw(bool _available, std::uint64_t _generation,
     d.trailTime = _simTime;
     d.particles.Step(dt, _velocity);
     d.SendBins(d.particles.Trails(d.colormap), d.TrailsNs(), d.trailsDrawn);
+    d.recolor = false;
   }
 }
 
@@ -384,7 +399,7 @@ bool FieldDrawing::SetMaxSpeed(double _maxSpeed)
   if (!(_maxSpeed > 0.0) || !std::isfinite(_maxSpeed))
     return false;
   this->dataPtr->colormap.SetMaxSpeed(_maxSpeed);
-  this->dataPtr->dirty = true;
+  this->dataPtr->recolor = true;
   return true;
 }
 

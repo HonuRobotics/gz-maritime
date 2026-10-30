@@ -335,6 +335,15 @@ TEST(FieldDrawing, ArrowsRedrawWhenDue)
   EXPECT_TRUE(mm.Take().empty()) << "100 ms after the last";
   drawing->Draw(true, 2, true, 0.0, East(0.5), milliseconds(1500));
   EXPECT_EQ(1u, mm.Take().size());
+
+  // A reset: time goes back, and the redraws go on from the new time
+  // instead of waiting for it to catch up.
+  drawing->Draw(true, 2, true, 0.0, East(0.5), milliseconds(0));
+  EXPECT_EQ(1u, mm.Take().size()) << "redrawn after a reset";
+  drawing->Draw(true, 2, true, 0.0, East(0.5), milliseconds(100));
+  EXPECT_TRUE(mm.Take().empty()) << "100 ms after the last";
+  drawing->Draw(true, 2, true, 0.0, East(0.5), milliseconds(200));
+  EXPECT_EQ(1u, mm.Take().size());
 }
 
 /////////////////////////////////////////////////
@@ -424,6 +433,14 @@ TEST(FieldDrawing, Trails)
   // A paused world: the next frame has the same time, so none.
   drawing->Draw(true, 1, false, 0.0, East(0.5), t - milliseconds(40));
   EXPECT_TRUE(mm.Take().empty());
+
+  // A reset: time goes back, and the trails go on from the new time
+  // instead of waiting for it to catch up.
+  drawing->Draw(true, 1, false, 0.0, East(0.5), milliseconds(0));
+  EXPECT_FALSE(mm.Take().empty()) << "trails after a reset";
+  drawing->Draw(true, 1, false, 0.0, East(0.5), milliseconds(40));
+  EXPECT_FALSE(mm.Take().empty()) << "and on from there";
+  t = milliseconds(40);
 
   // Another plane configures them again, and the trails restart.
   drawing->Draw(true, 1, false, 2.0, East(0.5), t);

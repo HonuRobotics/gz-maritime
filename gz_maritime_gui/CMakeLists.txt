@@ -84,8 +84,12 @@ foreach(plugin ${gui_plugins})
   )
 endforeach()
 
+# The core library is exported with its headers, so another GUI plugin can
+# link gz_maritime_gui::gz_maritime_gui_core.
 install(DIRECTORY include/ DESTINATION include)
 install(TARGETS ${PROJECT_NAME}_core
+  EXPORT export_${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 # The plugins in a folder of their own: the GUI's plugin menu lists every
@@ -138,5 +142,9 @@ endif()
 # GZ_GUI_PLUGIN_PATH hook so gz-sim's GUI finds the plugin library.
 ament_environment_hooks("hooks/hook.dsv.in")
 ament_environment_hooks("hooks/hook.sh.in")
+
+ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
+ament_export_include_directories(include)
+ament_export_dependencies(gz_sim_vendor gz_msgs_vendor gz_wind gz_ocean_current)
 
 ament_package()

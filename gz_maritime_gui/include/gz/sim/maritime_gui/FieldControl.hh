@@ -90,6 +90,20 @@ class FieldControl
   /// \param[in] _direction Degrees, in the field's own convention.
   public: void Steer(double _speed, double _direction);
 
+  /// \brief Steer the speed alone: a direction on its way keeps going,
+  /// one at rest stays.
+  /// \param[in] _speed m/s.
+  public: void SteerSpeed(double _speed);
+
+  /// \brief Steer the direction alone: a speed on its way keeps going, one
+  /// at rest stays.
+  /// \param[in] _direction Degrees, in the field's own convention.
+  public: void SteerDirection(double _direction);
+
+  /// \brief Stop steering, leaving the field where it is; a change sent
+  /// afterwards is not mistaken for someone else moving the field.
+  public: void StopSteering();
+
   /// \brief Send the steering's next step when one is due: an intermediate
   /// step untracked, the last one tracked like a change from Apply.
   /// \param[in] _speed The recipe's speed now.

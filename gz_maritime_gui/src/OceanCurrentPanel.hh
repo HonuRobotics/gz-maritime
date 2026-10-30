@@ -14,8 +14,8 @@
  * limitations under the License.
  *
  */
-#ifndef GZ_MARITIME_GUI_OCEANCURRENTPANEL_HH_
-#define GZ_MARITIME_GUI_OCEANCURRENTPANEL_HH_
+#ifndef GZ_SIM_MARITIME_GUI_OCEANCURRENTPANEL_HH_
+#define GZ_SIM_MARITIME_GUI_OCEANCURRENTPANEL_HH_
 
 #include <memory>
 
@@ -77,8 +77,8 @@ namespace gz::sim::maritime_gui
     /// \brief How the field is drawn: off, arrows or trails.
     Q_PROPERTY(QString display READ CurrentDisplay NOTIFY ArrowsChanged)
 
-    /// \brief The speed the colour map's last colour stands for, m/s, and
-    /// the steering slider's top.
+    /// \brief The speed the colour map's last colour stands for, m/s; the
+    /// speed slider spans it, and further when the field is past it.
     Q_PROPERTY(double maxSpeed READ MaxSpeed NOTIFY ArrowsChanged)
 
     /// \brief The colour map's stops, slowest first, as #rrggbb.
@@ -130,6 +130,16 @@ namespace gz::sim::maritime_gui
     /// \param[in] _flowHeading Degrees clockwise from north the flow goes
     /// towards, whatever the field's own convention.
     public: Q_INVOKABLE void SteerFlow(double _speed, double _flowHeading);
+
+    /// \brief Steer the speed alone; a heading on its way keeps going.
+    /// \param[in] _speed m/s.
+    public: Q_INVOKABLE void SteerSpeed(double _speed);
+
+    /// \brief Steer the flow's heading alone; a speed on its way keeps
+    /// going.
+    /// \param[in] _flowHeading Degrees clockwise from north the flow goes
+    /// towards.
+    public: Q_INVOKABLE void SteerHeading(double _flowHeading);
 
     /// \brief Set the side of the grid from a field's text.
     /// \param[in] _text m.
@@ -193,4 +203,4 @@ namespace gz::sim::maritime_gui
   };
 }
 
-#endif
+#endif  // GZ_SIM_MARITIME_GUI_OCEANCURRENTPANEL_HH_

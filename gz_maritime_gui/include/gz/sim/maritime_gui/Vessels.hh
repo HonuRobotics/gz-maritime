@@ -45,17 +45,17 @@ namespace gz::sim::maritime_gui
 struct Vessel
 {
   /// \brief Its model's name.
-  std::string name;
+  public: std::string name;
 
   /// \brief Its model's world pose.
-  math::Pose3d pose;
+  public: math::Pose3d pose;
 
   /// \brief Its velocity over the ground, world frame, estimated from its
   /// poses.
-  math::Vector3d velocity;
+  public: math::Vector3d velocity;
 
   /// \brief Where it has been, oldest first.
-  std::deque<math::Vector3d> track;
+  public: std::deque<math::Vector3d> track;
 };
 
 /// \brief Finds the vehicles in the GUI's ECM, every model that is not

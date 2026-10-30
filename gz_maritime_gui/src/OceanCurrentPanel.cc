@@ -16,28 +16,27 @@
  */
 #include "OceanCurrentPanel.hh"
 
-#include <tinyxml2.h>
-
 #include <chrono>
+#include <cmath>
 #include <map>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <utility>
 
-#include <gz/plugin/Register.hh>
-
-#include <cmath>
+#include <tinyxml2.h>
 
 #include <QColor>
+
+#include <gz/plugin/Register.hh>
+#include <gz/sim/ocean_current/OceanCurrentSampler.hh>
 
 #include "gz/sim/maritime_gui/FieldControl.hh"
 #include "gz/sim/maritime_gui/FieldDrawing.hh"
 #include "gz/sim/maritime_gui/FieldSpec.hh"
+#include "gz/sim/maritime_gui/Fields.hh"
 #include "gz/sim/maritime_gui/Flow.hh"
 #include "gz/sim/maritime_gui/Vessels.hh"
-#include "gz/sim/maritime_gui/Fields.hh"
-#include "gz/sim/ocean_current/OceanCurrentSampler.hh"
 
 using namespace gz;
 using namespace sim;
@@ -117,9 +116,12 @@ void OceanCurrentPanel::Update(const UpdateInfo &_info,
   auto &d = *this->dataPtr;
   d.control.Update(_ecm);
 
-  const bool inGui = ReadCurrent(_ecm).has_value();
+  // The recipe from the GUI's ECM, or from the state service's copy.
+  auto current = ReadCurrent(_ecm);
+  const bool inGui = current.has_value();
   const auto &source = d.control.Source(_ecm, inGui);
-  const auto current = ReadCurrent(source);
+  if (!inGui)
+    current = ReadCurrent(source);
 
   if (current)
   {
@@ -219,6 +221,11 @@ void OceanCurrentPanel::Apply(const QVariantMap &_edits)
     emit this->StatusChanged();
     return;
   }
+  // A ramp under way would overwrite the change, then take it for someone
+  // else's and stop: Apply ends the ramp first.
+  d.control.StopSteering();
+  d.steering = false;
+  d.yielded = false;
   d.control.Send(msg, d.current->generation);
   d.state = d.control.Track(d.current->generation);
   emit this->StatusChanged();
@@ -338,6 +345,29 @@ void OceanCurrentPanel::SteerFlow(double _speed, double _flowHeading)
 }
 
 //////////////////////////////////////////////////
+void OceanCurrentPanel::SteerSpeed(double _speed)
+{
+  if (!std::isfinite(_speed))
+    return;
+  this->dataPtr->invalid.clear();
+  this->dataPtr->control.SteerSpeed(_speed);
+  this->dataPtr->steering = true;
+  emit this->StatusChanged();
+}
+
+//////////////////////////////////////////////////
+void OceanCurrentPanel::SteerHeading(double _flowHeading)
+{
+  if (!std::isfinite(_flowHeading))
+    return;
+  this->dataPtr->invalid.clear();
+  // The current's direction is where it sets towards: the flow's heading.
+  this->dataPtr->control.SteerDirection(_flowHeading);
+  this->dataPtr->steering = true;
+  emit this->StatusChanged();
+}
+
+//////////////////////////////////////////////////
 double OceanCurrentPanel::Extent() const
 {
   return this->dataPtr->drawing.ArrowGrid().extent;
@@ -365,6 +395,11 @@ bool OceanCurrentPanel::OnVehicles() const
 void OceanCurrentPanel::SetOnVehicles(bool _on)
 {
   this->dataPtr->onVehicles = _on;
+  // Turned off, the tracker stops following the vehicles; on again, it
+  // starts afresh rather than averaging the velocity over the time it was
+  // off.
+  if (!_on)
+    this->dataPtr->vessels.Clear();
   emit this->ArrowsChanged();
 }
 

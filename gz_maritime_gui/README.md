@@ -105,7 +105,7 @@ All optional, in the plugin's element of a `<gui>` block:
 | Element | Plugin | Default | Meaning |
 |---|---|---|---|
 | `<display>` | both | off | `off`, `arrows` or `trails`. |
-| `<max_speed>` | both | 1 (current), 20 (wind) | m/s of the colour map's last colour, and the steering slider's top. |
+| `<max_speed>` | both | 1 (current), 20 (wind) | m/s of the colour map's last colour; the speed slider spans it, and further when the field is past it, and the wheel steps a twentieth of it. |
 | `<extent>` | both | 40 | Side of the area, m. |
 | `<spacing>` | both | 5 | Between two arrows, m. |
 | `<center_x>`, `<center_y>` | both | 0 | Centre of the area. |

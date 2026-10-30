@@ -11,6 +11,10 @@
 
   <depend>gz_sim_vendor</depend>
   <depend>gz_gui_vendor</depend>
+  <!-- The panels: Qt Quick. gz_gui_vendor only builds against Qt itself,
+       so the keys are declared here too. -->
+  <build_depend>qt6-base-dev</build_depend>
+  <build_depend>qt6-declarative-dev</build_depend>
   <depend>gz_transport_vendor</depend>
   <depend>gz_msgs_vendor</depend>
   <!-- The plugins' configuration. -->
@@ -21,6 +25,7 @@
 
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>python3-pytest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 

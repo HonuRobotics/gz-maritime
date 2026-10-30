@@ -20,10 +20,14 @@ import QtQuick.Layouts
 
 // A field for a number, with a decimal point or a decimal comma whatever
 // the locale: the plugin parses the text, so the locale's validator, which
-// takes only its own separator, is not used.
+// takes only its own separator, is not used. It remembers that the user
+// typed in it, so a panel knows what to send and what not to overwrite.
 TextField {
+  // True once the user typed in it, until the panel takes the value.
+  property bool edited: false
   Layout.fillWidth: true
   selectByMouse: true
+  onTextEdited: edited = true
   inputMethodHints: Qt.ImhFormattedNumbersOnly
   validator: RegularExpressionValidator {
     regularExpression: /^\s*[-+]?[0-9]*([.,][0-9]*)?\s*$/

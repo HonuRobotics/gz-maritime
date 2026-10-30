@@ -244,6 +244,43 @@ TEST(FieldControl, Steering)
 }
 
 /////////////////////////////////////////////////
+/// One axis steered at a time leaves the other where the world has it, and
+/// steering stopped before a change from Apply is not taken for someone
+/// else moving the field.
+TEST(FieldControl, SteerOneAxisAndStop)
+{
+  FakeServer server("axis");
+  EntityComponentManager ecm;
+  World(ecm, "axis", true);
+  FieldControl control(OceanCurrentSpec(), "test");
+  control.Update(ecm);
+  ASSERT_TRUE(SendWhenHeard(control, Speed(0.0), 4));
+  ASSERT_TRUE(server.WaitFor(1u));
+
+  // Turning alone: the speed is sent as the world has it.
+  auto t = Steering::Clock::now();
+  control.SteerDirection(90.0);
+  EXPECT_TRUE(control.IsSteering());
+  control.StepSteering(0.3, 0.0, 5, t);
+  ASSERT_TRUE(server.WaitFor(2u));
+  const auto step = server.Received()[1];
+  EXPECT_NEAR(0.3, step.params().at("speed").double_value(), 1e-9);
+  EXPECT_NEAR(9.0, step.params().at("direction").double_value(), 1e-9);
+
+  // Apply mid turn: the turn stops first, so the change is ours and the
+  // steering does not yield to it.
+  control.StopSteering();
+  EXPECT_FALSE(control.IsSteering());
+  t += milliseconds(100);
+  control.Send(Speed(0.5), 6, t);
+  control.StepSteering(0.5, 9.0, 7, t);
+  EXPECT_FALSE(control.Yielded());
+  EXPECT_FALSE(control.IsSteering());
+  ASSERT_TRUE(server.WaitFor(3u));
+  EXPECT_EQ(3u, server.Received().size()) << "nothing but the change";
+}
+
+/////////////////////////////////////////////////
 /// A panel whose GUI's ECM has no recipe asks the world's state service,
 /// once, after about a second of updates, and reads the recipe from the copy.
 TEST(FieldControl, StateServiceFallback)

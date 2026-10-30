@@ -249,11 +249,13 @@ TEST(Fields, GridPoints)
 }
 
 /////////////////////////////////////////////////
-/// The arrows are one LINE_LIST marker, and a delete removes it.
+/// A drawing is one unlit LINE_LIST marker, and a delete removes it.
 TEST(Fields, Markers)
 {
   const std::vector<math::Vector3d> segments{{0, 0, 0}, {1, 0, 0}};
-  const auto marker = ArrowMarker("ns", 4, math::Color::Blue, segments);
+  const auto marker = SolidMarker("ns", 4, msgs::Marker::LINE_LIST,
+                                  math::Color::Blue, segments);
+  EXPECT_FALSE(marker.material().lighting());
   EXPECT_EQ("ns", marker.ns());
   EXPECT_EQ(4u, marker.id());
   EXPECT_EQ(msgs::Marker::ADD_MODIFY, marker.action());
@@ -534,6 +536,47 @@ TEST(Flow, SteeringRamps)
   ASSERT_TRUE(msg.has_value());
   EXPECT_NEAR(1.0, msg->params().at("speed").double_value(), 1e-9);
   EXPECT_TRUE(steer.Arrived());
+}
+
+/////////////////////////////////////////////////
+/// One axis steered at a time: a speed target leaves a direction on its way
+/// going, and a direction target on an idle field leaves the speed where the
+/// world has it. Stop forgets the target and sends nothing more.
+TEST(Flow, SteeringOneAxisKeepsTheOther)
+{
+  using Clock = Steering::Clock;
+  Steering steer(1.0, 90.0, std::chrono::milliseconds(100));
+  auto t = Clock::now();
+
+  // Turning from 0 towards 170; the speed sits at 0.4.
+  steer.SetDirectionTarget(170.0);
+  auto msg = steer.Step(0.4, 0.0, t);
+  ASSERT_TRUE(msg.has_value());
+  EXPECT_NEAR(0.4, msg->params().at("speed").double_value(), 1e-9)
+      << "the speed stays where the world has it";
+  EXPECT_NEAR(9.0, msg->params().at("direction").double_value(), 1e-9);
+
+  // A speed target mid turn: the turn keeps its own target.
+  steer.SetSpeedTarget(1.0);
+  t += std::chrono::milliseconds(100);
+  msg = steer.Step(0.4, 9.0, t);
+  ASSERT_TRUE(msg.has_value());
+  EXPECT_NEAR(0.5, msg->params().at("speed").double_value(), 1e-9);
+  EXPECT_NEAR(18.0, msg->params().at("direction").double_value(), 1e-9)
+      << "still on its way to 170";
+
+  // Stop: no target, nothing sent, and the next target starts afresh.
+  steer.Stop();
+  EXPECT_FALSE(steer.Active());
+  t += std::chrono::milliseconds(100);
+  EXPECT_FALSE(steer.Step(0.5, 18.0, t).has_value());
+  steer.SetSpeedTarget(0.7);
+  t += std::chrono::milliseconds(100);
+  msg = steer.Step(0.5, 18.0, t);
+  ASSERT_TRUE(msg.has_value());
+  EXPECT_NEAR(0.6, msg->params().at("speed").double_value(), 1e-9);
+  EXPECT_NEAR(18.0, msg->params().at("direction").double_value(), 1e-9)
+      << "the direction stays where the world has it";
 }
 
 /////////////////////////////////////////////////

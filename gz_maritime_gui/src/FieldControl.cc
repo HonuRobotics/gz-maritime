@@ -198,6 +198,27 @@ void FieldControl::Steer(double _speed, double _direction)
 }
 
 //////////////////////////////////////////////////
+void FieldControl::SteerSpeed(double _speed)
+{
+  this->dataPtr->steering.SetSpeedTarget(_speed);
+  this->dataPtr->yielded = false;
+}
+
+//////////////////////////////////////////////////
+void FieldControl::SteerDirection(double _direction)
+{
+  this->dataPtr->steering.SetDirectionTarget(_direction);
+  this->dataPtr->yielded = false;
+}
+
+//////////////////////////////////////////////////
+void FieldControl::StopSteering()
+{
+  this->dataPtr->steering.Stop();
+  this->dataPtr->yielded = false;
+}
+
+//////////////////////////////////////////////////
 void FieldControl::StepSteering(double _speed, double _direction,
     std::uint64_t _generation, Steering::Clock::time_point _now)
 {

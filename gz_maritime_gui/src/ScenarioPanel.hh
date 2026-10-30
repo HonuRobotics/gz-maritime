@@ -14,8 +14,8 @@
  * limitations under the License.
  *
  */
-#ifndef GZ_MARITIME_GUI_SCENARIOPANEL_HH_
-#define GZ_MARITIME_GUI_SCENARIOPANEL_HH_
+#ifndef GZ_SIM_MARITIME_GUI_SCENARIOPANEL_HH_
+#define GZ_SIM_MARITIME_GUI_SCENARIOPANEL_HH_
 
 #include <memory>
 
@@ -46,7 +46,8 @@ namespace gz::sim::maritime_gui
   ///   each optional: the presets, replacing the built in Calm, Tidal ebb,
   ///   Fresh breeze and Squall. The current's direction is where it sets
   ///   towards, the wind's where it comes from.
-  /// * `<demo>`: start the demo when the world loads, default false.
+  /// * `<demo>`: start the demo when the world loads, default false; it
+  ///   waits for a field to be available before its first preset.
   class ScenarioPanel : public gz::sim::GuiSystem
   {
     Q_OBJECT
@@ -108,4 +109,4 @@ namespace gz::sim::maritime_gui
   };
 }
 
-#endif
+#endif  // GZ_SIM_MARITIME_GUI_SCENARIOPANEL_HH_

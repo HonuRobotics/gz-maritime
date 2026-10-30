@@ -14,8 +14,8 @@
  * limitations under the License.
  *
  */
-#ifndef GZ_MARITIME_GUI_WINDPANEL_HH_
-#define GZ_MARITIME_GUI_WINDPANEL_HH_
+#ifndef GZ_SIM_MARITIME_GUI_WINDPANEL_HH_
+#define GZ_SIM_MARITIME_GUI_WINDPANEL_HH_
 
 #include <memory>
 
@@ -83,8 +83,8 @@ namespace gz::sim::maritime_gui
     /// \brief How the field is drawn: off, arrows or trails.
     Q_PROPERTY(QString display READ CurrentDisplay NOTIFY ArrowsChanged)
 
-    /// \brief The speed the colour map's last colour stands for, m/s, and
-    /// the steering slider's top.
+    /// \brief The speed the colour map's last colour stands for, m/s; the
+    /// speed slider spans it, and further when the field is past it.
     Q_PROPERTY(double maxSpeed READ MaxSpeed NOTIFY ArrowsChanged)
 
     /// \brief The colour map's stops, slowest first, as #rrggbb.
@@ -126,9 +126,11 @@ namespace gz::sim::maritime_gui
     public: void Update(const UpdateInfo &_info,
                         EntityComponentManager &_ecm) override;
 
-    /// \brief Send the edited keys that differ from the recipe.
-    /// \param[in] _edits The fields' text by key: speed, direction,
-    /// speed_gust, speed_gust_time, direction_gust, direction_gust_time.
+    /// \brief Send the edited keys that differ from the recipe, stopping
+    /// any steering first so the change is not taken for someone else's.
+    /// \param[in] _edits The fields the user edited, their text by key:
+    /// speed, direction, speed_gust, speed_gust_time, direction_gust,
+    /// direction_gust_time.
     public: Q_INVOKABLE void Apply(const QVariantMap &_edits);
 
     /// \brief Draw the field another way.
@@ -145,6 +147,16 @@ namespace gz::sim::maritime_gui
     /// \param[in] _flowHeading Degrees clockwise from north the flow goes
     /// towards, whatever the field's own convention.
     public: Q_INVOKABLE void SteerFlow(double _speed, double _flowHeading);
+
+    /// \brief Steer the speed alone; a heading on its way keeps going.
+    /// \param[in] _speed m/s.
+    public: Q_INVOKABLE void SteerSpeed(double _speed);
+
+    /// \brief Steer the flow's heading alone; a speed on its way keeps
+    /// going.
+    /// \param[in] _flowHeading Degrees clockwise from north the flow goes
+    /// towards.
+    public: Q_INVOKABLE void SteerHeading(double _flowHeading);
 
     /// \brief Set the side of the grid from a field's text.
     /// \param[in] _text m.
@@ -228,4 +240,4 @@ namespace gz::sim::maritime_gui
   };
 }
 
-#endif
+#endif  // GZ_SIM_MARITIME_GUI_WINDPANEL_HH_

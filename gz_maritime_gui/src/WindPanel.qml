@@ -41,14 +41,38 @@ ScrollView {
     return ("00" + d).slice(-3) + "°";
   }
 
-  // A new recipe puts its values back in the fields.
+  // The fields and their keys on the set topic.
+  readonly property var fields: ({
+      "speed": speed, "direction": direction,
+      "speed_gust": speedGust, "speed_gust_time": speedGustTime,
+      "direction_gust": directionGust, "direction_gust_time": directionGustTime})
+  readonly property var values: ({
+      "speed": "speed", "direction": "direction",
+      "speed_gust": "speedGust", "speed_gust_time": "speedGustTime",
+      "direction_gust": "directionGust", "direction_gust_time": "directionGustTime"})
+
+  // A new recipe puts its values back in the fields, except one the user is
+  // typing in or has edited: a ramp brings a new recipe every 100 ms.
   function refresh() {
-    speed.text = show(field.speed);
-    direction.text = show(field.direction);
-    speedGust.text = show(field.speedGust);
-    speedGustTime.text = show(field.speedGustTime);
-    directionGust.text = show(field.directionGust);
-    directionGustTime.text = show(field.directionGustTime);
+    for (var key in fields) {
+      var f = fields[key];
+      if (!f.edited && !f.activeFocus)
+        f.text = show(field[values[key]]);
+    }
+  }
+  // What the user edited, by key: Apply sends that and nothing else.
+  function edits() {
+    var m = {};
+    for (var key in fields) {
+      if (fields[key].edited)
+        m[key] = fields[key].text;
+    }
+    return m;
+  }
+  function apply() {
+    _WindPanel.Apply(edits());
+    for (var key in fields)
+      fields[key].edited = false;
   }
   Connections {
     target: _WindPanel
@@ -85,7 +109,8 @@ ScrollView {
         maxSpeed: _WindPanel.maxSpeed
         color: "#ff8c26"
         still: !(root.field.speed > 0)
-        onSteered: function(s, h) { _WindPanel.SteerFlow(s, h); }
+        onSpeedSteered: function(s) { _WindPanel.SteerSpeed(s); }
+        onHeadingSteered: function(h) { _WindPanel.SteerHeading(h); }
       }
       Label {
         Layout.alignment: Qt.AlignHCenter
@@ -101,8 +126,10 @@ ScrollView {
           id: speedSlider
           Layout.fillWidth: true
           from: 0
-          to: _WindPanel.maxSpeed
-          onMoved: _WindPanel.SteerFlow(value, compass.shownHeading)
+          // The colour scale's top, or further when the field is past it.
+          to: Math.max(_WindPanel.maxSpeed,
+                       root.field.speed !== undefined ? root.field.speed : 0)
+          onMoved: _WindPanel.SteerSpeed(value)
           Binding on value {
             when: !speedSlider.pressed
             value: root.field.speed !== undefined ? root.field.speed : 0
@@ -110,7 +137,7 @@ ScrollView {
           }
         }
         Label {
-          text: root.show(_WindPanel.maxSpeed)
+          text: root.show(speedSlider.to)
           color: "grey"
           font.pixelSize: 11
         }
@@ -162,13 +189,7 @@ ScrollView {
       Layout.leftMargin: 8
       Button {
         text: "Apply"
-        onClicked: _WindPanel.Apply({
-            "speed": speed.text,
-            "direction": direction.text,
-            "speed_gust": speedGust.text,
-            "speed_gust_time": speedGustTime.text,
-            "direction_gust": directionGust.text,
-            "direction_gust_time": directionGustTime.text})
+        onClicked: root.apply()
       }
       Label {
         text: _WindPanel.status

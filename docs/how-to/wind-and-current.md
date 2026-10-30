@@ -162,7 +162,7 @@ the `filename` is optional:
     <property type="string" key="state">docked</property>
   </gz-gui>
   <display>trails</display>  <!-- off, arrows or trails -->
-  <max_speed>1</max_speed>   <!-- m/s of the last colour, the slider's top -->
+  <max_speed>1</max_speed>   <!-- m/s of the last colour, and the slider's span -->
   <extent>40</extent>        <!-- side of the area, m -->
   <spacing>5</spacing>       <!-- between two arrows, m -->
   <center_x>0</center_x>     <!-- centre of the area -->

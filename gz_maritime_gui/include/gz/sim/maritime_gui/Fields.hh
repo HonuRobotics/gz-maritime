@@ -42,56 +42,56 @@ namespace gz::sim::maritime_gui
 struct CurrentValues
 {
   /// \brief Generation of the recipe; a new one on every change.
-  std::uint64_t generation{0};
+  public: std::uint64_t generation{0};
 
   /// \brief The registered model.
-  std::string model;
+  public: std::string model;
 
   /// \brief m/s.
-  double speed{0.0};
+  public: double speed{0.0};
 
   /// \brief Degrees clockwise from north the current sets towards.
-  double direction{0.0};
+  public: double direction{0.0};
 
   /// \brief World z of the water's surface.
-  double waterLevel{0.0};
+  public: double waterLevel{0.0};
 
   /// \brief The parameters the model owns, as text.
-  std::map<std::string, std::string> extra;
+  public: std::map<std::string, std::string> extra;
 };
 
 /// \brief The wind as its recipe gives it.
 struct WindValues
 {
   /// \brief Generation of the recipe; a new one on every change.
-  std::uint64_t generation{0};
+  public: std::uint64_t generation{0};
 
   /// \brief The registered model.
-  std::string model;
+  public: std::string model;
 
   /// \brief m/s at the reference height.
-  double speed{0.0};
+  public: double speed{0.0};
 
   /// \brief Degrees clockwise from north the wind comes from.
-  double direction{0.0};
+  public: double direction{0.0};
 
   /// \brief Standard deviation of the speed gusts, m/s.
-  double speedGust{0.0};
+  public: double speedGust{0.0};
 
   /// \brief Correlation time of the speed gusts, s.
-  double speedGustTime{0.0};
+  public: double speedGustTime{0.0};
 
   /// \brief Standard deviation of the direction gusts, degrees.
-  double directionGust{0.0};
+  public: double directionGust{0.0};
 
   /// \brief Correlation time of the direction gusts, s.
-  double directionGustTime{0.0};
+  public: double directionGustTime{0.0};
 
   /// \brief m above the water the speed is given at.
-  double referenceHeight{0.0};
+  public: double referenceHeight{0.0};
 
   /// \brief World z of the water.
-  double waterLevel{0.0};
+  public: double waterLevel{0.0};
 };
 
 /// \brief The ocean current recipe on the world, if there is one.
@@ -122,6 +122,11 @@ std::map<std::string, double> Editable(const WindValues &_wind);
 msgs::Param ChangedKeys(const std::map<std::string, double> &_edits,
                         const std::map<std::string, double> &_recipe);
 
+/// \brief Degrees wrapped into [0, 360).
+/// \param[in] _degrees Any angle.
+/// \return The same angle, from 0 up to 360.
+double WrapDegrees(double _degrees);
+
 /// \brief The heading the flow goes towards, degrees clockwise from north
 /// in [0, 360): a current's own direction, a wind's direction plus 180.
 /// \param[in] _direction The field's direction in its own convention.
@@ -134,13 +139,13 @@ double FlowHeading(double _direction, bool _comesFrom);
 struct Grid
 {
   /// \brief Its centre, world x and y.
-  math::Vector2d center{0.0, 0.0};
+  public: math::Vector2d center{0.0, 0.0};
 
   /// \brief Length of its side, m.
-  double extent{40.0};
+  public: double extent{40.0};
 
   /// \brief Distance between two arrows, m.
-  double spacing{5.0};
+  public: double spacing{5.0};
 };
 
 /// \brief Most arrows on one side of a grid, so a small spacing over a wide
@@ -154,6 +159,16 @@ constexpr int kMaxArrowsPerSide{51};
 /// \return The points, row by row.
 std::vector<math::Vector3d> GridPoints(const Grid &_grid, double _z);
 
+/// \brief One arrow as line segments, appended: a shaft from the point along
+/// the velocity, `_scale` metres per m/s, and two strokes of a head. No
+/// velocity appends nothing.
+/// \param[in] _point Where the arrow starts.
+/// \param[in] _velocity The field's velocity there, world frame.
+/// \param[in] _scale Metres of arrow per m/s.
+/// \param[in,out] _segments Pairs of points, three pairs added per arrow.
+void AppendArrow(const math::Vector3d &_point, const math::Vector3d &_velocity,
+                 double _scale, std::vector<math::Vector3d> &_segments);
+
 /// \brief Arrows as line segments: a shaft from each point along the
 /// velocity there, `_scale` metres per m/s, and two strokes of a head. A
 /// point with no velocity draws nothing.
@@ -166,18 +181,7 @@ std::vector<math::Vector3d> ArrowSegments(
     const std::function<math::Vector3d(const math::Vector3d &)> &_velocity,
     double _scale);
 
-/// \brief A LINE_LIST marker drawing segments, added or replaced.
-/// \param[in] _ns Marker namespace.
-/// \param[in] _id Marker id, not 0: MarkerManager gives a marker with id 0
-/// a new random id, so it would add a marker instead of replacing one.
-/// \param[in] _color Its colour.
-/// \param[in] _segments Pairs of points.
-/// \return The marker.
-msgs::Marker ArrowMarker(const std::string &_ns, std::uint64_t _id,
-                         const math::Color &_color,
-                         const std::vector<math::Vector3d> &_segments);
-
-/// \brief A marker deleting what ArrowMarker drew.
+/// \brief A marker deleting what a drawing's marker drew.
 /// \param[in] _ns Marker namespace.
 /// \param[in] _id Marker id.
 /// \return The marker.
@@ -186,7 +190,10 @@ msgs::Marker DeleteMarker(const std::string &_ns, std::uint64_t _id);
 /// \brief Tells an applied change from a refused one. The server applies a
 /// `set` message whole or refuses it, logging why, and says nothing to the
 /// sender; a change it applies is a new recipe generation, so a sent
-/// message with no new generation within a timeout was refused.
+/// message with no new generation within a timeout was refused. The
+/// generation is the world's, whoever moved it: a change from another
+/// panel, a second GUI, `gz topic` or ROS within the timeout counts as this
+/// one applied, even if this one was refused.
 class ChangeTracker
 {
   /// \brief What became of the last message sent.

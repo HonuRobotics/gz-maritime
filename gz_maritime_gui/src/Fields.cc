@@ -128,12 +128,18 @@ msgs::Param ChangedKeys(const std::map<std::string, double> &_edits,
 }
 
 //////////////////////////////////////////////////
+double WrapDegrees(double _degrees)
+{
+  double d = std::fmod(_degrees, 360.0);
+  if (d < 0.0)
+    d += 360.0;
+  return d;
+}
+
+//////////////////////////////////////////////////
 double FlowHeading(double _direction, bool _comesFrom)
 {
-  double heading = std::fmod(_direction + (_comesFrom ? 180.0 : 0.0), 360.0);
-  if (heading < 0.0)
-    heading += 360.0;
-  return heading;
+  return WrapDegrees(_direction + (_comesFrom ? 180.0 : 0.0));
 }
 
 //////////////////////////////////////////////////
@@ -159,6 +165,33 @@ std::vector<math::Vector3d> GridPoints(const Grid &_grid, double _z)
 }
 
 //////////////////////////////////////////////////
+void AppendArrow(const math::Vector3d &_point, const math::Vector3d &_velocity,
+                 double _scale, std::vector<math::Vector3d> &_segments)
+{
+  const math::Vector3d v = _velocity * _scale;
+  const double length = v.Length();
+  if (length < 1e-6)
+    return;
+  const math::Vector3d tip = _point + v;
+  const math::Vector3d back = -v / length * (kHead * length);
+
+  // The head's strokes turn the shaft back about the vertical, so the head
+  // of a horizontal arrow lies flat on the water; an arrow pointing up or
+  // down turns about x instead.
+  const math::Vector3d axis = std::abs(v.Z()) > 0.99 * length ?
+      math::Vector3d::UnitX : math::Vector3d::UnitZ;
+  const math::Quaterniond left(axis, kHeadAngle);
+  const math::Quaterniond right(axis, -kHeadAngle);
+
+  _segments.push_back(_point);
+  _segments.push_back(tip);
+  _segments.push_back(tip);
+  _segments.push_back(tip + left.RotateVector(back));
+  _segments.push_back(tip);
+  _segments.push_back(tip + right.RotateVector(back));
+}
+
+//////////////////////////////////////////////////
 std::vector<math::Vector3d> ArrowSegments(
     const std::vector<math::Vector3d> &_points,
     const std::function<math::Vector3d(const math::Vector3d &)> &_velocity,
@@ -167,51 +200,8 @@ std::vector<math::Vector3d> ArrowSegments(
   std::vector<math::Vector3d> segments;
   segments.reserve(_points.size() * 6);
   for (const auto &p : _points)
-  {
-    const math::Vector3d v = _velocity(p) * _scale;
-    const double length = v.Length();
-    if (length < 1e-6)
-      continue;
-    const math::Vector3d tip = p + v;
-    const math::Vector3d back = -v / length * (kHead * length);
-
-    // The head's strokes turn the shaft back about the vertical, so the head
-    // of a horizontal arrow lies flat on the water; an arrow pointing up or
-    // down turns about x instead.
-    const math::Vector3d axis = std::abs(v.Z()) > 0.99 * length ?
-        math::Vector3d::UnitX : math::Vector3d::UnitZ;
-    const math::Quaterniond left(axis, kHeadAngle);
-    const math::Quaterniond right(axis, -kHeadAngle);
-
-    segments.push_back(p);
-    segments.push_back(tip);
-    segments.push_back(tip);
-    segments.push_back(tip + left.RotateVector(back));
-    segments.push_back(tip);
-    segments.push_back(tip + right.RotateVector(back));
-  }
+    AppendArrow(p, _velocity(p), _scale, segments);
   return segments;
-}
-
-//////////////////////////////////////////////////
-msgs::Marker ArrowMarker(const std::string &_ns, std::uint64_t _id,
-                         const math::Color &_color,
-                         const std::vector<math::Vector3d> &_segments)
-{
-  msgs::Marker marker;
-  marker.set_ns(_ns);
-  marker.set_id(_id);
-  marker.set_action(msgs::Marker::ADD_MODIFY);
-  marker.set_type(msgs::Marker::LINE_LIST);
-  marker.set_visibility(msgs::Marker::GUI);
-  msgs::Set(marker.mutable_pose(), math::Pose3d::Zero);
-  auto *material = marker.mutable_material();
-  msgs::Set(material->mutable_ambient(), _color);
-  msgs::Set(material->mutable_diffuse(), _color);
-  msgs::Set(material->mutable_emissive(), _color);
-  for (const auto &point : _segments)
-    msgs::Set(marker.add_point(), point);
-  return marker;
 }
 
 //////////////////////////////////////////////////

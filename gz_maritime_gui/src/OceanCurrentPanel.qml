@@ -41,11 +41,34 @@ ScrollView {
     return ("00" + d).slice(-3) + "°";
   }
 
-  // A new recipe puts its values back in the fields.
+  // The fields and their keys on the set topic.
+  readonly property var fields: ({
+      "speed": speed, "direction": direction, "water_level": waterLevel})
+  readonly property var values: ({
+      "speed": "speed", "direction": "direction", "water_level": "waterLevel"})
+
+  // A new recipe puts its values back in the fields, except one the user is
+  // typing in or has edited: a ramp brings a new recipe every 100 ms.
   function refresh() {
-    speed.text = show(field.speed);
-    direction.text = show(field.direction);
-    waterLevel.text = show(field.waterLevel);
+    for (var key in fields) {
+      var f = fields[key];
+      if (!f.edited && !f.activeFocus)
+        f.text = show(field[values[key]]);
+    }
+  }
+  // What the user edited, by key: Apply sends that and nothing else.
+  function edits() {
+    var m = {};
+    for (var key in fields) {
+      if (fields[key].edited)
+        m[key] = fields[key].text;
+    }
+    return m;
+  }
+  function apply() {
+    _OceanCurrentPanel.Apply(edits());
+    for (var key in fields)
+      fields[key].edited = false;
   }
   Connections {
     target: _OceanCurrentPanel
@@ -82,7 +105,8 @@ ScrollView {
         maxSpeed: _OceanCurrentPanel.maxSpeed
         color: "#1a99ff"
         still: !(root.field.speed > 0)
-        onSteered: function(s, h) { _OceanCurrentPanel.SteerFlow(s, h); }
+        onSpeedSteered: function(s) { _OceanCurrentPanel.SteerSpeed(s); }
+        onHeadingSteered: function(h) { _OceanCurrentPanel.SteerHeading(h); }
       }
       Label {
         Layout.alignment: Qt.AlignHCenter
@@ -98,8 +122,10 @@ ScrollView {
           id: speedSlider
           Layout.fillWidth: true
           from: 0
-          to: _OceanCurrentPanel.maxSpeed
-          onMoved: _OceanCurrentPanel.SteerFlow(value, compass.shownHeading)
+          // The colour scale's top, or further when the field is past it.
+          to: Math.max(_OceanCurrentPanel.maxSpeed,
+                       root.field.speed !== undefined ? root.field.speed : 0)
+          onMoved: _OceanCurrentPanel.SteerSpeed(value)
           Binding on value {
             when: !speedSlider.pressed
             value: root.field.speed !== undefined ? root.field.speed : 0
@@ -107,7 +133,7 @@ ScrollView {
           }
         }
         Label {
-          text: root.show(_OceanCurrentPanel.maxSpeed)
+          text: root.show(speedSlider.to)
           color: "grey"
           font.pixelSize: 11
         }
@@ -152,10 +178,7 @@ ScrollView {
       Layout.leftMargin: 8
       Button {
         text: "Apply"
-        onClicked: _OceanCurrentPanel.Apply({
-            "speed": speed.text,
-            "direction": direction.text,
-            "water_level": waterLevel.text})
+        onClicked: root.apply()
       }
       Label {
         text: _OceanCurrentPanel.status

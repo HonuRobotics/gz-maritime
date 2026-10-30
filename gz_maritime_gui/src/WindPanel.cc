@@ -17,31 +17,30 @@
 #include "WindPanel.hh"
 
 #include <chrono>
+#include <cmath>
 #include <locale>
 #include <map>
-#include <sstream>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include <tinyxml2.h>
 
+#include <QColor>
+
 #include <gz/common/Console.hh>
 #include <gz/plugin/Register.hh>
-
-#include <cmath>
-
-#include <QColor>
+#include <gz/sim/wind/WindSampler.hh>
 
 #include "gz/sim/maritime_gui/FieldControl.hh"
 #include "gz/sim/maritime_gui/FieldDrawing.hh"
 #include "gz/sim/maritime_gui/FieldSpec.hh"
+#include "gz/sim/maritime_gui/Fields.hh"
 #include "gz/sim/maritime_gui/Flow.hh"
 #include "gz/sim/maritime_gui/Vessels.hh"
 #include "gz/sim/maritime_gui/WindSock.hh"
-#include "gz/sim/maritime_gui/Fields.hh"
-#include "gz/sim/wind/WindSampler.hh"
 
 using namespace gz;
 using namespace sim;
@@ -158,9 +157,12 @@ void WindPanel::Update(const UpdateInfo &_info,
   auto &d = *this->dataPtr;
   d.control.Update(_ecm);
 
-  const bool inGui = ReadWind(_ecm).has_value();
+  // The recipe from the GUI's ECM, or from the state service's copy.
+  auto wind = ReadWind(_ecm);
+  const bool inGui = wind.has_value();
   const auto &source = d.control.Source(_ecm, inGui);
-  const auto wind = ReadWind(source);
+  if (!inGui)
+    wind = ReadWind(source);
 
   if (wind)
   {
@@ -284,6 +286,11 @@ void WindPanel::Apply(const QVariantMap &_edits)
     emit this->StatusChanged();
     return;
   }
+  // A ramp under way would overwrite the change, then take it for someone
+  // else's and stop: Apply ends the ramp first.
+  d.control.StopSteering();
+  d.steering = false;
+  d.yielded = false;
   d.control.Send(msg, d.wind->generation);
   d.state = d.control.Track(d.wind->generation);
   emit this->StatusChanged();
@@ -415,6 +422,29 @@ void WindPanel::SteerFlow(double _speed, double _flowHeading)
 }
 
 //////////////////////////////////////////////////
+void WindPanel::SteerSpeed(double _speed)
+{
+  if (!std::isfinite(_speed))
+    return;
+  this->dataPtr->invalid.clear();
+  this->dataPtr->control.SteerSpeed(_speed);
+  this->dataPtr->steering = true;
+  emit this->StatusChanged();
+}
+
+//////////////////////////////////////////////////
+void WindPanel::SteerHeading(double _flowHeading)
+{
+  if (!std::isfinite(_flowHeading))
+    return;
+  this->dataPtr->invalid.clear();
+  // The wind's direction is where it comes from.
+  this->dataPtr->control.SteerDirection(_flowHeading + 180.0);
+  this->dataPtr->steering = true;
+  emit this->StatusChanged();
+}
+
+//////////////////////////////////////////////////
 double WindPanel::Extent() const
 {
   return this->dataPtr->drawing.ArrowGrid().extent;
@@ -448,6 +478,11 @@ bool WindPanel::OnVehicles() const
 void WindPanel::SetOnVehicles(bool _on)
 {
   this->dataPtr->onVehicles = _on;
+  // Turned off, the tracker stops following the vehicles; on again, it
+  // starts afresh rather than averaging the velocity over the time it was
+  // off.
+  if (!_on)
+    this->dataPtr->vessels.Clear();
   emit this->ArrowsChanged();
 }
 

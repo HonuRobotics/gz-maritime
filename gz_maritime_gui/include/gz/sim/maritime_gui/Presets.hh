@@ -36,21 +36,21 @@ namespace gz::sim::maritime_gui
 struct FieldTarget
 {
   /// \brief m/s.
-  double speed{0.0};
+  public: double speed{0.0};
 
   /// \brief Degrees clockwise from north: where the current sets towards,
   /// where the wind comes from.
-  double direction{0.0};
+  public: double direction{0.0};
 };
 
 /// \brief The wind's gusts.
 struct Gusts
 {
   /// \brief Standard deviation of the speed, m/s.
-  double speed{0.0};
+  public: double speed{0.0};
 
   /// \brief Standard deviation of the direction, degrees.
-  double direction{0.0};
+  public: double direction{0.0};
 };
 
 /// \brief Named conditions: a current and a wind to ramp to, each optional,
@@ -58,19 +58,19 @@ struct Gusts
 struct Preset
 {
   /// \brief The button's label.
-  std::string name;
+  public: std::string name;
 
   /// \brief The current, if the preset sets one.
-  std::optional<FieldTarget> current;
+  public: std::optional<FieldTarget> current;
 
   /// \brief The wind, if the preset sets one.
-  std::optional<FieldTarget> wind;
+  public: std::optional<FieldTarget> wind;
 
   /// \brief The wind's gusts, if the preset sets them.
-  std::optional<Gusts> gusts;
+  public: std::optional<Gusts> gusts;
 
   /// \brief Seconds of simulation time the demo stays on it.
-  double dwell{20.0};
+  public: double dwell{20.0};
 };
 
 /// \brief The presets built in: Calm, Tidal ebb, Fresh breeze and Squall.

@@ -65,15 +65,12 @@ namespace
     return Unit(_c.R() * _k, _c.G() * _k, _c.B() * _k, _c.A());
   }
 
-  /// \brief Wrap degrees into (-180, 180].
+  /// \brief Wrap degrees into [-180, 180).
   /// \param[in] _deg Degrees.
   /// \return The same angle.
   double Wrap180(double _deg)
   {
-    double d = std::fmod(_deg + 180.0, 360.0);
-    if (d < 0.0)
-      d += 360.0;
-    return d - 180.0;
+    return WrapDegrees(_deg + 180.0) - 180.0;
   }
 }
 
@@ -209,22 +206,9 @@ std::vector<msgs::Marker> ColorBins::Markers(const std::string &_ns,
   out.reserve(this->points.size());
   for (int b = 0; b < this->Count(); ++b)
   {
-    msgs::Marker m;
-    m.set_ns(_ns);
-    m.set_id(_firstId + static_cast<std::uint64_t>(b));
-    m.set_action(msgs::Marker::ADD_MODIFY);
-    m.set_type(this->type);
-    m.set_visibility(msgs::Marker::GUI);
-    msgs::Set(m.mutable_pose(), math::Pose3d::Zero);
-    const math::Color c = this->BinColor(b);
-    auto *material = m.mutable_material();
-    material->set_lighting(false);
-    msgs::Set(material->mutable_ambient(), c);
-    msgs::Set(material->mutable_diffuse(), c);
-    msgs::Set(material->mutable_emissive(), c);
-    for (const auto &p : this->points[static_cast<std::size_t>(b)])
-      msgs::Set(m.add_point(), p);
-    out.push_back(std::move(m));
+    out.push_back(SolidMarker(_ns, _firstId + static_cast<std::uint64_t>(b),
+        this->type, this->BinColor(b),
+        this->points[static_cast<std::size_t>(b)]));
   }
   return out;
 }
@@ -257,11 +241,12 @@ ColorBins ColoredArrows(const std::vector<math::Vector3d> &_points,
     double _scale, const Colormap &_colormap)
 {
   ColorBins bins(_colormap, 8, 1);
+  std::vector<math::Vector3d> segments;
   for (const auto &p : _points)
   {
     const math::Vector3d v = _velocity(p);
-    const auto segments = ArrowSegments({p}, [&v](const math::Vector3d &)
-        { return v; }, _scale);
+    segments.clear();
+    AppendArrow(p, v, _scale, segments);
     for (std::size_t i = 0; i + 1 < segments.size(); i += 2)
       bins.Add(segments[i], segments[i + 1], v.Length());
   }
@@ -427,10 +412,27 @@ Steering::Steering(double _speedRate, double _turnRate,
 //////////////////////////////////////////////////
 void Steering::SetTarget(double _speed, double _direction)
 {
-  double d = std::fmod(_direction, 360.0);
-  if (d < 0.0)
-    d += 360.0;
-  this->target = std::make_pair(std::max(0.0, _speed), d);
+  this->target = Target{std::max(0.0, _speed), WrapDegrees(_direction)};
+  this->arrived = false;
+  this->yielded = false;
+}
+
+//////////////////////////////////////////////////
+void Steering::SetSpeedTarget(double _speed)
+{
+  if (!this->target)
+    this->target = Target{};
+  this->target->speed = std::max(0.0, _speed);
+  this->arrived = false;
+  this->yielded = false;
+}
+
+//////////////////////////////////////////////////
+void Steering::SetDirectionTarget(double _direction)
+{
+  if (!this->target)
+    this->target = Target{};
+  this->target->direction = WrapDegrees(_direction);
   this->arrived = false;
   this->yielded = false;
 }
@@ -496,9 +498,14 @@ std::optional<msgs::Param> Steering::Step(double _speed, double _direction,
   if (this->lastStep && _now - *this->lastStep < this->period)
     return std::nullopt;
 
-  // A fresh start ramps from the world's values, not from a stale command.
+  // A fresh start ramps from the world's values, not from a stale command,
+  // and an axis given no target stays where the world has it.
   if (!this->commanded)
     this->commanded = std::make_pair(_speed, _direction);
+  if (!this->target->speed)
+    this->target->speed = _speed;
+  if (!this->target->direction)
+    this->target->direction = _direction;
 
   const double dt = this->lastStep ?
       std::chrono::duration<double>(_now - *this->lastStep).count() :
@@ -507,16 +514,14 @@ std::optional<msgs::Param> Steering::Step(double _speed, double _direction,
   const double maxTurnStep = this->turnRate * dt;
 
   auto &[speed, direction] = *this->commanded;
-  const auto [toSpeed, toDirection] = *this->target;
+  const double toSpeed = *this->target->speed;
+  const double toDirection = *this->target->direction;
   const double ds = toSpeed - speed;
   speed = std::abs(ds) <= maxSpeedStep ? toSpeed :
       speed + std::copysign(maxSpeedStep, ds);
   const double dd = Wrap180(toDirection - direction);
   direction = std::abs(dd) <= maxTurnStep ? toDirection :
-      direction + std::copysign(maxTurnStep, dd);
-  direction = std::fmod(direction, 360.0);
-  if (direction < 0.0)
-    direction += 360.0;
+      WrapDegrees(direction + std::copysign(maxTurnStep, dd));
 
   this->lastStep = _now;
   this->arrived = speed == toSpeed && direction == toDirection;

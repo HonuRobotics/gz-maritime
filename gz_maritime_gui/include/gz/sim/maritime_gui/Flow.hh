@@ -33,9 +33,9 @@
 
 #include "gz/sim/maritime_gui/Fields.hh"
 
-/// \brief The livelier half of the maritime GUI, without Qt: colour by
-/// speed, flow trails that drift with a field, and steering a field by hand,
-/// rate limited.
+/// \brief Colour by speed and line segments binned by colour, flow trails
+/// that drift with a field, and steering a field by hand, rate limited;
+/// without Qt.
 namespace gz::sim::maritime_gui
 {
 /// \brief A colour map from speed to colour: stops evenly spaced from 0 to
@@ -186,27 +186,27 @@ class ParticleField
   public: struct Settings
   {
     /// \brief The region, and its plane's z.
-    Grid region;
+    public: Grid region;
 
     /// \brief World z of the plane.
-    double z{0.0};
+    public: double z{0.0};
 
     /// \brief How many particles.
-    int count{400};
+    public: int count{400};
 
     /// \brief Points kept in a trail, the particle's own included.
-    int trailLength{8};
+    public: int trailLength{8};
 
     /// \brief Seconds a particle lives, at most; each draws its own
     /// lifetime between half of this and this, so they do not all restart
     /// at once.
-    double lifetime{6.0};
+    public: double lifetime{6.0};
 
     /// \brief The field's velocity is multiplied by this to move them.
-    double speedup{1.0};
+    public: double speedup{1.0};
 
     /// \brief Seconds between two points of a trail.
-    double trailStep{0.1};
+    public: double trailStep{0.1};
   };
 
   /// \brief Constructor.
@@ -242,19 +242,19 @@ class ParticleField
   private: struct Particle
   {
     /// \brief Its trail, newest last; its position is the last point.
-    std::vector<math::Vector3d> trail;
+    public: std::vector<math::Vector3d> trail;
 
     /// \brief The field's speed at each point of the trail.
-    std::vector<double> speed;
+    public: std::vector<double> speed;
 
     /// \brief Seconds lived.
-    double age{0.0};
+    public: double age{0.0};
 
     /// \brief Seconds it lives.
-    double lifetime{1.0};
+    public: double lifetime{1.0};
 
     /// \brief Seconds since the trail's last point.
-    double sinceTrail{0.0};
+    public: double sinceTrail{0.0};
   };
 
   /// \brief Start a particle again somewhere in the region.
@@ -315,6 +315,17 @@ class Steering
   /// \param[in] _direction Degrees, in the field's own convention.
   public: void SetTarget(double _speed, double _direction);
 
+  /// \brief Steer the speed alone: a direction on its way keeps its target,
+  /// one at rest stays where the recipe has it, read at the next Step.
+  /// \param[in] _speed m/s, not negative.
+  public: void SetSpeedTarget(double _speed);
+
+  /// \brief Steer the direction alone: a speed on its way keeps its
+  /// target, one at rest stays where the recipe has it, read at the next
+  /// Step.
+  /// \param[in] _direction Degrees, in the field's own convention.
+  public: void SetDirectionTarget(double _direction);
+
   /// \brief Whether it is still on its way to the target.
   /// \return True if a step is to come.
   public: bool Active() const;
@@ -336,8 +347,9 @@ class Steering
   /// \return True if it did.
   public: bool Yielded() const;
 
-  /// \brief Forget the target and what was sent.
-  private: void Stop();
+  /// \brief Forget the target and what was sent, leaving the field where
+  /// it is. The next target starts again from the recipe's values.
+  public: void Stop();
 
   /// \brief Fastest change of speed, m/s per second.
   private: double speedRate;
@@ -348,8 +360,19 @@ class Steering
   /// \brief Time between two steps.
   private: Clock::duration period;
 
+  /// \brief A target: an axis not set is the recipe's value, read at the
+  /// next Step.
+  private: struct Target
+  {
+    /// \brief m/s.
+    public: std::optional<double> speed;
+
+    /// \brief Degrees.
+    public: std::optional<double> direction;
+  };
+
   /// \brief The target, once set.
-  private: std::optional<std::pair<double, double>> target;
+  private: std::optional<Target> target;
 
   /// \brief What the last step commanded, once steering started.
   private: std::optional<std::pair<double, double>> commanded;

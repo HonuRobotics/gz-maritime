@@ -19,21 +19,25 @@ import QtQuick
 // A compass rose, north up, with an arrow along the flow: where the air or
 // the water goes, whatever convention the numbers beside it follow. Drag the
 // arrow to turn the flow, and turn the mouse wheel over it to change the
-// speed; it emits steered() and shows the dragged heading until released,
-// then follows the world again as the field steps there.
+// speed; each emits its own signal, so steering one does not re-target the
+// other mid ramp. The arrow shows the dragged heading until released, then
+// follows the world again as the field steps there.
 Item {
   id: compass
   // Degrees clockwise from north the flow goes towards, from the world.
   property real heading: 0
-  // m/s, from the world, and the top of the speed range.
+  // m/s, from the world.
   property real speed: 0
+  // The colour scale's top: the wheel steps a twentieth of it. The speed
+  // itself is not bound by it.
   property real maxSpeed: 1
   property color color: "steelblue"
   // A still field has no direction to show: the arrow fades.
   property bool still: false
   property bool interactive: true
-  // The user steers towards a speed and a flow heading.
-  signal steered(real speed, real heading)
+  // The user steers the speed, or the flow's heading.
+  signal speedSteered(real speed)
+  signal headingSteered(real heading)
 
   property bool dragging: false
   property real dragHeading: 0
@@ -123,20 +127,22 @@ Item {
     onPressed: function(m) {
       compass.dragging = true;
       compass.dragHeading = compass.angleAt(m.x, m.y);
-      compass.steered(compass.speed, compass.dragHeading);
+      compass.headingSteered(compass.dragHeading);
     }
     onPositionChanged: function(m) {
       if (!pressed)
         return;
       compass.dragHeading = compass.angleAt(m.x, m.y);
-      compass.steered(compass.speed, compass.dragHeading);
+      compass.headingSteered(compass.dragHeading);
     }
     onReleased: compass.dragging = false
     onWheel: function(w) {
+      // A horizontal scroll, as a trackpad gives, is not a speed change.
+      if (w.angleDelta.y === 0)
+        return;
       var step = compass.maxSpeed / 20;
       var s = compass.speed + (w.angleDelta.y > 0 ? step : -step);
-      compass.steered(Math.max(0, Math.min(compass.maxSpeed, s)),
-                      compass.shownHeading);
+      compass.speedSteered(Math.max(0, s));
     }
   }
 }
