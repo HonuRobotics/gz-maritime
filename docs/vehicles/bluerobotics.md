@@ -41,6 +41,12 @@ of those pull requests.
 
 ## BlueBoat
 
+```{figure} images/blueboat-studio.jpg
+:alt: The BlueBoat on a light grey studio backdrop: two blue hulls joined by black crossbars, its electronics enclosures on top
+
+The BlueBoat, a studio render.
+```
+
 ```bash
 ros2 launch blueboat_gazebo sim.launch.xml \
   world:=$(ros2 pkg prefix --share kai_gazebo)/worlds/open_water.sdf
@@ -53,6 +59,12 @@ bridge and `robot_state_publisher` running. Its topics
 bluerobotics_models documentation; `gui:=false` runs it headless.
 
 ## BlueROV2
+
+```{figure} images/bluerov2-studio.jpg
+:alt: The BlueROV2 on a light grey studio backdrop: its grey frame, blue buoyancy blocks and thrusters
+
+The BlueROV2, a studio render.
+```
 
 ```{figure} images/bluerov2.jpg
 :alt: A BlueROV2 just under the surface of an indoor pool, the lane lines on the floor below it

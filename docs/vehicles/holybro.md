@@ -1,5 +1,11 @@
 # Holybro X500
 
+```{figure} images/x500-studio.jpg
+:alt: The X500 quadcopter on a light grey studio backdrop, its four arms, propellers and landing legs
+
+The X500, a studio render.
+```
+
 ```{figure} images/x500.jpg
 :alt: An X500 quadcopter in the air over the harbour at Sand Island, container cranes behind it
 

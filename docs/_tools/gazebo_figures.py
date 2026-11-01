@@ -15,6 +15,9 @@
 """
 Regenerate the Gazebo screenshots used in the documentation.
 
+The studio pictures of the vehicles (docs/vehicles/images/*-studio.jpg) are
+not made here: they are renders composited onto a backdrop, copied in.
+
 Each figure is rendered by a camera sensor in a copy of an installed world
 (open_water.sdf unless the figure names another), with the vehicles included
 in the world, and saved from the camera's image topic. One change to the
