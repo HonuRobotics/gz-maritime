@@ -54,6 +54,12 @@ bluerobotics_models documentation; `gui:=false` runs it headless.
 
 ## BlueROV2
 
+```{figure} images/bluerov2.jpg
+:alt: A BlueROV2 just under the surface of an indoor pool, the lane lines on the floor below it
+
+The BlueROV2 under the surface of the aquatic centre's pool.
+```
+
 ```bash
 ros2 launch bluerov2_gazebo sim.launch.xml \
   world:=$(ros2 pkg prefix --share kai_gazebo)/worlds/open_water.sdf

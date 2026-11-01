@@ -4,10 +4,10 @@ Maritime simulation for **Gazebo** and **ROS 2**: a moving ocean, an open
 water world, and everything you need to put your own boat or underwater
 vehicle on it.
 
-```{figure} getting-started/images/custom-usv.jpg
-:alt: A small twin-hull boat, the custom USV, floating on a calm simulated ocean
+```{figure} images/home.jpg
+:alt: A BlueBoat on the swell of the gulf of La Spezia, an X500 drone above it, the city and its hills behind
 
-The custom USV on the open water world.
+The BlueBoat and the X500 in the gulf of La Spezia, at sea state 5.
 ```
 
 What you get:

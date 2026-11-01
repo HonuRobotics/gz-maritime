@@ -59,10 +59,10 @@ IMAGE_TOPIC = '/world/default/model/docs_camera/link/link/sensor/camera/image'
 FONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 
 # name: output file, world (open_water unless given), vehicles to include
-# (uri, name, and an optional pose), sea state, camera pose and FOV, and the
-# simulation times [s] to capture. The sea has a fixed seed, so a given time
-# gives the same picture on every run. Several times make one image of
-# labelled panels side by side.
+# (uri, name, an optional pose, and 'static' to hold that pose), sea state,
+# camera pose and FOV, and the simulation times [s] to capture. The sea has a
+# fixed seed, so a given time gives the same picture on every run. Several
+# times make one image of labelled panels side by side.
 USV = 'model://custom_usv'
 SITE_FOV = 1.05  # the GUI's own field of view: the figure is the opening view
 FIGURES = {
@@ -104,6 +104,44 @@ FIGURES = {
         'fov': 0.9,
         'at': [10],
         'far': 20000,
+    },
+    # The home page: the BlueBoat on the swell of the gulf of La Spezia, the
+    # X500 held above it.
+    'home': {
+        'out': DOCS / 'images' / 'home.jpg',
+        'world': 'la_spezia',
+        'vehicles': [('model://blueboat', 'blueboat', '10 -372 0.05 0 0 0.38'),
+                     ('model://x500', 'x500', '12.26 -373.2 2.3 0 0 2.6',
+                      'static')],
+        'sea_state': 5,
+        'camera': '12.9 -378.4 1.4 0 0.0 2.0',
+        'fov': 1.0,
+        'at': [10],
+        'far': 5000,
+    },
+    # Held just under the surface of the pool, which is clear enough to see
+    # through from above.
+    'bluerov2': {
+        'out': DOCS / 'vehicles' / 'images' / 'bluerov2.jpg',
+        'world': 'aquatic_centre',
+        'vehicles': [('model://bluerov2', 'bluerov2', '-20 -1.25 -0.6 0 0 0.5',
+                      'static')],
+        'sea_state': 0,
+        'camera': '-21.8 -2.6 0.9 0 0.5 0.65',
+        'fov': 0.9,
+        'at': [10],
+    },
+    # Held in the air over the harbour at Sand Island: it has no flight
+    # controller to hover on its own.
+    'x500': {
+        'out': DOCS / 'vehicles' / 'images' / 'x500.jpg',
+        'world': 'sand_island',
+        'vehicles': [('model://x500', 'x500', '60 120 3 0 0 -2.2', 'static')],
+        'sea_state': 3,
+        'camera': '57.7 116.7 2.4 0 -0.1 0.95',
+        'fov': 0.9,
+        'at': [10],
+        'far': 5000,
     },
     # The four site worlds from their opening views, with the custom USV at
     # the start point each world's header recommends. A 16:9 sensor sees
@@ -217,7 +255,10 @@ def figure_world(_figure):
                           f'<sea_state>{_figure["sea_state"]}</sea_state>', 1)
     extra = ''.join(
         f'<include><uri>{v[0]}</uri><name>{v[1]}</name>'
-        + (f'<pose>{v[2]}</pose>' if len(v) > 2 else '') + '</include>'
+        + (f'<pose>{v[2]}</pose>' if len(v) > 2 else '')
+        + ('<static>true</static>'
+           if len(v) > 3 and v[3] == 'static' else '')
+        + '</include>'
         for v in _figure['vehicles'])
     extra += CAMERA.format(
         pose=_figure['camera'], fov=_figure['fov'], far=_figure.get('far', 1000))
