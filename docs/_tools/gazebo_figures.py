@@ -95,12 +95,15 @@ FIGURES = {
                    'Crest: the water covers the hulls'],
     },
     'blueboat': {
+        # Level, with the sky above the horizon: the sea mirrors its clouds,
+        # which a camera looking down on the boat never sees.
         'out': DOCS / 'vehicles' / 'images' / 'blueboat.jpg',
         'vehicles': [('model://blueboat', 'blueboat')],
-        'sea_state': 1,
-        'camera': '2.1 -1.7 0.95 0 0.33 2.46',
-        'fov': 0.75,
+        'sea_state': 3,
+        'camera': '3.0 -2.5 0.55 0 0.0 2.46',
+        'fov': 0.9,
         'at': [10],
+        'far': 20000,
     },
     # The four site worlds from their opening views, with the custom USV at
     # the start point each world's header recommends. A 16:9 sensor sees
