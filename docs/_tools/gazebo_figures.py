@@ -43,8 +43,8 @@ the site figures, the sites in the Fuel cache (run each world once).
 """
 
 import os
-from pathlib import Path
 import re
+from pathlib import Path
 import subprocess
 import sys
 import tempfile
@@ -206,9 +206,10 @@ FIGURES = {
         # Looking along the course, so the far shore's reflection stays small.
         # The ROV is surfaced and the X500 held in the air: the water hides
         # anything below it, and the X500 has no flight controller here.
-        'vehicles': [('model://blueboat', 'blueboat', '-532 180 0.05 0 0 0.25'),
-                     ('model://bluerov2', 'bluerov2', '-533.9 178.3 0.10 0 0 0.9',
-                      'static'),
+        'vehicles': [('model://blueboat', 'blueboat',
+                      '-532 180 0.05 0 0 0.25'),
+                     ('model://bluerov2', 'bluerov2',
+                      '-533.9 178.3 0.10 0 0 0.9', 'static'),
                      ('model://x500', 'x500', '-532.9 179.1 1.75 0 0 0.25',
                       'static')],
         'sea_state': 1,

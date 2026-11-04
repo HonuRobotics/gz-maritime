@@ -61,7 +61,7 @@ bluerobotics_models documentation; `gui:=false` runs it headless.
 ## BlueROV2
 
 ```{figure} images/bluerov2-studio.jpg
-:alt: The BlueROV2 on a light grey studio backdrop: its grey frame, blue buoyancy blocks and thrusters
+:alt: The BlueROV2 on a light grey studio backdrop: its black frame, light blue buoyancy blocks, thrusters and clear electronics tube
 
 The BlueROV2, a studio render.
 ```
