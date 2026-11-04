@@ -1,8 +1,21 @@
 # Holybro X500
 
+```{figure} images/x500-studio.jpg
+:alt: The X500 quadcopter on a light grey studio backdrop, its four arms, propellers and landing legs
+
+The X500, a studio render.
+```
+
+```{figure} images/x500.jpg
+:alt: An X500 quadcopter in the air over the harbour at Sand Island, container cranes behind it
+
+The X500 over the harbour at Sand Island, held in place for the picture.
+```
+
 [holybro_models](https://github.com/HonuRobotics/holybro_models) provides the
 Holybro X500 V2, a quadcopter development kit. It is a drone, not a maritime
-vehicle, so it runs in its own worlds rather than on this ocean.
+vehicle: its own launch runs it in its own world, and it joins the maritime
+worlds too, as in [Several vehicles on one ocean](../how-to/several-vehicles.md).
 
 It is listed here because it is built the same way as the vehicles in these
 docs: a description package with the URDF (`x500_description`), a Gazebo
