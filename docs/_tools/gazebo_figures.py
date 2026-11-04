@@ -16,7 +16,14 @@
 Regenerate the Gazebo screenshots used in the documentation.
 
 The studio pictures of the vehicles (docs/vehicles/images/*-studio.jpg) are
-not made here: they are renders composited onto a backdrop, copied in.
+not made here: they are renders composited onto a backdrop, copied in. Nor
+are the BlueBoat picture (docs/vehicles/images/blueboat.jpg) and the home
+picture (docs/images/home.jpg): they are frames of clips of the BlueBoat
+riding the waves on gz-maritime's Surface system, copied in.
+
+The BlueBoat in the figures below floats on the Surface system too: give it a
+model built with `configure_vehicle.py --buoyancy=surface` in place of
+model://blueboat.
 
 Each figure is rendered by a camera sensor in a copy of an installed world
 (open_water.sdf unless the figure names another), with the vehicles included
@@ -96,31 +103,6 @@ FIGURES = {
         'at': [9, 21],
         'labels': ['Trough: the hulls hang above the water',
                    'Crest: the water covers the hulls'],
-    },
-    'blueboat': {
-        # Level, with the sky above the horizon: the sea mirrors its clouds,
-        # which a camera looking down on the boat never sees.
-        'out': DOCS / 'vehicles' / 'images' / 'blueboat.jpg',
-        'vehicles': [('model://blueboat', 'blueboat')],
-        'sea_state': 3,
-        'camera': '3.0 -2.5 0.55 0 0.0 2.46',
-        'fov': 0.9,
-        'at': [10],
-        'far': 20000,
-    },
-    # The home page: the BlueBoat on the swell of the gulf of La Spezia, the
-    # X500 held above it.
-    'home': {
-        'out': DOCS / 'images' / 'home.jpg',
-        'world': 'la_spezia',
-        'vehicles': [('model://blueboat', 'blueboat', '10 -372 0.05 0 0 0.38'),
-                     ('model://x500', 'x500', '12.26 -373.2 2.3 0 0 2.6',
-                      'static')],
-        'sea_state': 5,
-        'camera': '12.9 -378.4 1.4 0 0.0 2.0',
-        'fov': 1.0,
-        'at': [10],
-        'far': 5000,
     },
     # Held just under the surface of the pool, which is clear enough to see
     # through from above.
@@ -208,11 +190,16 @@ FIGURES = {
     'several-vehicles': {
         'out': DOCS / 'how-to' / 'images' / 'several-vehicles.jpg',
         'world': 'sydney_regatta',
-        'vehicles': [('model://blueboat', 'blueboat', '-532 180 0.05 0 0 0'),
-                     ('model://bluerov2', 'bluerov2', '-526 180 -1 0 0 0'),
-                     ('model://x500', 'x500', '-545 192 1.25 0 0 0')],
+        # Looking along the course, so the far shore's reflection stays small.
+        # The ROV is surfaced and the X500 held in the air: the water hides
+        # anything below it, and the X500 has no flight controller here.
+        'vehicles': [('model://blueboat', 'blueboat', '-532 180 0.05 0 0 0.25'),
+                     ('model://bluerov2', 'bluerov2', '-533.9 178.3 0.10 0 0 0.9',
+                      'static'),
+                     ('model://x500', 'x500', '-532.9 179.1 1.75 0 0 0.25',
+                      'static')],
         'sea_state': 1,
-        'camera': '-522 172 4 0 0.2 2.35',
+        'camera': '-539.2 176.2 2.3 0 0.20 0.42',
         'fov': 1.0,
         'at': [10],
         'far': 5000,

@@ -5,9 +5,9 @@ water world, and everything you need to put your own boat or underwater
 vehicle on it.
 
 ```{figure} images/home.jpg
-:alt: A BlueBoat on the swell of the gulf of La Spezia, an X500 drone above it, the city and its hills behind
+:alt: Three BlueBoats riding the swell of the gulf of La Spezia, the city and its hills behind
 
-The BlueBoat and the X500 in the gulf of La Spezia, at sea state 5.
+Three BlueBoats riding the waves in the gulf of La Spezia, at sea state 3.
 ```
 
 What you get:
