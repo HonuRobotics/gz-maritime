@@ -15,15 +15,6 @@
 """
 Regenerate the Gazebo screenshots used in the documentation.
 
-The studio pictures of the vehicles (docs/vehicles/images/*-studio.jpg) are
-not made here: they are renders composited onto a backdrop, copied in. Nor
-is the home picture (docs/images/home.jpg): it is a frame of a clip of three
-BlueBoats riding the waves on gz-maritime's Surface system, copied in.
-
-The BlueBoat in the figures below floats on the Surface system too: give it a
-model built with `configure_vehicle.py --buoyancy=surface` in place of
-model://blueboat.
-
 Each figure is rendered by a camera sensor in a copy of an installed world
 (open_water.sdf unless the figure names another), with the vehicles included
 in the world, and saved from the camera's image topic. One change to the
