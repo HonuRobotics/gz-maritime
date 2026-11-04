@@ -1,9 +1,9 @@
 # BlueBoat and BlueROV2
 
 ```{figure} images/blueboat.jpg
-:alt: The BlueBoat, a blue twin hull surface vehicle with an antenna mast, riding the swell off Sand Island, the port cranes and mountains of Honolulu behind
+:alt: The BlueBoat, a blue twin hull surface vehicle with an antenna mast, in the channel at Sand Island, the island's container cranes, palms and quay behind and downtown Honolulu and the mountains beyond
 
-The BlueBoat riding a sea state 3 swell off Sand Island.
+The BlueBoat in the channel at Sand Island, in front of the island's container terminal.
 ```
 
 The Blue Robotics vehicles from
