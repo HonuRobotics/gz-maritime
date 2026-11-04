@@ -7,10 +7,10 @@ name, a sensor and an actuator of one vehicle, a gamepad bound to one
 vehicle, and a second copy of a vehicle joining the others.
 
 ```{figure} images/several-vehicles.jpg
-:alt: The BlueBoat afloat on the Sydney Regatta course, with the X500 on a landing pad behind it and the regatta centre on the bank
+:alt: The BlueBoat afloat on the Sydney Regatta course, the BlueROV2 surfaced in front of it and the X500 hovering beyond, the wooded shore behind
 
-The demo at Sydney Regatta: the BlueBoat off the start point, the BlueROV2
-under the surface ahead of it, the X500 on the landing pad.
+The BlueBoat, the BlueROV2 and the X500 together on the Sydney Regatta
+course.
 ```
 
 You need [bluerobotics_models](https://github.com/HonuRobotics/bluerobotics_models)

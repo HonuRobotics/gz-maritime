@@ -1,9 +1,9 @@
 # BlueBoat and BlueROV2
 
 ```{figure} images/blueboat.jpg
-:alt: The BlueBoat, a dark blue twin-hull surface vehicle with an antenna mast, floating on the ocean
+:alt: The BlueBoat, a blue twin hull surface vehicle with an antenna mast, in the channel at Sand Island, the island's container cranes, palms and quay behind and downtown Honolulu and the mountains beyond
 
-The BlueBoat on the open water world.
+The BlueBoat in the channel at Sand Island, in front of the island's container terminal.
 ```
 
 The Blue Robotics vehicles from
@@ -41,6 +41,12 @@ of those pull requests.
 
 ## BlueBoat
 
+```{figure} images/blueboat-studio.jpg
+:alt: The BlueBoat on a light grey studio backdrop: two blue hulls joined by black crossbars, its electronics enclosures on top
+
+The BlueBoat, a studio render.
+```
+
 ```bash
 ros2 launch blueboat_gazebo sim.launch.xml \
   world:=$(ros2 pkg prefix --share kai_gazebo)/worlds/open_water.sdf
@@ -53,6 +59,18 @@ bridge and `robot_state_publisher` running. Its topics
 bluerobotics_models documentation; `gui:=false` runs it headless.
 
 ## BlueROV2
+
+```{figure} images/bluerov2-studio.jpg
+:alt: The BlueROV2 on a light grey studio backdrop: its black frame, light blue buoyancy blocks, thrusters and clear electronics tube
+
+The BlueROV2, a studio render.
+```
+
+```{figure} images/bluerov2.jpg
+:alt: A BlueROV2 just under the surface of an indoor pool, the lane lines on the floor below it
+
+The BlueROV2 under the surface of the aquatic centre's pool.
+```
 
 ```bash
 ros2 launch bluerov2_gazebo sim.launch.xml \
