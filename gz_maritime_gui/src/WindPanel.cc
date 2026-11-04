@@ -31,6 +31,8 @@
 #include <QColor>
 
 #include <gz/common/Console.hh>
+#include <gz/gui/Application.hh>
+#include <gz/gui/MainWindow.hh>
 #include <gz/plugin/Register.hh>
 #include <gz/sim/wind/WindSampler.hh>
 
@@ -41,6 +43,8 @@
 #include "gz/sim/maritime_gui/Flow.hh"
 #include "gz/sim/maritime_gui/Vessels.hh"
 #include "gz/sim/maritime_gui/WindSock.hh"
+
+#include "Events.hh"
 
 using namespace gz;
 using namespace sim;
@@ -146,8 +150,27 @@ void WindPanel::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
       }
     }
   }
+  // The scenario panel says when it steers this field, through the main
+  // window, so a pending edit can be dropped.
+  if (auto *app = gz::gui::App())
+  {
+    if (auto *window = app->findChild<gz::gui::MainWindow *>())
+      window->installEventFilter(this);
+  }
   // The panel was built before the configuration was read.
   emit this->ArrowsChanged();
+}
+
+//////////////////////////////////////////////////
+bool WindPanel::eventFilter(QObject *_obj, QEvent *_event)
+{
+  if (_event->type() == events::FieldSteered::kType)
+  {
+    const auto *steered = static_cast<events::FieldSteered *>(_event);
+    if (steered->Field() == WindSpec().name)
+      emit this->EditsStale();
+  }
+  return QObject::eventFilter(_obj, _event);
 }
 
 //////////////////////////////////////////////////
@@ -262,11 +285,11 @@ void WindPanel::Update(const UpdateInfo &_info,
 }
 
 //////////////////////////////////////////////////
-void WindPanel::Apply(const QVariantMap &_edits)
+bool WindPanel::Apply(const QVariantMap &_edits)
 {
   auto &d = *this->dataPtr;
   if (!d.wind)
-    return;
+    return false;
   std::map<std::string, double> edits;
   d.invalid.clear();
   for (auto it = _edits.begin(); it != _edits.end(); ++it)
@@ -276,7 +299,7 @@ void WindPanel::Apply(const QVariantMap &_edits)
     {
       d.invalid = it.key().toStdString();
       emit this->StatusChanged();
-      return;
+      return false;
     }
     edits[it.key().toStdString()] = value;
   }
@@ -284,7 +307,7 @@ void WindPanel::Apply(const QVariantMap &_edits)
   if (msg.params().empty())
   {
     emit this->StatusChanged();
-    return;
+    return true;
   }
   // A ramp under way would overwrite the change, then take it for someone
   // else's and stop: Apply ends the ramp first.
@@ -294,6 +317,7 @@ void WindPanel::Apply(const QVariantMap &_edits)
   d.control.Send(msg, d.wind->generation);
   d.state = d.control.Track(d.wind->generation);
   emit this->StatusChanged();
+  return true;
 }
 
 //////////////////////////////////////////////////

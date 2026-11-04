@@ -50,9 +50,11 @@ agree even though their numbers do not.
 Type a decimal with a point or a comma, `1.5` or `1,5`, whatever your
 system's language. Edit the fields and press **Apply**. The panel sends only
 the values you changed, as one message on `/world/default/ocean_current/set`
-or `/world/default/wind/set`, the same topics `gz topic` and ROS use. The
-world applies a message whole or not at all, and the line beside **Apply**
-says which:
+or `/world/default/wind/set`, the same topics `gz topic` and ROS use. A
+field you typed in keeps its text while the world moves, until you press
+**Apply**, or until you steer the field or press a scenario, which drops it.
+The world applies a message whole or not at all, and the line beside
+**Apply** says which:
 
 | Status | Meaning |
 |---|---|

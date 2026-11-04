@@ -28,6 +28,8 @@
 
 #include <QColor>
 
+#include <gz/gui/Application.hh>
+#include <gz/gui/MainWindow.hh>
 #include <gz/plugin/Register.hh>
 #include <gz/sim/ocean_current/OceanCurrentSampler.hh>
 
@@ -37,6 +39,8 @@
 #include "gz/sim/maritime_gui/Fields.hh"
 #include "gz/sim/maritime_gui/Flow.hh"
 #include "gz/sim/maritime_gui/Vessels.hh"
+
+#include "Events.hh"
 
 using namespace gz;
 using namespace sim;
@@ -105,8 +109,27 @@ void OceanCurrentPanel::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
     if (const auto *elem = _pluginElem->FirstChildElement("on_vehicles"))
       elem->QueryBoolText(&this->dataPtr->onVehicles);
   }
+  // The scenario panel says when it steers this field, through the main
+  // window, so a pending edit can be dropped.
+  if (auto *app = gz::gui::App())
+  {
+    if (auto *window = app->findChild<gz::gui::MainWindow *>())
+      window->installEventFilter(this);
+  }
   // The panel was built before the configuration was read.
   emit this->ArrowsChanged();
+}
+
+//////////////////////////////////////////////////
+bool OceanCurrentPanel::eventFilter(QObject *_obj, QEvent *_event)
+{
+  if (_event->type() == events::FieldSteered::kType)
+  {
+    const auto *steered = static_cast<events::FieldSteered *>(_event);
+    if (steered->Field() == OceanCurrentSpec().name)
+      emit this->EditsStale();
+  }
+  return QObject::eventFilter(_obj, _event);
 }
 
 //////////////////////////////////////////////////
@@ -197,11 +220,11 @@ void OceanCurrentPanel::Update(const UpdateInfo &_info,
 }
 
 //////////////////////////////////////////////////
-void OceanCurrentPanel::Apply(const QVariantMap &_edits)
+bool OceanCurrentPanel::Apply(const QVariantMap &_edits)
 {
   auto &d = *this->dataPtr;
   if (!d.current)
-    return;
+    return false;
   std::map<std::string, double> edits;
   d.invalid.clear();
   for (auto it = _edits.begin(); it != _edits.end(); ++it)
@@ -211,7 +234,7 @@ void OceanCurrentPanel::Apply(const QVariantMap &_edits)
     {
       d.invalid = it.key().toStdString();
       emit this->StatusChanged();
-      return;
+      return false;
     }
     edits[it.key().toStdString()] = value;
   }
@@ -219,7 +242,7 @@ void OceanCurrentPanel::Apply(const QVariantMap &_edits)
   if (msg.params().empty())
   {
     emit this->StatusChanged();
-    return;
+    return true;
   }
   // A ramp under way would overwrite the change, then take it for someone
   // else's and stop: Apply ends the ramp first.
@@ -229,6 +252,7 @@ void OceanCurrentPanel::Apply(const QVariantMap &_edits)
   d.control.Send(msg, d.current->generation);
   d.state = d.control.Track(d.current->generation);
   emit this->StatusChanged();
+  return true;
 }
 
 //////////////////////////////////////////////////

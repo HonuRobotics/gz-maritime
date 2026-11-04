@@ -25,6 +25,9 @@
 
 #include <gz/sim/gui/GuiSystem.hh>
 
+class QEvent;
+class QObject;
+
 namespace gz::sim::maritime_gui
 {
   class OceanCurrentPanelPrivate;
@@ -114,7 +117,9 @@ namespace gz::sim::maritime_gui
     /// \brief Send the edited keys that differ from the recipe.
     /// \param[in] _edits The fields' text by key: speed, direction,
     /// water_level.
-    public: Q_INVOKABLE void Apply(const QVariantMap &_edits);
+    /// \return True when the message was sent, or there was nothing to
+    /// send; false when a field is not a number, and nothing was sent.
+    public: Q_INVOKABLE bool Apply(const QVariantMap &_edits);
 
     /// \brief Draw the field another way.
     /// \param[in] _display off, arrows or trails.
@@ -194,6 +199,17 @@ namespace gz::sim::maritime_gui
 
     /// \brief The status changed.
     signals: void StatusChanged();
+
+    /// \brief Another panel started steering this field, so an edit the
+    /// user typed but never applied is stale.
+    signals: void EditsStale();
+
+    /// \brief Catch the steering events the other panels send to the main
+    /// window.
+    /// \param[in] _obj The object the event is for.
+    /// \param[in] _event The event.
+    /// \return Whether the event was taken.
+    public: bool eventFilter(QObject *_obj, QEvent *_event) override;
 
     /// \brief An arrow setting changed.
     signals: void ArrowsChanged();

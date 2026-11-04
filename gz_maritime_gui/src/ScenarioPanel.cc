@@ -23,6 +23,8 @@
 
 #include <tinyxml2.h>
 
+#include <gz/gui/Application.hh>
+#include <gz/gui/MainWindow.hh>
 #include <gz/plugin/Register.hh>
 
 #include "gz/sim/maritime_gui/FieldControl.hh"
@@ -31,9 +33,28 @@
 #include "gz/sim/maritime_gui/Flow.hh"
 #include "gz/sim/maritime_gui/Presets.hh"
 
+#include "Events.hh"
+
 using namespace gz;
 using namespace sim;
 using namespace maritime_gui;
+
+namespace
+{
+  /// \brief Tell the field panels, through the main window, that a preset
+  /// is steering a field, so an edit typed there and never applied is
+  /// dropped.
+  /// \param[in] _field The field's name on its topics.
+  void AnnounceSteering(const std::string &_field)
+  {
+    auto *app = gz::gui::App();
+    auto *window = app ? app->findChild<gz::gui::MainWindow *>() : nullptr;
+    if (!window)
+      return;
+    events::FieldSteered event(_field);
+    app->sendEvent(window, &event);
+  }
+}
 
 class gz::sim::maritime_gui::ScenarioPanelPrivate
 {
@@ -165,10 +186,12 @@ void ScenarioPanel::ApplyPreset(int _index)
   if (p.current && d.currentValues)
   {
     d.current.Steer(p.current->speed, p.current->direction);
+    AnnounceSteering(OceanCurrentSpec().name);
   }
   if (p.wind && d.windValues)
   {
     d.wind.Steer(p.wind->speed, p.wind->direction);
+    AnnounceSteering(WindSpec().name);
   }
   if (p.gusts && d.windValues)
   {

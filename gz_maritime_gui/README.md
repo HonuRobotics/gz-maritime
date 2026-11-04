@@ -20,7 +20,10 @@ docs, [Change and see the wind and the current](../docs/how-to/wind-and-current.
   it and logs why; the panel sees a refusal as a recipe whose generation did
   not move within a few seconds. A number takes a decimal point or a decimal
   comma, whatever the locale: the panel parses the text itself, since Qt's
-  number validator takes only the locale's separator.
+  number validator takes only the locale's separator. A field typed in
+  keeps its text while the world moves, until Apply sends it, or until the
+  field is steered, by this panel's compass or by a scenario, which drops
+  it; a field the user never touched follows the world.
 - **Steer** it by hand: drag the compass's arrow to turn the flow, slide or
   scroll for its speed. A rate limit on the controls: the panel sends a
   `set` message every 100 ms of wall clock, no faster than a set rate (the

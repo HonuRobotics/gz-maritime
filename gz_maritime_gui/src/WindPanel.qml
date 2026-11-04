@@ -69,14 +69,22 @@ ScrollView {
     }
     return m;
   }
-  function apply() {
-    _WindPanel.Apply(edits());
+  function clearEdits() {
     for (var key in fields)
       fields[key].edited = false;
+  }
+  function apply() {
+    // The flags stay when nothing was sent, so a good value next to a bad
+    // one is not lost on the next refresh.
+    if (_WindPanel.Apply(edits()))
+      clearEdits();
   }
   Connections {
     target: _WindPanel
     function onWindChanged() { root.refresh(); }
+    // Steering from elsewhere, a scenario or the demo, makes a pending edit
+    // stale: the fields follow the world again.
+    function onEditsStale() { root.clearEdits(); root.refresh(); }
   }
   Component.onCompleted: refresh()
 
@@ -109,8 +117,9 @@ ScrollView {
         maxSpeed: _WindPanel.maxSpeed
         color: "#ff8c26"
         still: !(root.field.speed > 0)
-        onSpeedSteered: function(s) { _WindPanel.SteerSpeed(s); }
-        onHeadingSteered: function(h) { _WindPanel.SteerHeading(h); }
+        // Steering by hand drops a pending edit: the fields follow the world.
+        onSpeedSteered: function(s) { root.clearEdits(); _WindPanel.SteerSpeed(s); }
+        onHeadingSteered: function(h) { root.clearEdits(); _WindPanel.SteerHeading(h); }
       }
       Label {
         Layout.alignment: Qt.AlignHCenter
@@ -129,7 +138,7 @@ ScrollView {
           // The colour scale's top, or further when the field is past it.
           to: Math.max(_WindPanel.maxSpeed,
                        root.field.speed !== undefined ? root.field.speed : 0)
-          onMoved: _WindPanel.SteerSpeed(value)
+          onMoved: { root.clearEdits(); _WindPanel.SteerSpeed(value); }
           Binding on value {
             when: !speedSlider.pressed
             value: root.field.speed !== undefined ? root.field.speed : 0
