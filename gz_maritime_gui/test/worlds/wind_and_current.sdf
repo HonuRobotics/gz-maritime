@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!--
+  A world with a wind and an ocean current, for the GUI test: the plugin
+  must read both recipes from the GUI's state.
+-->
+<sdf version="1.9">
+  <world name="default">
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-maritime-wind-system"
+            name="gz::sim::maritime::Wind">
+      <speed>10</speed>
+      <direction>270</direction>
+    </plugin>
+    <plugin filename="gz-maritime-ocean-current-system"
+            name="gz::sim::maritime::OceanCurrent">
+      <speed>0.5</speed>
+      <direction>90</direction>
+    </plugin>
+  </world>
+</sdf>

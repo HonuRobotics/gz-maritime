@@ -16,7 +16,8 @@ The worlds are well formed, pass the SDF check and run headless.
 
 Every world is parsed and checked for the contract the docs state: the
 name every command relies on, the systems every vehicle needs, gz-maritime's
-buoyancy naming nobody, a wave source and the drawn sea (none indoors). The world with no
+buoyancy naming nobody, a wave source, the drawn sea (none indoors) and the
+three GUI panels, drawing nothing until asked. The world with no
 Fuel model in it, the open sea, also passes the SDF checker with every
 include resolved and runs for a few hundred steps without rendering, so a
 broken mesh path or a plugin that fails to load shows up here rather than
@@ -49,6 +50,8 @@ REQUIRED_SYSTEMS = (
     'gz-sim-air-pressure-system', 'gz-maritime-buoyancy-system',
     'gz-maritime-wind-system', 'gz-maritime-ocean-current-system',
 )
+# The gz_maritime_gui panels every world docks, drawing off.
+REQUIRED_PANELS = ('OceanCurrentPanel', 'WindPanel', 'ScenarioPanel')
 
 
 def sdf_env():
@@ -74,6 +77,13 @@ def test_world_keeps_the_contract(world):
     assert buoyancy.find('enable_by_default').text == 'false'
     assert buoyancy.find('enable') is None, 'the world must name no vehicle'
     assert w.find('spherical_coordinates/latitude_deg') is not None
+    # The GUI docks the current, wind and scenario panels, with no drawing
+    # until the user turns it on, so the scene looks as before.
+    gui = {p.get('filename'): p for p in w.findall('gui/plugin')}
+    assert set(REQUIRED_PANELS) <= set(gui), set(REQUIRED_PANELS) - set(gui)
+    for panel in ('OceanCurrentPanel', 'WindPanel'):
+        display = gui[panel].find('display')
+        assert display is not None and display.text == 'off', f'{panel} draws by default'
     uris = [i.find('uri').text for i in w.findall('include')]
     drawn = any(u.startswith('model://water_surface') for u in uris)
     if world in INDOOR:
