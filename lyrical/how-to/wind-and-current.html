@@ -1,0 +1,641 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Change and see the wind and the current &mdash; Gz Maritime lyrical documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/honu.css?v=44af46ee" />
+
+  
+    <link rel="shortcut icon" href="../_static/honu-robotics-favicon.svg"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=46f74c5b"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Troubleshooting" href="faq.html" />
+    <link rel="prev" title="Use your own world" href="own-world.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Gz Maritime
+              <img src="../_static/honu-robotics-white-logo.svg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting-started/index.html">Getting started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/requirements.html">Requirements</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/requirements.html#optional">Optional</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/requirements.html#docker">Docker</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/installation.html">Installation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#clone">1. Clone</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#install-the-dependencies">2. Install the dependencies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#build">3. Build</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#check">4. Check</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/first-simulation.html">First simulation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#the-ocean-on-its-own">1. The ocean on its own</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#put-a-boat-on-it">2. Put a boat on it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#drive-it">3. Drive it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#look-at-it-in-rviz">4. Look at it in RViz</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#add-a-second-boat">5. Add a second boat</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#make-waves">6. Make waves</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#next">Next</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../vehicles/index.html">Vehicles</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../vehicles/index.html#what-a-world-provides-what-a-vehicle-brings">What a world provides, what a vehicle brings</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/custom-usv.html">Custom USV</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#run-it">Run it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#drive-it">Drive it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#topics">Topics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#frames">Frames</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#what-it-is-made-of">What it is made of</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#limitations">Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/bluerobotics.html">BlueBoat and BlueROV2</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/bluerobotics.html#blueboat">BlueBoat</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/bluerobotics.html#bluerov2">BlueROV2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/bluerobotics.html#several-vehicles-on-one-ocean">Several vehicles on one ocean</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/holybro.html">Holybro X500</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/holybro.html#run-it">Run it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/holybro.html#on-the-ocean">On the ocean</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How to guides</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="index.html#bring-your-own-vehicle">Bring your own vehicle</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#more">More</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="own-vehicle.html">Bring your own vehicle</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#who-does-what">Who does what</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#the-path">The path</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="own-vehicle.html#why-the-urdf-comes-first">Why the URDF comes first</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#how-a-vehicle-floats">How a vehicle floats</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#what-the-gazebo-maritime-tutorials-cover">What the Gazebo maritime tutorials cover</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#waves-and-physics-today">Waves and physics today</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#already-have-a-model">Already have a model?</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="vehicle-description.html">Describe the vehicle</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#put-the-origin-on-the-waterline">Put the origin on the waterline</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#work-out-the-draft">Work out the draft</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#collision-shapes-are-for-contact">Collision shapes are for contact</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#mass-and-inertia">Mass and inertia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#propellers">Propellers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#sensor-frames">Sensor frames</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#no-instance-name-no-gazebo">No instance name, no Gazebo</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#check-it">Check it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#build-it">Build it</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="gazebo-composition.html">Compose the Gazebo model</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#the-wrapper">The wrapper</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="gazebo-composition.html#what-survives-the-conversion">What survives the conversion</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#mark-the-collisions-that-displace">Mark the collisions that displace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#thrusters">Thrusters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#hydrodynamic-damping">Hydrodynamic damping</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="gazebo-composition.html#added-mass">Added mass</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#sensors">Sensors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#joint-states">Joint states</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#build-it">Build it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#marking-from-a-urdf">Marking from a URDF</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="spawn-and-drive.html">Spawn and drive</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#the-simulation-part">The simulation part</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#spawn-an-instance">Spawn an instance</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="spawn-and-drive.html#your-sim-launch-xml">Your <code class="docutils literal notranslate"><span class="pre">sim.launch.xml</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="spawn-and-drive.html#one-name-per-instance">One name per instance</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#what-the-launch-needs-from-a-vehicle">What the launch needs from a vehicle</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#the-bridge-configuration">The bridge configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#drive">Drive</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#change-the-sea-while-it-runs">Change the sea while it runs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#several-vehicles">Several vehicles</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="spawn-and-drive.html#other-vehicles">Other vehicles</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sensors.html">Add sensors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#what-the-world-provides">What the world provides</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#the-pattern">The pattern</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#a-camera">A camera</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#check-a-sensor">Check a sensor</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="several-vehicles.html">Several vehicles on one ocean</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="several-vehicles.html#bring-it-up">1. Bring it up</a></li>
+<li class="toctree-l4"><a class="reference internal" href="several-vehicles.html#one-name-each">2. One name each</a></li>
+<li class="toctree-l4"><a class="reference internal" href="several-vehicles.html#read-a-sensor">3. Read a sensor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="several-vehicles.html#command-an-actuator">4. Command an actuator</a></li>
+<li class="toctree-l4"><a class="reference internal" href="several-vehicles.html#drive-one-with-a-gamepad">5. Drive one with a gamepad</a></li>
+<li class="toctree-l4"><a class="reference internal" href="several-vehicles.html#add-a-second-boat">6. Add a second boat</a></li>
+<li class="toctree-l4"><a class="reference internal" href="several-vehicles.html#change-the-sea">7. Change the sea</a></li>
+<li class="toctree-l4"><a class="reference internal" href="several-vehicles.html#what-to-know">What to know</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="site-worlds.html">Sail the competition sites</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#sydney-international-regatta-centre">Sydney International Regatta Centre</a></li>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#nathan-benderson-park">Nathan Benderson Park</a></li>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#sand-island">Sand Island</a></li>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#la-spezia">La Spezia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#marina-bay">Marina Bay</a></li>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#what-to-know">What to know</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="aquatic-centre.html">Dive in the aquatic centre</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="aquatic-centre.html#what-to-know">What to know</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="own-world.html">Use your own world</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#what-a-world-needs">What a world needs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#the-buoyancy-system">The buoyancy system</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#the-world-name">The world name</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#adding-a-seabed">Adding a seabed</a></li>
+</ul>
+</li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Change and see the wind and the current</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#steer-them-by-hand">Steer them by hand</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#set-them-exactly">Set them exactly</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#see-them">See them</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#what-each-vehicle-meets">What each vehicle meets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#wind-socks">Wind socks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#scenarios-and-the-demo">Scenarios and the demo</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#in-your-own-world">In your own world</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="faq.html">Troubleshooting</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#my-vehicle-sinks">My vehicle sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#my-vehicle-bumps-into-things-it-shouldn-t-or-sits-on-the-water-oddly">My vehicle bumps into things it shouldn’t, or sits on the water oddly</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#unsupported-collision-geometry-for-graded-buoyancy">“Unsupported collision geometry for graded buoyancy”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-vehicle-capsizes">The vehicle capsizes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-boat-moves-sideways-or-spins-instead-of-going-forward">The boat moves sideways, or spins, instead of going forward</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-boat-barely-moves-or-a-bigger-command-changes-nothing">The boat barely moves, or a bigger command changes nothing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-spawn-launch-stops-with-invalid-instance-name">The spawn launch stops with “invalid instance name”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-spawn-launch-returns-straight-away">The spawn launch returns straight away</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#two-boats-answer-the-same-command-or-rviz-shows-a-jumping-robot">Two boats answer the same command, or RViz shows a jumping robot</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#a-plugin-can-t-find-a-link">A plugin can’t find a link</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-server-stops-with-ode-internal-error-aabbbound">The server stops with “ODE INTERNAL ERROR … aabbBound”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-boat-falls-very-slowly-when-spawned-high">The boat falls very slowly when spawned high</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#rviz-shows-nothing-or-fixed-frame-does-not-exist">RViz shows nothing, or “Fixed Frame does not exist”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#robot-state-publisher-warns-about-the-root-link-inertia">robot_state_publisher warns about the root link inertia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-ocean-looks-flat-or-white-in-the-gui">The ocean looks flat or white in the GUI</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#camera-images-look-green-or-blue">Camera images look green or blue</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#two-simulations-interfere-with-each-other">Two simulations interfere with each other</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/launch-and-world.html">Launch files, world and services</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#launch-files">Launch files</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-simulation-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">simulation.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-spawn-vehicle-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">spawn_vehicle.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-multi-vehicle-demo-launch-py"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">multi_vehicle_demo.launch.py</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-sim-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">sim.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-rviz-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">rviz.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-display-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">display.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#instantiate-vehicle-py"><code class="docutils literal notranslate"><span class="pre">instantiate_vehicle.py</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#instance-rviz-py"><code class="docutils literal notranslate"><span class="pre">instance_rviz.py</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#worlds">Worlds</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#the-open-water-sdf-world">The <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code> world</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#buoyancy-markup">Buoyancy markup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#wind-markup">Wind markup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#wind-parameters">Wind parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#ocean-current-markup">Ocean current markup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#ocean-current-parameters">Ocean current parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#thruster-command">Thruster command</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#services">Services</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#examples">Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#wind">Wind</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#direction-and-units">Direction and units</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#ocean-current">Ocean current</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#id1">Direction and units</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#topics">Topics</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../design/index.html">Design</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#the-waves">The waves</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#floating-vehicles-the-world-doesn-t-know">Floating vehicles the world doesn’t know</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#one-name-per-instance">One name per instance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#one-thruster-interface">One thruster interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#buoyancy-that-follows-the-waves">Buoyancy that follows the waves</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#related">Related</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../project/index.html">Project</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Gz Maritime</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">How to guides</a></li>
+      <li class="breadcrumb-item active">Change and see the wind and the current</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/how-to/wind-and-current.md" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="change-and-see-the-wind-and-the-current">
+<h1>Change and see the wind and the current<a class="headerlink" href="#change-and-see-the-wind-and-the-current" title="Link to this heading"></a></h1>
+<p>Every world here docks three panels on the right of the Gazebo GUI,
+<strong>Ocean current</strong>, <strong>Wind</strong> and <strong>Scenarios</strong>. The first two show their
+field as the world has it now, let you steer it by hand or set it exactly,
+draw it on the water as flow trails or arrows coloured by speed, and show
+the water and the wind each vehicle meets; the wind panel also flies wind
+socks. The third steers both fields to named conditions and runs a demo. They need no ROS:
+they work the same with <code class="docutils literal notranslate"><span class="pre">gz</span> <span class="pre">sim</span></code> on its own and with every launch.</p>
+<figure class="align-default" id="id1">
+<img alt="The open water world with cyan current trails and magenta wind trails streaming across the water towards the landing pad, and the Ocean current panel on the right with its compass" src="../_images/wind-and-current.jpg" />
+<figcaption>
+<p><span class="caption-text">Flow trails: a 0.5 m/s current setting 060 (cyan) and a 10 m/s wind from
+250 with direction gusts (magenta), drifting across the water.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<section id="steer-them-by-hand">
+<h2>Steer them by hand<a class="headerlink" href="#steer-them-by-hand" title="Link to this heading"></a></h2>
+<p>The compass at the top of each panel draws the flow, where the air or the
+water goes, whatever convention the numbers follow:</p>
+<ul class="simple">
+<li><p><strong>Drag the arrow</strong> to turn the flow;</p></li>
+<li><p><strong>move the slider</strong>, or turn the mouse wheel over the compass, for its
+speed.</p></li>
+</ul>
+<p>The panel steers the field to where you point in small steps, the direction
+the short way round, no faster than the current at 0.5 m/s and 90° a
+second, the wind at 5 m/s and 90° a second of wall clock, so the trails,
+the vehicles and the numbers under the compass turn smoothly. Each step is
+still a step for the server: it is not a ramp of the field in simulation
+time, and steps sent while the world is paused all land when it runs again.
+If something else changes the field while a panel steers it (another
+panel, a second GUI, <code class="docutils literal notranslate"><span class="pre">gz</span> <span class="pre">topic</span></code> or ROS), the panel stops and says so.</p>
+</section>
+<section id="set-them-exactly">
+<h2>Set them exactly<a class="headerlink" href="#set-them-exactly" title="Link to this heading"></a></h2>
+<p>Each panel keeps its field’s own convention:</p>
+<ul class="simple">
+<li><p><strong>Ocean current:</strong> speed (m/s), the direction it <strong>sets towards</strong> in
+degrees clockwise from north (90 flows east), and the water level (m).</p></li>
+<li><p><strong>Wind:</strong> speed (m/s) at the wind’s reference height, the direction it
+<strong>comes from</strong> in degrees clockwise from north (270 blows east), and the
+gusts: the standard deviation of the speed (m/s) and of the direction
+(degrees), and their correlation times (s).</p></li>
+</ul>
+<p>A wind from 270 and a current setting 090 both go east; their compasses
+agree even though their numbers do not.</p>
+<p>Type a decimal with a point or a comma, <code class="docutils literal notranslate"><span class="pre">1.5</span></code> or <code class="docutils literal notranslate"><span class="pre">1,5</span></code>, whatever your
+system’s language. Edit the fields and press <strong>Apply</strong>. The panel sends only
+the values you changed, as one message on <code class="docutils literal notranslate"><span class="pre">/world/default/ocean_current/set</span></code>
+or <code class="docutils literal notranslate"><span class="pre">/world/default/wind/set</span></code>, the same topics <code class="docutils literal notranslate"><span class="pre">gz</span> <span class="pre">topic</span></code> and ROS use. A
+field you typed in keeps its text while the world moves, until you press
+<strong>Apply</strong>, or until you steer the field or press a scenario, which drops it.
+The world applies a message whole or not at all, and the line beside
+<strong>Apply</strong> says which:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Status</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Steering…</p></td>
+<td><p>The panel is stepping the field to where the compass points.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Stopped steering</p></td>
+<td><p>Something else changed the field while the panel steered it: another panel, a second GUI, <code class="docutils literal notranslate"><span class="pre">gz</span> <span class="pre">topic</span></code> or ROS. The panel left it there.</p></td>
+</tr>
+<tr class="row-even"><td><p>Applied.</p></td>
+<td><p>The world took the change.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Not applied</p></td>
+<td><p>The world kept its values: a value out of range, or refused by the model. The server’s log says why.</p></td>
+</tr>
+<tr class="row-even"><td><p>Not sent: … is not a number</p></td>
+<td><p>A field holds something that is not a number; nothing was sent.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Not sent: nothing is listening</p></td>
+<td><p>Nothing listened on the topic yet, as just after the GUI starts; press Apply again in a moment.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The fields always show the world’s values, whoever changed them last: the
+panel, <code class="docutils literal notranslate"><span class="pre">gz</span> <span class="pre">topic</span></code> or ROS. A world without a wind or an ocean current system
+says so in that panel. The reference height, the roughness length and the
+rest stay in the world file; see the
+<a class="reference internal" href="../reference/launch-and-world.html#wind-parameters"><span class="std std-ref">wind</span></a> and
+<a class="reference internal" href="../reference/launch-and-world.html#ocean-current-parameters"><span class="std std-ref">ocean current</span></a>
+parameters.</p>
+</section>
+<section id="see-them">
+<h2>See them<a class="headerlink" href="#see-them" title="Link to this heading"></a></h2>
+<p><strong>Show</strong> picks how a panel draws its field on the water:</p>
+<ul class="simple">
+<li><p><strong>Trails:</strong> a few hundred particles drift with the field and leave short
+trails that fade behind them, in a soft disc around the world’s origin.
+Gusts sweep through the wind’s trails; turn the current and its trails
+swing. The current’s particles move eight times faster than the water, so
+a slow current still visibly flows; the wind’s move at its own speed.</p></li>
+<li><p><strong>Arrows:</strong> a grid of arrows, the current’s 4 m long per m/s, the wind’s
+0.3 m.</p></li>
+<li><p><strong>Off</strong>, the default, so the scene looks as it always did.</p></li>
+</ul>
+<p>Both are coloured by speed, from still to the <strong>top speed</strong> shown on the
+legend: the water from deep blue through cyan to white (1 m/s by default),
+the air from indigo through magenta and orange to yellow (20 m/s). They are
+the field as the vehicles feel it, sampled from the world with the same
+code, so a current model that varies with place shows its pattern. The
+current is drawn just above the water level; the wind at a height above
+the water, 3 m by default, and sampled at that height, so the profile with
+height shows. Change the area’s side, the arrows’ spacing and the wind’s
+height in the panel.</p>
+</section>
+<section id="what-each-vehicle-meets">
+<h2>What each vehicle meets<a class="headerlink" href="#what-each-vehicle-meets" title="Link to this heading"></a></h2>
+<p>Tick <strong>On the vehicles</strong> in a panel to draw, on every vehicle (every model
+that is not static and has a link, so a floating buoy counts too), the water
+and the wind at its origin:</p>
+<ul class="simple">
+<li><p><strong>Ocean current:</strong> the water flowing past its hull at its origin, a solid
+arrow 1 m above it: the current there less the vehicle’s velocity over
+the ground. A boat
+drifting with the current has none; a moored one, or one holding station,
+shows the whole current. Also its track over the ground, fading over the
+last 30 s, and a line along its heading, so a boat crabbing in a current
+shows its track and its heading apart.</p></li>
+<li><p><strong>Wind:</strong> the apparent wind, a solid arrow 2 m above it: the wind there
+less the vehicle’s velocity, the wind a sailor on board would feel.</p></li>
+</ul>
+<p>The arrows are coloured by speed like the field, and drawn twice, flat and
+upright, so they read from above and from a camera low over the water. The
+GUI only sees the vehicles’ poses, so their velocity is estimated from how
+those change. The arrows are a picture, not the forces: the hydrodynamics
+asks the current at the centre of mass, marked shapes at the centre of
+each wet part, and the windage at each marked shape.</p>
+<figure class="align-default" id="id2">
+<img alt="A drifting box and a moored box on the water; the moored one carries a white arrow for the current flowing past it and a magenta arrow for the apparent wind, the drifting one only a magenta arrow and a white track behind it; a striped orange and white wind sock flies on the landing pad" src="../_images/what-the-boat-feels.jpg" />
+<figcaption>
+<p><span class="caption-text">A moored boat (front) feels the whole current and the wind; a drifting one
+feels only the wind, and leaves its track. The wind sock on the landing pad
+flies downwind.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="wind-socks">
+<h2>Wind socks<a class="headerlink" href="#wind-socks" title="Link to this heading"></a></h2>
+<p>The wind panel flies a striped wind sock at each <code class="docutils literal notranslate"><span class="pre">&lt;wind_sock&gt;</span></code> the world
+places (the open water world has one on the landing pad). A sock points
+where the wind goes and droops in light air: down by 80° in calm, straight
+out from 7.7 m/s (15 knots) up, and swinging with the gusts, sampled where
+it flies. <strong>Wind socks</strong> in the wind panel turns them off.</p>
+</section>
+<section id="scenarios-and-the-demo">
+<h2>Scenarios and the demo<a class="headerlink" href="#scenarios-and-the-demo" title="Link to this heading"></a></h2>
+<p>The <strong>Scenarios</strong> panel steers both fields to named conditions in one click,
+through the same steering as the compasses:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Preset</p></th>
+<th class="head"><p>Current</p></th>
+<th class="head"><p>Wind</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Calm</p></td>
+<td><p>slack</p></td>
+<td><p>still</p></td>
+</tr>
+<tr class="row-odd"><td><p>Tidal ebb</p></td>
+<td><p>0.8 m/s setting 225°</p></td>
+<td><p>3 m/s from 200°, light gusts</p></td>
+</tr>
+<tr class="row-even"><td><p>Fresh breeze</p></td>
+<td><p>0.3 m/s setting 090°</p></td>
+<td><p>10 m/s from 270°, gusts of 2 m/s and 10°</p></td>
+</tr>
+<tr class="row-odd"><td><p>Squall</p></td>
+<td><p>0.5 m/s setting 135°</p></td>
+<td><p>18 m/s from 300°, gusts of 5 m/s and 25°</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Demo</strong> steps through them in order, staying on each a while (12 to 25 s
+of simulation time) and starting again after the last: leave it running on
+a stand or during a talk. It follows simulation time, so pausing the world
+pauses it.</p>
+</section>
+<section id="in-your-own-world">
+<h2>In your own world<a class="headerlink" href="#in-your-own-world" title="Link to this heading"></a></h2>
+<p>Add either panel, or both, to the world’s <code class="docutils literal notranslate"><span class="pre">&lt;gui&gt;</span></code> block; every element but
+the <code class="docutils literal notranslate"><span class="pre">filename</span></code> is optional:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;plugin</span><span class="w"> </span><span class="na">filename=</span><span class="s">"OceanCurrentPanel"</span><span class="w"> </span><span class="na">name=</span><span class="s">"Ocean current"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;gz-gui&gt;</span>
+<span class="w">    </span><span class="nt">&lt;title&gt;</span>Ocean<span class="w"> </span>current<span class="nt">&lt;/title&gt;</span>
+<span class="w">    </span><span class="nt">&lt;property</span><span class="w"> </span><span class="na">type=</span><span class="s">"string"</span><span class="w"> </span><span class="na">key=</span><span class="s">"state"</span><span class="nt">&gt;</span>docked<span class="nt">&lt;/property&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/gz-gui&gt;</span>
+<span class="w">  </span><span class="nt">&lt;display&gt;</span>trails<span class="nt">&lt;/display&gt;</span><span class="w">  </span><span class="cm">&lt;!-- off, arrows or trails --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;max_speed&gt;</span>1<span class="nt">&lt;/max_speed&gt;</span><span class="w">   </span><span class="cm">&lt;!-- m/s of the last colour, and the slider's span --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;extent&gt;</span>40<span class="nt">&lt;/extent&gt;</span><span class="w">        </span><span class="cm">&lt;!-- side of the area, m --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;spacing&gt;</span>5<span class="nt">&lt;/spacing&gt;</span><span class="w">       </span><span class="cm">&lt;!-- between two arrows, m --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;center_x&gt;</span>0<span class="nt">&lt;/center_x&gt;</span><span class="w">     </span><span class="cm">&lt;!-- centre of the area --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;center_y&gt;</span>0<span class="nt">&lt;/center_y&gt;</span>
+<span class="w">  </span><span class="nt">&lt;scale&gt;</span>4<span class="nt">&lt;/scale&gt;</span><span class="w">           </span><span class="cm">&lt;!-- m of arrow per m/s --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;particles&gt;</span>400<span class="nt">&lt;/particles&gt;</span><span class="w"> </span><span class="cm">&lt;!-- trails --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;trail_length&gt;</span>8<span class="nt">&lt;/trail_length&gt;</span>
+<span class="w">  </span><span class="nt">&lt;lifetime&gt;</span>6<span class="nt">&lt;/lifetime&gt;</span><span class="w">     </span><span class="cm">&lt;!-- s a particle lives, at most --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;speedup&gt;</span>8<span class="nt">&lt;/speedup&gt;</span><span class="w">       </span><span class="cm">&lt;!-- particles move this many times the flow --&gt;</span>
+<span class="nt">&lt;/plugin&gt;</span>
+
+<span class="nt">&lt;plugin</span><span class="w"> </span><span class="na">filename=</span><span class="s">"WindPanel"</span><span class="w"> </span><span class="na">name=</span><span class="s">"Wind"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;gz-gui&gt;</span>
+<span class="w">    </span><span class="nt">&lt;title&gt;</span>Wind<span class="nt">&lt;/title&gt;</span>
+<span class="w">    </span><span class="nt">&lt;property</span><span class="w"> </span><span class="na">type=</span><span class="s">"string"</span><span class="w"> </span><span class="na">key=</span><span class="s">"state"</span><span class="nt">&gt;</span>docked<span class="nt">&lt;/property&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/gz-gui&gt;</span>
+<span class="w">  </span><span class="nt">&lt;display&gt;</span>trails<span class="nt">&lt;/display&gt;</span>
+<span class="w">  </span><span class="nt">&lt;height&gt;</span>3<span class="nt">&lt;/height&gt;</span><span class="w">             </span><span class="cm">&lt;!-- m above the water --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;on_vehicles&gt;</span>true<span class="nt">&lt;/on_vehicles&gt;</span>
+<span class="w">  </span><span class="nt">&lt;wind_sock&gt;</span>9.6<span class="w"> </span>-9.6<span class="w"> </span>1<span class="nt">&lt;/wind_sock&gt;</span><span class="w">  </span><span class="cm">&lt;!-- a pole's foot; repeat it --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;sock_height&gt;</span>3<span class="nt">&lt;/sock_height&gt;</span>
+<span class="nt">&lt;/plugin&gt;</span>
+
+<span class="nt">&lt;plugin</span><span class="w"> </span><span class="na">filename=</span><span class="s">"ScenarioPanel"</span><span class="w"> </span><span class="na">name=</span><span class="s">"Scenarios"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;gz-gui&gt;</span>
+<span class="w">    </span><span class="nt">&lt;title&gt;</span>Scenarios<span class="nt">&lt;/title&gt;</span>
+<span class="w">    </span><span class="nt">&lt;property</span><span class="w"> </span><span class="na">type=</span><span class="s">"string"</span><span class="w"> </span><span class="na">key=</span><span class="s">"state"</span><span class="nt">&gt;</span>docked<span class="nt">&lt;/property&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/gz-gui&gt;</span>
+<span class="w">  </span><span class="nt">&lt;demo&gt;</span>false<span class="nt">&lt;/demo&gt;</span><span class="w">             </span><span class="cm">&lt;!-- start the demo with the world --&gt;</span>
+<span class="w">  </span><span class="cm">&lt;!-- Presets of your own replace the built in ones: --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;preset</span><span class="w"> </span><span class="na">name=</span><span class="s">"Spring tide"</span><span class="w"> </span><span class="na">dwell=</span><span class="s">"30"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;current</span><span class="w"> </span><span class="na">speed=</span><span class="s">"1.2"</span><span class="w"> </span><span class="na">direction=</span><span class="s">"200"</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;wind</span><span class="w"> </span><span class="na">speed=</span><span class="s">"6"</span><span class="w"> </span><span class="na">direction=</span><span class="s">"180"</span><span class="w"> </span><span class="na">speed_gust=</span><span class="s">"1"</span><span class="w"> </span><span class="na">direction_gust=</span><span class="s">"10"</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/preset&gt;</span>
+<span class="nt">&lt;/plugin&gt;</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;on_vehicles&gt;</span></code> works on the ocean current panel too.</p>
+<p>The wind panel takes the same elements as the current panel, with its own
+defaults (20 m/s top speed, 0.3 m per m/s, 4 s lifetime, no speed-up). The
+drawing goes through Gazebo’s <code class="docutils literal notranslate"><span class="pre">MarkerManager</span></code>, which every world here loads;
+a world of your own needs it in its <code class="docutils literal notranslate"><span class="pre">&lt;gui&gt;</span></code> too. Both panels are also in the
+GUI’s plugin menu (top right, <strong>Ocean Current Panel</strong> and <strong>Wind Panel</strong>)
+for a world that does not list them. The package <code class="docutils literal notranslate"><span class="pre">gz_maritime_gui</span></code> installs
+them and puts their folder on <code class="docutils literal notranslate"><span class="pre">GZ_GUI_PLUGIN_PATH</span></code> when the workspace is
+sourced.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="own-world.html" class="btn btn-neutral float-left" title="Use your own world" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="faq.html" class="btn btn-neutral float-right" title="Troubleshooting" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Honu Robotics.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  
+<div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    <span class="fa fa-book"> Other Versions</span>
+    v: lyrical
+    <span class="fa fa-caret-down"></span>
+  </span>
+  <div class="rst-other-versions">
+    <dl id="honu-version-list">
+      <dt>Distributions</dt>
+      <dd><a href="/gz-maritime/lyrical/" data-version="lyrical">Lyrical</a></dd>
+    </dl>
+  </div>
+</div>
+<script>
+  (function () {
+    var current = "lyrical";
+    var base = "/gz-maritime/";
+
+    /* Keep the reader on the same page when switching versions; the
+       version root href stays as the fallback for pages a version lacks. */
+    function wire() {
+      document.querySelectorAll('.rst-other-versions a[data-version]').forEach(function (a) {
+        var target = a.getAttribute('data-version');
+        var path = window.location.pathname;
+        if (target !== current && path.indexOf('/' + current + '/') !== -1) {
+          a.href = path.replace('/' + current + '/', '/' + target + '/');
+        }
+      });
+    }
+
+    if (!window.fetch) { wire(); return; }
+
+    /* The deploy tool maintains versions.json at the site root; reading it
+       at runtime lets builds published before a new distribution existed
+       still offer it in the flyout. Offline or local preview builds fall
+       back to the build time list rendered above. */
+    fetch(base + 'versions.json', {cache: 'no-cache'}).then(function (response) {
+      if (!response.ok) { throw new Error(response.status); }
+      return response.json();
+    }).then(function (entries) {
+      var list = document.getElementById('honu-version-list');
+      if (!list || !entries.length) { return; }
+      list.querySelectorAll('dd').forEach(function (dd) { dd.remove(); });
+      entries.forEach(function (entry) {
+        var a = document.createElement('a');
+        a.href = entry.url;
+        a.setAttribute('data-version', entry.name);
+        a.textContent = entry.name.charAt(0).toUpperCase() + entry.name.slice(1);
+        var dd = document.createElement('dd');
+        dd.appendChild(a);
+        list.appendChild(dd);
+      });
+    }).catch(function () {}).finally(wire);
+  })();
+</script><script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
