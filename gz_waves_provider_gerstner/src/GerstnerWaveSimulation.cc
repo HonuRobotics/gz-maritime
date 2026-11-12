@@ -244,9 +244,11 @@ gz::math::Vector3d GerstnerWaveSimulation::ParticleVelocity(
     const double theta = this->Phase(i, _x, _y, _t);
     const double s = std::sin(theta);
     const double c = std::cos(theta);
-    vx += aw * d.X() * s;
-    vy += aw * d.Y() * s;
-    vz += aw * c;
+    // For eta = a cos(theta), the surface rises at d(eta)/dt = a w sin(theta)
+    // and the water moves along d at a w cos(theta), forward under a crest.
+    vx += aw * d.X() * c;
+    vy += aw * d.Y() * c;
+    vz += aw * s;
   }
   return gz::math::Vector3d(vx * r, vy * r, vz * r);
 }
