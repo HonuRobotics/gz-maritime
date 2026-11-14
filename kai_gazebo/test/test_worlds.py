@@ -51,8 +51,9 @@ REQUIRED_SYSTEMS = (
     'gz-maritime-wind-system', 'gz-maritime-ocean-current-system',
     'gz-maritime-acoustics-system',
 )
-# The gz_maritime_gui panels every world docks, drawing off.
-REQUIRED_PANELS = ('OceanCurrentPanel', 'WindPanel', 'ScenarioPanel')
+# The gz_maritime_gui panels every world docks, drawing off (but in the
+# acoustic demo, whose point is the acoustics panel's drawing).
+REQUIRED_PANELS = ('OceanCurrentPanel', 'WindPanel', 'ScenarioPanel', 'AcousticsPanel')
 
 
 def sdf_env():
@@ -85,6 +86,10 @@ def test_world_keeps_the_contract(world):
     for panel in ('OceanCurrentPanel', 'WindPanel'):
         display = gui[panel].find('display')
         assert display is not None and display.text == 'off', f'{panel} draws by default'
+    if world != 'acoustic_demo':
+        for tag in ('reach', 'pings', 'readings'):
+            draw = gui['AcousticsPanel'].find(tag)
+            assert draw is None or draw.text == 'false', f'AcousticsPanel draws {tag} by default'
     uris = [i.find('uri').text for i in w.findall('include')]
     drawn = any(u.startswith('model://water_surface') for u in uris)
     if world in INDOOR:

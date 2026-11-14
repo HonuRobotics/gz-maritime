@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-The OceanCurrentPanel, WindPanel and ScenarioPanel plugins in a running GUI.
+The OceanCurrentPanel, WindPanel, ScenarioPanel and AcousticsPanel plugins in a running GUI.
 
 A server runs a test world; the GUI runs with only these plugins, on Qt's
 offscreen platform. Each plugin logs where it read its recipe from, and the
 test reads that log: plugins loaded with the GUI read their recipes from the
 GUI's own state, and the wind panel in a world without a wind asks the
-world's state service once, finds none, and carries on.
+world's state service once, finds none, and carries on. The acoustics
+panel, drawing everything, reads the pingers from the GUI's state and
+hears the receivers the acoustics system lists.
 """
 
 import os
@@ -124,3 +126,21 @@ def test_world_without_wind(gui):
     assert not g.has('WindPanel: wind from')
     assert not g.has('OceanCurrentPanel: no recipe'), \
         'the current panel had its recipe and asked nothing'
+
+
+def test_acoustics_from_the_gui_state(gui):
+    g = gui('acoustics.sdf')
+    assert g.wait_for('Loaded plugin [AcousticsPanel]'), ''.join(g.lines)
+    assert g.wait_for("AcousticsPanel: pingers from the GUI's state: 1"), \
+        ''.join(g.lines)
+    assert g.wait_for('AcousticsPanel: receivers listed by the acoustics system: 1'), \
+        ''.join(g.lines)
+    # Drawing everything, with no scene to draw on, it keeps running, and
+    # its QML loads clean.
+    time.sleep(3.0)
+    assert g.gui.poll() is None, ''.join(g.lines)
+    assert not g.has('AcousticsPanel.qml:'), ''.join(g.lines)
+    # The wind and current panels ask, in a world without them; this one
+    # had its pingers.
+    assert not g.has('AcousticsPanel: no pinger'), \
+        'a plugin loaded with the GUI needs no state service'

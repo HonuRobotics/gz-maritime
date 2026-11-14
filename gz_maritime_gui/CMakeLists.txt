@@ -25,6 +25,7 @@ find_package(gz_msgs_vendor REQUIRED)
 find_package(gz-msgs REQUIRED)
 find_package(gz_wind REQUIRED)
 find_package(gz_ocean_current REQUIRED)
+find_package(gz_acoustics REQUIRED)
 
 find_package(tinyxml2 REQUIRED)
 
@@ -36,6 +37,7 @@ find_package(tinyxml2 REQUIRED)
 # its drawing, apart.
 # --------------------------------------------------------------------------
 add_library(${PROJECT_NAME}_core SHARED
+  src/Acoustics.cc
   src/Fields.cc
   src/FieldControl.cc
   src/FieldDrawing.cc
@@ -54,6 +56,7 @@ target_link_libraries(${PROJECT_NAME}_core
     gz-msgs::core
     gz_wind::gz_wind
     gz_ocean_current::gz_ocean_current
+    gz_acoustics::gz_acoustics
   PRIVATE
     gz-transport::core
     tinyxml2::tinyxml2
@@ -65,7 +68,7 @@ target_link_libraries(${PROJECT_NAME}_core
 # its .qrc under the same name.
 # --------------------------------------------------------------------------
 find_package(Qt6 REQUIRED COMPONENTS Core Quick QuickControls2)
-set(gui_plugins OceanCurrentPanel WindPanel ScenarioPanel)
+set(gui_plugins OceanCurrentPanel WindPanel ScenarioPanel AcousticsPanel)
 foreach(plugin ${gui_plugins})
   # moc by hand: AUTOMOC does not take .hh files as headers.
   qt6_wrap_cpp(${plugin}_moc src/${plugin}.hh)
@@ -133,6 +136,25 @@ if(BUILD_TESTING)
   endif()
 
   # The plugin in a running GUI, from the build tree.
+  ament_add_gtest(acoustics_drawing_test test/acoustics_drawing_test.cc)
+  if(TARGET acoustics_drawing_test)
+    target_link_libraries(acoustics_drawing_test ${PROJECT_NAME}_core
+      gz-transport::core)
+    set_tests_properties(acoustics_drawing_test PROPERTIES
+      ENVIRONMENT "GZ_PARTITION=gz_maritime_gui_acoustics_drawing_test")
+  endif()
+
+  # A camera never sees the panels' markers. Needs a GPU; skips without one.
+  ament_add_gtest(markers_camera_test test/markers_camera_test.cc TIMEOUT 120)
+  if(TARGET markers_camera_test)
+    target_compile_definitions(markers_camera_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(markers_camera_test ${PROJECT_NAME}_core
+      gz-transport::core)
+    set_tests_properties(markers_camera_test PROPERTIES
+      ENVIRONMENT "GZ_PARTITION=gz_maritime_gui_markers_camera_test")
+  endif()
+
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(test_gui_reads_recipes test/test_gui_reads_recipes.py
     TIMEOUT 240
@@ -145,6 +167,7 @@ ament_environment_hooks("hooks/hook.sh.in")
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
-ament_export_dependencies(gz_sim_vendor gz_msgs_vendor gz_wind gz_ocean_current)
+ament_export_dependencies(gz_sim_vendor gz_msgs_vendor gz_wind gz_ocean_current
+  gz_acoustics)
 
 ament_package()

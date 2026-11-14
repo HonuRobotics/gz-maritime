@@ -1,11 +1,12 @@
 # gz_maritime_gui
 
-The Gazebo GUI for the maritime environment: three GUI plugins.
+The Gazebo GUI for the maritime environment: four GUI plugins.
 `OceanCurrentPanel` and `WindPanel` each steer their field by hand or set it
 exactly, draw it on the water as flow trails or arrows coloured by speed,
 and show the water and the wind each vehicle meets; the wind panel also
 flies wind socks. `ScenarioPanel` steers both fields to named conditions
-and runs a demo. Planned in
+and runs a demo. `AcousticsPanel` shows the acoustic pingers and what the
+receivers hear, and switches the pingers (see below). Planned in
 [MARITIME_GUI_PLAN.md](../MARITIME_GUI_PLAN.md); how to use them is in the
 docs, [Change and see the wind and the current](../docs/how-to/wind-and-current.md).
 
@@ -66,6 +67,37 @@ comes from, the current's where it sets towards, both in degrees clockwise
 from north. The compass in each draws the flow.
 
 They need no ROS.
+
+## The acoustics panel
+
+`AcousticsPanel` shows `gz_acoustics` in the GUI. It lists the pingers,
+read from their `AcousticPinger` components in the GUI's ECM, each with its
+frequency, period, offset and reach and a switch that sends `active` on its
+`set` topic. It lists the receivers, which the acoustics system publishes on
+`/world/<world>/acoustics/receivers` (the GUI's copy of a custom sensor
+loses its `gz:type`, so the panel cannot find them in the ECM), each with its
+last reading and a field to retune it. It draws, each switched on its own:
+
+- **Reach:** the circle where each pinger's reach meets the water, in its
+  frequency's colour, grey and dashed when the pinger is off.
+- **Pings:** a ring per ping where its sound meets the water, spreading at
+  the speed of sound slowed down (`<slow_down>`, 50 by default, so a ring
+  crosses 300 m in 10 s), fading out at the reach.
+- **Bearings heard:** a ray from each receiver along its last reading's
+  bearing and elevation, for 1.5 s of simulation time; red when the reading
+  was invalid.
+
+Colours run with frequency from orange at 25 kHz to violet at 40 kHz.
+Configuration: `<reach>`, `<pings>`, `<readings>` (all false by default),
+`<speed_of_sound>`, `<slow_down>`, `<max_ring_radius>`, `<ray_length>`,
+`<ray_lifetime>`, `<water_level>` and `<marker_service>`.
+
+No camera sensor sees what the panels draw, because they draw only through
+the GUI's marker service, `/marker`: the server's sensors take markers on
+their own, `/sensors/marker`. The `visibility: GUI` flag the markers carry
+does not do it on its own; `markers_camera_test` renders a camera and shows
+both (it needs a GPU and skips without one). Never point `<marker_service>`
+at `/sensors/marker`.
 
 ## How they reach the recipes
 

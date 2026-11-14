@@ -499,6 +499,14 @@
           <property type="string" key="state">docked</property>
         </gz-gui>
       </plugin>
+
+      <!-- Acoustics (gz_maritime_gui): the pingers and the receivers, and what they hear; drawing off until turned on in the panel. -->
+      <plugin filename="AcousticsPanel" name="Acoustics">
+        <gz-gui>
+          <title>Acoustics</title>
+          <property type="string" key="state">docked</property>
+        </gz-gui>
+      </plugin>
     </gui>
 
     <!-- The site: the bay's seawalls and land, the city, its landmarks and

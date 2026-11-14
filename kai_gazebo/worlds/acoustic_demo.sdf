@@ -473,6 +473,17 @@
           <property type="string" key="state">docked</property>
         </gz-gui>
       </plugin>
+
+      <!-- Acoustics (gz_maritime_gui): the pingers and the receivers; this demo draws the reach, the pings and the bearings heard. -->
+      <plugin filename="AcousticsPanel" name="Acoustics">
+        <gz-gui>
+          <title>Acoustics</title>
+          <property type="string" key="state">docked</property>
+        </gz-gui>
+        <reach>true</reach>
+        <pings>true</pings>
+        <readings>true</readings>
+      </plugin>
     </gui>
 
     <!-- Water surface visual (wave-displaced mesh): one include draws a
