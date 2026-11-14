@@ -16,6 +16,8 @@
  */
 #include <atomic>
 #include <cmath>
+#include <optional>
+#include <sstream>
 #include <string>
 
 #include <Eigen/Eigen>
@@ -105,6 +107,12 @@ class gz::sim::maritime::HydrodynamicsPrivateData
 
   /// \brief Link entity
   public: Entity linkEntity;
+
+  /// \brief The point of the link, in the link frame, the model is written
+  /// at: the velocity and the current are taken there and the wrench acts
+  /// there. Unset without the tag: the link origin then, with the current
+  /// asked at the centre of mass.
+  public: std::optional<math::Vector3d> applicationPoint;
 
   /// \brief World entity, whose Environment component holds the current
   /// table
@@ -314,6 +322,24 @@ void AddWorldLinearVelocity(
 }
 
 /////////////////////////////////////////////////
+/// \brief Read a point from the text of an SDF element. sdformat's own
+/// conversion reports a text it cannot read as the point 0 0 0.
+/// \param[in] _text The element's text.
+/// \return The point, or nothing unless the text is three finite numbers.
+std::optional<math::Vector3d> ParsePoint(const std::string &_text)
+{
+  std::istringstream stream(_text);
+  double x{0}, y{0}, z{0};
+  std::string rest;
+  if (!(stream >> x >> y >> z) || (stream >> rest) ||
+      !std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z))
+  {
+    return std::nullopt;
+  }
+  return math::Vector3d(x, y, z);
+}
+
+/////////////////////////////////////////////////
 double SdfParamDouble(
     const std::shared_ptr<const sdf::Element> &_sdf,
     const std::string& _field,
@@ -439,6 +465,20 @@ void Hydrodynamics::Configure(
   {
     gzerr << "Link name" << linkName << "does not exist";
     return;
+  }
+
+  // The point the model is written at: the link origin unless given. A
+  // value that does not parse is an error and leaves the point unset, so a
+  // typo does not quietly move where the current is asked.
+  if (_sdf->HasElement("application_point"))
+  {
+    const auto text = _sdf->Get<std::string>("application_point");
+    this->dataPtr->applicationPoint = ParsePoint(text);
+    if (!this->dataPtr->applicationPoint)
+    {
+      gzerr << "Link [" << linkName << "]: <application_point> [" << text
+        << "] is not three finite numbers; it is ignored." << std::endl;
+    }
   }
 
   // The link's components this system reads. The world pose comes first:
@@ -578,26 +618,40 @@ void Hydrodynamics::PreUpdate(
     return;
   }
 
+  // Transform state to local frame
+  auto pose = baseLink.WorldPose(_ecm);
+  const math::Vector3d applicationPoint =
+    this->dataPtr->applicationPoint.value_or(math::Vector3d::Zero);
+
+  // Where the water is asked: the application point when the model names
+  // one, the centre of mass otherwise.
+  const auto waterPosition = [&]() -> std::optional<math::Vector3d>
+  {
+    if (this->dataPtr->applicationPoint)
+      return pose->Pos() + pose->Rot() * applicationPoint;
+    if (const auto inertialPose = baseLink.WorldInertialPose(_ecm))
+      return inertialPose->Pos();
+    return std::nullopt;
+  };
+
   // Get current vector
   math::Vector3d currentVector(0, 0, 0);
 
   if (worldCurrent)
   {
-    // The world owns the current: ask it at the centre of mass.
-    auto position = baseLink.WorldInertialPose(_ecm);
-    if (position.has_value())
+    // The world owns the current.
+    if (const auto position = waterPosition())
     {
       currentVector = this->dataPtr->oceanCurrent.At(
-        position.value().Pos(), _info.simTime);
+        *position, _info.simTime);
     }
   }
   else if (this->dataPtr->useCurrentTable)
   {
-    auto position = baseLink.WorldInertialPose(_ecm);
-    if (position.has_value())
+    if (const auto position = waterPosition())
     {
       currentVector = this->dataPtr->GetWaterCurrentFromEnvironment(
-        _ecm, _info.simTime, position.value().Pos());
+        _ecm, _info.simTime, *position);
     }
   }
   else
@@ -605,12 +659,15 @@ void Hydrodynamics::PreUpdate(
     std::lock_guard lock(this->dataPtr->mtx);
     currentVector = this->dataPtr->currentVector;
   }
-  // Transform state to local frame
-  auto pose = baseLink.WorldPose(_ecm);
-  // Since we are transforming angular and linear velocity we only care about
-  // rotation. Also this is where we apply the effects of current to the link
+
+  // The velocity of the application point: the origin's plus what the
+  // rotation adds there. Only the rotation of the pose matters from here
+  // on, and this is where the current enters: the state is the velocity
+  // relative to the water.
+  const math::Vector3d pointVelocity = linearVelocity->Data() +
+    rotationalVelocity->Cross(pose->Rot() * applicationPoint);
   auto localLinearVelocity = pose->Rot().Inverse() *
-    (linearVelocity->Data() - currentVector);
+    (pointVelocity - currentVector);
   auto localRotationalVelocity = pose->Rot().Inverse() * *rotationalVelocity;
 
   state(0) = localLinearVelocity.X();
@@ -681,26 +738,38 @@ void Hydrodynamics::PreUpdate(
   //   Applied = -kTotalWrench, so we add (Ca_rel*v_r - Ca_abs*v) to
   //   kTotalWrench, which produces external force (Ca_abs*v - Ca_rel*v_r).
   //   Combined with DART's implicit -C_A(v)*v, the total becomes -C_A(v_r)*v_r.
+  //
+  // That matrix belongs to the link, not to the application point, so the
+  // correction is built from the velocity of the link origin and acts there.
   if (this->dataPtr->hasFluidAddedMass)
   {
-    // Build absolute body-frame velocity (without current subtraction).
-    // Angular velocity is unaffected by ocean current.
-    Eigen::Matrix<double, 6, 1> absState;
-    auto localAbsLinearVelocity = pose->Rot().Inverse() *
+    // Body-frame velocity of the link origin, absolute and relative to the
+    // water. Angular velocity is unaffected by ocean current.
+    const auto localAbsLinearVelocity = pose->Rot().Inverse() *
       linearVelocity->Data();
-    absState(0) = localAbsLinearVelocity.X();
-    absState(1) = localAbsLinearVelocity.Y();
-    absState(2) = localAbsLinearVelocity.Z();
-    absState(3) = localRotationalVelocity.X();
-    absState(4) = localRotationalVelocity.Y();
-    absState(5) = localRotationalVelocity.Z();
+    const auto localRelLinearVelocity = pose->Rot().Inverse() *
+      (linearVelocity->Data() - currentVector);
+    Eigen::Matrix<double, 6, 1> absState;
+    Eigen::Matrix<double, 6, 1> relState;
+    absState << localAbsLinearVelocity.X(), localAbsLinearVelocity.Y(),
+      localAbsLinearVelocity.Z(), state.tail<3>();
+    relState << localRelLinearVelocity.X(), localRelLinearVelocity.Y(),
+      localRelLinearVelocity.Z(), state.tail<3>();
 
     auto Ca_abs = hydro::buildFullCoriolisMatrix(
       this->dataPtr->fluidAddedMass, absState);
     auto Ca_rel = hydro::buildFullCoriolisMatrix(
-      this->dataPtr->fluidAddedMass, state);
+      this->dataPtr->fluidAddedMass, relState);
 
-    kTotalWrench += Ca_rel * state - Ca_abs * absState;
+    // kTotalWrench acts at the application point. The same wrench at the
+    // link origin is the same force there, and the moment less what that
+    // force makes from the point.
+    Eigen::Matrix<double, 6, 1> correction =
+      Ca_rel * relState - Ca_abs * absState;
+    const Eigen::Vector3d arm(
+      applicationPoint.X(), applicationPoint.Y(), applicationPoint.Z());
+    correction.tail<3>() -= arm.cross(correction.head<3>());
+    kTotalWrench += correction;
   }
 
   math::Vector3d totalForce(
@@ -708,10 +777,13 @@ void Hydrodynamics::PreUpdate(
   math::Vector3d totalTorque(
     -kTotalWrench(3),  -kTotalWrench(4), -kTotalWrench(5));
 
+  // The force acts at the application point, so the offset overload adds
+  // the moment it makes about the link origin.
   baseLink.AddWorldWrench(
     _ecm,
     pose->Rot()*(totalForce),
-    pose->Rot()*totalTorque);
+    pose->Rot()*totalTorque,
+    applicationPoint);
 }
 
 /////////////////////////////////////////////////

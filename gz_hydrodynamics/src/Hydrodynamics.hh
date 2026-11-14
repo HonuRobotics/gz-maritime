@@ -96,6 +96,18 @@ namespace maritime
   ///   * `<link_name>` - Link to apply hydrodynamic forces to.
   ///     [string]
   ///
+  /// ### Optional
+  ///   * `<application_point>` - The point of the link, in the link
+  ///     frame, the coefficients below are written at: Fossen's origin.
+  ///     The velocity and the current are taken there and the forces act
+  ///     there, so the model is the same as one whose link frame is at
+  ///     that point. Set it to the centre of the wet hull, usually on the
+  ///     thrust line, so thrust and drag make no couple. Without it the
+  ///     point is the link origin, as upstream, and the current is asked
+  ///     at the centre of mass. The correction for a link's
+  ///     `<fluid_added_mass>` stays at the link origin, where that matrix
+  ///     is defined. [m]
+  ///
   /// ### Damping (Drag)
   ///
   /// Diagonal terms:
@@ -154,8 +166,9 @@ namespace maritime
   /// When the world carries a gz-maritime ocean current (the
   /// `OceanCurrentfield` recipe, written by
   /// `gz-maritime-ocean-current-system`), the plugin keeps an
-  /// `ocean_current::OceanCurrentSampler`, asks it at the link's centre of
-  /// mass every step and damps against that; the world owns the current, so
+  /// `ocean_current::OceanCurrentSampler`, asks it every step at the link's
+  /// centre of mass, or at `<application_point>` when given, and damps
+  /// against that; the world owns the current, so
   /// the tags and the topic below are then ignored, with a warning for a tag
   /// set and for the first message on the topic. Without one, they work as
   /// upstream.
