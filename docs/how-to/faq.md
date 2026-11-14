@@ -173,3 +173,11 @@ clearer type, or a larger `<visibility>`.
 The daylight fades with depth, red first: in coastal water there is little
 left at 20 m. That is the water, not a bug. Vehicle lights come with a later
 step; meanwhile `<exposure>auto</exposure>` brightens what light there is.
+
+## The GUI and the underwater camera differ
+
+The underwater camera plugin works on its own image; the GUI only sees
+through the water with the `underwater_optics` model in the world
+([See through the water](underwater-camera.md#the-gui-view-and-every-camera-at-once)).
+With the model, they agree on every surface; where a camera sees nothing but
+sky, the camera plugin shows the veil and the GUI still shows the sky.

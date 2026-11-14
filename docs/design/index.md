@@ -163,6 +163,16 @@ test checks the published image against the model computed in the test from
 the in-air frame, pixel by pixel, and finds no difference. A GPU path, for
 every camera and the GUI, must match it.
 
+**The GPU path.** A render pass in gz-rendering sees only the colour
+image, never depth: passes are chained between two colour textures, and the
+camera's depth buffer is Ogre's own. So the GPU path does not post-process:
+it adds the model to Ogre's PBS pixel shader, where every fragment knows its
+view-space position and so its range (the technique POSIM uses; no code
+taken from it). gz-rendering's own shader pieces and Hlms listener are
+chained, not replaced. It matches the reference camera to 0.01 of a step on
+average. What PBS does not shade (the sky, the water surface, markers) is
+drawn as in air.
+
 **Checked against itself first.** Every step is tested against what the
 model predicts, generated from the same equations by
 `docs/_tools/underwater_camera_figures.py`: a grey target against range,

@@ -546,6 +546,39 @@ What it settled, beyond this plan:
 - **Video**: *Through the water*, 54 s: three waters side by side with the
   plain camera, a dive from 0.5 to 40 m, the water changed live.
 
+### Phase 3, the GPU path: done, on `ahcorde/uw_phase3_gpu_path`
+
+**The spike's answers.**
+
+1. *Can a render pass reach the camera's depth without forking
+   gz-rendering?* **No.** `Ogre2RenderTarget::UpdateRenderPassChain` chains
+   passes between two colour textures (`_ogreTextures[2]`); the camera's
+   depth buffer is Ogre's pooled one, not a texture the chain exposes.
+   Approach B would need gz-rendering internals or a change.
+2. *Can the chosen path see the lights?* **Yes, for approach A**: the PBS
+   pixel shader is where lights are evaluated; their data is in the pass
+   buffer, and more can be appended by the same listener.
+
+So **approach A**: `gz_underwater_rendering`, the model in Ogre's PBS
+shaders, chaining gz-rendering's composite pieces (copied at run time with
+one more `@insertpiece`) and its Hlms listener.
+
+What it settled:
+
+- **Matches the reference camera**: mean 0.01 of an 8-bit step, 99th
+  percentile 1 (criterion 1 and 3), rendered test; depth, a camera above the
+  water and segmentation labels byte for byte unchanged; the reference
+  camera passes through when the GPU path is on (an `UnderwaterRendering`
+  marker component on the world).
+- **The GUI uses it**: checked with screenshots on a virtual display.
+- **Not done, against the plan**: the sky, the background, the water surface
+  and unlit materials are drawn as in air (only PBS is shaded). The
+  background needs a compositor listener; the surface is §4.5. Depth is from
+  the still water level, not the waves. No throughput benchmark in CI yet
+  (the PBS change costs a few ALU instructions per fragment).
+- **Video**: *Same water, every camera*: the reference and the GPU images of
+  one scene side by side, with their difference, and the GUI.
+
 ## Open questions
 
 - Which BlueROV2 camera settings (resolution, field of view, port type) match

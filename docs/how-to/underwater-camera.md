@@ -126,7 +126,23 @@ gz sim underwater_camera_demo.sdf
 What the chart must look like from 3 m deep, by range, in three waters.
 ```
 
+## The GUI view, and every camera at once
+
+To see through the water in the GUI too, and in every camera without a
+plugin on each, include the `underwater_optics` model:
+
+```xml
+<include>
+  <uri>model://underwater_optics</uri>
+</include>
+```
+
+The renderer then draws the water into every surface, on the GPU. An
+underwater camera plugin in the same world passes its image through, so the
+water is not applied twice. The sky and the water surface are not drawn
+through the water yet: point the GUI at a seabed or a structure.
+
 ## What comes next
 
-The same water in the GUI's own view, then the vehicle's own lights. The plan is in
+The vehicle's own lights. The plan is in
 [UNDERWATER_CAMERA_PLAN.md](https://github.com/HonuRobotics/gz-maritime/blob/lyrical/UNDERWATER_CAMERA_PLAN.md).

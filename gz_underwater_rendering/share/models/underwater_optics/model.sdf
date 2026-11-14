@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<!--
+  Include it in a world and every camera, in the sensors and in the GUI,
+  sees through the world's water: the underwater rendering plugin
+  (gz_underwater_rendering), on a visual nobody sees. The world sets the
+  water with gz-maritime-water-optics-system.
+-->
+<sdf version="1.9">
+  <model name="underwater_optics">
+    <static>true</static>
+    <link name="link">
+      <visual name="underwater_optics">
+        <geometry><box><size>0.001 0.001 0.001</size></box></geometry>
+        <transparency>1</transparency>
+        <cast_shadows>false</cast_shadows>
+        <plugin filename="gz-maritime-underwater-rendering-system"
+                name="gz::sim::maritime::UnderwaterRendering"/>
+      </visual>
+    </link>
+  </model>
+</sdf>
