@@ -41,7 +41,7 @@ WORLDS = HERE / 'worlds'
 class Gui:
     """A server and a GUI in a partition of their own, and the GUI's log."""
 
-    def __init__(self, world):
+    def __init__(self, world, config=CONFIG):
         env = dict(os.environ,
                    GZ_PARTITION='gz_maritime_gui_test_' + uuid.uuid4().hex,
                    QT_QPA_PLATFORM='offscreen')
@@ -51,7 +51,7 @@ class Gui:
             env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             start_new_session=True)
         self.gui = subprocess.Popen(
-            ['gz', 'sim', '-g', '-v', '4', '--gui-config', str(CONFIG)],
+            ['gz', 'sim', '-g', '-v', '4', '--gui-config', str(config)],
             env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, start_new_session=True)
         self.reader = threading.Thread(target=self._read, daemon=True)
@@ -90,8 +90,8 @@ class Gui:
 def gui():
     started = []
 
-    def start(world):
-        started.append(Gui(WORLDS / world))
+    def start(world, config=CONFIG):
+        started.append(Gui(WORLDS / world, config))
         return started[-1]
 
     yield start
@@ -135,6 +135,9 @@ def test_acoustics_from_the_gui_state(gui):
         ''.join(g.lines)
     assert g.wait_for('AcousticsPanel: receivers listed by the acoustics system: 1'), \
         ''.join(g.lines)
+    # On the receiver's plane, 1 m down, once it is found.
+    assert g.wait_for('AcousticsPanel: drawing at the depth of listener'), \
+        ''.join(g.lines)
     # Drawing everything, with no scene to draw on, it keeps running, and
     # its QML loads clean.
     time.sleep(3.0)
@@ -144,3 +147,13 @@ def test_acoustics_from_the_gui_state(gui):
     # had its pingers.
     assert not g.has('AcousticsPanel: no pinger'), \
         'a plugin loaded with the GUI needs no state service'
+
+
+def test_acoustics_in_3d(gui):
+    g = gui('acoustics.sdf', HERE / 'gui_3d.config')
+    assert g.wait_for("AcousticsPanel: pingers from the GUI's state: 1"), \
+        ''.join(g.lines)
+    # Drawing the spheres, it keeps running, and its QML loads clean.
+    time.sleep(3.0)
+    assert g.gui.poll() is None, ''.join(g.lines)
+    assert not g.has('AcousticsPanel.qml:'), ''.join(g.lines)

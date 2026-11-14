@@ -157,8 +157,60 @@ ScrollView {
       Layout.leftMargin: 8
       Layout.rightMargin: 8
       spacing: 0
+      RowLayout {
+        Label { text: "Reach and pings on" }
+        ComboBox {
+          id: planeBox
+          Layout.fillWidth: true
+          textRole: "label"
+          valueRole: "key"
+          model: [
+            { "key": "water", "label": "the water" },
+            { "key": "depth", "label": "a depth" },
+            { "key": "receiver", "label": "a receiver's depth" },
+            { "key": "3d", "label": "spheres, in 3D" }
+          ]
+          currentIndex: Math.max(0, indexOfValue(_AcousticsPanel.plane))
+          onActivated: _AcousticsPanel.SetPlane(currentValue)
+        }
+      }
+      RowLayout {
+        Layout.leftMargin: 28
+        visible: _AcousticsPanel.plane === "depth"
+        NumberField {
+          Layout.fillWidth: false
+          Layout.preferredWidth: 60
+          text: root.show(_AcousticsPanel.planeDepth)
+          onAccepted: {
+            if (_AcousticsPanel.SetPlaneDepth(text))
+              edited = false;
+          }
+        }
+        Label { text: "m under the water" }
+      }
+      ComboBox {
+        Layout.leftMargin: 28
+        Layout.fillWidth: true
+        visible: _AcousticsPanel.plane === "receiver"
+        textRole: "name"
+        valueRole: "topic"
+        model: _AcousticsPanel.receivers
+        currentIndex: Math.max(0, indexOfValue(_AcousticsPanel.planeReceiver))
+        onActivated: _AcousticsPanel.SetPlaneReceiver(currentValue)
+      }
+      Label {
+        Layout.leftMargin: 28
+        text: "Drawing " + _AcousticsPanel.planeText +
+            (_AcousticsPanel.plane === "water" ? "" :
+             ": under the drawn sea, seen from under the water" +
+             " or with the water hidden.")
+        font.pixelSize: 11
+        color: "grey"
+        wrapMode: Text.WordWrap
+        Layout.fillWidth: true
+      }
       CheckBox {
-        text: "Reach on the water"
+        text: "Reach"
         checked: _AcousticsPanel.showReach
         onToggled: _AcousticsPanel.showReach = checked
       }

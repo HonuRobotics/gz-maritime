@@ -68,10 +68,6 @@ namespace
   /// the reach, which move with what carries them.
   constexpr std::chrono::milliseconds kRedrawPeriod{100};
 
-  /// \brief Height above the water the reach and the rings are drawn at,
-  /// m, so the drawn sea does not hide them.
-  constexpr double kAboveWater{0.08};
-
   /// \brief Period of wall time between two refreshes of the lists.
   constexpr std::chrono::milliseconds kListPeriod{250};
 
@@ -208,6 +204,20 @@ class gz::sim::maritime_gui::AcousticsPanelPrivate
   /// \brief World z of the water.
   public: double waterLevel{0.0};
 
+  /// \brief What the reach and the pings are drawn on.
+  public: Plane plane{Plane::kWater};
+
+  /// \brief m under the water, for the depth plane.
+  public: double planeDepth{5.0};
+
+  /// \brief The topic of the receiver the receiver plane follows; empty
+  /// for the first listed.
+  public: std::string planeReceiver;
+
+  /// \brief The world z drawn at, and the text that says it.
+  public: double planeZ{0.0};
+  public: QString planeText;
+
   /// \brief Simulation time of the last frame of the rings and of the last
   /// redraw of the rest.
   public: std::optional<std::chrono::steady_clock::duration> lastRings;
@@ -232,6 +242,9 @@ class gz::sim::maritime_gui::AcousticsPanelPrivate
   /// for the test.
   public: bool logged{false};
   public: bool loggedReceivers{false};
+
+  /// \brief The receiver whose depth was last logged as drawn at.
+  public: std::string loggedPlane;
 
   /// \brief The state service's fallback: updates with no pinger, whether
   /// it was asked, its reply and the copy made from it.
@@ -418,6 +431,21 @@ void AcousticsPanel::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
           std::chrono::duration<double>(lifetime));
     }
     ReadDouble(_pluginElem, "water_level", d.waterLevel);
+    if (const auto *elem = _pluginElem->FirstChildElement("plane"))
+    {
+      const char *text = elem->GetText();
+      if (!text || !ParsePlane(text, d.plane))
+        gzwarn << kLog << ": <plane> is water, depth or receiver\n";
+    }
+    double depth = d.planeDepth;
+    ReadDouble(_pluginElem, "plane_depth", depth);
+    if (depth >= 0.0)
+      d.planeDepth = depth;
+    if (const auto *elem = _pluginElem->FirstChildElement("plane_receiver"))
+    {
+      if (const char *text = elem->GetText())
+        d.planeReceiver = text;
+    }
     if (const auto *elem = _pluginElem->FirstChildElement("marker_service"))
     {
       if (const char *text = elem->GetText())
@@ -545,11 +573,54 @@ void AcousticsPanel::Update(const UpdateInfo &_info,
     }
   }
 
-  // The receivers' poses, for the rays.
+  // The plane the reach and the pings are drawn on; a receiver's moves with
+  // it.
   std::map<std::string, math::Pose3d> poses;
-  if (d.showReadings)
+  if (d.plane == Plane::kReceiver || d.showReadings)
     poses = d.ReceiverPoses(_ecm, receivers);
-  const double waterZ = d.waterLevel + kAboveWater;
+  std::optional<double> receiverZ;
+  std::string followed;
+  if (d.plane == Plane::kReceiver)
+  {
+    for (const auto &r : receivers)
+    {
+      if (!d.planeReceiver.empty() && r.topic != d.planeReceiver)
+        continue;
+      const auto pose = poses.find(r.topic);
+      if (pose != poses.end())
+      {
+        receiverZ = pose->second.Pos().Z();
+        followed = ShortName(r.name, d.world);
+      }
+      break;
+    }
+  }
+  d.planeZ = PlaneZ(d.plane, d.waterLevel, d.planeDepth, receiverZ);
+  {
+    char buf[128];
+    if (d.plane == Plane::kWater)
+      std::snprintf(buf, sizeof(buf), "on the water");
+    else if (d.plane == Plane::k3D)
+      std::snprintf(buf, sizeof(buf), "in 3D, under the water");
+    else if (d.plane == Plane::kDepth)
+      std::snprintf(buf, sizeof(buf), "%.1f m under the water", d.planeDepth);
+    else if (receiverZ)
+      std::snprintf(buf, sizeof(buf), "at %s's depth, %.1f m",
+                    followed.c_str(), d.waterLevel - *receiverZ);
+    else
+      std::snprintf(buf, sizeof(buf), "on the water: no receiver found yet");
+    const QString text(buf);
+    if (receiverZ && followed != d.loggedPlane)
+    {
+      gzdbg << kLog << ": drawing at the depth of " << followed << "\n";
+      d.loggedPlane = followed;
+    }
+    if (text != d.planeText)
+    {
+      d.planeText = text;
+      emit this->StatusChanged();
+    }
+  }
 
   // The drawings, in simulation time; nothing moves while it is paused.
   const bool due = d.dirty || !d.lastRedraw ||
@@ -557,7 +628,25 @@ void AcousticsPanel::Update(const UpdateInfo &_info,
   if (due)
   {
     if (d.showReach)
-      d.reachLayer->Draw(ReachMarkers(pingers, waterZ, d.reachLayer->Ns()));
+    {
+      // The reach, and inside it where pings start to drop for the
+      // receivers that have a dropout; in 3D, that ring on the water.
+      std::vector<double> starts;
+      for (const auto &r : receivers)
+        starts.push_back(r.dropoutStart);
+      const bool sphere = d.plane == Plane::k3D;
+      auto markers = sphere ?
+          ReachSpheres(pingers, d.waterLevel, d.reachLayer->Ns()) :
+          ReachMarkers(pingers, d.planeZ, d.reachLayer->Ns());
+      const double ringZ = sphere ?
+          PlaneZ(Plane::kWater, d.waterLevel, 0.0, std::nullopt) : d.planeZ;
+      for (auto &m : DropoutMarkers(pingers, starts, ringZ,
+                                    d.reachLayer->Ns()))
+      {
+        markers.push_back(std::move(m));
+      }
+      d.reachLayer->Draw(markers);
+    }
     else if (d.reachLayer->Drawn())
       d.reachLayer->Clear();
 
@@ -572,7 +661,9 @@ void AcousticsPanel::Update(const UpdateInfo &_info,
         {
           continue;
         }
-        rays.push_back({pose->second, h});
+        const double fade = std::chrono::duration<double>(now - h.stamp)
+            .count() / std::chrono::duration<double>(d.rayLifetime).count();
+        rays.push_back({pose->second, h, fade});
       }
       d.rayLayer->Draw(RayMarkers(rays, d.rayLength, d.rayLayer->Ns()));
     }
@@ -587,9 +678,14 @@ void AcousticsPanel::Update(const UpdateInfo &_info,
       now - *d.lastRings >= kRingPeriod || now < *d.lastRings;
   if (ringsDue)
   {
-    if (d.showPings)
+    if (d.showPings && d.plane == Plane::k3D)
     {
-      d.pingLayer->Draw(PingMarkers(pingers, waterZ, now,
+      d.pingLayer->Draw(PingSpheres(pingers, d.waterLevel, now,
+          d.speedOfSound / d.slowDown, d.maxRingRadius, d.pingLayer->Ns()));
+    }
+    else if (d.showPings)
+    {
+      d.pingLayer->Draw(PingMarkers(pingers, d.planeZ, now,
           d.speedOfSound / d.slowDown, d.maxRingRadius, d.pingLayer->Ns()));
     }
     else if (d.pingLayer->Drawn())
@@ -640,6 +736,61 @@ bool AcousticsPanel::SetSlowDown(const QString &_text)
   this->dataPtr->dirty = true;
   emit this->DrawingChanged();
   return true;
+}
+
+//////////////////////////////////////////////////
+void AcousticsPanel::SetPlane(const QString &_plane)
+{
+  Plane plane{Plane::kWater};
+  if (!ParsePlane(_plane.toStdString(), plane))
+    return;
+  this->dataPtr->plane = plane;
+  this->dataPtr->dirty = true;
+  emit this->DrawingChanged();
+}
+
+//////////////////////////////////////////////////
+bool AcousticsPanel::SetPlaneDepth(const QString &_text)
+{
+  double value{0.0};
+  if (!ParseNumber(_text.toStdString(), value) || value < 0.0)
+    return false;
+  this->dataPtr->planeDepth = value;
+  this->dataPtr->dirty = true;
+  emit this->DrawingChanged();
+  return true;
+}
+
+//////////////////////////////////////////////////
+void AcousticsPanel::SetPlaneReceiver(const QString &_topic)
+{
+  this->dataPtr->planeReceiver = _topic.toStdString();
+  this->dataPtr->dirty = true;
+  emit this->DrawingChanged();
+}
+
+//////////////////////////////////////////////////
+QString AcousticsPanel::CurrentPlane() const
+{
+  return QString::fromStdString(PlaneName(this->dataPtr->plane));
+}
+
+//////////////////////////////////////////////////
+double AcousticsPanel::PlaneDepth() const
+{
+  return this->dataPtr->planeDepth;
+}
+
+//////////////////////////////////////////////////
+QString AcousticsPanel::PlaneReceiver() const
+{
+  return QString::fromStdString(this->dataPtr->planeReceiver);
+}
+
+//////////////////////////////////////////////////
+QString AcousticsPanel::PlaneText() const
+{
+  return this->dataPtr->planeText;
 }
 
 //////////////////////////////////////////////////

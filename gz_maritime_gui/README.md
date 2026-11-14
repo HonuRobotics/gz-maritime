@@ -79,16 +79,28 @@ loses its `gz:type`, so the panel cannot find them in the ECM), each with its
 last reading and a field to retune it. It draws, each switched on its own:
 
 - **Reach:** the circle where each pinger's reach meets the water, in its
-  frequency's colour, grey and dashed when the pinger is off.
+  frequency's colour, grey and dashed when the pinger is off, and inside it
+  a lighter dashed ring where pings start to drop, one per dropout start
+  the receivers use.
 - **Pings:** a ring per ping where its sound meets the water, spreading at
   the speed of sound slowed down (`<slow_down>`, 50 by default, so a ring
   crosses 300 m in 10 s), fading out at the reach.
 - **Bearings heard:** a ray from each receiver along its last reading's
-  bearing and elevation, for 1.5 s of simulation time; red when the reading
-  was invalid.
+  bearing and elevation, fading in three steps over 1.5 s of simulation
+  time; red when the reading was invalid.
+
+The reach and the pings are drawn on a horizontal plane, chosen in the
+panel: the water (default); a depth under it; or a receiver's depth,
+following it, the slice a vehicle under the water listens in. Or in 3D:
+the reach as a wireframe sphere around each pinger and each ping as a
+sparser one growing out of it, both cut at the water, where sound stops,
+with a ring where they meet it. Under the water any of them lies behind the
+drawn sea, so look from an underwater camera or hide the water.
 
 Colours run with frequency from orange at 25 kHz to violet at 40 kHz.
 Configuration: `<reach>`, `<pings>`, `<readings>` (all false by default),
+`<plane>` (`water`, `depth`, `receiver` or `3d`), `<plane_depth>` (m, default 5),
+`<plane_receiver>` (a receiver's topic, default the first listed),
 `<speed_of_sound>`, `<slow_down>`, `<max_ring_radius>`, `<ray_length>`,
 `<ray_lifetime>`, `<water_level>` and `<marker_service>`.
 
