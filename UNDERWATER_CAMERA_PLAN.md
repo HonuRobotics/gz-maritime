@@ -519,6 +519,33 @@ What it settled, beyond this plan:
   and preset is in the reference and the README; Sphinx builds with no
   warnings.
 
+### Phase 2, the reference camera: done, on `ahcorde/uw_phase2_reference_camera`
+
+What it settled, beyond this plan:
+
+- **No new rendering sensor.** Gazebo's `rgbd_camera` already renders
+  colour and depth in one pass with one stamp; the camera is a plugin inside
+  it (Gazebo loads plugins inside a `<sensor>`), pairing the two by stamp.
+  The depth image holds z-depth (checked: a wall 4.95 m away reads 4.95 at
+  the centre and the corners), so the ray table converts it to range, using
+  the intrinsics of the sensor's own `camera_info`.
+- **Parameters** are `<exposure>` (a gain or `auto`), `<max_gain>`,
+  `<white_balance>` (`none`, `grey_world`), `<shot_noise>`, `<read_noise>`,
+  `<seed>` and `<output_topic>`, rather than one `<noise>` keyword.
+- **Per pixel**, the daylight is faded to each object's own depth, and a
+  climbing ray counts only the water up to the surface (flat at the camera's
+  local surface); a pixel that hits nothing is the veil, or the sky through
+  the surface for a climbing ray.
+- **Results**: the rendered test finds the published image identical to the
+  model computed in the test (19,200 pixels, 0 steps of difference); 640×480
+  in 22 ms (45 Hz) on the CPU; above the water byte for byte unchanged.
+- **The demo** is `kai_gazebo/worlds/underwater_camera_demo.sdf` (open water,
+  a neutral ambient, charts at 0.5–16 m, an image panel per camera), in the
+  world tests. **The BlueROV2's own camera is not switched yet**: it lives in
+  `bluerobotics_models`, a separate PR there.
+- **Video**: *Through the water*, 54 s: three waters side by side with the
+  plain camera, a dive from 0.5 to 40 m, the water changed live.
+
 ## Open questions
 
 - Which BlueROV2 camera settings (resolution, field of view, port type) match

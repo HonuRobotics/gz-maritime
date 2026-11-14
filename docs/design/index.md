@@ -155,6 +155,14 @@ measured. Explicit coefficients are there for a matched data set.
 The presets.
 ```
 
+**The reference camera.** `gz_underwater_camera` applies the model on the
+CPU to an `rgbd_camera`'s colour and depth, which one render produces
+together, so they never come from different frames. It is slower than a GPU
+path would be (640×480 in about 22 ms) but exactly testable: its rendered
+test checks the published image against the model computed in the test from
+the in-air frame, pixel by pixel, and finds no difference. A GPU path, for
+every camera and the GUI, must match it.
+
 **Checked against itself first.** Every step is tested against what the
 model predicts, generated from the same equations by
 `docs/_tools/underwater_camera_figures.py`: a grey target against range,
