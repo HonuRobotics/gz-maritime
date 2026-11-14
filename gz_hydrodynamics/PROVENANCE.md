@@ -44,3 +44,11 @@ and nothing else. To see it against a newer upstream:
 This package is a fork until upstream has a current component and its
 Hydrodynamics reads it. Retire it when a Gazebo release that ROS ships
 carries both, and switch the vehicles back to `gz-sim-hydrodynamics-system`.
+
+4. **The waves' water velocity.** In a world marked with `gz_waves`'
+   `WaveCoupling` component, which `gz_waves_buoyancy`'s wave buoyancy
+   writes, the plugin adds the waves' water velocity at the link's centre of
+   mass to the current it damps against (`waves::WaterVelocity`: the surface
+   particle velocity faded with depth as e^(-k d)). A vehicle near the surface
+   is carried by the waves, one deep down hardly. Without the component,
+   nothing changes. `test/hydrodynamics_waves_test.cc` covers both.

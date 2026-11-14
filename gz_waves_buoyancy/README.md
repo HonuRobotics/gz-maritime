@@ -43,16 +43,21 @@ marked shape is pushed twice. One tangent plane per shape is right while the
 shape is short against the wavelength; a long hull is better split into
 several marked shapes, as the BlueBoat's pontoons already are.
 
-## The world is marked wave coupled
+## Water that moves with the waves
 
 The system also marks the world with the `WaveCoupling` component (from
-`gz_waves`), holding the water level: the sign, for any system that damps a
-vehicle against the water, that the water here moves with the waves.
+`gz_waves`), holding the water level. `gz_hydrodynamics` sees it and damps a
+vehicle against the current **plus** the waves' water velocity at its centre
+of mass: the surface particle velocity, faded with depth as e^(-k d), with k
+the deep-water wavenumber of the sea's peak period
+(`waves::WaterVelocity`). A vehicle near the surface is carried back and
+forth by the waves; one deep down hardly feels them. In a world without the
+wave buoyancy, nothing changes.
 
 ## Tests
 
 ```bash
-colcon test --packages-select gz_waves_buoyancy
+colcon test --packages-select gz_waves_buoyancy gz_hydrodynamics
 ```
 
 - `displacement_test`: the volume and centre under flat, raised, lowered and
@@ -62,10 +67,19 @@ colcon test --packages-select gz_waves_buoyancy
   - on the wave, it follows the surface above it (correlation over 0.9, about
     as far);
   - a neutral sphere 3 m down does not move.
+- `gz_hydrodynamics`' `hydrodynamics_waves_test`: two damped neutral spheres
+  under the same wave. The one 0.6 m down swings 0.37 m, the one 5 m down
+  0.12 m, as e^(-k d) predicts. With the waves only drawn, neither moves.
 
 ## Not yet
 
 - Wave-coupled physics is opt-in per world: no world in `kai_gazebo` runs it
   yet.
-- The waves lift a vehicle but do not carry it: its hydrodynamics still damps
-  against still water (or the current), not water moving with the waves.
+- The water's motion fades with depth at one rate, the sea's peak wave's.
+  A real sea fades its short waves faster, so deep down the motion is
+  overstated: at 30 m, 40 to 80 % more than linear theory at sea states 5
+  to 9.
+- Added mass sees the waves' velocity but not their acceleration (the
+  Froude–Krylov force); vehicles here carry no added mass.
+- The Gerstner engine's particle velocity has its phase wrong (#15, fixed in
+  #70). The FFT engine, which every world uses, is not affected.

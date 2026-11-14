@@ -31,6 +31,7 @@ find_package(gz-transport REQUIRED)
 find_package(gz_msgs_vendor REQUIRED)
 find_package(gz-msgs REQUIRED)
 find_package(gz_ocean_current REQUIRED)
+find_package(gz_waves REQUIRED)
 
 # --------------------------------------------------------------------------
 # The hydrodynamics system (gz-maritime-hydrodynamics-system). Upstream builds
@@ -48,6 +49,7 @@ target_include_directories(gz-maritime-hydrodynamics-system PRIVATE
 target_link_libraries(gz-maritime-hydrodynamics-system
   PRIVATE
     gz_ocean_current::gz_ocean_current
+    gz_waves::gz_waves
     gz-sim::core
     gz-plugin::register
     gz-math::gz-math
@@ -93,6 +95,23 @@ if(BUILD_TESTING)
     set_tests_properties(hydrodynamics_current_test PROPERTIES
       ENVIRONMENT
       "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$<TARGET_FILE_DIR:gz_ocean_current::gz_ocean_current>;GZ_PARTITION=gz_hydrodynamics_test")
+  endif()
+
+  # The waves' water velocity: a body is carried by them in a world whose
+  # physics follows the waves, and not in one whose waves are drawn only.
+  # The wave engine and both buoyancy systems come from the sourced
+  # workspace's plugin path.
+  ament_add_gtest(hydrodynamics_waves_test test/hydrodynamics_waves_test.cc
+    TIMEOUT 300)
+  if(TARGET hydrodynamics_waves_test)
+    target_compile_definitions(hydrodynamics_waves_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(hydrodynamics_waves_test
+      gz-sim::core
+      gz-common::gz-common)
+    set_tests_properties(hydrodynamics_waves_test PROPERTIES
+      ENVIRONMENT
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH}")
   endif()
 endif()
 

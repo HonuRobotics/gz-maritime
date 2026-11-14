@@ -14,6 +14,7 @@
  * limitations under the License.
  *
  */
+#include <chrono>
 #include <atomic>
 #include <cmath>
 #include <string>
@@ -38,6 +39,9 @@
 #include "gz/transport/Node.hh"
 
 #include "gz/sim/ocean_current/OceanCurrentSampler.hh"
+#include "gz/sim/components/WaveCoupling.hh"
+#include "gz/sim/components/Wavefield.hh"
+#include "gz/sim/waves/Eval.hh"
 
 #include "Hydrodynamics.hh"
 #include "HydrodynamicsUtils.hh"
@@ -603,6 +607,25 @@ void Hydrodynamics::PreUpdate(
     std::lock_guard lock(this->dataPtr->mtx);
     currentVector = this->dataPtr->currentVector;
   }
+  // In a world whose physics follows the waves, the water also moves with
+  // them: their orbital velocity at the centre of mass, fading with depth,
+  // so a vehicle near the surface is carried by the waves and one deep down
+  // hardly feels them.
+  const Entity world = worldEntity(_ecm);
+  const auto *coupling = _ecm.Component<components::WaveCoupling>(world);
+  const auto *field = _ecm.Component<components::Wavefield>(world);
+  if (coupling && field && field->Data().simulation)
+  {
+    const auto at = baseLink.WorldInertialPose(_ecm);
+    if (at.has_value())
+    {
+      const auto p = at.value().Pos();
+      currentVector += waves::WaterVelocity(field->Data(), coupling->Data(),
+          p.X(), p.Y(), p.Z(),
+          std::chrono::duration<double>(_info.simTime).count());
+    }
+  }
+
   // Transform state to local frame
   auto pose = baseLink.WorldPose(_ecm);
   // Since we are transforming angular and linear velocity we only care about

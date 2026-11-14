@@ -45,8 +45,8 @@ namespace gz::sim::maritime
   /// `<water_level>`, as with the flat buoyancy.
   ///
   /// It marks the world with the `WaveCoupling` component, holding the water
-  /// level, so a system that damps against the water can tell the water
-  /// moves with the waves.
+  /// level, so a system that damps against the water (gz_hydrodynamics)
+  /// adds the waves' water velocity.
   ///
   /// World plugin parameters:
   ///

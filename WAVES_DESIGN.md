@@ -724,4 +724,6 @@ ros2 launch kai_bringup simulation.launch.xml
 - `gz_waves_buoyancy` ships the `WaveBuoyancy` consumer: buoyancy on the
   local, sloping surface above each marked shape, opt-in per world instead
   of the flat buoyancy, and the `WaveCoupling` world component that marks
-  such a world. No `kai_gazebo` world runs it yet.
+  such a world. There `gz_hydrodynamics` damps against the waves' water
+  velocity too (`waves::WaterVelocity`, faded with depth). No
+  `kai_gazebo` world runs it yet.
