@@ -108,6 +108,32 @@ camera at full frame rate, use the GPU path
   path ([`gz_underwater_rendering`](../gz_underwater_rendering/README.md)).
   The `CameraInfo` stays the in-air pinhole's, also with a flat port.
 
+## Checking it against real footage
+
+Two tools, installed in `lib/gz_underwater_camera`:
+
+- `make_chart_world.py` writes a world that reproduces a colour chart
+  photographed under water (a 24-patch ColorChecker at a given range and
+  depth, in a given Jerlov type or visibility, facing this camera), and the
+  patches' pixel boxes in its image.
+- `chart_validation.py` compares the real and the simulated images patch by
+  patch: the RGB angular error of each patch's mean colour in linear light,
+  the metric of OceanSim (arXiv:2503.01074), which ignores brightness. It
+  prints the errors, can draw a report, and passes when the mean is under
+  10 degrees.
+
+```bash
+make_chart_world.py --out chart.sdf --range 2 --depth 5 --jerlov 3C
+gz sim -s -r chart.sdf      # save one frame of chart/camera/underwater/image
+chart_validation.py --real dive.png --sim sim.png --patches chart.json --report report.png
+```
+
+![An example report](../docs/design/images/uw-validation-example.png)
+
+The example above is **not a validation**: its "real" image is another
+simulation, in 5C water against 3C (13.4 degrees, a fail, as it should be).
+Real footage is still needed.
+
 ## Tests
 
 ```bash
@@ -123,6 +149,11 @@ colcon test --packages-select gz_underwater_camera
   15 Hz frame, and a parallel frame the same every time; forward scatter's edge width at 2, 4 and 8 m within 10 % of
   the Gaussian's; a flat port's points within half a pixel of Snell's law,
   a dome port unchanged; every parameter documented.
+- `test_chart_validation`: the metric (zero for the same colour, 90 for
+  orthogonal ones, brightness not counted), patch means away from the
+  edges, a closed loop on synthetic charts (the same water near zero, an
+  exposure difference near zero, another water far), the command line, and
+  the chart world (valid SDF, patches inside the image, in order).
 - `underwater_camera_test`, rendered (needs a GPU): the published image
   against the model computed in the test from the in-air frame, pixel by
   pixel; the far wall fading into the veil more than the near plate; above
