@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!-- An unknown water type: the system reports it and the world has clear
+     water. -->
+<sdf version="1.9">
+  <world name="optics_bad">
+    <physics name="fast" type="ignored">
+      <max_step_size>0.01</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-maritime-water-optics-system"
+            name="gz::sim::maritime::WaterOptics">
+      <jerlov>4C</jerlov>
+    </plugin>
+  </world>
+</sdf>

@@ -265,6 +265,48 @@ library; `gz::sim::ocean_current::OceanCurrentAt` builds the model on every
 call and suits an occasional query. The query is a point query: a consumer that spans a gradient
 integrates over its own extent with repeated queries.
 
+## Water optics parameters
+
+What a world says to the water optics system,
+`gz-maritime-water-optics-system`. Without it, the world has clear water.
+
+| Markup | Meaning |
+|---|---|
+| `<jerlov>` | The Jerlov water type, below. Default `II`. |
+| `<visibility>` | Horizontal visibility of a black target, m: scales the type's absorption, scattering and diffuse attenuation by the same factor so that 4.8 / c in the green comes out at this distance (Zaneveld and Pegau 2003). The water keeps its colour. |
+| `<attenuation>` | β^D, how fast an object's light fades with range, 1/m, as `r g b`. Replaces c = a + b. |
+| `<backscatter>` | β^B, how fast the veil builds with range, 1/m, as `r g b`. Replaces c. |
+| `<veil>` | B∞, the veil just below the surface as a fraction of the daylight there, as `r g b`. Replaces b / c. |
+| `<diffuse_attenuation>` | K_d, how fast the daylight fades with depth, 1/m, as `r g b`. Replaces the type's K_d. |
+| `<water_level>` | World z of the still water, m, default 0. Under a wave field, depth is below the local wave surface. |
+| `<publish_rate>` | Rate of the ground truth, 1 Hz by default. |
+
+Any other element is warned about and ignored. An unknown type, a visibility
+that is not positive or a negative value is one error, and the world has
+clear water. An explicit `<attenuation>` wins over `<visibility>`, with a
+warning.
+
+The Jerlov types, from Solonenko and Mobley (2015), at red 625 nm, green
+525 nm and blue 450 nm:
+
+| Type | Water | c = a + b (1/m) | Veil b / c | K_d (1/m) | Visibility (m) |
+|---|---|---|---|---|---|
+| `I` | Clearest open ocean | 0.296, 0.0481, 0.0218 | 0.00, 0.04, 0.17 | 0.302, 0.049, 0.022 | 99.9 |
+| `IA` | Clear open ocean | 0.298, 0.0508, 0.0284 | 0.01, 0.08, 0.22 | 0.303, 0.0503, 0.0264 | 94.5 |
+| `IB` | Clear open ocean | 0.343, 0.103, 0.0915 | 0.14, 0.55, 0.74 | 0.31, 0.0572, 0.0342 | 46.4 |
+| `II` | Open ocean | 0.584, 0.434, 0.528 | 0.49, 0.89, 0.95 | 0.337, 0.0845, 0.062 | 11.1 |
+| `III` | Turbid open ocean | 1.08, 1.11, 1.42 | 0.73, 0.95, 0.97 | 0.39, 0.129, 0.124 | 4.32 |
+| `1C` | Clearest coastal | 0.597, 0.463, 0.619 | 0.49, 0.85, 0.83 | 0.395, 0.121, 0.179 | 10.4 |
+| `3C` | Coastal | 1.16, 1.23, 1.65 | 0.74, 0.94, 0.91 | 0.456, 0.187, 0.319 | 3.91 |
+| `5C` | Coastal | 1.4, 1.57, 2.17 | 0.77, 0.92, 0.86 | 0.48, 0.277, 0.535 | 3.06 |
+| `7C` | Turbid coastal | 2.26, 2.77, 3.84 | 0.84, 0.92, 0.86 | 0.6, 0.47, 0.924 | 1.73 |
+| `9C` | Most turbid coastal | 2.95, 3.81, 5.33 | 0.85, 0.89, 0.82 | 0.763, 0.826, 1.56 | 1.26 |
+
+Each triple is red, green, blue. The optics are kept on the world entity as
+the `WaterOptics` component; a system that sees through water keeps a
+`gz::sim::water_optics::WaterOpticsSampler`, from the `gz_water_optics`
+library.
+
 ## Thruster command
 
 What a vehicle's Thruster plugins expect, with `gz-maritime-thruster-system`
@@ -404,6 +446,25 @@ From Gazebo, turning it to set south, and reading it back:
 gz topic -t /world/default/ocean_current/set -m gz.msgs.Param \
   -p 'params {key: "direction" value {type: DOUBLE double_value: 180}}'
 gz topic -e -t /world/default/ocean_current_info -n 1
+```
+
+## Water optics
+
+The water is set in the world file and changes while the simulation runs on
+the topic `/world/<world>/water_optics/set`: a `gz.msgs.Param` whose keys are
+the elements above. `jerlov` takes a string; `visibility` and `water_level`
+a number (or a string holding one); `attenuation`, `backscatter`, `veil` and
+`diffuse_attenuation` a string `"r g b"`. An empty string removes a
+visibility or an explicit value, going back to what the type gives. A
+message is applied whole or not at all. The resolved optics are published on
+`/world/<world>/water_optics_info` as `gz.msgs.Param`: `jerlov`,
+`visibility`, the four per-channel values as strings, `water_level` and
+`generation`.
+
+```bash
+gz topic -t /world/default/water_optics/set -m gz.msgs.Param \
+  -p 'params {key: "jerlov" value {type: STRING string_value: "7C"}}'
+gz topic -e -t /world/default/water_optics_info -n 1
 ```
 
 ## Topics

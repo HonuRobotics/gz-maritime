@@ -492,6 +492,33 @@ What we do differently: water from the world recipe, not hardcoded; the
 water level from the waves; per-sensor settings; the revised model (β^D ≠
 β^B) on linear colour; validation.
 
+## Progress
+
+### Phase 1, water optics the world owns: done, on `ahcorde/uw_phase1_water_optics`
+
+What it settled, beyond this plan:
+
+- **The Jerlov table** (`gz_water_optics/src/Jerlov.cc`): a, b and K_d of
+  all ten types at red 625, green 525, blue 450 nm, from Solonenko and
+  Mobley (2015) Tables 4–8, through the Apache-2.0 transcription in
+  `tishibashi-cpu/jerlov`, which checks it against the paper's equations.
+  Not yet checked against the printed paper by us. 5C at 625 nm uses
+  Williamson and Hollins (2022) and Jerlov (1976), the printed row being
+  corrupted.
+- **From a type**, β^D = β^B = c = a + b at each channel's wavelength; the
+  revised model's β^D ≠ β^B is reached through explicit values. B∞ = b / c,
+  the single-scattering albedo, as a fraction of the daylight: the veil
+  matches a white target lit by the same daylight when b / c = 1.
+- **`<visibility>`** scales K_d along with a and b.
+- **Ground truth** at 1 Hz by default; any unknown element is warned about.
+- **Figures** now read the real table: the IB, 3C and 7C waters, and a new
+  `uw-jerlov-presets.svg`.
+- **Docs**: `gz_water_optics/README.md`, `docs/how-to/underwater-camera.md`,
+  the reference's water optics parameters (with the presets table) and
+  topics, a design section, the `AGENTS.md` row; a test checks every element
+  and preset is in the reference and the README; Sphinx builds with no
+  warnings.
+
 ## Open questions
 
 - Which BlueROV2 camera settings (resolution, field of view, port type) match

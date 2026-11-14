@@ -115,6 +115,55 @@ field. The main points it has to handle:
 - **Choppy seas.** The high-fidelity sea also moves the surface sideways;
   finding the true height at a point needs that displacement.
 
+## Seeing through the water
+
+A camera under water sees the water as much as what is in it. The plan is in
+[UNDERWATER_CAMERA_PLAN.md](https://github.com/HonuRobotics/gz-maritime/blob/lyrical/UNDERWATER_CAMERA_PLAN.md);
+this section grows as it lands.
+
+```{figure} images/uw-image-formation.svg
+What reaches the camera: the object's light, faded with range; the veil the
+water adds; and the daylight, faded with depth before it lit anything.
+```
+
+**The model.** Per colour channel, a camera at depth z sees an object of
+colour J (as lit) at range r as
+
+```
+I = J · exp(−β^D r) + B∞(z) · (1 − exp(−β^B r)),    B∞(z) = B∞ · exp(−K_d z)
+```
+
+the revised underwater image formation model (Akkaynak and Treibitz, CVPR
+2018). The older "fog" model uses one coefficient for both terms; keeping
+β^D and β^B apart is what the revised model adds, and what lets a camera
+match real images (OceanSim's colour-chart test).
+
+**The water belongs to the world.** Like the waves, the wind and the
+current, the water's optics are one recipe on the world entity
+(`gz_water_optics`), so every camera sees the same water, a change on the
+`water_optics/set` topic reaches all of them at once, and other sensors can
+read it later. Depth is measured below the wave field's local surface, not a
+flat level.
+
+**Water types, not coefficients.** A world names a Jerlov type, the
+oceanographers' classification, and optionally a visibility in metres; the
+system derives the coefficients from published optical properties
+(Solonenko and Mobley 2015): β^D = β^B = c = a + b, B∞ = b / c, K_d as
+measured. Explicit coefficients are there for a matched data set.
+
+```{figure} images/uw-jerlov-presets.svg
+The presets.
+```
+
+**Checked against itself first.** Every step is tested against what the
+model predicts, generated from the same equations by
+`docs/_tools/underwater_camera_figures.py`: a grey target against range,
+the scene against depth, a colour chart by range.
+
+```{figure} images/uw-expected-range.svg
+What a camera must show: a 50 % grey target at each range, in three waters.
+```
+
 ## Related
 
 The [bluerobotics_models](https://github.com/HonuRobotics/bluerobotics_models)
