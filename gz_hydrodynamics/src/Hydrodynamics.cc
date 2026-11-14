@@ -709,7 +709,10 @@ void Hydrodynamics::PreUpdate(
   // diagonal terms here. Have yet to add the cross terms here. Also note, since
   // $M_a(0,0) = \dot X_u $ , $M_a(1,1) = \dot Y_v $ and so forth, we simply
   // load the stability derivatives from $M_a$.
-  if (!this->dataPtr->disableCoriolis)
+  //
+  // A link with <fluid_added_mass> gets these terms from the physics engine,
+  // so the plugin's own would count them twice.
+  if (!this->dataPtr->disableCoriolis && !this->dataPtr->hasFluidAddedMass)
   {
     // kTotalWrench gathers the left hand side of Fossen's equation,
     // M_A * dv/dt + C_A(v) * v + D(v) * v, and is applied negated below,

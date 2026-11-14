@@ -23,6 +23,7 @@
 #include <cmath>
 #include <map>
 #include <string>
+#include <vector>
 
 #include <gz/common/Filesystem.hh>
 #include <gz/math/Pose3.hh>
@@ -52,20 +53,21 @@ Link LinkOf(const EntityComponentManager &_ecm, const std::string &_model)
   return Link(Model(model).LinkByName(_ecm, "link"));
 }
 
-/// \brief Run a world with the bodies "plugin" and "native" and return each
-/// one's pose at the end.
+/// \brief Run a world and return the pose of each body at the end.
 /// \param[in] _world World file, in the test worlds.
 /// \param[in] _steps Steps of 1 ms to run.
+/// \param[in] _bodies Model names.
 /// \return Pose by model name.
-std::map<std::string, math::Pose3d> FinalPoses(const std::string &_world,
-                                               const int _steps)
+std::map<std::string, math::Pose3d> FinalPoses(
+    const std::string &_world, const int _steps,
+    const std::vector<std::string> &_bodies = {"plugin", "native"})
 {
   TestFixture fixture(common::joinPaths(TEST_WORLD_DIR, _world));
   std::map<std::string, math::Pose3d> pose;
   fixture.OnPostUpdate([&](const UpdateInfo &,
                            const EntityComponentManager &_ecm)
   {
-    for (const std::string name : {"plugin", "native"})
+    for (const auto &name : _bodies)
       pose[name] = worldPose(LinkOf(_ecm, name).Entity(), _ecm);
   }).Finalize();
   fixture.Server()->Run(true, _steps, false);
@@ -107,6 +109,23 @@ TEST(HydrodynamicsAddedMass, MatchesThePhysicsEngineInStillWater)
       pose.at("native").Pos() - offset), 5e-3);
   EXPECT_LT((pose.at("plugin").Rot().Inverse() *
              pose.at("native").Rot()).Euler().Length(), 5e-3);
+}
+
+//////////////////////////////////////////////////
+/// A link with <fluid_added_mass> gets its Coriolis terms from the physics
+/// engine. When the plugin is also given the added mass parameters, with
+/// its added mass force disabled, it must not apply those terms a second
+/// time: the body moves like the one with <fluid_added_mass> alone.
+TEST(HydrodynamicsAddedMass, FluidAddedMassCoriolisNotCountedTwice)
+{
+  const auto pose = FinalPoses("added_mass.sdf", 2000, {"native", "both"});
+  // "both" starts 5 m to the left of "native".
+  const math::Vector3d offset(0, 5, 0);
+  EXPECT_GT(std::abs(pose.at("native").Rot().Yaw()), 0.2);
+  EXPECT_LT(pose.at("native").Pos().Distance(
+      pose.at("both").Pos() - offset), 1e-6);
+  EXPECT_LT((pose.at("native").Rot().Inverse() *
+             pose.at("both").Rot()).Euler().Length(), 1e-6);
 }
 
 //////////////////////////////////////////////////

@@ -71,7 +71,11 @@ namespace maritime
   /// this plugin automatically applies a Coriolis correction so that
   /// the Coriolis force uses the relative velocity v_r rather than
   /// the absolute velocity v. This correction is zero when there is
-  /// no current.
+  /// no current. It covers the Coriolis terms only: the added mass still
+  /// accelerates against the ground, so a small error remains for a body
+  /// that turns in a current. The plugin's own Coriolis force, from its
+  /// added mass parameters, is not applied to such a link, since the
+  /// physics engine already applies it.
   ///
   /// ## SNAME Naming Convention
   ///

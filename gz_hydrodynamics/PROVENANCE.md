@@ -59,7 +59,12 @@ and nothing else. To see it against a newer upstream:
    the error for added mass given twice ever runs. Here the components come
    first. With the correction at work a body with `<fluid_added_mass>` in a
    current stays within centimetres of one with the same added mass in the
-   plugin, against a quarter of a metre without. Meant for upstream.
+   plugin, against a quarter of a metre without. The plugin's own Coriolis
+   force is not applied to such a link, since the physics engine already
+   applies it: with the old sign the two cancelled, with the fix they would
+   double.
+
+   Deltas 4 and 5 are proposed upstream in gazebosim/gz-sim#4209.
 
 6. **An application point.** Upstream takes the velocity at the link origin
    and applies the wrench there, so a link whose origin is off the thrust
