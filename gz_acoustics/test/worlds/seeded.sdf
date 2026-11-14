@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<!--
+  Everything random at once, from one seed: a pinger every 0.25 s with a
+  200 m reach, and a receiver 150 m away with noise on its bearing, outliers
+  and a dropout zone starting half way, so half the pings are lost. Run
+  twice with the same seed, it must hear the same pings with the same
+  values. The test changes the seed by rewriting <seed>.
+-->
+<sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
+  <world name="seeded">
+    <physics name="fast" type="dart">
+      <max_step_size>0.004</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-maritime-acoustics-system"
+            name="gz::sim::maritime::Acoustics">
+      <seed>11</seed>
+    </plugin>
+    <model name="buoy">
+      <static>true</static>
+      <link name="link"/>
+      <plugin filename="gz-maritime-acoustic-pinger-system"
+              name="gz::sim::maritime::AcousticPinger">
+        <pose>0 0 -2 0 0 0</pose>
+        <period>0.25</period>
+        <reach>200</reach>
+      </plugin>
+    </model>
+    <model name="listener">
+      <static>true</static>
+      <pose>150 0 -2 0 0 0</pose>
+      <link name="link">
+        <sensor name="receiver" type="custom" gz:type="acoustic_receiver">
+          <topic>/seeded</topic>
+          <gz:acoustic_receiver>
+            <bearing_noise>
+              <noise type="gaussian"><mean>0</mean><stddev>0.1</stddev></noise>
+            </bearing_noise>
+            <outlier_probability>0.2</outlier_probability>
+            <dropout_start>0.5</dropout_start>
+          </gz:acoustic_receiver>
+        </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>

@@ -1,0 +1,85 @@
+<?xml version="1.0"?>
+<!--
+  One pinger 2 m under a static buoy at the origin, 30 kHz, once a second,
+  with a 500 m reach, and receivers around it, sound at 1500 m/s:
+
+  * listener, 150 m east, 2 m down, turned 90 degrees to port, so the
+    pinger is on its port beam: bearing +pi/2, elevation 0, range 150, the
+    ping 0.1 s late. It reports the range.
+  * deaf, 20 m north, tuned to 40 kHz: out of band.
+  * far, 600 m north: out of reach.
+  * dry, 20 m south, 5 m above the water: out of the water.
+-->
+<sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
+  <world name="pingers">
+    <physics name="fast" type="dart">
+      <max_step_size>0.004</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-maritime-acoustics-system"
+            name="gz::sim::maritime::Acoustics">
+      <speed_of_sound>1500</speed_of_sound>
+      <seed>7</seed>
+      <publish_rate>10</publish_rate>
+    </plugin>
+    <!-- After the acoustics system on purpose: a receiver spawned at run
+         time must be found whatever order the systems run in. -->
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <model name="buoy">
+      <static>true</static>
+      <link name="link"/>
+      <plugin filename="gz-maritime-acoustic-pinger-system"
+              name="gz::sim::maritime::AcousticPinger">
+        <pose>0 0 -2 0 0 0</pose>
+        <frequency>30000</frequency>
+        <period>1</period>
+        <reach>500</reach>
+      </plugin>
+    </model>
+    <model name="listener">
+      <static>true</static>
+      <pose>150 0 -2 0 0 1.5707963267948966</pose>
+      <link name="link">
+        <sensor name="receiver" type="custom" gz:type="acoustic_receiver">
+          <topic>/listener</topic>
+          <frame_id>listener/receiver</frame_id>
+          <gz:acoustic_receiver>
+            <range>true</range>
+          </gz:acoustic_receiver>
+        </sensor>
+      </link>
+    </model>
+    <model name="deaf">
+      <static>true</static>
+      <pose>0 20 -2 0 0 0</pose>
+      <link name="link">
+        <sensor name="receiver" type="custom" gz:type="acoustic_receiver">
+          <topic>/deaf</topic>
+          <gz:acoustic_receiver>
+            <frequency>40000</frequency>
+            <bandwidth>1000</bandwidth>
+          </gz:acoustic_receiver>
+        </sensor>
+      </link>
+    </model>
+    <model name="far">
+      <static>true</static>
+      <pose>0 600 -2 0 0 0</pose>
+      <link name="link">
+        <sensor name="receiver" type="custom" gz:type="acoustic_receiver">
+          <topic>/far</topic>
+        </sensor>
+      </link>
+    </model>
+    <model name="dry">
+      <static>true</static>
+      <pose>0 -20 5 0 0 0</pose>
+      <link name="link">
+        <sensor name="receiver" type="custom" gz:type="acoustic_receiver">
+          <topic>/dry</topic>
+        </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>
