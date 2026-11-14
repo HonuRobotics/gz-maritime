@@ -652,8 +652,11 @@ void Hydrodynamics::PreUpdate(
   // load the stability derivatives from $M_a$.
   if (!this->dataPtr->disableCoriolis)
   {
+    // kTotalWrench gathers the left hand side of Fossen's equation,
+    // M_A * dv/dt + C_A(v) * v + D(v) * v, and is applied negated below,
+    // so C_A * v enters it with a plus sign like the other two terms.
     Cmat = hydro::buildCoriolisMatrix(this->dataPtr->Ma, state);
-    const Eigen::Matrix<double, 6, 1> kCmatVec = - Cmat * state;
+    const Eigen::Matrix<double, 6, 1> kCmatVec = Cmat * state;
     kTotalWrench += kCmatVec;
   }
 

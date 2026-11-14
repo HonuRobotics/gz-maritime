@@ -41,6 +41,16 @@ and nothing else. To see it against a newer upstream:
    `gz::sim::maritime::Hydrodynamics` does not collide with gz-sim's own when
    both libraries are on `GZ_SIM_SYSTEM_PLUGIN_PATH`.
 
+4. **The sign of the added mass Coriolis term.** Upstream applies
+   +C_A(ν)ν to the link where Fossen's equation has −C_A(ν)ν:
+   `buildCoriolisMatrix` returns C_A for the negative coefficients the
+   plugin takes, not −C_A as its comment said, and `PreUpdate` negated it
+   once too often. A body with more added mass in sway than in surge was
+   turned nose on to its motion instead of broadside (the Munk moment), by
+   the right amount in the wrong direction. Fixed, with a test against
+   Kirchhoff's equations and against DART's `<fluid_added_mass>`, which
+   agree with each other. Meant for upstream.
+
 This package is a fork until upstream has a current component and its
 Hydrodynamics reads it. Retire it when a Gazebo release that ROS ships
 carries both, and switch the vehicles back to `gz-sim-hydrodynamics-system`.
