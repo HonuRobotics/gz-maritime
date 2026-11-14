@@ -441,6 +441,12 @@ void Hydrodynamics::Configure(
     return;
   }
 
+  // The link's components this system reads. The world pose comes first:
+  // the fluid added mass below can only be read once it exists.
+  AddWorldPose(this->dataPtr->linkEntity, _ecm);
+  AddAngularVelocityComponent(this->dataPtr->linkEntity, _ecm);
+  AddWorldLinearVelocity(this->dataPtr->linkEntity, _ecm);
+
   // Cache the fluid added mass matrix if present on this link.
   // This is used for the Coriolis current-velocity correction.
   {
@@ -518,10 +524,6 @@ void Hydrodynamics::Configure(
       _sdf->Get<std::string>("lookup_current_z");
   }
 
-
-  AddWorldPose(this->dataPtr->linkEntity, _ecm);
-  AddAngularVelocityComponent(this->dataPtr->linkEntity, _ecm);
-  AddWorldLinearVelocity(this->dataPtr->linkEntity, _ecm);
 }
 
 /////////////////////////////////////////////////

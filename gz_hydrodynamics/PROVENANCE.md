@@ -51,6 +51,15 @@ and nothing else. To see it against a newer upstream:
    Kirchhoff's equations and against DART's `<fluid_added_mass>`, which
    agree with each other. Meant for upstream.
 
+5. **The link's `<fluid_added_mass>` is seen.** Upstream reads it in
+   `Configure` before it creates the link's world pose component, which the
+   read needs. Unless another system made that component first the added
+   mass is not found, and neither the Coriolis correction in a current nor
+   the error for added mass given twice ever runs. Here the components come
+   first. With the correction at work a body with `<fluid_added_mass>` in a
+   current stays within centimetres of one with the same added mass in the
+   plugin, against a quarter of a metre without. Meant for upstream.
+
 This package is a fork until upstream has a current component and its
 Hydrodynamics reads it. Retire it when a Gazebo release that ROS ships
 carries both, and switch the vehicles back to `gz-sim-hydrodynamics-system`.

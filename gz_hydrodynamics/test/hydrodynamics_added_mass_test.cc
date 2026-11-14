@@ -52,12 +52,15 @@ Link LinkOf(const EntityComponentManager &_ecm, const std::string &_model)
   return Link(Model(model).LinkByName(_ecm, "link"));
 }
 
-/// \brief Run added_mass.sdf and return each body's pose at the end.
+/// \brief Run a world with the bodies "plugin" and "native" and return each
+/// one's pose at the end.
+/// \param[in] _world World file, in the test worlds.
 /// \param[in] _steps Steps of 1 ms to run.
 /// \return Pose by model name.
-std::map<std::string, math::Pose3d> FinalPoses(const int _steps)
+std::map<std::string, math::Pose3d> FinalPoses(const std::string &_world,
+                                               const int _steps)
 {
-  TestFixture fixture(common::joinPaths(TEST_WORLD_DIR, "added_mass.sdf"));
+  TestFixture fixture(common::joinPaths(TEST_WORLD_DIR, _world));
   std::map<std::string, math::Pose3d> pose;
   fixture.OnPostUpdate([&](const UpdateInfo &,
                            const EntityComponentManager &_ecm)
@@ -85,7 +88,7 @@ TEST(HydrodynamicsAddedMass, CoriolisTurnsTheBodyBroadside)
   const double yaw = (a11 - a22) * uvOverT2 * std::pow(t, 4) / 12 /
       (izz + a66);
 
-  const auto pose = FinalPoses(static_cast<int>(t / 1e-3));
+  const auto pose = FinalPoses("added_mass.sdf", static_cast<int>(t / 1e-3));
   EXPECT_LT(pose.at("plugin").Rot().Yaw(), 0.0);
   EXPECT_NEAR(yaw, pose.at("plugin").Rot().Yaw(), 0.05 * std::abs(yaw));
 }
@@ -95,7 +98,7 @@ TEST(HydrodynamicsAddedMass, CoriolisTurnsTheBodyBroadside)
 /// same model, so the two bodies move alike.
 TEST(HydrodynamicsAddedMass, MatchesThePhysicsEngineInStillWater)
 {
-  const auto pose = FinalPoses(2000);
+  const auto pose = FinalPoses("added_mass.sdf", 2000);
   const math::Vector3d offset(0, 5, 0);
   // Both moved and turned well away from where they started.
   EXPECT_GT(pose.at("native").Pos().Distance(offset), 1.0);
@@ -104,4 +107,19 @@ TEST(HydrodynamicsAddedMass, MatchesThePhysicsEngineInStillWater)
       pose.at("native").Pos() - offset), 5e-3);
   EXPECT_LT((pose.at("plugin").Rot().Inverse() *
              pose.at("native").Rot()).Euler().Length(), 5e-3);
+}
+
+//////////////////////////////////////////////////
+/// In a current the physics engine's added mass takes its Coriolis terms
+/// against the ground. The plugin corrects them, so the body ends within
+/// centimetres of the one whose added mass is in the plugin; without the
+/// correction they end a quarter of a metre apart. What is left is the
+/// current's turning in the body frame, which the correction leaves out.
+TEST(HydrodynamicsAddedMass, CorrectsThePhysicsEngineInACurrent)
+{
+  const auto pose = FinalPoses("added_mass_current.sdf", 4000);
+  const math::Vector3d offset(0, 5, 0);
+  EXPECT_GT(pose.at("native").Pos().Distance(offset), 1.0);
+  EXPECT_LT(pose.at("plugin").Pos().Distance(
+      pose.at("native").Pos() - offset), 0.03);
 }
