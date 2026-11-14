@@ -1,0 +1,111 @@
+<?xml version="1.0"?>
+<!--
+  The acoustic pinger demo: two custom USVs in kai_gazebo's acoustic_demo
+  world, with three moored pingers (gz_acoustics).
+
+  custom_usv homes on the pinger it hears: pinger_homing.py reads its
+  acoustic receiver, tuned to 30 kHz, turns each bearing into a heading and
+  drives there, and stops close to the buoy. It starts at the origin, the
+  green buoy's pinger active 40 m ahead and to port. boat_b sits still and
+  listens: the same pings, from another place, other bearings. Neither
+  hears the yellow buoy's 37 kHz decoy.
+
+  Switch the course pinger while it runs, and custom_usv turns for the
+  other buoy:
+
+      ros2 topic pub -1 /world/default/acoustics/pinger_green/set ros_gz_interfaces/msg/ParamVec \
+          "{params: [{name: active, value: {type: 1, bool_value: false}}]}"
+      ros2 topic pub -1 /world/default/acoustics/pinger_red/set ros_gz_interfaces/msg/ParamVec \
+          "{params: [{name: active, value: {type: 1, bool_value: true}}]}"
+
+  Watch what a boat hears, and the ground truth:
+
+      ros2 topic echo /custom_usv/acoustic_receiver
+      ros2 topic echo /boat_b/acoustic_receiver
+      ros2 topic echo /world/default/acoustics/pingers
+
+      ros2 launch kai_custom_vehicle acoustic_demo.launch.xml
+      ros2 launch kai_custom_vehicle acoustic_demo.launch.xml homing:=false gazebo_gui:=false
+
+  The same demo on the RobotX 2026 course, course B of Marina Bay, whose two
+  survey pingers are about 25 m out from its start point (the site comes
+  from Fuel the first time; marina_bay_lite.sdf draws less):
+
+      ros2 launch kai_custom_vehicle acoustic_demo.launch.xml world:=marina_bay.sdf \
+          x:=-15 y:=-8 yaw:=0.55 listener_x:=15 listener_y:=-28 listener_yaw:=0.55
+-->
+<launch>
+  <arg name="gazebo_gui" default="true" description="Launch the Gazebo GUI"/>
+  <arg name="use_composition" default="true"
+       description="Run gz_server, the bridges and robot_state_publisher in one container"/>
+  <arg name="homing" default="true"
+       description="Drive custom_usv to the pinger it hears"/>
+  <arg name="listener" default="true"
+       description="Add boat_b, which only listens"/>
+  <arg name="world" default="acoustic_demo.sdf"
+       description="World SDF file name: a world with 30 kHz pingers named pinger_green and pinger_red"/>
+  <arg name="x" default="0" description="custom_usv's start x [m]"/>
+  <arg name="y" default="0" description="custom_usv's start y [m]"/>
+  <arg name="yaw" default="0" description="custom_usv's start heading [rad]"/>
+  <arg name="listener_x" default="-10" description="boat_b's x [m]"/>
+  <arg name="listener_y" default="-20" description="boat_b's y [m]"/>
+  <arg name="listener_yaw" default="1.5707963267948966" description="boat_b's heading [rad]"/>
+
+  <let name="share" value="$(find-pkg-share kai_custom_vehicle)"/>
+
+  <!-- 1. The simulation on the demo world. -->
+  <include file="$(find-pkg-share kai_bringup)/launch/simulation.launch.xml">
+    <arg name="world" value="$(var world)"/>
+    <arg name="gazebo_gui" value="$(var gazebo_gui)"/>
+    <arg name="use_composition" value="$(var use_composition)"/>
+  </include>
+
+  <!-- Each boat in a group of its own: the spawn launch's arguments, its
+       instance directory among them, must not leak from one boat into the
+       next, or the second boat's files overwrite the first's. -->
+
+  <!-- 2. custom_usv, at the origin heading east by default. -->
+  <group>
+    <include file="$(find-pkg-share kai_bringup)/launch/spawn_vehicle.launch.xml">
+      <arg name="name" value="custom_usv"/>
+      <arg name="world" value=""/>
+      <arg name="xacro" value="$(var share)/models/custom_usv/model.sdf.xacro"/>
+      <arg name="bridge" value="$(var share)/config/ros_gz_bridge.yaml.in"/>
+      <arg name="urdf" value="$(var share)/urdf/custom_usv.urdf.xacro"/>
+      <arg name="x" value="$(var x)"/>
+      <arg name="y" value="$(var y)"/>
+      <arg name="yaw" value="$(var yaw)"/>
+      <arg name="use_composition" value="$(var use_composition)"/>
+    </include>
+  </group>
+
+  <!-- 3. boat_b, west of the course heading north by default. -->
+  <group if="$(var listener)">
+    <include file="$(find-pkg-share kai_bringup)/launch/spawn_vehicle.launch.xml">
+      <arg name="name" value="boat_b"/>
+      <arg name="world" value=""/>
+      <arg name="xacro" value="$(var share)/models/custom_usv/model.sdf.xacro"/>
+      <arg name="bridge" value="$(var share)/config/ros_gz_bridge.yaml.in"/>
+      <arg name="urdf" value="$(var share)/urdf/custom_usv.urdf.xacro"/>
+      <arg name="x" value="$(var listener_x)"/>
+      <arg name="y" value="$(var listener_y)"/>
+      <arg name="yaw" value="$(var listener_yaw)"/>
+      <arg name="use_composition" value="$(var use_composition)"/>
+    </include>
+  </group>
+
+  <!-- 4. The world's pinger topics: switch them from ROS, read the ground
+       truth. -->
+  <ros_gz_bridge
+      bridge_name="acoustic_demo_bridge"
+      config_file="$(var share)/config/acoustic_demo_bridge.yaml"
+      container_name="ros_gz_container"
+      create_own_container="false"
+      use_composition="$(var use_composition)"/>
+
+  <!-- 5. custom_usv's controller, on simulation time. -->
+  <node pkg="kai_custom_vehicle" exec="pinger_homing.py" name="pinger_homing"
+        namespace="custom_usv" output="screen" if="$(var homing)">
+    <param name="use_sim_time" value="true"/>
+  </node>
+</launch>

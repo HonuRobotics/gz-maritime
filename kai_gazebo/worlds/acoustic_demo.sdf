@@ -20,7 +20,8 @@
           -p 'params { key: "active" value { type: BOOLEAN bool_value: true } }'
 
   Every pinger, where it is and how it is set, is published on
-  /world/default/acoustics/pingers.
+  /world/default/acoustics/pingers. Launch it with a boat that homes on the
+  pinger: ros2 launch kai_custom_vehicle acoustic_demo.launch.xml
 -->
 <sdf version="1.12" xmlns:gz="http://gazebosim.org/schema" xmlns:experimental="http://sdformat.org/schemas/experimental">
   <world name="default">

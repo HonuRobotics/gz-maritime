@@ -127,6 +127,14 @@
     <origin xyz="0 0 ${deck_z + deck_thickness / 2}" rpy="0 0 0"/>
   </joint>
 
+  <!-- The acoustic receiver's hydrophone, under the deck centre. -->
+  <link name="hydrophone_link"/>
+  <joint name="hydrophone_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="hydrophone_link"/>
+    <origin xyz="0 0 ${-hydrophone_depth}" rpy="0 0 0"/>
+  </joint>
+
   <link name="gps_link"/>
   <joint name="gps_joint" type="fixed">
     <parent link="base_link"/>
