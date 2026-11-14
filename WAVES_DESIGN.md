@@ -721,5 +721,7 @@ ros2 launch kai_bringup simulation.launch.xml
   the engine's folding (Jacobian) metric; the analytic Gerstner engine's
   Jacobian barely leaves 1.0, so it carries no usable folding signal and the
   shader's foam pass is skipped for it.
-- The wave-coupled `test_buoy` demo vessel and the `WaveBuoyancy` consumer ship
-  with `gz_waves_buoyancy`, which also adds the buoy to `open_water.sdf`.
+- `gz_waves_buoyancy` ships the `WaveBuoyancy` consumer: buoyancy on the
+  local, sloping surface above each marked shape, opt-in per world instead
+  of the flat buoyancy, and the `WaveCoupling` world component that marks
+  such a world. No `kai_gazebo` world runs it yet.

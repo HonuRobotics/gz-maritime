@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<!--
+  The same, on still water (no wave height): the box rests at the draft the flat buoyancy gives.
+-->
+<sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
+  <world name="flat">
+    <physics name="fast" type="dart">
+      <max_step_size>0.002</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <!-- One long wave along +x: 4 s, so 25 m long, ramping in over 2 s. -->
+    <plugin filename="gz-sim-waves-gerstner-system"
+            name="gz::sim::systems::GerstnerWaves">
+      <update_rate>30</update_rate>
+      <wave>
+        <model>CWR</model>
+        <number>1</number>
+        <amplitude>0</amplitude>
+        <period>4</period>
+        <direction>0</direction>
+        <steepness>0</steepness>
+        <tau>2</tau>
+      </wave>
+    </plugin>
+    <plugin filename="gz-maritime-wave-buoyancy-system"
+            name="gz::sim::maritime::WaveBuoyancy">
+      <water_density>1025</water_density>
+      <air_density>1</air_density>
+      <water_level>0</water_level>
+    </plugin>
+    <!-- A 1 x 1 x 0.4 m box of 200 kg: on flat water its draft is
+         200 / 1025 = 0.195 m, its centre 0.005 m above the water. -->
+    <model name="floater">
+      <pose>0 0 0.005 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>200</mass>
+          <inertia>
+            <ixx>19.3</ixx><iyy>19.3</iyy><izz>33.3</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="hull" gz:buoyancy="true">
+          <geometry><box><size>1 1 0.4</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+    <!-- A neutral sphere 3 m down, wholly under the water at every wave. -->
+    <model name="sinker">
+      <pose>10 0 -3 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>34.348</mass>
+          <inertia>
+            <ixx>0.55</ixx><iyy>0.55</iyy><izz>0.55</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="hull" gz:buoyancy="true">
+          <geometry><sphere><radius>0.2</radius></sphere></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+  </world>
+</sdf>
