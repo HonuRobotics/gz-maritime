@@ -13,6 +13,7 @@
 #include <sstream>
 
 #include <gtest/gtest.h>
+#include <gz/math/Helpers.hh>
 
 #include "gz/sim/waves/Eval.hh"
 #include "gz/sim/waves/GerstnerWaveSimulation.hh"
@@ -176,6 +177,53 @@ TEST(ParticleVelocity, FiniteOnPmsField)
     EXPECT_TRUE(std::isfinite(v.Y()));
     EXPECT_TRUE(std::isfinite(v.Z()));
     EXPECT_LT(v.Length(), 10.0);
+  }
+}
+
+//////////////////////////////////////////////////
+/// The surface rises as fast as the water under it: the vertical velocity is
+/// the time derivative of the elevation, a quarter cycle ahead of it.
+TEST(ParticleVelocity, VerticalIsElevationRate)
+{
+  auto wf = MakePmsField();
+  const double h = 1e-5;
+  for (double t = 30.0; t < 60.0; t += 0.37)
+  {
+    const double x = 1.3 + 0.1 * t;
+    const double y = -0.7;
+    const double rate = (gsw::SurfaceElevation(wf, x, y, t + h) -
+                         gsw::SurfaceElevation(wf, x, y, t - h)) / (2.0 * h);
+    EXPECT_NEAR(rate, gsw::ParticleVelocity(wf, x, y, t).Z(), 1e-6)
+        << "at t=" << t;
+  }
+}
+
+//////////////////////////////////////////////////
+/// In a single wave the water moves forward under the crest and backward
+/// under the trough: the velocity along the wave is w times the elevation.
+TEST(ParticleVelocity, HorizontalFollowsTheCrest)
+{
+  gsw::WavefieldData wf;
+  wf.algorithm = "gerstner";
+  wf.params.model = "CWR";
+  wf.params.number = 1;
+  wf.params.amplitude = 0.5;
+  wf.params.period = 4.0;
+  wf.params.direction = GZ_PI / 2.0;
+  wf.params.steepness = 0.0;
+  wf.params.tau = 2.0;
+  wf.simulation = gsw::CreateWaveSimulation(wf.algorithm, wf.params);
+  ASSERT_NE(wf.simulation, nullptr);
+
+  const double omega = 2.0 * GZ_PI / wf.params.period;
+  for (double t = 30.0; t < 40.0; t += 0.23)
+  {
+    const double x = 2.0;
+    const double y = 0.4 * t;
+    const double eta = gsw::SurfaceElevation(wf, x, y, t);
+    const auto v = gsw::ParticleVelocity(wf, x, y, t);
+    EXPECT_NEAR(0.0, v.X(), 1e-9) << "at t=" << t;
+    EXPECT_NEAR(omega * eta, v.Y(), 1e-6) << "at t=" << t;
   }
 }
 
