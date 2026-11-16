@@ -179,8 +179,9 @@ slides out of its turns. The custom USV's values are placeholders borrowed
 from the BlueBoat; tune them for your vehicle.
 
 The plugin is `gz-maritime-hydrodynamics-system`, from `gz_hydrodynamics`:
-Gazebo's Hydrodynamics with one change. It damps against the water rather
-than the ground, so the boat drifts with the world's ocean current. gz-sim's
+Gazebo's Hydrodynamics with a few changes. The main one: it damps against the
+water rather than the ground, so the boat drifts with the world's ocean
+current. gz-sim's
 own `gz-sim-hydrodynamics-system` takes the same coefficients but doesn't see
 the world's current, so a boat that names it sits still in one. Put added
 mass in the plugin's `<xDotU>` and the like, not in `<fluid_added_mass>`,
@@ -189,6 +190,19 @@ which only DART implements.
 ```{note}
 The damping acts in the air too, so a boat spawned well above the water falls
 slowly. Spawn it at the waterline.
+```
+
+By default the plugin takes the hull's velocity and applies the drag at the
+origin of its link. When the thrust acts on another line, say below
+`base_link`, thrust and drag make a couple and the vehicle pitches or rolls
+under way. The coefficients are only valid about the point they were defined
+at, so name that point, the **centre of pressure**, in the link frame: where
+the coefficients were identified or, for coefficients without coupling terms,
+where the drag acts on the hull. The plugin then takes the velocity and the
+current there and applies the drag there.
+
+```xml
+<center_of_pressure>0 0 -0.07</center_of_pressure>
 ```
 
 ### Added mass
