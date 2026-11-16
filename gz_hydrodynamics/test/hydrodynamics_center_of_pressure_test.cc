@@ -173,8 +173,8 @@ TEST(HydrodynamicsCenterOfPressure, VelocityIsTakenAtThePoint)
 //////////////////////////////////////////////////
 /// In a current that grows with depth, a body whose model is written below
 /// its centre of mass is pushed by the water at that point; one that names
-/// no point is pushed by the water at its centre of mass, not at its link
-/// origin.
+/// no point is pushed by the water at its link origin, where its velocity
+/// is taken, not at its centre of mass.
 TEST(HydrodynamicsCenterOfPressure, CurrentIsTakenAtThePoint)
 {
   TestFixture fixture(common::joinPaths(TEST_WORLD_DIR,
@@ -197,10 +197,10 @@ TEST(HydrodynamicsCenterOfPressure, CurrentIsTakenAtThePoint)
   // long as the body is far slower than the water.
   const double elapsed = steps * 1e-3;
   EXPECT_NEAR(0.75 * elapsed / 10.0, velocity["at_point"].X(), 2e-4);
-  EXPECT_NEAR(0.625 * elapsed / 10.0, velocity["at_origin"].X(), 2e-4);
-  // A point that does not parse is ignored, not read as the link origin,
-  // where the water runs at 0.5 m/s.
-  EXPECT_NEAR(0.625 * elapsed / 10.0, velocity["bad_tag"].X(), 2e-4);
+  EXPECT_NEAR(0.5 * elapsed / 10.0, velocity["at_origin"].X(), 2e-4);
+  // A point that does not parse is ignored, not read in part: its first
+  // three numbers are the point one metre down, in water at 0.75 m/s.
+  EXPECT_NEAR(0.5 * elapsed / 10.0, velocity["bad_tag"].X(), 2e-4);
 }
 
 //////////////////////////////////////////////////

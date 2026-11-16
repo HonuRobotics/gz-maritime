@@ -132,8 +132,8 @@ whose current came from a file.
 ships, verbatim in its own commit so the delta reads on its own. One change:
 when the world has an ocean current recipe, the plugin keeps an
 `OceanCurrentSampler` and takes ν_c from it at its link's centre of mass
-(since then also at the plugin's `<center_of_pressure>`, when a vehicle names one)
-every step, so damping, added
+(since then at the plugin's `<center_of_pressure>`, the link origin unless a
+vehicle names another point) every step, so damping, added
 mass and Coriolis all use the velocity relative to that water, Fossen's
 model as written. With no recipe in the world, its old inputs,
 `<default_current>`, `<lookup_current_*>` and the `/ocean_current` topic,

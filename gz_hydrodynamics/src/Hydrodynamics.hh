@@ -111,9 +111,10 @@ namespace maritime
   ///     coupling terms (no surge to pitch, sway to roll), all the drag
   ///     acts through this point, so put it where the drag acts on the
   ///     hull. Without it the point is the link origin (Fossen's CO), as
-  ///     upstream, and the current is asked at the centre of mass. The
-  ///     correction for a link's `<fluid_added_mass>` stays at the link
-  ///     origin, where that matrix is defined. [m]
+  ///     upstream, and the current is asked there too, where upstream
+  ///     asks it at the centre of mass. The correction for a link's
+  ///     `<fluid_added_mass>` stays at the link origin, where that matrix
+  ///     is defined. [m]
   ///
   /// ### Damping (Drag)
   ///
@@ -173,8 +174,8 @@ namespace maritime
   /// When the world carries a gz-maritime ocean current (the
   /// `OceanCurrentfield` recipe, written by
   /// `gz-maritime-ocean-current-system`), the plugin keeps an
-  /// `ocean_current::OceanCurrentSampler`, asks it every step at the link's
-  /// centre of mass, or at `<center_of_pressure>` when given, and damps
+  /// `ocean_current::OceanCurrentSampler`, asks it every step at the link
+  /// origin, or at `<center_of_pressure>` when given, and damps
   /// against that; the world owns the current, so
   /// the tags and the topic below are then ignored, with a warning for a tag
   /// set and for the first message on the topic. Without one, they work as

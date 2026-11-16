@@ -15,9 +15,9 @@ and nothing else. To see it against a newer upstream:
 
 1. **The world's ocean current.** When the world carries the
    `OceanCurrentfield` recipe of `gz_ocean_current`, the plugin keeps an
-   `OceanCurrentSampler`, synced every `PreUpdate`, asks it at the link's
-   centre of mass (`WorldInertialPose`), or at the centre of pressure of
-   delta 6 when the model names one, and damps against the velocity
+   `OceanCurrentSampler`, synced every `PreUpdate`, asks it at the centre
+   of pressure of delta 6, the link origin unless the model names another
+   point, and damps against the velocity
    relative to that water, ν − ν_c, in added mass, Coriolis and damping:
    Fossen's model as written. The world owns the current, so the plugin's
    `<default_current>`, `<lookup_current_*>` and its ocean current topic
@@ -73,10 +73,13 @@ and nothing else. To see it against a newer upstream:
    velocity is the point's, the current is asked there and the wrench acts
    at it. That is Fossen's change of origin, so the model is the one a link
    frame at that point would give; a test compares the two. Without the tag
-   the point is the link origin and the current is asked at the centre of
-   mass, upstream's behaviour, bit for bit. The Coriolis correction for a
-   link's `<fluid_added_mass>` keeps the link origin, where that matrix is
-   defined. Meant for upstream.
+   the point is the link origin, and the current is asked there too.
+   Upstream asks it at the centre of mass (`WorldInertialPose`) while it
+   takes the velocity at the link origin, two points for one relative
+   velocity; the two agree in a uniform current, so only a current from a
+   table moves, by what it changes between the two points. The Coriolis
+   correction for a link's `<fluid_added_mass>` keeps the link origin,
+   where that matrix is defined. Meant for upstream.
 
 This package is a fork until upstream has a current component its
 Hydrodynamics reads, and deltas 4 to 6. Retire it when a Gazebo release that

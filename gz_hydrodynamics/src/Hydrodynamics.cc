@@ -110,10 +110,9 @@ class gz::sim::maritime::HydrodynamicsPrivateData
 
   /// \brief The centre of pressure: the point of the link, in the link
   /// frame, the coefficients are defined about. The velocity and the
-  /// current are taken there and the wrench acts there. Unset without the
-  /// tag: the link origin then, with the current asked at the centre of
-  /// mass.
-  public: std::optional<math::Vector3d> centerOfPressure;
+  /// current are taken there and the wrench acts there. The link origin
+  /// without the tag.
+  public: math::Vector3d centerOfPressure;
 
   /// \brief World entity, whose Environment component holds the current
   /// table
@@ -468,14 +467,16 @@ void Hydrodynamics::Configure(
     return;
   }
 
-  // The centre of pressure: the link origin unless given. A
-  // value that does not parse is an error and leaves the point unset, so a
-  // typo does not quietly move where the current is asked.
+  // The centre of pressure: the link origin unless given. A value that
+  // does not parse is an error and leaves the point at the link origin.
   if (_sdf->HasElement("center_of_pressure"))
   {
     const auto text = _sdf->Get<std::string>("center_of_pressure");
-    this->dataPtr->centerOfPressure = ParsePoint(text);
-    if (!this->dataPtr->centerOfPressure)
+    if (const auto point = ParsePoint(text))
+    {
+      this->dataPtr->centerOfPressure = *point;
+    }
+    else
     {
       gzerr << "Link [" << linkName << "]: <center_of_pressure> [" << text
         << "] is not three finite numbers; it is ignored." << std::endl;
@@ -621,19 +622,13 @@ void Hydrodynamics::PreUpdate(
 
   // Transform state to local frame
   auto pose = baseLink.WorldPose(_ecm);
-  const math::Vector3d centerOfPressure =
-    this->dataPtr->centerOfPressure.value_or(math::Vector3d::Zero);
+  const math::Vector3d &centerOfPressure = this->dataPtr->centerOfPressure;
 
-  // Where the water is asked: the centre of pressure when the model names
-  // one, the centre of mass otherwise.
-  const auto waterPosition = [&]() -> std::optional<math::Vector3d>
-  {
-    if (this->dataPtr->centerOfPressure)
-      return pose->Pos() + pose->Rot() * centerOfPressure;
-    if (const auto inertialPose = baseLink.WorldInertialPose(_ecm))
-      return inertialPose->Pos();
-    return std::nullopt;
-  };
+  // From the link origin to the centre of pressure, in the world. The
+  // water is asked at the centre of pressure, the point the velocity is
+  // taken at, so the two make the velocity relative to the water there.
+  const math::Vector3d worldArm = pose->Rot() * centerOfPressure;
+  const math::Vector3d waterPosition = pose->Pos() + worldArm;
 
   // Get current vector
   math::Vector3d currentVector(0, 0, 0);
@@ -641,19 +636,13 @@ void Hydrodynamics::PreUpdate(
   if (worldCurrent)
   {
     // The world owns the current.
-    if (const auto position = waterPosition())
-    {
-      currentVector = this->dataPtr->oceanCurrent.At(
-        *position, _info.simTime);
-    }
+    currentVector = this->dataPtr->oceanCurrent.At(
+      waterPosition, _info.simTime);
   }
   else if (this->dataPtr->useCurrentTable)
   {
-    if (const auto position = waterPosition())
-    {
-      currentVector = this->dataPtr->GetWaterCurrentFromEnvironment(
-        _ecm, _info.simTime, *position);
-    }
+    currentVector = this->dataPtr->GetWaterCurrentFromEnvironment(
+      _ecm, _info.simTime, waterPosition);
   }
   else
   {
@@ -666,7 +655,7 @@ void Hydrodynamics::PreUpdate(
   // on, and this is where the current enters: the state is the velocity
   // relative to the water.
   const math::Vector3d pointVelocity = linearVelocity->Data() +
-    rotationalVelocity->Cross(pose->Rot() * centerOfPressure);
+    rotationalVelocity->Cross(worldArm);
   auto localLinearVelocity = pose->Rot().Inverse() *
     (pointVelocity - currentVector);
   auto localRotationalVelocity = pose->Rot().Inverse() * *rotationalVelocity;

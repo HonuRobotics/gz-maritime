@@ -116,9 +116,8 @@ The arrows are coloured by speed like the field, and drawn twice, flat and
 upright, so they read from above and from a camera low over the water. The
 GUI only sees the vehicles' poses, so their velocity is estimated from how
 those change. The arrows are a picture, not the forces: the hydrodynamics
-asks the current at the centre of mass (or at its `<center_of_pressure>`),
-marked shapes at the centre of
-each wet part, and the windage at each marked shape.
+asks the current at its link origin (or at its `<center_of_pressure>`),
+marked shapes at the centre of each wet part, and the windage at each marked shape.
 
 ```{figure} images/what-the-boat-feels.jpg
 :alt: A drifting box and a moored box on the water; the moored one carries a white arrow for the current flowing past it and a magenta arrow for the apparent wind, the drifting one only a magenta arrow and a white track behind it; a striped orange and white wind sock flies on the landing pad

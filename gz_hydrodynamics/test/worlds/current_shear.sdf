@@ -4,11 +4,10 @@
   +x at z = -2, so 0.5 m/s at z = 0, where both link origins are.
   "at_point" writes its hydrodynamics one metre below its origin and feels
   the water there, 0.75 m/s. "at_origin" names no point and feels the water
-  at its centre of mass, half a metre below its origin, 0.625 m/s.
-  "bad_tag" is the same body with a point that is not three numbers, which
-  is reported and ignored. No
-  gravity and no buoyancy; the large inertia keeps the bodies from turning
-  during the test.
+  at its link origin, 0.5 m/s, not at its centre of mass half a metre below,
+  0.625 m/s. "bad_tag" is the same body with a point that is not three
+  numbers, which is reported and ignored. No gravity and no buoyancy; the
+  large inertia keeps the bodies from turning during the test.
 -->
 <sdf version="1.9">
   <world name="current_shear">
@@ -88,7 +87,7 @@
       <plugin filename="gz-maritime-hydrodynamics-system"
               name="gz::sim::maritime::Hydrodynamics">
         <link_name>link</link_name>
-        <center_of_pressure>0 0</center_of_pressure>
+        <center_of_pressure>0 0 -1 0</center_of_pressure>
         <lookup_current_x>current_x</lookup_current_x>
         <lookup_current_y>current_y</lookup_current_y>
         <lookup_current_z>current_z</lookup_current_z>
