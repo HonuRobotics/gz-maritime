@@ -119,6 +119,7 @@ every one.
 | `sand_island.sdf` | Sand Island, Honolulu, RobotX 2016 and 2018, VRX 2019 | Built from open data, from Fuel on first use (about 9 MB); optional seabed; also `sand_island_lite.sdf`, lighter, about 5 MB | start at x 60, y 120 | Harbour channel and open ocean, any (calmer in the channel) |
 | `la_spezia.sdf` | La Spezia, VORC 2020 | Built from open data, from Fuel on first use (about 14 MB); optional seabed; also `la_spezia_lite.sdf`, lighter, about 7 MB | start at x 10, y -372 | Port and gulf, any (calm in the port) |
 | `marina_bay.sdf` | Marina Bay, Singapore, RobotX 2026 | Built from OpenStreetMap, from Fuel on first use (about 11 MB); optional seabed; also `marina_bay_lite.sdf`, lighter, about 8 MB | the four courses around the origin; course A at x -45, y 12, heading 0.55 | Freshwater reservoir, 0 to 2 |
+| `robotx_2026.sdf` | Marina Bay set up for the Maritime RobotX Challenge 2026 | `marina_bay.sdf`'s site with the four courses, their task elements and the dressed pontoon, all from Fuel on first use | the middle of each course's seawall end; course A at x -53, y 0, heading 0.98 | Freshwater reservoir, 0 to 2 |
 | `aquatic_centre.sdf` | An indoor aquatic centre: an Olympic pool and a diving well with a 15 m pit | A hall, from Fuel on first use (about 3 MB) | lane 4 at x -20, y -1.25; the diving well at x 45, z -2.5 | Still pool, no drawn sea, 0 |
 
 Every world starts at sea state 1, Sand Island at 3 and the indoor pool

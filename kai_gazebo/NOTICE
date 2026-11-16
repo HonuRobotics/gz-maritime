@@ -62,6 +62,16 @@ kai_gazebo ships worlds built on site models made from open data:
     depths (https://www.gebco.net, public domain). Plausible, not surveyed:
     not for navigation.
   The textures and the modelled landmarks are procedural.
+- The RobotX 2026 world (worlds/robotx_2026.sdf): the course elements and the
+  venue dressing are models on Gazebo Fuel (https://app.gazebosim.org/
+  honurobotics, the RobotX_2026 collection), fetched at run time, and its
+  water (models/water_surface_overcast) ships here, all by Honu Robotics
+  under the Creative Commons Attribution 4.0 International License. They are
+  modelled after RoboNation's Maritime RobotX Challenge 2026 team handbook
+  and build guides, and the venue as photographed in November 2026. The
+  water's reflection holds the Marina Bay skyline above, a Produced Work of
+  OpenStreetMap data (c) OpenStreetMap contributors, ODbL 1.0. The overcast
+  sky and the textures are procedural.
 - The aquatic centre: the hall, its pools and their water, a model on
   Gazebo Fuel (https://app.gazebosim.org/honurobotics: aquatic_centre),
   fetched at run time, by Honu Robotics under the Creative Commons
