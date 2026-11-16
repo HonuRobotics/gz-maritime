@@ -192,14 +192,17 @@ The damping acts in the air too, so a boat spawned well above the water falls
 slowly. Spawn it at the waterline.
 ```
 
-The plugin takes the hull's velocity and applies the drag at the origin of
-its link. When the thrust acts on another line, say below `base_link`,
-thrust and drag make a couple and the vehicle pitches or rolls under way.
-Name the point where the drag should act, in the link frame, and the plugin
-writes the whole model there:
+By default the plugin takes the hull's velocity and applies the drag at the
+origin of its link. When the thrust acts on another line, say below
+`base_link`, thrust and drag make a couple and the vehicle pitches or rolls
+under way. The coefficients are only valid about the point they were defined
+at, so name that point, the **centre of pressure**, in the link frame: where
+the coefficients were identified or, for coefficients without coupling terms,
+where the drag acts on the hull. The plugin then takes the velocity and the
+current there and applies the drag there.
 
 ```xml
-<application_point>0 0 -0.07</application_point>
+<center_of_pressure>0 0 -0.07</center_of_pressure>
 ```
 
 ### Added mass

@@ -3,12 +3,12 @@
   Three bodies that are the same piece of metal, tilted, with added mass,
   Coriolis and damping in a current, pushed by a "gravity" from rest.
   "tag" writes its hydrodynamics at 0.10 -0.03 -0.20 of its link through
-  <application_point>. "moved" has its link frame at that point and no tag,
+  <center_of_pressure>. "moved" has its link frame at that point and no tag,
   so its inertial pose is shifted back: the same model without the feature.
   "plain" leaves the model at the link origin of "tag", a different model.
 -->
 <sdf version="1.9">
-  <world name="application_point_equivalent">
+  <world name="center_of_pressure_equivalent">
     <gravity>1.0 0.5 -2.0</gravity>
     <physics name="1ms" type="dart">
       <max_step_size>0.001</max_step_size>
@@ -31,7 +31,7 @@
       <plugin filename="gz-maritime-hydrodynamics-system"
               name="gz::sim::maritime::Hydrodynamics">
         <link_name>link</link_name>
-        <application_point>0.10 -0.03 -0.20</application_point>
+        <center_of_pressure>0.10 -0.03 -0.20</center_of_pressure>
         <xDotU>-1</xDotU><yDotV>-2</yDotV><zDotW>-3</zDotW>
         <kDotP>-0.01</kDotP><mDotQ>-0.02</mDotQ><nDotR>-0.015</nDotR>
         <xU>-4</xU><yV>-6</yV><zW>-5</zW>

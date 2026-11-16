@@ -100,8 +100,8 @@ if(BUILD_TESTING)
   # The plugin's added mass against theory and the physics engine's own.
   gz_hydrodynamics_gtest(hydrodynamics_added_mass_test)
 
-  # The application point: a change of reference point for the whole model.
-  gz_hydrodynamics_gtest(hydrodynamics_application_point_test)
+  # The centre of pressure: a change of reference point for the whole model.
+  gz_hydrodynamics_gtest(hydrodynamics_center_of_pressure_test)
 endif()
 
 # GZ_SIM_SYSTEM_PLUGIN_PATH hook so gz-sim finds this package's system plugin

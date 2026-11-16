@@ -15,7 +15,7 @@
  *
  */
 
-// The application point of the vendored hydrodynamics: a body pushed where
+// The centre of pressure of the vendored hydrodynamics: a body pushed where
 // its model is written stays level, and one whose model is left at a link
 // origin off the thrust line pitches, as upstream's does.
 #include <gtest/gtest.h>
@@ -94,10 +94,10 @@ std::map<std::string, math::Pose3d> FinalPoses(
 //////////////////////////////////////////////////
 /// Thrust and drag on one line leave the body level at its terminal speed;
 /// drag left at the link origin, above the thrust, pitches it.
-TEST(HydrodynamicsApplicationPoint, DragActsAtThePoint)
+TEST(HydrodynamicsCenterOfPressure, DragActsAtThePoint)
 {
   TestFixture fixture(common::joinPaths(TEST_WORLD_DIR,
-                                        "application_point.sdf"));
+                                        "center_of_pressure.sdf"));
   std::map<std::string, math::Pose3d> pose;
   std::map<std::string, math::Vector3d> velocity;
   fixture.OnPreUpdate([&](const UpdateInfo &, EntityComponentManager &_ecm)
@@ -135,10 +135,10 @@ TEST(HydrodynamicsApplicationPoint, DragActsAtThePoint)
 /// model is written there: the point does not move. With the model left at
 /// the link origin, which swings around the centre of mass, the drag there
 /// pushes the body away.
-TEST(HydrodynamicsApplicationPoint, VelocityIsTakenAtThePoint)
+TEST(HydrodynamicsCenterOfPressure, VelocityIsTakenAtThePoint)
 {
   TestFixture fixture(common::joinPaths(TEST_WORLD_DIR,
-                                        "application_point.sdf"));
+                                        "center_of_pressure.sdf"));
   const math::Vector3d centreOfMass(0, 0, -0.1);
   std::map<std::string, math::Vector3d> start;
   std::map<std::string, math::Vector3d> end;
@@ -175,7 +175,7 @@ TEST(HydrodynamicsApplicationPoint, VelocityIsTakenAtThePoint)
 /// its centre of mass is pushed by the water at that point; one that names
 /// no point is pushed by the water at its centre of mass, not at its link
 /// origin.
-TEST(HydrodynamicsApplicationPoint, CurrentIsTakenAtThePoint)
+TEST(HydrodynamicsCenterOfPressure, CurrentIsTakenAtThePoint)
 {
   TestFixture fixture(common::joinPaths(TEST_WORLD_DIR,
                                         "current_shear.sdf"));
@@ -210,9 +210,9 @@ TEST(HydrodynamicsApplicationPoint, CurrentIsTakenAtThePoint)
 /// a tilted, tumbling body. They differ by what the integrator makes of two
 /// descriptions of one motion, which shrinks with the step. The body that
 /// leaves the model at the link origin goes somewhere else.
-TEST(HydrodynamicsApplicationPoint, MatchesAModelWrittenAtThePoint)
+TEST(HydrodynamicsCenterOfPressure, MatchesAModelWrittenAtThePoint)
 {
-  const auto pose = FinalPoses("application_point_equivalent.sdf", 2000,
+  const auto pose = FinalPoses("center_of_pressure_equivalent.sdf", 2000,
                                {"tag", "moved", "plain"});
   // Centre of mass in each link frame, and where each model starts.
   const math::Vector3d com(0.05, 0.02, -0.10);
@@ -236,12 +236,12 @@ TEST(HydrodynamicsApplicationPoint, MatchesAModelWrittenAtThePoint)
 
 //////////////////////////////////////////////////
 /// The correction for the physics engine's added mass belongs to the link:
-/// two bodies that differ only in their application point, with nothing
+/// two bodies that differ only in their centre of pressure, with nothing
 /// else in the plugin, move alike. The body without the plugin, whose
 /// Coriolis terms stay against the ground, ends somewhere else.
-TEST(HydrodynamicsApplicationPoint, FluidAddedMassIgnoresThePoint)
+TEST(HydrodynamicsCenterOfPressure, FluidAddedMassIgnoresThePoint)
 {
-  const auto pose = FinalPoses("application_point_fluid_added_mass.sdf",
+  const auto pose = FinalPoses("center_of_pressure_fluid_added_mass.sdf",
                                3000, {"at_point", "at_origin", "no_plugin"});
   const auto moved = [&](const std::string &_name, const double _y)
   {
@@ -256,10 +256,10 @@ TEST(HydrodynamicsApplicationPoint, FluidAddedMassIgnoresThePoint)
 //////////////////////////////////////////////////
 /// The world's own current reaches a body that names a point: it settles
 /// at the water's velocity, 0.5 m/s east.
-TEST(HydrodynamicsApplicationPoint, FeelsTheWorldCurrentAtThePoint)
+TEST(HydrodynamicsCenterOfPressure, FeelsTheWorldCurrentAtThePoint)
 {
   TestFixture fixture(common::joinPaths(
-      TEST_WORLD_DIR, "application_point_world_current.sdf"));
+      TEST_WORLD_DIR, "center_of_pressure_world_current.sdf"));
   math::Vector3d velocity;
   fixture.OnPostUpdate([&](const UpdateInfo &,
                            const EntityComponentManager &_ecm)

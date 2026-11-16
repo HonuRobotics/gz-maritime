@@ -16,7 +16,7 @@ and nothing else. To see it against a newer upstream:
 1. **The world's ocean current.** When the world carries the
    `OceanCurrentfield` recipe of `gz_ocean_current`, the plugin keeps an
    `OceanCurrentSampler`, synced every `PreUpdate`, asks it at the link's
-   centre of mass (`WorldInertialPose`), or at the application point of
+   centre of mass (`WorldInertialPose`), or at the centre of pressure of
    delta 6 when the model names one, and damps against the velocity
    relative to that water, ν − ν_c, in added mass, Coriolis and damping:
    Fossen's model as written. The world owns the current, so the plugin's
@@ -66,10 +66,10 @@ and nothing else. To see it against a newer upstream:
 
    Deltas 4 and 5 are proposed upstream in gazebosim/gz-sim#4209.
 
-6. **An application point.** Upstream takes the velocity at the link origin
+6. **A centre of pressure.** Upstream takes the velocity at the link origin
    and applies the wrench there, so a link whose origin is off the thrust
    line pitches or rolls under way: thrust and drag make a couple.
-   `<application_point>`, a point in the link frame, moves both: the
+   `<center_of_pressure>`, a point in the link frame, moves both: the
    velocity is the point's, the current is asked there and the wrench acts
    at it. That is Fossen's change of origin, so the model is the one a link
    frame at that point would give; a test compares the two. Without the tag

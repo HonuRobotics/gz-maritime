@@ -7,7 +7,7 @@
   upstream: the drag acts 0.1 m above the thrust and the couple pitches it.
 -->
 <sdf version="1.9">
-  <world name="application_point">
+  <world name="center_of_pressure">
     <gravity>0 0 0</gravity>
     <physics name="1ms" type="dart">
       <max_step_size>0.001</max_step_size>
@@ -30,7 +30,7 @@
       <plugin filename="gz-maritime-hydrodynamics-system"
               name="gz::sim::maritime::Hydrodynamics">
         <link_name>link</link_name>
-        <application_point>0 0 -0.1</application_point>
+        <center_of_pressure>0 0 -0.1</center_of_pressure>
         <xUabsU>-40</xUabsU><yVabsV>-40</yVabsV><zWabsW>-40</zWabsW>
         <kP>-1</kP><mQ>-1</mQ><nR>-1</nR>
       </plugin>

@@ -45,7 +45,7 @@
       <plugin filename="gz-maritime-hydrodynamics-system"
               name="gz::sim::maritime::Hydrodynamics">
         <link_name>link</link_name>
-        <application_point>0 0 -1</application_point>
+        <center_of_pressure>0 0 -1</center_of_pressure>
         <lookup_current_x>current_x</lookup_current_x>
         <lookup_current_y>current_y</lookup_current_y>
         <lookup_current_z>current_z</lookup_current_z>
@@ -88,7 +88,7 @@
       <plugin filename="gz-maritime-hydrodynamics-system"
               name="gz::sim::maritime::Hydrodynamics">
         <link_name>link</link_name>
-        <application_point>0 0</application_point>
+        <center_of_pressure>0 0</center_of_pressure>
         <lookup_current_x>current_x</lookup_current_x>
         <lookup_current_y>current_y</lookup_current_y>
         <lookup_current_z>current_z</lookup_current_z>

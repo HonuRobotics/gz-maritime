@@ -101,16 +101,19 @@ namespace maritime
   ///     [string]
   ///
   /// ### Optional
-  ///   * `<application_point>` - The point of the link, in the link
-  ///     frame, the coefficients below are written at: Fossen's origin.
-  ///     The velocity and the current are taken there and the forces act
-  ///     there, so the model is the same as one whose link frame is at
-  ///     that point. Set it to the centre of the wet hull, usually on the
-  ///     thrust line, so thrust and drag make no couple. Without it the
-  ///     point is the link origin, as upstream, and the current is asked
-  ///     at the centre of mass. The correction for a link's
-  ///     `<fluid_added_mass>` stays at the link origin, where that matrix
-  ///     is defined. [m]
+  ///   * `<center_of_pressure>` - The centre of pressure (CP): the point
+  ///     of the link, in the link frame, about which the coefficients
+  ///     below are defined, their moment reference point. The
+  ///     coefficients stay in the link's axes. The velocity and the
+  ///     current are taken there and the forces act there, so the model
+  ///     is the same as one whose link frame is at that point. Put it
+  ///     where the coefficients were identified; for coefficients without
+  ///     coupling terms (no surge to pitch, sway to roll), all the drag
+  ///     acts through this point, so put it where the drag acts on the
+  ///     hull. Without it the point is the link origin (Fossen's CO), as
+  ///     upstream, and the current is asked at the centre of mass. The
+  ///     correction for a link's `<fluid_added_mass>` stays at the link
+  ///     origin, where that matrix is defined. [m]
   ///
   /// ### Damping (Drag)
   ///
@@ -171,7 +174,7 @@ namespace maritime
   /// `OceanCurrentfield` recipe, written by
   /// `gz-maritime-ocean-current-system`), the plugin keeps an
   /// `ocean_current::OceanCurrentSampler`, asks it every step at the link's
-  /// centre of mass, or at `<application_point>` when given, and damps
+  /// centre of mass, or at `<center_of_pressure>` when given, and damps
   /// against that; the world owns the current, so
   /// the tags and the topic below are then ignored, with a warning for a tag
   /// set and for the first message on the topic. Without one, they work as

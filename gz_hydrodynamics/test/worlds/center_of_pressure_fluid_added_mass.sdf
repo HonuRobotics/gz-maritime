@@ -4,12 +4,12 @@
   (<fluid_added_mass>), in a uniform current, with no coefficient in the
   plugin: all it applies is the Coriolis correction for that added mass. The
   matrix belongs to the link, so the correction must not depend on the
-  application point: "at_point" and "at_origin" must move alike.
+  centre of pressure: "at_point" and "at_origin" must move alike.
   "no_plugin" has the same added mass and no plugin, to show the correction
   is at work.
 -->
 <sdf version="1.11">
-  <world name="application_point_fluid_added_mass">
+  <world name="center_of_pressure_fluid_added_mass">
     <gravity>1.0 0.5 -2.0</gravity>
     <physics name="1ms" type="dart">
       <max_step_size>0.001</max_step_size>
@@ -36,7 +36,7 @@
       <plugin filename="gz-maritime-hydrodynamics-system"
               name="gz::sim::maritime::Hydrodynamics">
         <link_name>link</link_name>
-        <application_point>0 0 -0.5</application_point>
+        <center_of_pressure>0 0 -0.5</center_of_pressure>
         <default_current>0.3 0.2 0</default_current>
       </plugin>
     </model>

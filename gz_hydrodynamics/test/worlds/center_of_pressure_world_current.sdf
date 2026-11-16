@@ -2,11 +2,11 @@
 <!--
   A 0.5 m/s ocean current setting east, owned by the world, and a body
   that writes its hydrodynamics at its centre of mass, 0.2 m below its link
-  origin, through <application_point>. No gravity and no buoyancy: the
+  origin, through <center_of_pressure>. No gravity and no buoyancy: the
   damping against the water is all that moves it.
 -->
 <sdf version="1.9">
-  <world name="application_point_world_current">
+  <world name="center_of_pressure_world_current">
     <gravity>0 0 0</gravity>
     <physics name="1ms" type="dart">
       <max_step_size>0.001</max_step_size>
@@ -36,7 +36,7 @@
       <plugin filename="gz-maritime-hydrodynamics-system"
               name="gz::sim::maritime::Hydrodynamics">
         <link_name>link</link_name>
-        <application_point>0 0 -0.2</application_point>
+        <center_of_pressure>0 0 -0.2</center_of_pressure>
         <xU>-40</xU><yV>-40</yV><zW>-40</zW>
         <kP>-1</kP><mQ>-1</mQ><nR>-1</nR>
       </plugin>
