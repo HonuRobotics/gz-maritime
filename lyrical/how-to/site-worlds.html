@@ -181,7 +181,10 @@
 <li class="toctree-l4"><a class="reference internal" href="#nathan-benderson-park">Nathan Benderson Park</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#sand-island">Sand Island</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#la-spezia">La Spezia</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#marina-bay">Marina Bay</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#marina-bay">Marina Bay</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#robotx-2026">RobotX 2026</a></li>
+</ul>
+</li>
 <li class="toctree-l4"><a class="reference internal" href="#what-to-know">What to know</a></li>
 </ul>
 </li>
@@ -577,9 +580,10 @@ seawalls and bridges, more than 5000 buildings and 7000 trees from
 OpenStreetMap, and the landmarks modelled on their own, Marina Bay Sands
 and its SkyPark, the ArtScience Museum, the Esplanade’s domes, the Singapore
 Flyer (its wheel turns, once every 105 s), the Helix Bridge and the
-Supertree Grove. The pontoon and the courses
-are placed from the organisers’ site plan; the course elements themselves
-are not in the world, so add your own.</p>
+Supertree Grove. The quays stand 3 m above the water, as measured at the
+Promontory. The courses are placed from the organisers’ site plan; the
+event’s pontoon and course elements are not in this world, so add your own,
+or launch <code class="docutils literal notranslate"><span class="pre">robotx_2026.sdf</span></code> below, which has them.</p>
 <p>The world’s origin is the middle of the courses. The water is the Marina
 Reservoir, fresh water behind the Marina Barrage, so buoyancy uses
 1000 kg/m³, and there is no tide.</p>
@@ -626,6 +630,50 @@ camera’s copies bound the frame rate:</p>
 </pre></div>
 </div>
 <p>Its site model is a separate download, about 8 MB.</p>
+<section id="robotx-2026">
+<h3>RobotX 2026<a class="headerlink" href="#robotx-2026" title="Link to this heading"></a></h3>
+<figure class="align-default" id="id6">
+<img alt="The RobotX 2026 courses from above the Marina Boulevard seawall: buoy fields, delivery platforms and docks in front of the pontoon, its banners, canopies and flags, and the overcast bay behind" src="../_images/robotx-2026.jpg" />
+<figcaption>
+<p><span class="caption-text">The RobotX 2026 world at its opening view, over courses A and B.</span><a class="headerlink" href="#id6" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p><code class="docutils literal notranslate"><span class="pre">robotx_2026.sdf</span></code> is Marina Bay set up as at the Maritime RobotX Challenge
+2026, after the venue’s photos and video. Each of the four courses, 30 m
+wide and 36 m apart from 5 m off the Marina Boulevard seawall to 5 m off the
+pontoon, has its boundary buoys (lettered A to D), the Task 1 buoy field,
+the Task 2 buoys over the pipeline with a pinger under each, two delivery
+platforms with a red, a green and a blue tin on each, and the docking bays.
+The pontoon runs behind all four courses, from a few metres off the
+Promontory to a gangway up to the promenade at the D end, with a dragon boat
+berth on its bay side. Each course has its launch area there: the UAV launch
+and landing platform and two USV launch fingers. Banners, canopies and flags
+dress the pontoon, and the COURSE A to D tents stand on the promenade. The
+day is overcast, as it was.</p>
+<p>The elements are static, except the tins, which a UAV can pick up. They
+come from the RobotX_2026 collection on Fuel, about 30 MB on first use.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p></p></th>
+<th class="head"><p></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Launch</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ros2</span> <span class="pre">launch</span> <span class="pre">kai_bringup</span> <span class="pre">simulation.launch.xml</span> <span class="pre">world:=robotx_2026.sdf</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Start points</p></td>
+<td><p>course A <code class="docutils literal notranslate"><span class="pre">x:=-53</span> <span class="pre">y:=0</span></code>, B <code class="docutils literal notranslate"><span class="pre">x:=-23</span> <span class="pre">y:=-20</span></code>, C <code class="docutils literal notranslate"><span class="pre">x:=7</span> <span class="pre">y:=-40</span></code>, D <code class="docutils literal notranslate"><span class="pre">x:=37</span> <span class="pre">y:=-60</span></code>, each <code class="docutils literal notranslate"><span class="pre">yaw:=0.98</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Water</p></td>
+<td><p>The Marina Reservoir, fresh, overcast</p></td>
+</tr>
+<tr class="row-odd"><td><p>Sea states</p></td>
+<td><p>0 to 2</p></td>
+</tr>
+</tbody>
+</table>
+</section>
 </section>
 <section id="what-to-know">
 <h2>What to know<a class="headerlink" href="#what-to-know" title="Link to this heading"></a></h2>
