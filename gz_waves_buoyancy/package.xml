@@ -3,7 +3,7 @@
 <package format="3">
   <name>gz_waves_buoyancy</name>
   <version>0.1.0</version>
-  <description>Buoyancy on the waves for Gazebo Sim: a world system that floats every collision marked gz:buoyancy="true" on the world's wave field instead of flat water, pushing each shape up by the water under the local, sloping surface, and that marks the world as wave coupled for the systems that damp against the water.</description>
+  <description>Buoyancy on the waves for Gazebo Sim: a world system that floats every collision marked gz:buoyancy="true" on the world's wave field instead of flat water, pushing each shape up by the water under a plane fitted to the surface around it.</description>
   <maintainer email="acordero@honurobotics.com">Alejandro Hernandez Cordero</maintainer>
   <license>Apache-2.0</license>
 
@@ -16,12 +16,17 @@
   <depend>sdformat_vendor</depend>
   <!-- The wave field it floats things on. -->
   <depend>gz_waves</depend>
+  <!-- The marked collisions, found as the wind and current find theirs. -->
+  <depend>gz_marked_shapes</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
-  <!-- The analytic wave engine the tests use. -->
+  <!-- The wave engines the tests use. -->
   <test_depend>gz_waves_provider_gerstner</test_depend>
+  <test_depend>gz_waves_provider_fft</test_depend>
+  <!-- The flat buoyancy, to show the two never push together. -->
+  <test_depend>gz_buoyancy</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

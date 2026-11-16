@@ -29,24 +29,29 @@ namespace gz::sim::maritime
   /// field, not on flat water.
   ///
   /// A world system, used instead of `gz-maritime-buoyancy-system` in a
-  /// world whose physics should follow the waves; the two must not run
-  /// together, or each marked shape is pushed twice. It reads the same marks:
-  /// every collision marked `gz:buoyancy="true"` (a box, a cylinder or a
-  /// sphere) on any model, spawned later under any name included; the world
-  /// names nobody, and no vehicle changes.
+  /// world whose physics should follow the waves. It reads the same marks:
+  /// every collision marked `gz:buoyancy="true"` (a box, a cylinder, a
+  /// sphere, a capsule, an ellipsoid or a cone) on any model, spawned later
+  /// under any name included; the world names nobody, and no vehicle
+  /// changes. The two must not run together, or each marked shape is pushed
+  /// twice: it leaves any link the flat buoyancy floats (one with a
+  /// `Volume` component, which that system gives each link it floats), with
+  /// an error.
   ///
-  /// Every step, for each marked shape, it asks the wave field (the world's
-  /// `Wavefield` component, advanced to the step) for the surface height and
-  /// its normal above the shape's centre, takes the volume of the shape under
-  /// that tangent plane, and pushes the link up with the weight of the water
-  /// displaced, at the centre of that volume, and with the weight of the air
-  /// displaced by the rest. A crest lifts a shape, a trough drops it, the
-  /// slope tilts it. Without a wave field the water is flat at
-  /// `<water_level>`, as with the flat buoyancy.
+  /// Every step, for each marked shape, it fits a plane through the height
+  /// of the drawn surface (`waves::SurfaceHeight`) at the shape's centre and
+  /// at the ends of its footprint, takes the volume of the shape under that
+  /// plane, and pushes the link up with the weight of the water displaced,
+  /// at the centre of that volume, and with the weight of the air displaced
+  /// by the rest. A crest lifts a shape, a trough drops it, the slope tilts
+  /// it. It reads the world's `Wavefield` as the wave system last advanced
+  /// it, at that system's `<update_rate>`, and never advances it. Without a
+  /// wave field the water is flat at `<water_level>`, as with the flat
+  /// buoyancy.
   ///
-  /// It marks the world with the `WaveCoupling` component, holding the water
-  /// level, so a system that damps against the water can tell the water
-  /// moves with the waves.
+  /// The force is hydrostatic only: the weight of the water under the
+  /// plane, straight up. The waves' pressure under the surface and their
+  /// horizontal push are not modelled.
   ///
   /// World plugin parameters:
   ///

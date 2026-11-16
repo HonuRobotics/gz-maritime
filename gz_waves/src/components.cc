@@ -17,4 +17,3 @@
 /// state arrives.
 
 #include "gz/sim/components/Wavefield.hh"
-#include "gz/sim/components/WaveCoupling.hh"

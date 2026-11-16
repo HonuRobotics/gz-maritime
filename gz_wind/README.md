@@ -22,7 +22,7 @@ on its side is cut on the face the wind sees; the cut is at the flat
 `<water_level>`, not the wave surface. The velocity is the wind relative to the shape, so a boat
 running with the wind feels less of it. `gz:wind_cd` sets a shape's drag
 coefficient. A mark is read as a bool, so `"1"` works too. Boxes,
-cylinders, spheres, capsules and ellipsoids keep their shape; a mesh counts
+cylinders, spheres, capsules, ellipsoids and cones keep their shape; a mesh counts
 as its bounding box.
 
 The system also writes the wind at the reference height above the world's
