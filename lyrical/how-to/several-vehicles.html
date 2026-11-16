@@ -324,7 +324,7 @@ and <a class="reference external" href="https://github.com/HonuRobotics/holybro_
 in the workspace, and every terminal sourced. The Sydney site downloads
 from Fuel the first time it loads, about 12 MB.</p>
 <section id="bring-it-up">
-<h2>1. Bring it up<a class="headerlink" href="#bring-it-up" title="Link to this heading"></a></h2>
+<span id="1-bring-it-up"></span><h2>1. Bring it up<a class="headerlink" href="#bring-it-up" title="Link to this heading"></a></h2>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>multi_vehicle_demo.launch.py
 </pre></div>
 </div>
@@ -339,7 +339,7 @@ same demo around the origin of the open water world; the demo knows where
 to put its vehicles in those two worlds.</p>
 </section>
 <section id="one-name-each">
-<h2>2. One name each<a class="headerlink" href="#one-name-each" title="Link to this heading"></a></h2>
+<span id="2-one-name-each"></span><h2>2. One name each<a class="headerlink" href="#one-name-each" title="Link to this heading"></a></h2>
 <p>Every instance goes by one name, which is its Gazebo model name, its topic
 prefix, its ROS namespace and its TF prefix. That is what keeps three
 vehicles apart. See it in the graph:</p>
@@ -387,7 +387,7 @@ The frames carry the name too, in TF and in every message header:</p>
 </div>
 </section>
 <section id="read-a-sensor">
-<h2>3. Read a sensor<a class="headerlink" href="#read-a-sensor" title="Link to this heading"></a></h2>
+<span id="3-read-a-sensor"></span><h2>3. Read a sensor<a class="headerlink" href="#read-a-sensor" title="Link to this heading"></a></h2>
 <p>The X500’s barometer, which works because the world runs the air pressure
 system:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>topic<span class="w"> </span><span class="nb">echo</span><span class="w"> </span>--once<span class="w"> </span>/x500/air_pressure
@@ -404,7 +404,7 @@ ros2<span class="w"> </span>run<span class="w"> </span>rqt_image_view<span class
 </div>
 </section>
 <section id="command-an-actuator">
-<h2>4. Command an actuator<a class="headerlink" href="#command-an-actuator" title="Link to this heading"></a></h2>
+<span id="4-command-an-actuator"></span><h2>4. Command an actuator<a class="headerlink" href="#command-an-actuator" title="Link to this heading"></a></h2>
 <p>The boat’s propellers take a fraction of full thrust in [-1, 1] on their
 command topics. Half ahead on both, one terminal each:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>topic<span class="w"> </span>pub<span class="w"> </span>-r<span class="w"> </span><span class="m">5</span><span class="w"> </span>/blueboat/motor_port/cmd<span class="w"> </span>std_msgs/msg/Float64<span class="w"> </span><span class="s2">"{data: 0.5}"</span>
@@ -424,7 +424,7 @@ rotors take one speed per rotor:</p>
 <p>They spin, and with no flight controller in the loop that is all they do.</p>
 </section>
 <section id="drive-one-with-a-gamepad">
-<h2>5. Drive one with a gamepad<a class="headerlink" href="#drive-one-with-a-gamepad" title="Link to this heading"></a></h2>
+<span id="5-drive-one-with-a-gamepad"></span><h2>5. Drive one with a gamepad<a class="headerlink" href="#drive-one-with-a-gamepad" title="Link to this heading"></a></h2>
 <p>The teleop stack of bluerobotics_models binds to one instance and runs
 under its name (<a class="reference external" href="https://honurobotics.github.io/bluerobotics_models/lyrical/how-to/teleop.html">Teleoperate with a gamepad</a>).
 The demo’s boat is <code class="docutils literal notranslate"><span class="pre">blueboat</span></code>, which is the stack’s default for that
@@ -441,7 +441,7 @@ motor commands, or <code class="docutils literal notranslate"><span class="pre">
 the pad never reaches the other vehicle.</p>
 </section>
 <section id="add-a-second-boat">
-<h2>6. Add a second boat<a class="headerlink" href="#add-a-second-boat" title="Link to this heading"></a></h2>
+<span id="6-add-a-second-boat"></span><h2>6. Add a second boat<a class="headerlink" href="#add-a-second-boat" title="Link to this heading"></a></h2>
 <p>Two of a kind work the same way as two kinds. While the demo runs, spawn
 another BlueBoat beside the first under a new name:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>spawn_vehicle.launch.xml<span class="w"> </span>name:<span class="o">=</span>boat_b<span class="w"> </span>x:<span class="o">=</span>-536<span class="w"> </span>y:<span class="o">=</span><span class="m">158</span><span class="w"> </span>yaw:<span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
@@ -457,7 +457,7 @@ Drive it with the pad, bound by name:</p>
 another name.</p>
 </section>
 <section id="change-the-sea">
-<h2>7. Change the sea<a class="headerlink" href="#change-the-sea" title="Link to this heading"></a></h2>
+<span id="7-change-the-sea"></span><h2>7. Change the sea<a class="headerlink" href="#change-the-sea" title="Link to this heading"></a></h2>
 <p>The lake is a rowing course, so keep the sea state between 0 and 2
 (<a class="reference internal" href="site-worlds.html"><span class="std std-doc">Sail the competition sites</span></a>):</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gz<span class="w"> </span>service<span class="w"> </span>-s<span class="w"> </span>/world/default/wave/set_parameters<span class="w"> </span>--reqtype<span class="w"> </span>gz.msgs.Param<span class="w"> </span><span class="se">\</span>

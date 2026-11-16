@@ -332,7 +332,7 @@ floats nothing.</p></li>
 </ol>
 </section>
 <section id="my-vehicle-bumps-into-things-it-shouldn-t-or-sits-on-the-water-oddly">
-<h2>My vehicle bumps into things it shouldn’t, or sits on the water oddly<a class="headerlink" href="#my-vehicle-bumps-into-things-it-shouldn-t-or-sits-on-the-water-oddly" title="Link to this heading"></a></h2>
+<span id="my-vehicle-bumps-into-things-it-shouldnt-or-sits-on-the-water-oddly"></span><h2>My vehicle bumps into things it shouldn’t, or sits on the water oddly<a class="headerlink" href="#my-vehicle-bumps-into-things-it-shouldn-t-or-sits-on-the-water-oddly" title="Link to this heading"></a></h2>
 <p>A marked collision is still a collision to the physics engine. Give every
 mark <code class="docutils literal notranslate"><span class="pre">&lt;surface&gt;&lt;contact&gt;&lt;collide_bitmask&gt;0x00&lt;/collide_bitmask&gt;&lt;/contact&gt;&lt;/surface&gt;</span></code>
 so the displacement volume touches nothing, and let the URDF’s shapes do the
@@ -400,7 +400,7 @@ spawned the installed default model twice by hand, spawn each boat through
 name.</p>
 </section>
 <section id="a-plugin-can-t-find-a-link">
-<h2>A plugin can’t find a link<a class="headerlink" href="#a-plugin-can-t-find-a-link" title="Link to this heading"></a></h2>
+<span id="a-plugin-cant-find-a-link"></span><h2>A plugin can’t find a link<a class="headerlink" href="#a-plugin-can-t-find-a-link" title="Link to this heading"></a></h2>
 <p>Gazebo merges links attached by fixed joints into their parent when it reads
 a URDF, so those links no longer exist, only frames with their names.
 Reference a link that survives, or place things <code class="docutils literal notranslate"><span class="pre">relative_to</span></code> the frame. See
@@ -408,7 +408,7 @@ what survives with <code class="docutils literal notranslate"><span class="pre">
 (<a class="reference internal" href="gazebo-composition.html#what-survives-the-conversion"><span class="std std-ref">What survives the conversion</span></a>).</p>
 </section>
 <section id="the-server-stops-with-ode-internal-error-aabbbound">
-<h2>The server stops with “ODE INTERNAL ERROR … aabbBound”<a class="headerlink" href="#the-server-stops-with-ode-internal-error-aabbbound" title="Link to this heading"></a></h2>
+<span id="the-server-stops-with-ode-internal-error--aabbbound"></span><h2>The server stops with “ODE INTERNAL ERROR … aabbBound”<a class="headerlink" href="#the-server-stops-with-ode-internal-error-aabbbound" title="Link to this heading"></a></h2>
 <p>A box-shaped hull floating almost exactly level made the buoyancy
 calculation return a wildly wrong result, which blew the simulation up. This
 is a gz-math bug, fixed upstream in
@@ -437,7 +437,7 @@ For your own vehicle, set the same three things in your RViz config.
 <code class="docutils literal notranslate"><span class="pre">display.launch.xml</span></code>, which runs without Gazebo, uses no prefix.</p>
 </section>
 <section id="robot-state-publisher-warns-about-the-root-link-inertia">
-<h2>robot_state_publisher warns about the root link inertia<a class="headerlink" href="#robot-state-publisher-warns-about-the-root-link-inertia" title="Link to this heading"></a></h2>
+<span id="robot_state_publisher-warns-about-the-root-link-inertia"></span><h2>robot_state_publisher warns about the root link inertia<a class="headerlink" href="#robot-state-publisher-warns-about-the-root-link-inertia" title="Link to this heading"></a></h2>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>The root link base_link has an inertia specified in the URDF, but KDL does not
 support a root link with an inertia.
 </pre></div>

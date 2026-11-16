@@ -310,7 +310,7 @@
 <p>Start the ocean, put the custom USV on it, and drive it. Run every command
 in a terminal where you sourced <code class="docutils literal notranslate"><span class="pre">~/maritime_ws/install/setup.bash</span></code>.</p>
 <section id="the-ocean-on-its-own">
-<h2>1. The ocean on its own<a class="headerlink" href="#the-ocean-on-its-own" title="Link to this heading"></a></h2>
+<span id="1-the-ocean-on-its-own"></span><h2>1. The ocean on its own<a class="headerlink" href="#the-ocean-on-its-own" title="Link to this heading"></a></h2>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>simulation.launch.xml
 </pre></div>
 </div>
@@ -325,7 +325,7 @@ vehicle is part of this world; vehicles are added to it. Stop it with
 Ctrl+C before the next step.</p>
 </section>
 <section id="put-a-boat-on-it">
-<h2>2. Put a boat on it<a class="headerlink" href="#put-a-boat-on-it" title="Link to this heading"></a></h2>
+<span id="2-put-a-boat-on-it"></span><h2>2. Put a boat on it<a class="headerlink" href="#put-a-boat-on-it" title="Link to this heading"></a></h2>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_custom_vehicle<span class="w"> </span>sim.launch.xml
 </pre></div>
 </div>
@@ -345,7 +345,7 @@ ros2<span class="w"> </span>topic<span class="w"> </span>list<span class="w"> </
 </div>
 </section>
 <section id="drive-it">
-<h2>3. Drive it<a class="headerlink" href="#drive-it" title="Link to this heading"></a></h2>
+<span id="3-drive-it"></span><h2>3. Drive it<a class="headerlink" href="#drive-it" title="Link to this heading"></a></h2>
 <p>Each propeller takes a command between -1 and 1: the fraction of its full
 thrust to apply, 1 full ahead, -1 full astern, 0 stop. It keeps the last
 command it got until a new one arrives. Drive with one terminal per
@@ -373,7 +373,7 @@ second command waits, the further the boat turns before it goes straight.</p>
 </div>
 </section>
 <section id="look-at-it-in-rviz">
-<h2>4. Look at it in RViz<a class="headerlink" href="#look-at-it-in-rviz" title="Link to this heading"></a></h2>
+<span id="4-look-at-it-in-rviz"></span><h2>4. Look at it in RViz<a class="headerlink" href="#look-at-it-in-rviz" title="Link to this heading"></a></h2>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_custom_vehicle<span class="w"> </span>rviz.launch.xml
 </pre></div>
 </div>
@@ -390,7 +390,7 @@ instance, with simulation time. For another boat, pass its name:
 <code class="docutils literal notranslate"><span class="pre">name:=boat_b</span></code>.</p>
 </section>
 <section id="add-a-second-boat">
-<h2>5. Add a second boat<a class="headerlink" href="#add-a-second-boat" title="Link to this heading"></a></h2>
+<span id="5-add-a-second-boat"></span><h2>5. Add a second boat<a class="headerlink" href="#add-a-second-boat" title="Link to this heading"></a></h2>
 <p>While the first one runs, put another on the ocean from a new terminal.
 gz-maritime’s spawn launch takes a name and the vehicle’s three files:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_bringup<span class="w"> </span>spawn_vehicle.launch.xml<span class="w"> </span>name:<span class="o">=</span>boat_b<span class="w"> </span>y:<span class="o">=</span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
@@ -414,7 +414,7 @@ Terminal 1:</p>
 <p>A third boat is the same spawn command with another name.</p>
 </section>
 <section id="make-waves">
-<h2>6. Make waves<a class="headerlink" href="#make-waves" title="Link to this heading"></a></h2>
+<span id="6-make-waves"></span><h2>6. Make waves<a class="headerlink" href="#make-waves" title="Link to this heading"></a></h2>
 <p>The sea state can change while the simulation runs, from 0 (glassy) to 9:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gz<span class="w"> </span>service<span class="w"> </span>-s<span class="w"> </span>/world/default/wave/set_parameters<span class="w"> </span>--reqtype<span class="w"> </span>gz.msgs.Param<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--reptype<span class="w"> </span>gz.msgs.Boolean<span class="w"> </span>--timeout<span class="w"> </span><span class="m">2000</span><span class="w"> </span><span class="se">\</span>

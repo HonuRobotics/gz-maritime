@@ -309,7 +309,7 @@
 <h1>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h1>
 <p>gz-maritime builds from source in a colcon workspace, with Ehukai next to it.</p>
 <section id="clone">
-<h2>1. Clone<a class="headerlink" href="#clone" title="Link to this heading"></a></h2>
+<span id="1-clone"></span><h2>1. Clone<a class="headerlink" href="#clone" title="Link to this heading"></a></h2>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>-p<span class="w"> </span>~/maritime_ws/src<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>~/maritime_ws/src
 git<span class="w"> </span>clone<span class="w"> </span>https://github.com/HonuRobotics/gz-maritime.git
 git<span class="w"> </span>clone<span class="w"> </span>https://github.com/HonuRobotics/ehukai.git
@@ -319,7 +319,7 @@ git<span class="w"> </span>clone<span class="w"> </span>https://github.com/HonuR
 before the wave package that needs it, so there is no separate install step.</p>
 </section>
 <section id="install-the-dependencies">
-<h2>2. Install the dependencies<a class="headerlink" href="#install-the-dependencies" title="Link to this heading"></a></h2>
+<span id="2-install-the-dependencies"></span><h2>2. Install the dependencies<a class="headerlink" href="#install-the-dependencies" title="Link to this heading"></a></h2>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>~/maritime_ws
 rosdep<span class="w"> </span>update
 rosdep<span class="w"> </span>install<span class="w"> </span>--from-paths<span class="w"> </span>src<span class="w"> </span>--ignore-src<span class="w"> </span>-y
@@ -333,7 +333,7 @@ stops before installing anything.</p>
 </div>
 </section>
 <section id="build">
-<h2>3. Build<a class="headerlink" href="#build" title="Link to this heading"></a></h2>
+<span id="3-build"></span><h2>3. Build<a class="headerlink" href="#build" title="Link to this heading"></a></h2>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>colcon<span class="w"> </span>build<span class="w"> </span>--merge-install
 <span class="nb">source</span><span class="w"> </span>install/setup.bash
 </pre></div>
@@ -342,7 +342,7 @@ stops before installing anything.</p>
 Gazebo where to find the worlds, models and plugins.</p>
 </section>
 <section id="check">
-<h2>4. Check<a class="headerlink" href="#check" title="Link to this heading"></a></h2>
+<span id="4-check"></span><h2>4. Check<a class="headerlink" href="#check" title="Link to this heading"></a></h2>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>pkg<span class="w"> </span>list<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s2">"kai_|gz_buoyancy|gz_thruster"</span>
 </pre></div>
 </div>
