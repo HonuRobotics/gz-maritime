@@ -12,10 +12,15 @@
 
 #include <algorithm>
 #include <cmath>
+#include <condition_variable>
+#include <mutex>
 #include <string>
+#include <thread>
+#include <utility>
 
 #include <gz/common/Console.hh>
 #include <gz/math/Helpers.hh>  // GZ_PI
+#include <tbb/task_arena.h>
 
 #include "gz/sim/waves/Wavefield.hh"
 
@@ -29,10 +34,66 @@ namespace
 /// Forward-difference step [s] for the lazy particle-velocity computation.
 constexpr double kVelDt = 0.05;
 
+/// Most TBB threads the update computed ahead may use (see
+/// EhukaiState::Run).
+constexpr int kAheadThreads = 4;
+
 /// Row-major float matrix view of Ehukai's spatial buffers (Ehukai stores
 /// row-major float; our grids are column-major double).
 using RowMatF = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic,
                               Eigen::RowMajor>;
+
+/// \brief The grids one update fills: what the queries and the renderer
+/// read.
+struct Grids
+{
+  /// \brief Surface elevation [m].
+  Eigen::MatrixXd height;
+  /// \brief Final horizontal displacement x [m], choppiness included.
+  Eigen::MatrixXd dispX;
+  /// \brief Final horizontal displacement y [m].
+  Eigen::MatrixXd dispY;
+  /// \brief Minimum eigenvalue of the displacement Jacobian; 1 = flat.
+  Eigen::MatrixXd minE;
+};
+
+//////////////////////////////////////////////////
+/// \brief Ehukai's propagated state as our grids: float to double, row to
+/// column major, at our calibrated amplitude.
+/// \param[in] _state The propagated state.
+/// \param[in] _n Grid resolution per axis.
+/// \param[in] _scale Amplitude scale: ramp, calibration and gain.
+/// \param[in] _chopScale The same times the choppiness.
+/// \param[out] _height Surface elevation.
+/// \param[out] _dispX Final horizontal displacement x.
+/// \param[out] _dispY Final horizontal displacement y.
+/// \param[out] _minE Folding metric.
+void ToGrids(const ehukai::PropagatedStatef &_state, int _n, double _scale,
+             double _chopScale, Eigen::MatrixXd &_height,
+             Eigen::MatrixXd &_dispX, Eigen::MatrixXd &_dispY,
+             Eigen::MatrixXd &_minE)
+{
+  // Map+cast assignment lets Eigen vectorize the float→double conversion and
+  // row→column layout swap; the scale folds into the same expression.
+  _height = Eigen::Map<const RowMatF>(
+      _state.Height.cdata(), _n, _n).cast<double>() * _scale;
+  // WaveField2D carries the FINAL horizontal displacement, so the Tessendorf
+  // choppiness multiplier folds in here (the shader applies dx/dy as-is; a
+  // shader-side chopFactor would invert the Gerstner engine's baked chop).
+  _dispX = Eigen::Map<const RowMatF>(
+      _state.Dx.cdata(), _n, _n).cast<double>() * _chopScale;
+  _dispY = Eigen::Map<const RowMatF>(
+      _state.Dy.cdata(), _n, _n).cast<double>() * _chopScale;
+
+  // Foam: Ehukai computes MinE = -(min eigenvalue of the displacement
+  // Jacobian) at its internal amplitude. At our calibrated amplitude the
+  // minimum eigenvalue is 1 - scale*(MinE + 1). Jacobian() bilinear-samples
+  // this; Eval::FoamMask turns values below its threshold into whitecaps. At
+  // t=0 (scale=0) the surface is flat -> eigenvalue 1 -> no foam.
+  _minE = (1.0 - _scale *
+      (Eigen::Map<const RowMatF>(_state.MinE.cdata(), _n, _n)
+          .cast<double>().array() + 1.0)).matrix();
+}
 
 //////////////////////////////////////////////////
 /// Returns the integer log2 of n if n is a positive power of two; -1 otherwise.
@@ -206,6 +267,91 @@ struct FFTWaveSimulation::EhukaiState
   /// Scratch state propagated at t+dt to finite-difference particle velocity;
   /// filled lazily by ParticleVelocity(), not by Update().
   std::unique_ptr<ehukai::PropagatedStatef> scratch;
+
+  // ---- The update computed ahead (Prepare) -------------------------------
+  // A worker thread propagates the hinted time into a working set of its
+  // own, so the caller's thread never waits on it unless the hinted update
+  // comes due before it is done. The worker shares only `params` and
+  // `initial` with the caller, both read only after SetParameters.
+
+  /// The worker's propagation scratch (Ehukai's is per instance).
+  std::unique_ptr<ehukai::Propagationf> aheadPropagation;
+  /// The state the worker propagates into; swapped with `state` when taken.
+  std::unique_ptr<ehukai::PropagatedStatef> aheadState;
+  /// The grids the worker fills; copied into the live ones when taken.
+  Grids aheadGrids;
+
+  /// Guards everything below, and the swap of `state` and `aheadState`.
+  std::mutex mutex;
+  /// Wakes the worker for a job, and the caller when the worker is done.
+  std::condition_variable cv;
+  /// The worker; started by the first Prepare.
+  std::thread worker;
+  /// Tells the worker to leave.
+  bool quit{false};
+  /// A job waits for the worker, or the worker is on one.
+  bool pending{false};
+  /// The time of that job, and its amplitude scales.
+  double jobTime{0.0};
+  double jobScale{0.0};
+  double jobChopScale{0.0};
+  /// `aheadState` and `aheadGrids` hold the update for `readyTime`.
+  bool ready{false};
+  double readyTime{0.0};
+
+  /// \brief Stop the worker.
+  ~EhukaiState()
+  {
+    {
+      std::lock_guard<std::mutex> lock(this->mutex);
+      this->quit = true;
+    }
+    this->cv.notify_all();
+    if (this->worker.joinable())
+      this->worker.join();
+  }
+
+  /// \brief The worker: propagate each job into the ahead working set.
+  /// \param[in] _n Grid resolution per axis.
+  void Run(int _n)
+  {
+    // Ehukai runs its loops and transforms on TBB, by default on every
+    // core. Here that crowds the thread being spared: with the update off
+    // the caller's thread but spread over all cores, a step was slower than
+    // with no worker at all. A few threads finish a 128 x 128 update in
+    // about half a millisecond and leave the caller's core alone.
+    const int threads = std::clamp(
+        static_cast<int>(std::thread::hardware_concurrency()) / 2,
+        1, kAheadThreads);
+    tbb::task_arena arena(threads);
+
+    std::unique_lock<std::mutex> lock(this->mutex);
+    while (true)
+    {
+      this->cv.wait(lock, [this] { return this->quit || this->pending; });
+      if (this->quit)
+        return;
+      const double t = this->jobTime;
+      const double scale = this->jobScale;
+      const double chopScale = this->jobChopScale;
+      // Nobody swaps aheadState while a job is pending.
+      ehukai::PropagatedStatef &out = *this->aheadState;
+      lock.unlock();
+      arena.execute([&]
+      {
+        this->aheadPropagation->propagate(
+            this->params, *this->initial, out, static_cast<float>(t));
+      });
+      ToGrids(out, _n, scale, chopScale, this->aheadGrids.height,
+              this->aheadGrids.dispX, this->aheadGrids.dispY,
+              this->aheadGrids.minE);
+      lock.lock();
+      this->pending = false;
+      this->ready = true;
+      this->readyTime = t;
+      this->cv.notify_all();
+    }
+  }
 };
 
 FFTWaveSimulation::~FFTWaveSimulation() = default;
@@ -288,6 +434,17 @@ void FFTWaveSimulation::SetParameters(const WaveParameters &_params)
       std::make_unique<ehukai::PropagatedStatef>(ep);
   this->ehukai->scratch =
       std::make_unique<ehukai::PropagatedStatef>(ep);
+  // The working set of the update computed ahead. Built here, on the
+  // caller's thread: Ehukai's converters set a process-wide thread cap when
+  // constructed, which must not race an execution.
+  this->ehukai->aheadPropagation =
+      std::make_unique<ehukai::Propagationf>(ep, /*nthreads=*/-1);
+  this->ehukai->aheadState =
+      std::make_unique<ehukai::PropagatedStatef>(ep);
+  this->ehukai->aheadGrids.height = Eigen::MatrixXd::Zero(N, N);
+  this->ehukai->aheadGrids.dispX  = Eigen::MatrixXd::Zero(N, N);
+  this->ehukai->aheadGrids.dispY  = Eigen::MatrixXd::Zero(N, N);
+  this->ehukai->aheadGrids.minE   = Eigen::MatrixXd::Constant(N, N, 1.0);
 
   // --- Physics-based amplitude calibration -------------------------------
   // Ehukai's amplitudeGain only feeds its (here unused) normal computation,
@@ -345,49 +502,84 @@ void FFTWaveSimulation::Update(double _simTime)
     return;  // default-constructed, not yet configured
 
   const int N = static_cast<int>(this->gridSize);
+  auto &e = *this->ehukai;
 
-  this->ehukai->propagation->propagate(
-      this->ehukai->params,
-      *this->ehukai->initial,
-      *this->ehukai->state,
-      static_cast<float>(_simTime));
+  // The update computed ahead, when Prepare was given this very time: wait
+  // for the worker if it is still on it, then take its result. It ran the
+  // same propagation on the same inputs, so the field is the same either
+  // way.
+  {
+    std::unique_lock<std::mutex> lock(e.mutex);
+    if (e.pending && e.jobTime == _simTime)
+      e.cv.wait(lock, [&e] { return !e.pending; });
+    if (e.ready && e.readyTime == _simTime && !e.pending)
+    {
+      // In place, as a synchronous update writes them: a Field() view taken
+      // earlier keeps pointing at the live data. ParticleVelocity reads
+      // `state`, so that follows too.
+      std::swap(e.state, e.aheadState);
+      this->heightGrid = e.aheadGrids.height;
+      this->dispXGrid = e.aheadGrids.dispX;
+      this->dispYGrid = e.aheadGrids.dispY;
+      this->minEGrid = e.aheadGrids.minE;
+      e.ready = false;
+      return;
+    }
+  }
 
-  // Combined output scale per Update:
-  //  * ramp         — fade the field in over `tau`;
-  //  * this->ehukaiScale — physics-based amplitude calibration to a PM sea state
-  //                   (Ehukai's amplitudeGain doesn't scale the height);
-  //  * this->gain        — the SDF <gain> user multiplier (a no-op via Ehukai's
-  //                   amplitudeGain, so we apply it here to make it work).
-  const double scale =
-      StartupRamp(_simTime, this->tau) * this->ehukaiScale * this->gain;
-
-  // Map+cast assignment lets Eigen vectorize the float→double conversion and
-  // row→column layout swap; the scale folds into the same expression.
-  this->heightGrid = Eigen::Map<const RowMatF>(
-      this->ehukai->state->Height.cdata(), N, N).cast<double>() * scale;
-  // WaveField2D carries the FINAL horizontal displacement, so the Tessendorf
-  // choppiness multiplier folds in here (the shader applies dx/dy as-is; a
-  // shader-side chopFactor would invert the Gerstner engine's baked chop).
-  const double chopScale = scale * this->choppiness;
-  this->dispXGrid = Eigen::Map<const RowMatF>(
-      this->ehukai->state->Dx.cdata(), N, N).cast<double>() * chopScale;
-  this->dispYGrid = Eigen::Map<const RowMatF>(
-      this->ehukai->state->Dy.cdata(), N, N).cast<double>() * chopScale;
-
-  // Foam: Ehukai computes MinE = -(min eigenvalue of the displacement
-  // Jacobian) at its internal amplitude. At our calibrated amplitude the
-  // minimum eigenvalue is 1 - scale*(MinE + 1). Jacobian() bilinear-samples
-  // this; Eval::FoamMask turns values below its threshold into whitecaps. At
-  // t=0 (scale=0) the surface is flat -> eigenvalue 1 -> no foam.
-  this->minEGrid = (1.0 - scale *
-      (Eigen::Map<const RowMatF>(this->ehukai->state->MinE.cdata(), N, N)
-          .cast<double>().array() + 1.0)).matrix();
+  e.propagation->propagate(
+      e.params, *e.initial, *e.state, static_cast<float>(_simTime));
+  ToGrids(*e.state, N, this->AmplitudeScale(_simTime),
+          this->AmplitudeScale(_simTime) * this->choppiness,
+          this->heightGrid, this->dispXGrid, this->dispYGrid, this->minEGrid);
 
   // The particle-velocity grids are NOT refreshed here: their finite
   // difference needs a second full propagation at t+dt, which would double
   // the per-tick cost for consumers that never query velocity (the renderer
   // reads Field() only). ParticleVelocity() fills them lazily, keyed on
   // lastUpdateT.
+}
+
+//////////////////////////////////////////////////
+double FFTWaveSimulation::AmplitudeScale(double _simTime) const
+{
+  // Combined output scale per update:
+  //  * ramp         — fade the field in over `tau`;
+  //  * this->ehukaiScale — physics-based amplitude calibration to a PM sea state
+  //                   (Ehukai's amplitudeGain doesn't scale the height);
+  //  * this->gain        — the SDF <gain> user multiplier (a no-op via Ehukai's
+  //                   amplitudeGain, so we apply it here to make it work).
+  return StartupRamp(_simTime, this->tau) * this->ehukaiScale * this->gain;
+}
+
+//////////////////////////////////////////////////
+void FFTWaveSimulation::Prepare(double _nextSimTime)
+{
+  if (!this->ehukai || !this->ehukai->aheadPropagation ||
+      _nextSimTime == this->lastUpdateT)
+  {
+    return;
+  }
+  auto &e = *this->ehukai;
+  std::unique_lock<std::mutex> lock(e.mutex);
+  if (e.pending && e.jobTime == _nextSimTime)
+    return;
+  // A job for another time: let it finish, its working set is in use.
+  e.cv.wait(lock, [&e] { return !e.pending; });
+  if (e.ready && e.readyTime == _nextSimTime)
+    return;
+  e.ready = false;
+  e.jobTime = _nextSimTime;
+  e.jobScale = this->AmplitudeScale(_nextSimTime);
+  e.jobChopScale = e.jobScale * this->choppiness;
+  e.pending = true;
+  if (!e.worker.joinable())
+  {
+    e.worker = std::thread(&EhukaiState::Run, &e,
+                           static_cast<int>(this->gridSize));
+  }
+  lock.unlock();
+  e.cv.notify_all();
 }
 
 //////////////////////////////////////////////////
