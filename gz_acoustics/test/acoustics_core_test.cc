@@ -18,6 +18,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <random>
 #include <sstream>
 #include <vector>
 
@@ -26,6 +27,7 @@
 
 #include "gz/sim/acoustics/Hearing.hh"
 #include "gz/sim/acoustics/Pinger.hh"
+#include "gz/sim/acoustics/Random.hh"
 
 using namespace gz;
 using namespace sim;
@@ -144,6 +146,121 @@ TEST(TravelTime, DistanceOverSpeed)
 {
   EXPECT_EQ(Duration(100ms), TravelTime(150, 1500));
   EXPECT_EQ(Duration::zero(), TravelTime(150, 0));
+}
+
+//////////////////////////////////////////////////
+/// The first window is the step before, so a system added to a world that
+/// has run for an hour sends one step of pings, not an hour of them; at the
+/// world's first step a ping at time zero is in it.
+TEST(EmissionTimes, TheFirstWindowIsOneStep)
+{
+  EXPECT_EQ(Duration(-1ns), FirstWindowStart(4ms, 4ms));
+  EXPECT_EQ(Duration(3600s), FirstWindowStart(3600s + 4ms, 4ms));
+
+  const PingerData p = Pinger(1.0, 0.0);
+  EXPECT_EQ(1u, EmissionTimes(p, FirstWindowStart(4ms, 4ms), 4ms).size());
+  const Duration late = 3600s + 4ms;
+  EXPECT_TRUE(EmissionTimes(p, FirstWindowStart(late, 4ms), late).empty());
+  EXPECT_EQ(1u, EmissionTimes(p, FirstWindowStart(3601s, 4ms), 3601s).size());
+}
+
+//////////////////////////////////////////////////
+/// A field of view: from the lowest elevation heard to the highest.
+TEST(InElevation, BetweenTheTwoAngles)
+{
+  EXPECT_TRUE(InElevation(0.4, -GZ_PI / 2, GZ_PI / 2));
+  EXPECT_TRUE(InElevation(GZ_PI / 2, -GZ_PI / 2, GZ_PI / 2));
+  EXPECT_TRUE(InElevation(-0.2, -0.5, 0.5));
+  EXPECT_FALSE(InElevation(0.6, -0.5, 0.5));
+  EXPECT_FALSE(InElevation(-0.6, -0.5, 0.5));
+}
+
+//////////////////////////////////////////////////
+/// Two pings overlap when the later arrives while the earlier still sounds,
+/// whichever is given first, and however long the later one lasts.
+TEST(Overlap, TheLaterArrivesWhileTheEarlierSounds)
+{
+  // 0.13 ms apart, 4 ms pulses.
+  EXPECT_TRUE(Overlap(10ms, 4ms, 10ms + 130us, 4ms));
+  // 3.7 ms apart, 1 ms pulses.
+  EXPECT_FALSE(Overlap(10ms, 1ms, 10ms + 3700us, 1ms));
+  // The earlier pulse decides, not the longer.
+  EXPECT_FALSE(Overlap(10ms, 1ms, 13ms, 4ms));
+  EXPECT_FALSE(Overlap(13ms, 4ms, 10ms, 1ms));
+  EXPECT_TRUE(Overlap(10ms, 4ms, 13ms, 1ms));
+  EXPECT_TRUE(Overlap(13ms, 1ms, 10ms, 4ms));
+  // Over exactly when the other arrives.
+  EXPECT_FALSE(Overlap(10ms, 4ms, 14ms, 4ms));
+  // Together, and a pulse of zero turns the rule off.
+  EXPECT_TRUE(Overlap(10ms, 4ms, 10ms, 4ms));
+  EXPECT_FALSE(Overlap(10ms, 0ms, 10ms, 0ms));
+}
+
+//////////////////////////////////////////////////
+/// The draws are written out, so a seed gives the same numbers on every
+/// standard library: the hash is FNV-1a, and a number in [0, 1) is one word
+/// of the Mersenne Twister.
+TEST(Random, TheSameEverywhere)
+{
+  EXPECT_EQ(0x811c9dc5u, Hash(""));
+  EXPECT_EQ(0xe40c292cu, Hash("a"));
+  EXPECT_EQ(0xbf9cf968u, Hash("foobar"));
+
+  // The first word of a default seeded generator is 3499211612.
+  Generator rng;
+  EXPECT_DOUBLE_EQ(3499211612.0 / 4294967296.0, Uniform(rng));
+
+  Generator one(7), two(7);
+  double sum{0.0}, squares{0.0};
+  const int n = 20000;
+  for (int i = 0; i < n; ++i)
+  {
+    const double u = Uniform(one);
+    ASSERT_GE(u, 0.0);
+    ASSERT_LT(u, 1.0);
+    const double x = Normal(one, 2.0, 0.5);
+    Uniform(two);
+    ASSERT_DOUBLE_EQ(x, Normal(two, 2.0, 0.5));
+    sum += x;
+    squares += x * x;
+  }
+  const double mean = sum / n;
+  EXPECT_NEAR(2.0, mean, 0.02);
+  EXPECT_NEAR(0.5, std::sqrt(squares / n - mean * mean), 0.02);
+}
+
+//////////////////////////////////////////////////
+/// A channel's noise: nothing without a block, a constant bias, a spread,
+/// and rounding to a precision.
+TEST(Random, ChannelNoise)
+{
+  Generator rng(3);
+  const Generator untouched = rng;
+  Noise none;
+  EXPECT_DOUBLE_EQ(1.25, ApplyNoise(none, 1.25, rng));
+  // No noise, no draw: a receiver without noise leaves the sequence alone.
+  EXPECT_EQ(untouched, rng);
+
+  Noise bias;
+  bias.bias = 0.5;
+  EXPECT_DOUBLE_EQ(1.75, ApplyNoise(bias, 1.25, rng));
+
+  Noise coarse;
+  coarse.precision = 0.5;
+  EXPECT_DOUBLE_EQ(1.5, ApplyNoise(coarse, 1.3, rng));
+
+  Noise spread;
+  spread.stddev = 0.1;
+  double sum{0.0}, squares{0.0};
+  const int n = 20000;
+  for (int i = 0; i < n; ++i)
+  {
+    const double e = ApplyNoise(spread, 3.0, rng) - 3.0;
+    sum += e;
+    squares += e * e;
+  }
+  EXPECT_NEAR(0.0, sum / n, 0.005);
+  EXPECT_NEAR(0.1, std::sqrt(squares / n), 0.005);
 }
 
 //////////////////////////////////////////////////
