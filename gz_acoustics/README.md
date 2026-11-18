@@ -190,7 +190,9 @@ library.
 | Message | `Param`, header grows each publish | `Param`, one header entry |
 
 Not yet: occlusion by hulls or terrain, time differences per hydrophone,
-transponders (USBL), and drawing pingers in the GUI.
+transponders (USBL), and drawing pingers in the GUI. The water is the flat
+`<water_level>`, not the waves: a shallow hydrophone on a boat that follows
+the waves is out of the water whenever it rises above that plane.
 
 ## Tests
 
