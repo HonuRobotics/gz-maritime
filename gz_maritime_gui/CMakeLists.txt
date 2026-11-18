@@ -43,6 +43,7 @@ add_library(${PROJECT_NAME}_core SHARED
   src/FieldDrawing.cc
   src/FieldSpec.cc
   src/Flow.cc
+  src/MarkerLayer.cc
   src/Presets.cc
   src/Vessels.cc
   src/WindSock.cc
@@ -155,10 +156,17 @@ if(BUILD_TESTING)
       ENVIRONMENT "GZ_PARTITION=gz_maritime_gui_markers_camera_test")
   endif()
 
+  # Stands for MarkerManager in the offscreen GUI test, and prints what it
+  # is sent.
+  add_executable(marker_recorder test/marker_recorder.cc)
+  target_link_libraries(marker_recorder ${PROJECT_NAME}_core
+    gz-transport::core gz-msgs::core)
+
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(test_gui_reads_recipes test/test_gui_reads_recipes.py
     TIMEOUT 240
-    APPEND_ENV GZ_GUI_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR})
+    APPEND_ENV GZ_GUI_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}
+    ENV MARKER_RECORDER=$<TARGET_FILE:marker_recorder>)
 endif()
 
 # GZ_GUI_PLUGIN_PATH hook so gz-sim's GUI finds the plugin library.

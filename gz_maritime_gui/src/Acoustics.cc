@@ -20,11 +20,10 @@
 #include <cmath>
 #include <functional>
 #include <mutex>
+#include <sstream>
 #include <utility>
 
 #include <gz/math/Helpers.hh>
-#include <gz/msgs/boolean.pb.h>
-#include <gz/msgs/marker_v.pb.h>
 #include <gz/msgs/param.pb.h>
 #include <gz/msgs/Utility.hh>
 #include <gz/sim/Util.hh>
@@ -45,6 +44,10 @@ namespace
 
   /// \brief Shades a ping fades through as it spreads.
   constexpr int kShades{3};
+
+  /// \brief Segments around a ring: fewer than a reach circle, which is
+  /// sent once, since the rings are sent again as they spread.
+  constexpr int kRingSegments{64};
 
   /// \brief The colour of a pinger that is off, and of an invalid reading.
   const math::Color kOff(0.55f, 0.55f, 0.55f, 1.0f);
@@ -109,6 +112,87 @@ std::vector<PingerView> ReadPingers(const EntityComponentManager &_ecm)
             [](const PingerView &_a, const PingerView &_b)
             { return _a.data.name < _b.data.name; });
   return out;
+}
+
+//////////////////////////////////////////////////
+std::vector<PingerView> ParsePingers(const msgs::Param &_msg)
+{
+  std::vector<PingerView> out;
+  for (const auto &child : _msg.children())
+  {
+    const auto &p = child.params();
+    auto number = [&p](const std::string &_key, double _default)
+    {
+      const auto it = p.find(_key);
+      return it == p.end() ? _default : it->second.double_value();
+    };
+    const auto name = p.find("name");
+    if (name == p.end() || name->second.string_value().empty())
+      continue;
+    PingerView v;
+    v.data.name = name->second.string_value();
+    const auto active = p.find("active");
+    v.data.active = active == p.end() || active->second.bool_value();
+#define GZ_ACOUSTICS_GUI_READ(m, key) v.data.m = number(key, v.data.m);
+    GZ_ACOUSTICS_PINGER_TABLE(GZ_ACOUSTICS_GUI_READ)
+#undef GZ_ACOUSTICS_GUI_READ
+    v.position.Set(number("x", 0.0), number("y", 0.0), number("z", 0.0));
+    out.push_back(std::move(v));
+  }
+  std::sort(out.begin(), out.end(),
+            [](const PingerView &_a, const PingerView &_b)
+            { return _a.data.name < _b.data.name; });
+  return out;
+}
+
+//////////////////////////////////////////////////
+std::vector<PingerView> MergePingers(std::vector<PingerView> _listed,
+    const std::vector<PingerView> &_state)
+{
+  for (const auto &fresh : _state)
+  {
+    const auto it = std::find_if(_listed.begin(), _listed.end(),
+        [&fresh](const PingerView &_p)
+        { return _p.data.name == fresh.data.name; });
+    if (it != _listed.end())
+      *it = fresh;
+    else
+      _listed.push_back(fresh);
+  }
+  std::sort(_listed.begin(), _listed.end(),
+            [](const PingerView &_a, const PingerView &_b)
+            { return _a.data.name < _b.data.name; });
+  return _listed;
+}
+
+//////////////////////////////////////////////////
+void PingerChanges::Track(std::vector<PingerView> &_pingers,
+    const std::chrono::steady_clock::duration &_now, double _waterLevel)
+{
+  // Simulation time going back is a world reset: nothing is known of the
+  // new run yet.
+  if (_now < this->last)
+    this->seen.clear();
+  this->last = _now;
+
+  std::map<std::string, Seen> now;
+  for (auto &p : _pingers)
+  {
+    std::ostringstream schedule;
+    schedule << p.data.active << ' ' << p.data.period << ' ' << p.data.offset
+             << ' ' << (p.position.Z() < _waterLevel);
+    Seen entry;
+    entry.schedule = schedule.str();
+    const auto before = this->seen.find(p.data.name);
+    if (before != this->seen.end())
+    {
+      entry.since = before->second.schedule == entry.schedule ?
+          before->second.since : _now;
+    }
+    p.since = entry.since;
+    now[p.data.name] = std::move(entry);
+  }
+  this->seen = std::move(now);
 }
 
 //////////////////////////////////////////////////
@@ -179,7 +263,8 @@ std::vector<msgs::Marker> ReachMarkers(const std::vector<PingerView> &_pingers,
 
 //////////////////////////////////////////////////
 std::vector<msgs::Marker> PingMarkers(const std::vector<PingerView> &_pingers,
-    double _planeZ, const std::chrono::steady_clock::duration &_now,
+    double _planeZ, double _waterLevel,
+    const std::chrono::steady_clock::duration &_now,
     double _speed, double _maxRadius, const std::string &_ns)
 {
   std::vector<msgs::Marker> out;
@@ -188,14 +273,13 @@ std::vector<msgs::Marker> PingMarkers(const std::vector<PingerView> &_pingers,
   std::uint64_t id = kFirstId;
   for (const auto &p : _pingers)
   {
-    if (!p.data.active)
+    // A pinger that is off, or out of the water, sends nothing.
+    if (!p.data.active || !(p.position.Z() < _waterLevel))
       continue;
     const double depth = _planeZ - p.position.Z();
-    // Out to the reach, or the cap.
-    double limit = _maxRadius;
-    if (p.data.reach > 0.0)
-      limit = std::min(limit, p.data.reach);
-    if (!(limit > 0.0))
+    // Out to the reach; the cap is for a pinger with none.
+    const double limit = p.data.reach > 0.0 ? p.data.reach : _maxRadius;
+    if (!(limit > 0.0) || !(p.data.period > 0.0))
       continue;
     const auto window = std::chrono::duration_cast<
         std::chrono::steady_clock::duration>(
@@ -203,9 +287,21 @@ std::vector<msgs::Marker> PingMarkers(const std::vector<PingerView> &_pingers,
     const math::Vector3d centre(p.position.X(), p.position.Y(), _planeZ);
     const math::Color colour = FrequencyColor(p.data.frequency);
 
+    // With more pings on their way than rings to draw, every stride-th
+    // ping of the schedule, so the same pings stay drawn as they spread.
+    const auto period = acoustics::FromSeconds(p.data.period);
+    const auto offset = acoustics::FromSeconds(p.data.offset);
+    const std::int64_t stride = std::max<std::int64_t>(1,
+        static_cast<std::int64_t>(std::ceil(
+            limit / _speed / p.data.period / kMaxRings)));
+
     std::vector<std::vector<math::Vector3d>> shades(kShades);
     for (const auto &t : RecentPings(p.data, _now, window))
     {
+      if (p.since && t < *p.since)
+        continue;
+      if (period.count() > 0 && ((t - offset) / period) % stride != 0)
+        continue;
       const double sphere =
           _speed * std::chrono::duration<double>(_now - t).count();
       const double r = CutRadius(sphere, depth);
@@ -213,7 +309,7 @@ std::vector<msgs::Marker> PingMarkers(const std::vector<PingerView> &_pingers,
         continue;
       const int shade = std::min(kShades - 1,
           static_cast<int>(kShades * sphere / limit));
-      auto ring = CircleSegments(centre, r, false);
+      auto ring = CircleSegments(centre, r, false, kRingSegments);
       auto &dst = shades[static_cast<std::size_t>(shade)];
       dst.insert(dst.end(), ring.begin(), ring.end());
     }
@@ -264,87 +360,44 @@ std::vector<msgs::Marker> RayMarkers(const std::vector<BearingRay> &_rays,
 }
 
 //////////////////////////////////////////////////
-struct MarkerLayer::Impl
+void KeepRays(std::map<std::string, BearingRay> &_kept,
+    const std::map<std::string, HeardPing> &_last,
+    const std::map<std::string, math::Pose3d> &_poses)
 {
-  /// \brief The namespace.
-  std::string ns;
-
-  /// \brief MarkerManager's service.
-  std::string service;
-
-  /// \brief The ids on the scene.
-  std::set<std::uint64_t> drawn;
-
-  /// \brief Transport node. Last, so it is destroyed first.
-  transport::Node node;
-
-  /// \brief Send markers without waiting.
-  /// \param[in] _markers The markers.
-  void Send(const msgs::Marker_V &_markers)
+  for (auto it = _kept.begin(); it != _kept.end();)
   {
-    std::function<void(const msgs::Boolean &, const bool)> cb =
-        [](const msgs::Boolean &, const bool) {};
-    this->node.Request(this->service + "_array", _markers, cb);
+    if (_last.count(it->first) == 0u)
+      it = _kept.erase(it);
+    else
+      ++it;
   }
-};
-
-//////////////////////////////////////////////////
-MarkerLayer::MarkerLayer(const std::string &_ns, const std::string &_service)
-  : impl(std::make_unique<Impl>())
-{
-  this->impl->ns = _ns;
-  this->impl->service = _service;
-}
-
-//////////////////////////////////////////////////
-MarkerLayer::~MarkerLayer()
-{
-  this->Clear();
-}
-
-//////////////////////////////////////////////////
-void MarkerLayer::Draw(const std::vector<msgs::Marker> &_markers)
-{
-  auto &d = *this->impl;
-  msgs::Marker_V out;
-  std::set<std::uint64_t> now;
-  for (const auto &m : _markers)
+  for (const auto &[topic, heard] : _last)
   {
-    // A marker sent with no points keeps its old ones, so an empty one is
-    // deleted instead.
-    if (m.point_size() == 0)
+    const auto kept = _kept.find(topic);
+    if (kept != _kept.end() && kept->second.ping.stamp == heard.stamp &&
+        kept->second.ping.bearing == heard.bearing)
+    {
       continue;
-    auto *added = out.add_marker();
-    *added = m;
-    added->set_ns(d.ns);
-    now.insert(m.id());
+    }
+    const auto pose = _poses.find(topic);
+    if (pose != _poses.end())
+      _kept[topic] = {pose->second, heard};
   }
-  for (const auto id : d.drawn)
+}
+
+//////////////////////////////////////////////////
+std::vector<BearingRay> LiveRays(
+    const std::map<std::string, BearingRay> &_kept,
+    const std::chrono::steady_clock::duration &_now,
+    const std::chrono::steady_clock::duration &_lifetime)
+{
+  std::vector<BearingRay> out;
+  for (const auto &[topic, ray] : _kept)
   {
-    if (now.count(id) == 0u)
-      *out.add_marker() = DeleteMarker(d.ns, id);
+    if (_now >= ray.ping.stamp && _now - ray.ping.stamp <= _lifetime)
+      out.push_back(ray);
   }
-  d.drawn = std::move(now);
-  if (out.marker_size() > 0)
-    d.Send(out);
-}
-
-//////////////////////////////////////////////////
-void MarkerLayer::Clear()
-{
-  this->Draw({});
-}
-
-//////////////////////////////////////////////////
-bool MarkerLayer::Drawn() const
-{
-  return !this->impl->drawn.empty();
-}
-
-//////////////////////////////////////////////////
-const std::string &MarkerLayer::Ns() const
-{
-  return this->impl->ns;
+  return out;
 }
 
 //////////////////////////////////////////////////
@@ -418,6 +471,9 @@ struct AcousticListener::Impl
   /// \brief Whether a list came.
   bool heard{false};
 
+  /// \brief The pingers as the ground truth last listed them.
+  std::vector<PingerView> pingers;
+
   /// \brief The last reading per topic.
   std::map<std::string, HeardPing> last;
 
@@ -427,6 +483,15 @@ struct AcousticListener::Impl
   /// \brief Transport node. Last, so it is destroyed first and no callback
   /// runs on the rest after it.
   transport::Node node;
+
+  /// \brief The pingers' ground truth.
+  /// \param[in] _msg The message.
+  void OnPingers(const msgs::Param &_msg)
+  {
+    auto list = ParsePingers(_msg);
+    const std::lock_guard<std::mutex> lock(this->mutex);
+    this->pingers = std::move(list);
+  }
 
   /// \brief A list of receivers.
   /// \param[in] _msg The message.
@@ -481,6 +546,8 @@ void AcousticListener::Listen(const std::string &_world)
   }
   d.node.Subscribe("/world/" + _world + "/acoustics/receivers",
                    &Impl::OnReceivers, &d);
+  d.node.Subscribe("/world/" + _world + "/acoustics/pingers",
+                   &Impl::OnPingers, &d);
 }
 
 //////////////////////////////////////////////////
@@ -488,6 +555,13 @@ std::vector<ReceiverInfo> AcousticListener::Receivers() const
 {
   const std::lock_guard<std::mutex> lock(this->impl->mutex);
   return this->impl->receivers;
+}
+
+//////////////////////////////////////////////////
+std::vector<PingerView> AcousticListener::Pingers() const
+{
+  const std::lock_guard<std::mutex> lock(this->impl->mutex);
+  return this->impl->pingers;
 }
 
 //////////////////////////////////////////////////

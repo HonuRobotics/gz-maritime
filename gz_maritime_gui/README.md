@@ -71,9 +71,14 @@ They need no ROS.
 ## The acoustics panel
 
 `AcousticsPanel` shows `gz_acoustics` in the GUI. It lists the pingers,
-read from their `AcousticPinger` components in the GUI's ECM, each with its
-frequency, period, offset and reach and a switch that sends `active` on its
-`set` topic. It lists the receivers, which the acoustics system publishes on
+each with its frequency, period, offset and reach and a switch that sends
+`active` on its `set` topic. The pingers are those the acoustics system
+lists on `/world/<world>/acoustics/pingers`, each as its `AcousticPinger`
+component in the GUI's ECM has it when the GUI has one, which is newer. A
+panel loaded with the GUI has them all in the ECM. One added later from the
+plugin menu has only those that changed since, and the list fills in the
+rest, at the acoustics system's `<publish_rate>`. It never asks for the
+world's state: no pinger is the normal case, in every world but the demo. It lists the receivers, which the acoustics system publishes on
 `/world/<world>/acoustics/receivers` (the GUI's copy of a custom sensor
 loses its `gz:type`, so the panel cannot find them in the ECM), each with its
 last reading and a field to retune it. It draws, each switched on its own:
@@ -82,10 +87,21 @@ last reading and a field to retune it. It draws, each switched on its own:
   frequency's colour, grey and dashed when the pinger is off.
 - **Pings:** a ring per ping where its sound meets the water, spreading at
   the speed of sound slowed down (`<slow_down>`, 50 by default, so a ring
-  crosses 300 m in 10 s), fading out at the reach.
+  crosses 300 m in 10 s), fading out at the reach. `<max_ring_radius>` ends
+  the rings of a pinger with no reach only. Only pings that were sent ring:
+  none from a pinger above the water, none from before a pinger was last
+  switched on or its schedule changed. At most six rings per pinger: slowed
+  down further, every second or third ping is drawn, so what is sent stays
+  about 15 kB per pinger and frame.
 - **Bearings heard:** a ray from each receiver along its last reading's
   bearing and elevation, for 1.5 s of simulation time; red when the reading
-  was invalid.
+  was invalid. The ray keeps the pose the receiver had when the reading
+  came, so it stays on the pinger while the boat turns.
+
+The reach and the rays are sent when they change, not on a timer: a pinger
+switched off or a buoy dragged while the world is paused is redrawn at
+once, and a circle that stays is not sent again. The rings are sent every
+50 ms of simulation time, and no more often than that in wall time.
 
 Colours run with frequency from orange at 25 kHz to violet at 40 kHz.
 Configuration: `<reach>`, `<pings>`, `<readings>` (all false by default),
@@ -122,10 +138,12 @@ It never writes into the GUI's ECM.
 | `include/gz/sim/maritime_gui/FieldSpec.hh`, `src/FieldSpec.cc` | Each field defined once: its topic name, steering rates, colours, arrow scale and trails. |
 | `include/gz/sim/maritime_gui/FieldControl.hh`, `src/FieldControl.cc` | A panel's control of a field: the world's name, the field's topic, the state service, tracking, steering, the status line and number parsing. |
 | `include/gz/sim/maritime_gui/FieldDrawing.hh`, `src/FieldDrawing.cc` | A panel's drawing of a field: arrows or trails, and the vehicles and socks beside them. |
-| `src/OceanCurrentPanel.*`, `src/WindPanel.*`, `src/ScenarioPanel.*` | The three GUI systems and their QML panels. |
+| `include/gz/sim/maritime_gui/MarkerLayer.hh`, `src/MarkerLayer.cc` | One drawing on the scene: what is drawn, replaced and deleted through MarkerManager, for every panel, and the panels' default marker service. |
+| `include/gz/sim/maritime_gui/Acoustics.hh`, `src/Acoustics.cc` | The acoustics panel's logic: the pingers from the ECM and from the list, the listener, and the reach, rings and rays as markers. |
+| `src/OceanCurrentPanel.*`, `src/WindPanel.*`, `src/ScenarioPanel.*`, `src/AcousticsPanel.*` | The four GUI systems and their QML panels. |
 | `src/Compass.qml`, `src/Legend.qml`, `src/NumberField.qml` | The steering compass, the colour legend and the number field both panels use. |
 | `test/fields_test.cc` | gtests on the core. |
-| `test/test_gui_reads_recipes.py` | Both plugins in a running GUI on Qt's offscreen platform, reading the recipes from the GUI's state and, in a world without a wind, asking the state service. |
+| `test/test_gui_reads_recipes.py` | The plugins in a running GUI on Qt's offscreen platform, reading the recipes from the GUI's state and, in a world without a wind, asking the state service; the acoustics panel's drawings, as `test/marker_recorder.cc` receives them in MarkerManager's place, and a world without pingers. |
 
 The core (`gz_maritime_gui_core`, the first six rows) has no Qt. The
 plugins install to `lib/gz_maritime_gui`, a folder of their own, and the

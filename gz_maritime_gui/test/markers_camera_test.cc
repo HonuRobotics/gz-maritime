@@ -47,7 +47,9 @@
 #include <gz/transport/Node.hh>
 
 #include "gz/sim/maritime_gui/Acoustics.hh"
+#include "gz/sim/maritime_gui/Fields.hh"
 #include "gz/sim/maritime_gui/Flow.hh"
+#include "gz/sim/maritime_gui/MarkerLayer.hh"
 
 using namespace gz;
 using namespace sim;
@@ -183,9 +185,15 @@ TEST(MarkersCamera, PanelMarkersStayOutOfCameras)
   auto panel = ReachMarkers({pinger}, 0.0, "test/reach");
   panel.push_back(Square(msgs::Marker::GUI));
 
-  // Where the panels send them: the GUI's service, which the server does
-  // not serve.
-  EXPECT_FALSE(Send("/marker_array", panel));
+  // Where the panels send them by default, kMarkerService, which every
+  // panel and every layer takes its default from: not the sensors' service,
+  // and one the server does not serve. That is the whole protection, so it
+  // is the default that is checked, not a name written here; the unchanged
+  // image then follows.
+  const std::string panels = std::string(kMarkerService) + "_array";
+  const std::string sensorsService = "/sensors/marker_array";
+  ASSERT_NE(sensorsService, panels);
+  EXPECT_FALSE(Send(panels, panel));
   const auto gui = images.Next(std::chrono::seconds(5));
   ASSERT_TRUE(gui.has_value());
   EXPECT_EQ(0, Changed(*before, *gui));
@@ -193,15 +201,25 @@ TEST(MarkersCamera, PanelMarkersStayOutOfCameras)
   // Sent to the sensors' own service, the same markers show: the GUI
   // visibility flag does not keep them out of a camera. Only drawing through
   // the GUI's service does.
-  EXPECT_TRUE(Send("/sensors/marker_array", panel));
+  EXPECT_TRUE(Send(sensorsService, panel));
   const auto sensors = images.Next(std::chrono::seconds(5));
   ASSERT_TRUE(sensors.has_value());
   EXPECT_GT(Changed(*before, *sensors), 100);
 
+  // Taken off again, the image is the first one: what follows is seen on
+  // an empty scene, not on top of the markers above.
+  std::vector<msgs::Marker> off;
+  for (const auto &m : panel)
+    off.push_back(DeleteMarker(m.ns(), m.id()));
+  EXPECT_TRUE(Send(sensorsService, off));
+  const auto cleared = images.Next(std::chrono::seconds(5));
+  ASSERT_TRUE(cleared.has_value());
+  EXPECT_EQ(0, Changed(*before, *cleared));
+
   // A marker visible to all, there, shows as well: the camera sees markers.
   auto all = Square(msgs::Marker::ALL);
   all.set_ns("test/control");
-  EXPECT_TRUE(Send("/sensors/marker_array", {all}));
+  EXPECT_TRUE(Send(sensorsService, {all}));
   const auto control = images.Next(std::chrono::seconds(5));
   ASSERT_TRUE(control.has_value());
   EXPECT_GT(Changed(*before, *control), 100);
