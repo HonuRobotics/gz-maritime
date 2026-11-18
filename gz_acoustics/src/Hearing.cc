@@ -25,16 +25,22 @@
 
 namespace gz::sim::acoustics
 {
-namespace
+//////////////////////////////////////////////////
+Duration FromSeconds(double _seconds)
 {
-  /// \brief Seconds as a simulation duration, to the nanosecond.
-  /// \param[in] _s Seconds.
-  /// \return The duration.
-  Duration FromSeconds(double _s)
-  {
-    return std::chrono::duration_cast<Duration>(
-        std::chrono::nanoseconds(std::llround(_s * 1e9)));
-  }
+  return std::chrono::duration_cast<Duration>(
+      std::chrono::nanoseconds(std::llround(_seconds * 1e9)));
+}
+
+//////////////////////////////////////////////////
+Duration FirstWindowStart(const Duration &_now, const Duration &_dt)
+{
+  const Duration start = _now - _dt;
+  // The window's start is exclusive: one tick before zero takes a ping at
+  // time zero in.
+  if (start <= Duration::zero())
+    return -Duration(1);
+  return start;
 }
 
 //////////////////////////////////////////////////
@@ -82,6 +88,12 @@ bool InBand(double _frequency, double _centre, double _bandwidth)
 }
 
 //////////////////////////////////////////////////
+bool InElevation(double _elevation, double _min, double _max)
+{
+  return _elevation >= _min && _elevation <= _max;
+}
+
+//////////////////////////////////////////////////
 double DropoutProbability(double _distance, double _reach, double _start)
 {
   if (_reach <= 0.0 || _start >= 1.0)
@@ -105,6 +117,15 @@ Duration TravelTime(double _distance, double _speedOfSound)
   if (_speedOfSound <= 0.0)
     return Duration::zero();
   return FromSeconds(_distance / _speedOfSound);
+}
+
+//////////////////////////////////////////////////
+bool Overlap(const Duration &_a, const Duration &_aPulse,
+    const Duration &_b, const Duration &_bPulse)
+{
+  if (_a <= _b)
+    return _b - _a < _aPulse;
+  return _a - _b < _bPulse;
 }
 
 //////////////////////////////////////////////////

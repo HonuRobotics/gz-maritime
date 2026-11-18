@@ -22,7 +22,7 @@ buoy's 30 kHz pinger pings and a red one's is silent:
   boat_b at (-10, -20) heading north, green at (40, 15), red at (40, -15),
   and a yellow 37 kHz decoy at (-30, 30);
 * marina_bay_lite.sdf, the RobotX 2026 course: custom_usv at course B's
-  start point, boat_b at course C's, the survey pingers 25 m out from B's.
+  start point, boat_b at course C's, the survey pingers 35 m out from B's.
   Its site comes from Fuel, so this one runs only once the site is cached.
 
 The tests check what the boats hear, that custom_usv reaches the green
@@ -59,8 +59,8 @@ SCENES = {
     'marina_bay_lite': {
         'args': ['world:=marina_bay_lite.sdf', 'x:=-15', 'y:=-8', 'yaw:=0.55',
                  'listener_x:=15', 'listener_y:=-28', 'listener_yaw:=0.55'],
-        'green': (3.7, 9.4),
-        'red': (8.9, 0.8),
+        'green': (12.2, 14.6),
+        'red': (17.5, 6.0),
         'boat_b': (15.0, -28.0, 0.55),
         'pingers': ('pinger_green', 'pinger_red'),
         # The site, from Fuel: only once it is in the cache.
@@ -198,8 +198,12 @@ def test_the_readings_reach_ros(demo):
                          timeout=30)
     assert code == 0, f'no reading over ROS:\n{out}\n{err}'
     assert 'frame_id: boat_b/hydrophone_link' in out, out
-    for key in ('bearing', 'elevation', 'frequency', 'amplitude', 'valid', 'emit_time'):
+    for key in ('bearing', 'elevation', 'frequency', 'amplitude', 'valid'):
         assert f'name: {key}' in out, f'{key} missing:\n{out}'
+    # A passive receiver: neither the range nor the time the ping was sent,
+    # which with the stamp gives the range.
+    for key in ('range', 'emit_time'):
+        assert f'name: {key}' not in out, f'{key} reported:\n{out}'
 
 
 def test_the_ground_truth_lists_the_pingers(demo):

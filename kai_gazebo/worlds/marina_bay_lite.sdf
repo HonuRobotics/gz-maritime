@@ -508,15 +508,16 @@
          quays and the pontoon and aerial vehicles the buildings. -->
     <!-- ===================== Course B pingers =====================
          The RobotX 2026 survey task: a pinger under each of two buoys, 30 kHz,
-         and only the one under the green buoy pings. About 25 m out from the
+         and only the one under the green buoy pings. About 35 m out from the
          course B start point (-15 -8, facing 0.55 rad), 10 m apart across the
-         course. Switch them on /world/default/acoustics/pinger_green/set and
+         course, which keeps both clear of a vehicle spawned at the origin
+         heading +x: the nearer one, the red, is 6 m off that line. Switch them on /world/default/acoustics/pinger_green/set and
          /world/default/acoustics/pinger_red/set (key active). -->
     <!-- Green: pinging. -->
     <include>
       <uri>model://acoustic_pinger</uri>
       <name>pinger_green</name>
-      <pose>3.7 9.4 0 0 0 0</pose>
+      <pose>12.2 14.6 0 0 0 0</pose>
       <experimental:params>
           <visual element_id="link::body" action="modify">
             <material><ambient>0.1 0.6 0.2 1</ambient><diffuse>0.1 0.6 0.2 1</diffuse></material>
@@ -531,7 +532,7 @@
     <include>
       <uri>model://acoustic_pinger</uri>
       <name>pinger_red</name>
-      <pose>8.9 0.8 0 0 0 0</pose>
+      <pose>17.5 6.0 0 0 0 0</pose>
       <experimental:params>
           <plugin element_id="gz::sim::maritime::AcousticPinger" action="modify">
             <active>false</active>

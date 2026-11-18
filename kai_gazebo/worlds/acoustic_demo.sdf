@@ -5,10 +5,10 @@
   kai_gazebo's model://acoustic_pinger with its own name, colour and
   settings.
 
-  * buoy_green (40, 15) and buoy_red (40, -15) carry the course pingers,
+  * pinger_green (40, 15) and pinger_red (40, -15) carry the course pingers,
     both 30 kHz, once a second, 300 m reach. Only one pings at a time, the
     green one to start with, as the RobotX 2026 survey task has it.
-  * buoy_yellow (-30, 30) carries a decoy at 37 kHz: a receiver tuned to
+  * pinger_yellow (-30, 30) carries a decoy at 37 kHz: a receiver tuned to
     30 kHz never hears it.
 
   Switch the active pinger while it runs (bridged to ROS by the demo launch
