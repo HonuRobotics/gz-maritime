@@ -162,6 +162,23 @@ if(BUILD_TESTING)
     set_tests_properties(lens_drops_test PROPERTIES
       ENVIRONMENT "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}")
   endif()
+
+  # The drops show in a camera's images. Needs a GPU; skips without one.
+  # The bridge and the shaders are found in the build and source trees.
+  ament_add_gtest(lens_drops_camera_test test/lens_drops_camera_test.cc
+    TIMEOUT 180 SKIP_LINKING_MAIN_LIBRARIES)
+  if(TARGET lens_drops_camera_test)
+    target_compile_definitions(lens_drops_camera_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(lens_drops_camera_test
+      gz-sim::core gz-transport::core gz-msgs::core)
+    set(_camera_test_env
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}"
+      "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH}"
+      "GZ_LENS_DROPS_SHADER_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/shaders")
+    set_tests_properties(lens_drops_camera_test PROPERTIES
+      ENVIRONMENT "${_camera_test_env}")
+  endif()
 endif()
 
 # GZ_SIM_SYSTEM_PLUGIN_PATH, so gz-sim finds the system, and
