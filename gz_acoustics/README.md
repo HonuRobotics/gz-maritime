@@ -109,7 +109,8 @@ would give the distance away. `range` and `emit_time` (the stamp less it is
 the distance over the speed of sound) are off unless asked for. The
 amplitude is the spreading loss, so without noise 10^(-amplitude / 20) is
 the distance exactly: give a receiver that must not know its range an
-`<amplitude_noise>`.
+`<amplitude_noise>`. A receiver with `<range>` off and no spread on its
+amplitude says so in a warning when it loads.
 
 Each `*_noise` is a gaussian `<noise>` block as on any Gazebo sensor
 (`mean`, `stddev`, `bias_mean`, `bias_stddev`, and `precision` with

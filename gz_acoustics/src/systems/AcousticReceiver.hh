@@ -128,7 +128,8 @@ namespace gz::sim::maritime
   ///   drawn from the receiver's own generator. The bearing is wrapped into
   ///   (-pi, pi], the elevation clamped to [-pi/2, pi/2] and the range kept
   ///   positive. Without `<amplitude_noise>` the amplitude gives the range
-  ///   away exactly.
+  ///   away exactly, and a receiver with `<range>` off warns of it when it
+  ///   loads.
   /// * `<outlier_probability>`: chance a reading's bearing is uniformly
   ///   random, default 0.
   /// * `<dropout_start>`: fraction of a pinger's reach where its pings start

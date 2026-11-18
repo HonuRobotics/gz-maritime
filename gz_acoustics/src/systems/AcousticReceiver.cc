@@ -67,9 +67,21 @@ bool AcousticReceiver::Load(const sdf::Sensor &_sdf)
   if (!this->node.Subscribe(setTopic, &AcousticReceiver::OnSet, this))
     gzerr << "AcousticReceiver: cannot subscribe to " << setTopic << "\n";
 
+  // A receiver that hides its range still reports an amplitude, which
+  // without noise is the range again.
+  auto warnOfTheAmplitude = [this]()
+  {
+    gzwarn << "AcousticReceiver [" << this->Name() << "]: reports no range, "
+           << "but its amplitude has no noise and gives the range exactly; "
+           << "add an <amplitude_noise>\n";
+  };
+
   const auto elem = _sdf.Element();
   if (!elem || !elem->HasElement(kBlock))
+  {
+    warnOfTheAmplitude();
     return true;
+  }
   const auto block = elem->FindElement(kBlock);
 
   auto &s = this->settings;
@@ -127,6 +139,9 @@ bool AcousticReceiver::Load(const sdf::Sensor &_sdf)
              << "> has a dynamic bias, which is not modelled\n";
     }
   }
+  const auto &loud = this->noise[static_cast<std::size_t>(Channel::kAmplitude)];
+  if (!s.range && !(loud.stddev > 0.0))
+    warnOfTheAmplitude();
   return true;
 }
 
