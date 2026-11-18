@@ -399,7 +399,7 @@ void AcousticsPanel::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
     {
       const char *text = elem->GetText();
       if (!text || !ParsePlane(text, d.plane))
-        gzwarn << kLog << ": <plane> is water, depth or receiver\n";
+        gzwarn << kLog << ": <plane> is water, depth, receiver or 3d\n";
     }
     double depth = d.planeDepth;
     ReadDouble(_pluginElem, "plane_depth", depth);
@@ -420,6 +420,9 @@ void AcousticsPanel::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
   emit this->ShowPingsChanged();
   emit this->ShowReadingsChanged();
   emit this->SlowDownChanged();
+  emit this->PlaneChanged();
+  emit this->PlaneDepthChanged();
+  emit this->PlaneReceiverChanged();
 }
 
 //////////////////////////////////////////////////
@@ -736,7 +739,7 @@ bool AcousticsPanel::SetPlaneDepth(const QString &_text)
     return false;
   this->dataPtr->planeDepth = value;
   this->dataPtr->dirty = true;
-  emit this->PlaneChanged();
+  emit this->PlaneDepthChanged();
   return true;
 }
 
@@ -745,7 +748,7 @@ void AcousticsPanel::SetPlaneReceiver(const QString &_topic)
 {
   this->dataPtr->planeReceiver = _topic.toStdString();
   this->dataPtr->dirty = true;
-  emit this->PlaneChanged();
+  emit this->PlaneReceiverChanged();
 }
 
 //////////////////////////////////////////////////

@@ -119,15 +119,19 @@ namespace gz::sim::maritime_gui
     /// check box ticked.
     Q_PROPERTY(double slowDown READ SlowDown NOTIFY SlowDownChanged)
 
-    /// \brief What the reach and the pings are drawn on: water, depth or
-    /// receiver.
+    /// \brief What the reach and the pings are drawn on: water, depth,
+    /// receiver or 3d.
     Q_PROPERTY(QString plane READ CurrentPlane NOTIFY PlaneChanged)
 
     /// \brief m under the water, for the depth plane.
-    Q_PROPERTY(double planeDepth READ PlaneDepth NOTIFY PlaneChanged)
+    /// A signal of its own, as each drawing property has: one shared with
+    /// the plane would put the old depth back in the field while a new one
+    /// is typed and another option changed.
+    Q_PROPERTY(double planeDepth READ PlaneDepth NOTIFY PlaneDepthChanged)
 
     /// \brief The topic of the receiver the receiver plane follows.
-    Q_PROPERTY(QString planeReceiver READ PlaneReceiver NOTIFY PlaneChanged)
+    Q_PROPERTY(QString planeReceiver READ PlaneReceiver
+               NOTIFY PlaneReceiverChanged)
 
     /// \brief The world z drawn at now, as text.
     Q_PROPERTY(QString planeText READ PlaneText NOTIFY StatusChanged)
@@ -167,7 +171,7 @@ namespace gz::sim::maritime_gui
     public: Q_INVOKABLE bool SetSlowDown(const QString &_text);
 
     /// \brief Draw the reach and the pings on another plane.
-    /// \param[in] _plane water, depth or receiver.
+    /// \param[in] _plane water, depth, receiver or 3d.
     public: Q_INVOKABLE void SetPlane(const QString &_plane);
 
     /// \brief Set the depth of the depth plane.
@@ -180,7 +184,7 @@ namespace gz::sim::maritime_gui
     public: Q_INVOKABLE void SetPlaneReceiver(const QString &_topic);
 
     /// \brief What the reach and the pings are drawn on.
-    /// \return water, depth or receiver.
+    /// \return water, depth, receiver or 3d.
     public: QString CurrentPlane() const;
 
     /// \brief The depth of the depth plane.
@@ -260,8 +264,14 @@ namespace gz::sim::maritime_gui
     /// \brief The rings spread at another speed.
     signals: void SlowDownChanged();
 
-    /// \brief The plane drawn on, its depth or its receiver changed.
+    /// \brief The reach and the pings are drawn on another plane, or in 3D.
     signals: void PlaneChanged();
+
+    /// \brief The depth of the depth plane changed.
+    signals: void PlaneDepthChanged();
+
+    /// \brief The receiver plane follows another receiver.
+    signals: void PlaneReceiverChanged();
 
     /// \brief The status changed.
     signals: void StatusChanged();

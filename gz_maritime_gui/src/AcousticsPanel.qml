@@ -194,8 +194,22 @@ ScrollView {
         visible: _AcousticsPanel.plane === "receiver"
         textRole: "name"
         valueRole: "topic"
+        id: receiverBox
         model: _AcousticsPanel.receivers
-        currentIndex: Math.max(0, indexOfValue(_AcousticsPanel.planeReceiver))
+        // The index does not follow the model: a ComboBox goes back to its
+        // first row whenever the list is replaced, as it is when a receiver
+        // is retuned. So the row of the receiver followed is set again each
+        // time the list or the receiver changes, not bound once.
+        function follow() {
+          currentIndex = Math.max(0, indexOfValue(_AcousticsPanel.planeReceiver));
+        }
+        Component.onCompleted: follow()
+        onModelChanged: follow()
+        onCountChanged: follow()
+        Connections {
+          target: _AcousticsPanel
+          function onPlaneReceiverChanged() { receiverBox.follow(); }
+        }
         onActivated: _AcousticsPanel.SetPlaneReceiver(currentValue)
       }
       Label {
