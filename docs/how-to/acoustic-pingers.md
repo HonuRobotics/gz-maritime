@@ -33,7 +33,7 @@ at the origin and homes on what it hears (`pinger_homing.py`); `boat_b`, at
 `listener:=false` and `gazebo_gui:=false` turn the pieces off.
 
 The same demo runs on the RobotX 2026 course, course B of Marina Bay, whose
-two survey pingers sit about 25 m out from the course's start point:
+two survey pingers sit about 35 m out from the course's start point:
 
 ```bash
 ros2 launch kai_custom_vehicle acoustic_demo.launch.xml world:=marina_bay.sdf \
@@ -69,7 +69,8 @@ draws, each with its own check box:
 - **Pings spreading:** a ring per ping, slowed down 50 times by default so
   the eye can follow it;
 - **Bearings heard:** a ray from each receiver along the bearing it last
-  reported, red when the reading was invalid.
+  reported, from where the receiver was when it heard it, so the ray stays
+  on the pinger while the boat turns; red when the reading was invalid.
 
 The reach and the pings are drawn on the water by default, where a boat's
 hydrophone listens. For a vehicle under the water, pick **a depth** or **a
@@ -127,8 +128,9 @@ RoboNation rules have it. A pinger above the water sends nothing.
 
 The receiver follows the [sensor pattern](sensors.md#the-pattern): a frame
 in the URDF, a tiny link in the model, a `<frame_id>` with the instance
-name and a bridge entry. The custom USV hangs its hydrophone 0.3 m under the
-deck, so it stays in the water as the boat rolls:
+name and a bridge entry. The custom USV hangs its hydrophone on a pole,
+0.3 m below the waterline (its `base_link` is on the waterline), so it
+stays in the water as the boat rolls:
 
 ```{literalinclude} ../../kai_custom_vehicle/models/custom_usv/model.sdf.xacro
 :language: xml
@@ -144,10 +146,21 @@ It publishes one message per ping it hears, a `gz.msgs.Param` bridged to
 | `bearing` | rad, counter clockwise from the sensor's x |
 | `elevation` | rad, positive up; a pinger below gives a negative value |
 | `frequency` | Hz of the ping |
-| `amplitude` | dB relative to 1 m, -20 log10 of the distance |
-| `valid` | false when another ping in band arrived on top of it |
-| `emit_time` | s of simulation time the pinger sent it |
+| `amplitude` | dB relative to 1 m, -20 log10 of the distance, with the receiver's `<amplitude_noise>` |
+| `valid` | false when another ping in band arrived while an earlier one still sounded |
 | `range` | m, only with `<range>true</range>` |
+| `emit_time` | s of simulation time the pinger sent it, only with `<emit_time>true</emit_time>` |
+
+The stamp of a reading is when the ping arrived: when it was sent plus the
+distance over the speed of sound.
+
+A passive receiver hears a direction, not a distance, so `range` and
+`emit_time` are off unless asked for. The amplitude would give the distance
+away too: without noise, 10^(-amplitude / 20) is the distance exactly. The
+custom USV's receiver carries 1 dB of `<amplitude_noise>` for that reason,
+and a receiver with `<range>` off and no amplitude noise warns when it
+loads. Use the amplitude to tell near from far, as `pinger_homing.py` does
+with the median of the last three, not as a range.
 
 Bridge the readings and the retuning topic:
 
@@ -159,8 +172,10 @@ Bridge the readings and the retuning topic:
 
 A receiver has no `<update_rate>`: it reports when a ping arrives. A ping is
 heard when both ends are under the water, the receiver is within the
-pinger's reach, the frequency is in the receiver's band, and it isn't lost
-to the dropout near the reach. The full list of tags is in the
+pinger's reach, the frequency is in the receiver's band, it comes from
+inside the receiver's field of view (`<min_elevation>` to `<max_elevation>`,
+every direction by default), and it isn't lost to the dropout near the
+reach. The water is the flat `<water_level>`, not the waves. The full list of tags is in the
 [gz_acoustics README](https://github.com/HonuRobotics/gz-maritime/blob/lyrical/gz_acoustics/README.md).
 
 ## Coming from VRX
@@ -175,7 +190,8 @@ plugin and published range, bearing and elevation at a fixed rate. Here:
 - `bearing` and `elevation` keep their names and meaning, measured from the
   sensor's own frame; `range` is there only when the receiver asks for it,
   since a passive receiver cannot measure it;
-- a pinger is switched or moved through its `set` topic, not by publishing
-  a new position.
+- a pinger is switched on or off, and its frequency, period, offset, reach
+  and pulse length changed, through its `set` topic. It has no position to
+  publish: it moves with its model.
 
 Next: [Use your own world](own-world.md).

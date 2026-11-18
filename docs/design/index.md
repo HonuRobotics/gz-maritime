@@ -113,7 +113,8 @@ buoyancy and wind marks do:
   reading is in its own frame.
 - **Behaviour, not acoustics.** A ping is an event on a schedule, carried at
   the speed of sound to each receiver, and heard or not by a few rules
-  (water, reach, band, dropout, overlap), each of which can be switched off.
+  (water, reach, band, field of view, dropout, overlap), each of which can
+  be switched off.
   Nothing models how sound bends, echoes or fades beyond spherical
   spreading; a team testing its own signal processing will need more than
   this, which is left for later (time differences per hydrophone).
