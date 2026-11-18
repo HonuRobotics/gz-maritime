@@ -24,9 +24,15 @@ A ping comes once a second, and the boat turns in between, so a bearing is
 turned into a heading the moment it arrives, with the IMU's yaw then, and
 the boat steers to that heading until the next ping. A ping marked invalid
 is ignored, and the median of the last three headings throws out a lone
-outlier. Close to the pinger (the ping louder than stop_amplitude) the boat
-stops and holds; with no ping for silence_timeout seconds, the pinger
-switched off, it stops and waits for one.
+outlier. Close to the pinger the boat stops and holds; with no ping for
+silence_timeout seconds, the pinger switched off, it stops and waits for
+one.
+
+Close is loud: the receiver gives no range, and its amplitude (the
+spreading loss, 20 dB down for each ten times the distance) is noisy, 1 dB
+on the custom USV. So the boat stops on the median of the last three
+amplitudes, not on one ping: louder than stop_amplitude, -16 dB, which is
+6.3 m without noise and between about 5.5 and 7 m with it.
 
     ros2 run kai_custom_vehicle pinger_homing.py --ros-args -r __ns:=/custom_usv
 """
@@ -77,7 +83,7 @@ class PingerHoming(Node):
 
         self.yaw = None
         self.headings = []
-        self.amplitude = None
+        self.amplitudes = []
         self.last_ping = None
         self.state = 'waiting'
 
@@ -95,11 +101,20 @@ class PingerHoming(Node):
         if not r.get('valid', False) or self.yaw is None or 'bearing' not in r:
             return
         self.headings = (self.headings + [wrap(self.yaw + r['bearing'])])[-3:]
-        self.amplitude = r.get('amplitude')
+        if 'amplitude' in r:
+            self.amplitudes = (self.amplitudes + [r['amplitude']])[-3:]
         self.last_ping = self.get_clock().now()
         self.get_logger().info(
             f"ping {r.get('frequency', 0) / 1000:.1f} kHz bearing "
-            f"{math.degrees(r['bearing']):+.0f} deg, {self.amplitude:.1f} dB")
+            f"{math.degrees(r['bearing']):+.0f} deg, "
+            f"{r.get('amplitude', float('nan')):.1f} dB")
+
+    def loud(self) -> bool:
+        """Return whether the last pings say the pinger is close."""
+        # The median, so one loud draw of the noise does not stop the boat
+        # short, nor one quiet draw send it off again.
+        return (bool(self.amplitudes) and
+                sorted(self.amplitudes)[len(self.amplitudes) // 2] >= self.stop_amplitude)
 
     def drive(self, port: float, stbd: float):
         self.port.publish(Float64(data=max(-1.0, min(1.0, port))))
@@ -116,10 +131,11 @@ class PingerHoming(Node):
                   (now - self.last_ping).nanoseconds * 1e-9 > self.silence_timeout)
         if silent:
             self.headings = []
+            self.amplitudes = []
             self.set_state('waiting')
             self.drive(0.0, 0.0)
             return
-        if self.amplitude is not None and self.amplitude >= self.stop_amplitude:
+        if self.loud():
             self.set_state('arrived')
             self.drive(0.0, 0.0)
             return

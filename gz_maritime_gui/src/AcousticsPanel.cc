@@ -20,9 +20,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
-#include <functional>
 #include <map>
-#include <mutex>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -35,7 +33,6 @@
 #include <gz/common/Console.hh>
 #include <gz/math/Helpers.hh>
 #include <gz/msgs/param.pb.h>
-#include <gz/msgs/serialized_map.pb.h>
 #include <gz/plugin/Register.hh>
 #include <gz/sim/Util.hh>
 #include <gz/sim/components/Name.hh>
@@ -44,6 +41,7 @@
 
 #include "gz/sim/maritime_gui/Acoustics.hh"
 #include "gz/sim/maritime_gui/FieldControl.hh"
+#include "gz/sim/maritime_gui/MarkerLayer.hh"
 
 using namespace gz;
 using namespace sim;
@@ -57,16 +55,15 @@ namespace
   /// \brief The marker namespace of the drawings.
   const std::string kNs{"gz_maritime_gui/acoustics"};
 
-  /// \brief Updates with no pinger in the GUI's state before the panel asks
-  /// the world's state service.
-  constexpr int kFetchAfter{30};
+  /// \brief Updates before the panel says where its pingers come from, so
+  /// the GUI's state, which comes a moment after the panel, has come.
+  constexpr int kSettled{30};
 
-  /// \brief Period of simulation time between two frames of the rings.
+  /// \brief Period between two frames of the rings, of simulation time and
+  /// of wall time both: a world running faster than real time does not
+  /// send more frames.
   constexpr std::chrono::milliseconds kRingPeriod{50};
 
-  /// \brief Period of simulation time between two redraws of the rays and
-  /// the reach, which move with what carries them.
-  constexpr std::chrono::milliseconds kRedrawPeriod{100};
 
   /// \brief Period of wall time between two refreshes of the lists.
   constexpr std::chrono::milliseconds kListPeriod{250};
@@ -142,8 +139,10 @@ class gz::sim::maritime_gui::AcousticsPanelPrivate
   /// \brief Send what waits for a subscriber.
   public: void SendPending();
 
-  /// \brief The pingers from the GUI's ECM, or from the state service's
-  /// copy for a panel loaded after the world's first state.
+  /// \brief The pingers: those the acoustics system lists, each as the
+  /// GUI's ECM has it when it does. A panel loaded with the GUI finds them
+  /// all in the ECM; one loaded later, or a world without pingers, takes
+  /// what the list says, and asks nobody.
   /// \param[in] _ecm The GUI's ECM.
   /// \return The pingers.
   public: std::vector<PingerView> Pingers(const EntityComponentManager &_ecm);
@@ -185,6 +184,15 @@ class gz::sim::maritime_gui::AcousticsPanelPrivate
   /// \brief A drawing setting changed since the last draw.
   public: bool dirty{true};
 
+  /// \brief Since when each pinger pings as it does.
+  public: PingerChanges changes;
+
+  /// \brief Each receiver's last reading with the pose it was heard at.
+  public: std::map<std::string, BearingRay> rays;
+
+  /// \brief The pingers as the rings were last drawn from, as text.
+  public: std::string ringsKey;
+
   /// \brief m/s, the world's speed of sound.
   public: double speedOfSound{1500.0};
 
@@ -218,10 +226,9 @@ class gz::sim::maritime_gui::AcousticsPanelPrivate
   public: double planeZ{0.0};
   public: QString planeText;
 
-  /// \brief Simulation time of the last frame of the rings and of the last
-  /// redraw of the rest.
+  /// \brief Simulation time and wall time of the last frame of the rings.
   public: std::optional<std::chrono::steady_clock::duration> lastRings;
-  public: std::optional<std::chrono::steady_clock::duration> lastRedraw;
+  public: std::chrono::steady_clock::time_point lastRingsWall;
 
   /// \brief Wall time of the last refresh of the lists.
   public: std::chrono::steady_clock::time_point lastList;
@@ -239,19 +246,13 @@ class gz::sim::maritime_gui::AcousticsPanelPrivate
   public: QString status;
 
   /// \brief Whether the pingers and the receivers were logged as found,
-  /// for the test.
+  /// for the test, and the updates so far.
   public: bool logged{false};
   public: bool loggedReceivers{false};
 
   /// \brief The receiver whose depth was last logged as drawn at.
   public: std::string loggedPlane;
-
-  /// \brief The state service's fallback: updates with no pinger, whether
-  /// it was asked, its reply and the copy made from it.
-  public: int missing{0};
-  public: bool fetchAsked{false};
-  public: std::optional<msgs::SerializedStepMap> fetched;
-  public: std::unique_ptr<EntityComponentManager> snapshot;
+  public: int updates{0};
 
   /// \brief Receivers' sensor entities, by scoped name.
   public: std::unordered_map<std::string, Entity> sensorEntities;
@@ -260,9 +261,6 @@ class gz::sim::maritime_gui::AcousticsPanelPrivate
   /// publishers.
   public: std::map<std::string, msgs::Param> pending;
   public: std::map<std::string, transport::Node::Publisher> publishers;
-
-  /// \brief Guards `fetched` across the transport and Qt threads.
-  public: std::mutex mutex;
 
   /// \brief Transport node. Last, so it is destroyed first.
   public: transport::Node node;
@@ -313,56 +311,22 @@ void AcousticsPanelPrivate::SendPending()
 std::vector<PingerView> AcousticsPanelPrivate::Pingers(
     const EntityComponentManager &_ecm)
 {
-  auto pingers = ReadPingers(_ecm);
-  if (!pingers.empty())
+  const auto state = ReadPingers(_ecm);
+  auto pingers = MergePingers(this->listener.Pingers(), state);
+  if (!this->logged && !pingers.empty() && ++this->updates > kSettled)
   {
-    if (!this->logged)
+    if (state.size() == pingers.size())
     {
       gzdbg << kLog << ": pingers from the GUI's state: " << pingers.size()
             << "\n";
-      this->logged = true;
     }
-    return pingers;
-  }
-
-  {
-    const std::lock_guard<std::mutex> lock(this->mutex);
-    if (this->fetched)
+    else
     {
-      this->snapshot = std::make_unique<EntityComponentManager>();
-      this->snapshot->SetState(this->fetched->state());
-      this->fetched.reset();
+      gzdbg << kLog << ": pingers from the acoustics system's list: "
+            << pingers.size() << ", " << state.size()
+            << " of them in the GUI's state\n";
     }
-  }
-  // A panel loaded after the GUI received the world's first state never
-  // got the pingers; ask once for the whole state. Their positions then stay
-  // where they were. Only in a world with acoustics, which lists its
-  // receivers, even none: a world without asks nothing.
-  if (!this->fetchAsked && this->listener.Heard() &&
-      ++this->missing > kFetchAfter && !this->world.empty())
-  {
-    this->fetchAsked = true;
-    gzdbg << kLog << ": no pinger in the GUI's state yet; asking the "
-          << "world's state service\n";
-    std::function<void(const msgs::SerializedStepMap &, const bool)> cb =
-        [this](const msgs::SerializedStepMap &_rep, const bool _result)
-        {
-          if (!_result)
-            return;
-          const std::lock_guard<std::mutex> lock(this->mutex);
-          this->fetched = _rep;
-        };
-    this->node.Request("/world/" + this->world + "/state", cb);
-  }
-  if (this->snapshot)
-  {
-    pingers = ReadPingers(*this->snapshot);
-    if (!pingers.empty() && !this->logged)
-    {
-      gzdbg << kLog << ": pingers from the state service: "
-            << pingers.size() << "\n";
-      this->logged = true;
-    }
+    this->logged = true;
   }
   return pingers;
 }
@@ -398,7 +362,7 @@ std::map<std::string, math::Pose3d> AcousticsPanelPrivate::ReceiverPoses(
 AcousticsPanel::AcousticsPanel()
   : dataPtr(std::make_unique<AcousticsPanelPrivate>())
 {
-  this->dataPtr->MakeLayers("/marker");
+  this->dataPtr->MakeLayers(kMarkerService);
 }
 
 //////////////////////////////////////////////////
@@ -452,7 +416,10 @@ void AcousticsPanel::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
         d.MakeLayers(text);
     }
   }
-  emit this->DrawingChanged();
+  emit this->ShowReachChanged();
+  emit this->ShowPingsChanged();
+  emit this->ShowReadingsChanged();
+  emit this->SlowDownChanged();
 }
 
 //////////////////////////////////////////////////
@@ -494,7 +461,10 @@ void AcousticsPanel::Update(const UpdateInfo &_info,
     for (const auto &p : pingers)
     {
       const auto &v = p.data;
-      pkey << v.name << ' ' << v.generation << ' ' << v.active << ';';
+      // What the row shows: a pinger from the acoustics system's list has
+      // no generation to tell a change by.
+      pkey << v.name << ' ' << v.frequency << ' ' << v.period << ' '
+           << v.offset << ' ' << v.reach << ' ' << v.active << ';';
       QVariantMap m;
       m["name"] = QString::fromStdString(v.name);
       m["frequency"] = v.frequency / 1000.0;
@@ -622,77 +592,86 @@ void AcousticsPanel::Update(const UpdateInfo &_info,
     }
   }
 
-  // The drawings, in simulation time; nothing moves while it is paused.
-  const bool due = d.dirty || !d.lastRedraw ||
-      now - *d.lastRedraw >= kRedrawPeriod || now < *d.lastRedraw;
-  if (due)
+  // The reach and the rays are asked for at every update and sent only
+  // when they changed: a pinger switched off or a buoy dragged while the
+  // world is paused is redrawn at once, and a circle that stays is not
+  // sent again.
+  if (d.showReach)
   {
-    if (d.showReach)
+    // The reach, and inside it where pings start to drop for the
+    // receivers that have a dropout; in 3D, that ring on the water.
+    std::vector<double> starts;
+    for (const auto &r : receivers)
+      starts.push_back(r.dropoutStart);
+    const bool sphere = d.plane == Plane::k3D;
+    auto markers = sphere ?
+        ReachSpheres(pingers, d.waterLevel, d.reachLayer->Ns()) :
+        ReachMarkers(pingers, d.planeZ, d.reachLayer->Ns());
+    const double ringZ = sphere ?
+        PlaneZ(Plane::kWater, d.waterLevel, 0.0, std::nullopt) : d.planeZ;
+    for (auto &m : DropoutMarkers(pingers, starts, ringZ,
+                                  d.reachLayer->Ns()))
     {
-      // The reach, and inside it where pings start to drop for the
-      // receivers that have a dropout; in 3D, that ring on the water.
-      std::vector<double> starts;
-      for (const auto &r : receivers)
-        starts.push_back(r.dropoutStart);
-      const bool sphere = d.plane == Plane::k3D;
-      auto markers = sphere ?
-          ReachSpheres(pingers, d.waterLevel, d.reachLayer->Ns()) :
-          ReachMarkers(pingers, d.planeZ, d.reachLayer->Ns());
-      const double ringZ = sphere ?
-          PlaneZ(Plane::kWater, d.waterLevel, 0.0, std::nullopt) : d.planeZ;
-      for (auto &m : DropoutMarkers(pingers, starts, ringZ,
-                                    d.reachLayer->Ns()))
-      {
-        markers.push_back(std::move(m));
-      }
-      d.reachLayer->Draw(markers);
+      markers.push_back(std::move(m));
     }
-    else if (d.reachLayer->Drawn())
-      d.reachLayer->Clear();
-
-    if (d.showReadings)
-    {
-      std::vector<BearingRay> rays;
-      for (const auto &[topic, h] : last)
-      {
-        const auto pose = poses.find(topic);
-        if (pose == poses.end() || now < h.stamp ||
-            now - h.stamp > d.rayLifetime)
-        {
-          continue;
-        }
-        const double fade = std::chrono::duration<double>(now - h.stamp)
-            .count() / std::chrono::duration<double>(d.rayLifetime).count();
-        rays.push_back({pose->second, h, fade});
-      }
-      d.rayLayer->Draw(RayMarkers(rays, d.rayLength, d.rayLayer->Ns()));
-    }
-    else if (d.rayLayer->Drawn())
-    {
-      d.rayLayer->Clear();
-    }
-    d.lastRedraw = now;
+    d.reachLayer->DrawIfChanged(markers);
+  }
+  else if (d.reachLayer->Drawn())
+  {
+    d.reachLayer->Clear();
   }
 
-  const bool ringsDue = d.dirty || !d.lastRings ||
-      now - *d.lastRings >= kRingPeriod || now < *d.lastRings;
+  if (d.showReadings)
+  {
+    // A reading keeps the pose its receiver had when it came.
+    KeepRays(d.rays, last, poses);
+    d.rayLayer->DrawIfChanged(RayMarkers(
+        LiveRays(d.rays, now, d.rayLifetime), d.rayLength, d.rayLayer->Ns()));
+  }
+  else
+  {
+    d.rays.clear();
+    if (d.rayLayer->Drawn())
+      d.rayLayer->Clear();
+  }
+
+  // The rings move with simulation time: a frame every so often of it,
+  // and at once when a pinger or a setting changed.
+  auto tracked = pingers;
+  d.changes.Track(tracked, now, d.waterLevel);
+  std::ostringstream key;
+  for (const auto &p : tracked)
+  {
+    key << p.data.name << ' ' << p.data.active << ' ' << p.data.frequency
+        << ' ' << p.data.period << ' ' << p.data.offset << ' '
+        << p.data.reach << ' ' << p.position << ';';
+  }
+  // The plane the rings lie on, which a receiver's depth moves.
+  key << static_cast<int>(d.plane) << ' ' << d.planeZ;
+  const bool changed = d.dirty || key.str() != d.ringsKey;
+  const bool ringsDue = changed || !d.lastRings || now < *d.lastRings ||
+      (now - *d.lastRings >= kRingPeriod &&
+       wall - d.lastRingsWall >= kRingPeriod);
   if (ringsDue)
   {
     if (d.showPings && d.plane == Plane::k3D)
     {
-      d.pingLayer->Draw(PingSpheres(pingers, d.waterLevel, now,
+      d.pingLayer->DrawIfChanged(PingSpheres(tracked, d.waterLevel, now,
           d.speedOfSound / d.slowDown, d.maxRingRadius, d.pingLayer->Ns()));
     }
     else if (d.showPings)
     {
-      d.pingLayer->Draw(PingMarkers(pingers, d.planeZ, now,
-          d.speedOfSound / d.slowDown, d.maxRingRadius, d.pingLayer->Ns()));
+      d.pingLayer->DrawIfChanged(PingMarkers(tracked, d.planeZ, d.waterLevel,
+          now, d.speedOfSound / d.slowDown, d.maxRingRadius,
+          d.pingLayer->Ns()));
     }
     else if (d.pingLayer->Drawn())
     {
       d.pingLayer->Clear();
     }
     d.lastRings = now;
+    d.lastRingsWall = wall;
+    d.ringsKey = key.str();
   }
   d.dirty = false;
 }
@@ -734,7 +713,7 @@ bool AcousticsPanel::SetSlowDown(const QString &_text)
     return false;
   this->dataPtr->slowDown = value;
   this->dataPtr->dirty = true;
-  emit this->DrawingChanged();
+  emit this->SlowDownChanged();
   return true;
 }
 
@@ -746,7 +725,7 @@ void AcousticsPanel::SetPlane(const QString &_plane)
     return;
   this->dataPtr->plane = plane;
   this->dataPtr->dirty = true;
-  emit this->DrawingChanged();
+  emit this->PlaneChanged();
 }
 
 //////////////////////////////////////////////////
@@ -757,7 +736,7 @@ bool AcousticsPanel::SetPlaneDepth(const QString &_text)
     return false;
   this->dataPtr->planeDepth = value;
   this->dataPtr->dirty = true;
-  emit this->DrawingChanged();
+  emit this->PlaneChanged();
   return true;
 }
 
@@ -766,7 +745,7 @@ void AcousticsPanel::SetPlaneReceiver(const QString &_topic)
 {
   this->dataPtr->planeReceiver = _topic.toStdString();
   this->dataPtr->dirty = true;
-  emit this->DrawingChanged();
+  emit this->PlaneChanged();
 }
 
 //////////////////////////////////////////////////
@@ -820,9 +799,11 @@ bool AcousticsPanel::ShowReach() const
 //////////////////////////////////////////////////
 void AcousticsPanel::SetShowReach(bool _show)
 {
+  if (_show == this->dataPtr->showReach)
+    return;
   this->dataPtr->showReach = _show;
   this->dataPtr->dirty = true;
-  emit this->DrawingChanged();
+  emit this->ShowReachChanged();
 }
 
 //////////////////////////////////////////////////
@@ -834,9 +815,11 @@ bool AcousticsPanel::ShowPings() const
 //////////////////////////////////////////////////
 void AcousticsPanel::SetShowPings(bool _show)
 {
+  if (_show == this->dataPtr->showPings)
+    return;
   this->dataPtr->showPings = _show;
   this->dataPtr->dirty = true;
-  emit this->DrawingChanged();
+  emit this->ShowPingsChanged();
 }
 
 //////////////////////////////////////////////////
@@ -848,9 +831,11 @@ bool AcousticsPanel::ShowReadings() const
 //////////////////////////////////////////////////
 void AcousticsPanel::SetShowReadings(bool _show)
 {
+  if (_show == this->dataPtr->showReadings)
+    return;
   this->dataPtr->showReadings = _show;
   this->dataPtr->dirty = true;
-  emit this->DrawingChanged();
+  emit this->ShowReadingsChanged();
 }
 
 //////////////////////////////////////////////////

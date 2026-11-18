@@ -28,7 +28,7 @@
       ros2 launch kai_custom_vehicle acoustic_demo.launch.xml homing:=false gazebo_gui:=false
 
   The same demo on the RobotX 2026 course, course B of Marina Bay, whose two
-  survey pingers are about 25 m out from its start point (the site comes
+  survey pingers are about 35 m out from its start point (the site comes
   from Fuel the first time; marina_bay_lite.sdf draws less):
 
       ros2 launch kai_custom_vehicle acoustic_demo.launch.xml world:=marina_bay.sdf \

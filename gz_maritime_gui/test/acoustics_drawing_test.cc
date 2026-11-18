@@ -15,8 +15,9 @@
  *
  */
 // The acoustics panel's logic, without a GUI or a scene: the pingers read
-// from an ECM, the drawings as markers, the messages parsed, and a marker
-// layer sending to a fake MarkerManager in this process.
+// from an ECM and from the acoustics system's list, the drawings as markers,
+// the messages parsed, a listener hearing a fake acoustics system, and a
+// marker layer sending to a fake MarkerManager in this process.
 
 #include <gtest/gtest.h>
 
@@ -26,9 +27,11 @@
 
 #include <chrono>
 #include <cmath>
+#include <map>
 #include <mutex>
 #include <set>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <gz/math/Helpers.hh>
@@ -42,6 +45,7 @@
 
 #include "gz/sim/components/AcousticPinger.hh"
 #include "gz/sim/maritime_gui/Acoustics.hh"
+#include "gz/sim/maritime_gui/MarkerLayer.hh"
 
 using namespace gz;
 using namespace sim;
@@ -78,6 +82,22 @@ std::vector<double> Radii(const msgs::Marker &_m, const math::Vector3d &_c)
   std::vector<double> out;
   for (const auto &p : _m.point())
     out.push_back(std::hypot(p.x() - _c.X(), p.y() - _c.Y()));
+  return out;
+}
+
+/// \brief The radii of the rings in a set of markers, in cm.
+/// \param[in] _markers The markers.
+/// \param[in] _c The rings' centre.
+/// \return The distinct radii.
+std::set<long> RingRadii(const std::vector<msgs::Marker> &_markers,
+                         const math::Vector3d &_c)
+{
+  std::set<long> out;
+  for (const auto &m : _markers)
+  {
+    for (const auto r : Radii(m, _c))
+      out.insert(std::lround(r * 100));
+  }
   return out;
 }
 
@@ -351,15 +371,226 @@ TEST(AcousticsGui, PingMarkers)
   // first, and the water at 3 m cuts the others to 14.70 and 4 m.
   const auto markers = PingMarkers(
       {Pinger("on", at, 30000, 20, true), Pinger("off", at, 30000, 20, false)},
-      0.0, 2500ms, 10.0, 200.0, "ns");
+      0.0, 0.0, 2500ms, 10.0, 200.0, "ns");
   ASSERT_EQ(3u, markers.size());
-  std::set<long> radii;
-  for (const auto &m : markers)
+  EXPECT_EQ((std::set<long>{400, 1470}), RingRadii(markers, at));
+}
+
+//////////////////////////////////////////////////
+/// The rings go out to the reach, whatever the cap: the cap is for a pinger
+/// with no reach, whose rings would never end.
+TEST(AcousticsGui, RingsReachTheReachTheCapIsForNone)
+{
+  const math::Vector3d at(0, 0, -3);
+  // At 30 m/s, a ping every 2 s: after 9.9 s the pings of 0, 2, 4, 6 and
+  // 8 s have spheres of 297, 237, 177, 117 and 57 m.
+  const auto reach = PingMarkers({Pinger("reach", at, 30000, 300, true)},
+      0.0, 0.0, 9900ms, 30.0, 200.0, "ns");
+  const auto far = RingRadii(reach, at);
+  ASSERT_EQ(5u, far.size());
+  EXPECT_NEAR(std::sqrt(297.0 * 297.0 - 9.0), *far.rbegin() / 100.0, 0.01);
+
+  // With no reach the cap of 200 m ends them.
+  const auto capped = PingMarkers({Pinger("none", at, 30000, 0, true)},
+      0.0, 0.0, 9900ms, 30.0, 200.0, "ns");
+  const auto near = RingRadii(capped, at);
+  ASSERT_EQ(3u, near.size());
+  EXPECT_LT(*near.rbegin(), 200 * 100);
+}
+
+//////////////////////////////////////////////////
+/// Only pings that were sent ring: none from a pinger above the water, and
+/// none from before a pinger was switched on.
+TEST(AcousticsGui, RingsOnlyOfPingsSent)
+{
+  // The same pinger a metre above the water.
+  const math::Vector3d dry(0, 0, 1);
+  for (const auto &m : PingMarkers({Pinger("dry", dry, 30000, 20, true)},
+                                   0.0, 0.0, 2500ms, 10.0, 200.0, "ns"))
   {
-    for (const auto r : Radii(m, at))
-      radii.insert(std::lround(r * 100));
+    EXPECT_EQ(0, m.point_size());
   }
-  EXPECT_EQ((std::set<long>{400, 1470}), radii);
+
+  // Off at 1 s, on again at 2.2 s: at 2.5 s the schedule alone would draw
+  // the pings of 1 and 2 s, neither of which was sent.
+  const math::Vector3d at(0, 0, -3);
+  PingerChanges changes;
+  std::vector<PingerView> pingers{Pinger("p", at, 30000, 20, true)};
+  changes.Track(pingers, 500ms, 0.0);
+  EXPECT_FALSE(pingers[0].since.has_value()) << "as first seen";
+  EXPECT_EQ((std::set<long>{400}),
+            RingRadii(PingMarkers(pingers, 0.0, 0.0, 500ms, 10.0, 200.0,
+                                  "ns"), at));
+  pingers[0].data.active = false;
+  changes.Track(pingers, 1000ms, 0.0);
+  pingers[0].data.active = true;
+  changes.Track(pingers, 2200ms, 0.0);
+  ASSERT_TRUE(pingers[0].since.has_value());
+  EXPECT_EQ(std::chrono::steady_clock::duration(2200ms), *pingers[0].since);
+  changes.Track(pingers, 2500ms, 0.0);
+  EXPECT_EQ(std::chrono::steady_clock::duration(2200ms), *pingers[0].since)
+      << "unchanged since";
+  EXPECT_TRUE(RingRadii(PingMarkers(pingers, 0.0, 0.0, 2500ms, 10.0, 200.0,
+                                    "ns"), at).empty());
+  // The ping of 3 s was sent.
+  changes.Track(pingers, 3500ms, 0.0);
+  EXPECT_EQ((std::set<long>{400}),
+            RingRadii(PingMarkers(pingers, 0.0, 0.0, 3500ms, 10.0, 200.0,
+                                  "ns"), at));
+
+  // Lifted out and put back: it starts again from when it went under.
+  pingers[0].position.Z(1.0);
+  changes.Track(pingers, 4000ms, 0.0);
+  pingers[0].position.Z(-3.0);
+  changes.Track(pingers, 4200ms, 0.0);
+  EXPECT_EQ(std::chrono::steady_clock::duration(4200ms), *pingers[0].since);
+
+  // A reset, simulation time going back, forgets it.
+  changes.Track(pingers, 100ms, 0.0);
+  EXPECT_FALSE(pingers[0].since.has_value());
+}
+
+//////////////////////////////////////////////////
+/// Slowed down a lot, many pings are on their way at once: no more rings
+/// than the limit are drawn, the same pings from one frame to the next,
+/// and still out towards the reach.
+TEST(AcousticsGui, RingsAreBounded)
+{
+  const math::Vector3d at(0, 0, -1);
+  // At 1 m/s a 300 m reach holds 300 pings a second apart.
+  const std::vector<PingerView> pingers{Pinger("p", at, 30000, 300, true)};
+  const auto a = RingRadii(PingMarkers(pingers, 0.0, 0.0, 1000s, 1.0, 200.0,
+                                       "ns"), at);
+  EXPECT_LE(a.size(), static_cast<std::size_t>(kMaxRings));
+  EXPECT_GE(a.size(), static_cast<std::size_t>(kMaxRings - 1));
+  EXPECT_GT(*a.rbegin(), 200 * 100) << "out past the cap, towards the reach";
+
+  // Half a second on, the same pings, each half a metre further out.
+  const auto b = RingRadii(PingMarkers(pingers, 0.0, 0.0, 1000s + 500ms, 1.0,
+                                       200.0, "ns"), at);
+  ASSERT_EQ(a.size(), b.size());
+  auto ia = a.begin();
+  for (auto ib = b.begin(); ib != b.end(); ++ia, ++ib)
+    EXPECT_NEAR(50.0, static_cast<double>(*ib - *ia), 2.0);
+}
+
+//////////////////////////////////////////////////
+/// A reading's ray keeps the pose the receiver had when the reading came:
+/// the boat turning afterwards does not turn the ray off the pinger.
+TEST(AcousticsGui, ARayKeepsThePoseItWasHeardAt)
+{
+  std::map<std::string, BearingRay> kept;
+  HeardPing heard;
+  heard.bearing = 0.3;
+  heard.stamp = 1s;
+  const math::Pose3d then(5, 0, -0.3, 0, 0, 0);
+  KeepRays(kept, {{"/a", heard}}, {{"/a", then}});
+  ASSERT_EQ(1u, kept.size());
+  EXPECT_EQ(then, kept.at("/a").pose);
+
+  // A second later the boat has yawed 0.4 rad and moved on; same reading.
+  const math::Pose3d later(6, 1, -0.3, 0, 0, 0.4);
+  KeepRays(kept, {{"/a", heard}}, {{"/a", later}});
+  EXPECT_EQ(then, kept.at("/a").pose);
+  const auto markers =
+      RayMarkers(LiveRays(kept, 2s, 1500ms), 10.0, "ns");
+  ASSERT_EQ(1u, markers.size());
+  EXPECT_NEAR(5 + 10 * std::cos(0.3), markers[0].point(1).x(), 1e-9);
+  EXPECT_NEAR(10 * std::sin(0.3), markers[0].point(1).y(), 1e-9);
+
+  // The next reading takes the pose of its own moment.
+  heard.stamp = 2s;
+  KeepRays(kept, {{"/a", heard}}, {{"/a", later}});
+  EXPECT_EQ(later, kept.at("/a").pose);
+
+  // A ray lives for its lifetime, and a receiver that is gone has none.
+  EXPECT_EQ(1u, LiveRays(kept, 3s, 1500ms).size());
+  EXPECT_TRUE(LiveRays(kept, 4s, 1500ms).empty());
+  EXPECT_TRUE(LiveRays(kept, 1s, 1500ms).empty()) << "before it came";
+  KeepRays(kept, {}, {});
+  EXPECT_TRUE(kept.empty());
+
+  // A reading whose receiver has no pose yet waits for one.
+  KeepRays(kept, {{"/b", heard}}, {});
+  EXPECT_TRUE(kept.empty());
+}
+
+//////////////////////////////////////////////////
+/// The pingers a panel shows: the acoustics system's list, each as the
+/// GUI's state has it when it does. A pinger that changed arrives alone in
+/// the state of a panel loaded late; the others stay.
+TEST(AcousticsGui, PingersFromTheListAndTheState)
+{
+  msgs::Param list;
+  auto add = [&list](const std::string &_name, double _x, bool _active)
+  {
+    auto *c = list.add_children();
+    auto &n = (*c->mutable_params())["name"];
+    n.set_type(msgs::Any::STRING);
+    n.set_string_value(_name);
+    for (const auto &[key, value] : std::map<std::string, double>{
+        {"x", _x}, {"y", 2.0}, {"z", -1.5}, {"frequency", 37000.0},
+        {"period", 2.0}, {"offset", 0.5}, {"reach", 300.0},
+        {"pulse_length", 0.004}})
+    {
+      auto &a = (*c->mutable_params())[key];
+      a.set_type(msgs::Any::DOUBLE);
+      a.set_double_value(value);
+    }
+    auto &a = (*c->mutable_params())["active"];
+    a.set_type(msgs::Any::BOOLEAN);
+    a.set_bool_value(_active);
+  };
+  add("red", 40.0, false);
+  add("green", 10.0, true);
+
+  const auto listed = ParsePingers(list);
+  ASSERT_EQ(2u, listed.size());
+  EXPECT_EQ("green", listed[0].data.name);
+  EXPECT_EQ(math::Vector3d(10, 2, -1.5), listed[0].position);
+  EXPECT_DOUBLE_EQ(37000.0, listed[0].data.frequency);
+  EXPECT_DOUBLE_EQ(2.0, listed[0].data.period);
+  EXPECT_DOUBLE_EQ(0.5, listed[0].data.offset);
+  EXPECT_DOUBLE_EQ(300.0, listed[0].data.reach);
+  EXPECT_TRUE(listed[0].data.active);
+  EXPECT_FALSE(listed[1].data.active);
+  EXPECT_TRUE(ParsePingers(msgs::Param()).empty());
+
+  // Nothing in the state: the list.
+  EXPECT_EQ(2u, MergePingers(listed, {}).size());
+  // Red alone in the state, switched on: both stay, red as the state has it.
+  auto red = Pinger("red", math::Vector3d(41, 2, -1.5), 37000, 300, true);
+  const auto merged = MergePingers(listed, {red});
+  ASSERT_EQ(2u, merged.size());
+  EXPECT_EQ("green", merged[0].data.name);
+  EXPECT_TRUE(merged[1].data.active);
+  EXPECT_DOUBLE_EQ(41.0, merged[1].position.X());
+  // Before the list comes, the state alone.
+  EXPECT_EQ(1u, MergePingers({}, {red}).size());
+}
+
+//////////////////////////////////////////////////
+/// The listener hears the pingers the acoustics system lists.
+TEST(AcousticsGui, ListenerHearsThePingers)
+{
+  transport::Node node;
+  auto pub = node.Advertise<msgs::Param>(
+      "/world/listened/acoustics/pingers");
+  AcousticListener listener;
+  listener.Listen("listened");
+  EXPECT_TRUE(listener.Pingers().empty());
+
+  msgs::Param list;
+  auto &n = (*list.add_children()->mutable_params())["name"];
+  n.set_type(msgs::Any::STRING);
+  n.set_string_value("only");
+  for (int i = 0; i < 100 && listener.Pingers().empty(); ++i)
+  {
+    pub.Publish(list);
+    std::this_thread::sleep_for(20ms);
+  }
+  ASSERT_EQ(1u, listener.Pingers().size());
+  EXPECT_EQ("only", listener.Pingers()[0].data.name);
 }
 
 //////////////////////////////////////////////////
@@ -518,6 +749,20 @@ TEST(AcousticsGui, MarkerLayerAddsAndDeletes)
     EXPECT_EQ((std::set<std::uint64_t>{2}),
               ids(sent, msgs::Marker::DELETE_MARKER));
     EXPECT_TRUE(layer.Drawn());
+
+    // Asked for again unchanged, nothing is sent; changed, it is; and a
+    // plain Draw sends whatever is there.
+    EXPECT_FALSE(layer.DrawIfChanged({ring(1, false), ring(2, true)}));
+    std::this_thread::sleep_for(100ms);
+    EXPECT_TRUE(manager.Take().empty());
+    EXPECT_TRUE(layer.DrawIfChanged({ring(1, false), ring(3, false)}));
+    sent = manager.Take();
+    EXPECT_EQ((std::set<std::uint64_t>{1, 3}),
+              ids(sent, msgs::Marker::ADD_MODIFY));
+    layer.Draw({ring(1, false), ring(3, false)});
+    EXPECT_EQ(2u, manager.Take().size());
+    layer.Draw({ring(1, false)});
+    manager.Take();
   }
   // Gone: what it drew is deleted.
   const auto last = manager.Take();

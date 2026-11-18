@@ -211,12 +211,14 @@
     </xacro:sensor_link>
 
     <!-- The acoustic receiver, read by the acoustics system (gz_acoustics)
-         at the hydrophone under the deck: one reading per ping heard, the
+         at the hydrophone on its pole, 0.3 m below the waterline: one
+         reading per ping heard, the
          bearing and elevation of the pinger in the sensor frame, tuned to
          the 30 kHz of a RobotX course pinger with a 1 kHz band, and
          retuned on /<name>/acoustic_receiver/set. The noise and the
          dropout near a pinger's reach are those of a small hydrophone
-         array; no range, which a passive receiver cannot measure. -->
+         array; no range, which a passive receiver cannot measure, and noise
+         on the amplitude, which without it would give the range exactly. -->
     <xacro:sensor_link sensor_name="acoustic_receiver" frame="hydrophone_link">
       <sensor name="acoustic_receiver" type="custom" gz:type="acoustic_receiver">
         <frame_id>${name}/hydrophone_link</frame_id>
@@ -237,6 +239,12 @@
               <stddev>0.03</stddev>
             </noise>
           </elevation_noise>
+          <amplitude_noise>
+            <noise type="gaussian">
+              <mean>0</mean>
+              <stddev>1</stddev>
+            </noise>
+          </amplitude_noise>
           <outlier_probability>0.02</outlier_probability>
           <dropout_start>0.8</dropout_start>
         </gz:acoustic_receiver>

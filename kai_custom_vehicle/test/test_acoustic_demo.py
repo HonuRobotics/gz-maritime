@@ -22,7 +22,7 @@ buoy's 30 kHz pinger pings and a red one's is silent:
   boat_b at (-10, -20) heading north, green at (40, 15), red at (40, -15),
   and a yellow 37 kHz decoy at (-30, 30);
 * marina_bay_lite.sdf, the RobotX 2026 course: custom_usv at course B's
-  start point, boat_b at course C's, the survey pingers 25 m out from B's.
+  start point, boat_b at course C's, the survey pingers 35 m out from B's.
   Its site comes from Fuel, so this one runs only once the site is cached.
 
 The tests check what the boats hear, that custom_usv reaches the green
@@ -59,8 +59,8 @@ SCENES = {
     'marina_bay_lite': {
         'args': ['world:=marina_bay_lite.sdf', 'x:=-15', 'y:=-8', 'yaw:=0.55',
                  'listener_x:=15', 'listener_y:=-28', 'listener_yaw:=0.55'],
-        'green': (3.7, 9.4),
-        'red': (8.9, 0.8),
+        'green': (12.2, 14.6),
+        'red': (17.5, 6.0),
         'boat_b': (15.0, -28.0, 0.55),
         'pingers': ('pinger_green', 'pinger_red'),
         # The site, from Fuel: only once it is in the cache.
@@ -69,8 +69,9 @@ SCENES = {
         'fuel.gazebosim.org' / 'honurobotics' / 'models' / 'marina_bay_lite',
     },
 }
-# How close to a buoy counts as there: the controller stops when the ping
-# is louder than -16 dB, about 6 m away.
+# How close to a buoy counts as there: the controller stops when the median
+# of the last pings is louder than -16 dB, about 6 m away, give or take the
+# receiver's 1 dB of amplitude noise.
 ARRIVED = 8.0
 
 _NUM = r'-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?'
@@ -87,40 +88,67 @@ def nodes(env):
 
 
 def model_xy(env, name):
-    """Return a model's world position (x, y) from `gz model -p`."""
-    code, out, err = gz(env, 'model', '-m', name, '-p', timeout=15)
+    """
+    Return a model's world position (x, y) from `gz model -p`, or None.
+
+    None when the call fails, as it does when the machine is busy and the
+    service times out: the caller polls, and tries again.
+    """
+    code, out, _ = gz(env, 'model', '-m', name, '-p', timeout=15)
     triples = POSE_TRIPLE.findall(out)
-    assert code == 0 and triples, f'cannot read the pose of {name}:\n{out}\n{err}'
+    if code != 0 or not triples:
+        return None
     return float(triples[0][0]), float(triples[0][1])
 
 
 def distance_to(env, name, point):
-    """Return the horizontal distance from a model to a point, m."""
-    x, y = model_xy(env, name)
-    return math.hypot(x - point[0], y - point[1])
+    """Return the horizontal distance from a model to a point, m, or None."""
+    xy = model_xy(env, name)
+    if xy is None:
+        return None
+    return math.hypot(xy[0] - point[0], xy[1] - point[1])
 
 
 def sim_seconds(env):
-    """Return the current sim time in seconds from the world stats topic."""
-    code, out, err = gz(env, 'topic', '-e', '-t', f'/world/{WORLD_NAME}/stats',
-                        '-n', '1', timeout=15)
+    """Return the sim time in seconds from the world stats topic, or None."""
+    code, out, _ = gz(env, 'topic', '-e', '-t', f'/world/{WORLD_NAME}/stats',
+                      '-n', '1', timeout=15)
     block = re.search(r'sim_time\s*{([^}]*)}', out)
-    assert code == 0 and block, f'cannot read world stats:\n{out}\n{err}'
+    if code != 0 or not block:
+        return None
     sec = re.search(r'\bsec:\s*(\d+)', block.group(1))
     nsec = re.search(r'nsec:\s*(\d+)', block.group(1))
     return (int(sec.group(1)) if sec else 0) + (int(nsec.group(1)) if nsec else 0) / 1e9
 
 
 def wait_until_near(env, name, point, sim_budget, wall_timeout=300):
-    """Block until a model is within ARRIVED of a point, within sim_budget s of sim time."""
-    start = sim_seconds(env)
-    poll_until(
-        lambda: (distance_to(env, name, point) < ARRIVED or
-                 sim_seconds(env) - start > sim_budget),
-        wall_timeout, f'sim time stalled while waiting for {name}', interval=1)
-    d = distance_to(env, name, point)
-    assert d < ARRIVED, (f'{name} is {d:.1f} m from {point} after '
-                         f'{sim_seconds(env) - start:.0f} s of sim time')
+    """
+    Block until a model is within ARRIVED of a point, within sim_budget s of sim time.
+
+    A call that fails is not a failure of the test: every reading is polled
+    for, so a slow answer on a busy machine is asked for again.
+    """
+    seen = {}
+
+    def started():
+        seen['start'] = sim_seconds(env)
+        return seen['start'] is not None
+
+    def near_or_out_of_time():
+        seen['d'] = distance_to(env, name, point)
+        if seen['d'] is not None and seen['d'] < ARRIVED:
+            return True
+        now = sim_seconds(env)
+        if now is not None:
+            seen['now'] = now
+        return seen['d'] is not None and now is not None and now - seen['start'] > sim_budget
+
+    poll_until(started, 60, 'cannot read world stats', interval=1)
+    poll_until(near_or_out_of_time, wall_timeout,
+               f'sim time stalled while waiting for {name}', interval=1)
+    assert seen['d'] < ARRIVED, (
+        f"{name} is {seen['d']:.1f} m from {point} after "
+        f"{seen.get('now', seen['start']) - seen['start']:.0f} s of sim time")
 
 
 def gz_readings(env, topic, count):
@@ -186,9 +214,10 @@ def test_the_listener_hears_the_green_pinger_from_where_it_is(demo):
     expected = math.atan2(dy, dx) - boat_b[2]
     bearing = statistics.median(r['bearing'] for r in readings)
     assert bearing == pytest.approx(expected, abs=0.15), readings
-    # Spherical spreading from about 61 m.
+    # Spherical spreading from where it is, under the receiver's 1 dB of
+    # amplitude noise.
     amplitude = statistics.median(r['amplitude'] for r in readings)
-    assert amplitude == pytest.approx(-20 * math.log10(math.hypot(dx, dy)), abs=1.0)
+    assert amplitude == pytest.approx(-20 * math.log10(math.hypot(dx, dy)), abs=2.5)
 
 
 def test_the_readings_reach_ros(demo):
@@ -198,8 +227,12 @@ def test_the_readings_reach_ros(demo):
                          timeout=30)
     assert code == 0, f'no reading over ROS:\n{out}\n{err}'
     assert 'frame_id: boat_b/hydrophone_link' in out, out
-    for key in ('bearing', 'elevation', 'frequency', 'amplitude', 'valid', 'emit_time'):
+    for key in ('bearing', 'elevation', 'frequency', 'amplitude', 'valid'):
         assert f'name: {key}' in out, f'{key} missing:\n{out}'
+    # A passive receiver: neither the range nor the time the ping was sent,
+    # which with the stamp gives the range.
+    for key in ('range', 'emit_time'):
+        assert f'name: {key}' not in out, f'{key} reported:\n{out}'
 
 
 def test_the_ground_truth_lists_the_pingers(demo):

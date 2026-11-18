@@ -30,8 +30,12 @@
   <!-- Seawater, as in the gz-maritime open_water world. -->
   <xacro:property name="water_density" value="1025.0"/>
 
-  <!-- Hydrophone: on a pole under the deck centre, this deep below the
-       design waterline, so it stays in the water as the boat rolls. -->
+  <!-- Hydrophone: on a pole below the deck centre, this deep below the
+       design waterline (base_link is on the waterline), not just under the
+       deck, so it stays in the water as the boat rolls. The acoustics hear
+       below the flat <water_level> only: once a boat follows the waves, a
+       hydrophone this shallow will come out of that plane in a rough sea
+       and read as dry at times. -->
   <xacro:property name="hydrophone_depth" value="0.3"/>
   <!-- ===================== Derived ===================== -->
   <!-- Draft: the depth at which the two hulls displace the whole boat's
