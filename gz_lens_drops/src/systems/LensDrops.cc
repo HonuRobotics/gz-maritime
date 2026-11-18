@@ -43,7 +43,11 @@
 #include <gz/rendering/RenderingIface.hh>
 #include <gz/rendering/Scene.hh>
 #include <gz/sim/Util.hh>
+#include <gz/math/Pose3.hh>
+#include <gz/math/Vector3.hh>
 #include <gz/sim/components/Camera.hh>
+#include <gz/sim/components/ParentEntity.hh>
+#include <gz/sim/components/Pose.hh>
 #include <gz/sim/rendering/Events.hh>
 #include <gz/transport/Node.hh>
 #include <gz/transport/TopicUtils.hh>
@@ -51,6 +55,7 @@
 #include "Ogre2LensDropsBridge.hh"
 #include "gz/sim/lens_drops/DropMap.hh"
 #include "gz/sim/lens_drops/Drops.hh"
+#include "gz/sim/wind/WindSampler.hh"
 
 namespace
 {
@@ -242,6 +247,32 @@ class LensDropsPrivate
   /// \brief Publisher of the mask.
   public: transport::Node::Publisher maskPub;
 
+  /// \brief What the world does to the lens this step, from the sensor's
+  /// pose, its motion and the wind. Sim thread only.
+  /// \param[in] _info The step.
+  /// \param[in] _ecm The entity component manager.
+  /// \return The environment.
+  public: lens_drops::Environment Environment(const UpdateInfo &_info,
+                                             const EntityComponentManager &_ecm);
+
+  /// \brief The sensor entity. Set in Configure.
+  public: Entity sensor{kNullEntity};
+
+  /// \brief The link the sensor is on. Set in Configure.
+  public: Entity link{kNullEntity};
+
+  /// \brief True to take the world's wind. Set in Configure.
+  public: bool useWind{true};
+
+  /// \brief The world's wind. Sim thread only.
+  public: wind::WindSampler sampler;
+
+  /// \brief The sensor's world position at the last step. Sim thread only.
+  public: math::Vector3d lastPosition;
+
+  /// \brief True once lastPosition holds a position. Sim thread only.
+  public: bool havePosition{false};
+
   /// \brief The camera's name in the rendering scene. Set in Configure.
   public: std::string cameraName;
 
@@ -310,6 +341,11 @@ void LensDrops::Configure(const Entity &_entity,
     return;
   }
 
+  this->dataPtr->sensor = _entity;
+  if (auto *parent = _ecm.Component<components::ParentEntity>(_entity))
+    this->dataPtr->link = parent->Data();
+  this->dataPtr->useWind = _sdf->Get<bool>("wind", true).first;
+
   lens_drops::Params params;
   params.rainRate = _sdf->Get<double>("rain_rate", params.rainRate).first;
   params.exposure = _sdf->Get<double>("exposure", params.exposure).first;
@@ -367,7 +403,7 @@ void LensDrops::Configure(const Entity &_entity,
 
 //////////////////////////////////////////////////
 void LensDrops::PostUpdate(const UpdateInfo &_info,
-    const EntityComponentManager &)
+    const EntityComponentManager &_ecm)
 {
   if (!this->dataPtr->valid)
     return;
@@ -375,13 +411,21 @@ void LensDrops::PostUpdate(const UpdateInfo &_info,
   if (_info.simTime < this->dataPtr->lastState)
     this->dataPtr->lastState = std::chrono::steady_clock::duration::zero();
 
+  // Gravity, air and rain on the lens, from the sensor's pose and motion.
+  std::optional<lens_drops::Environment> env;
+  if (!_info.paused)
+    env = this->dataPtr->Environment(_info, _ecm);
+
   lens_drops::Params params;
+  lens_drops::Environment used;
   std::size_t count{0};
   std::size_t sliding{0};
   double covered{0.0};
   bool attached{false};
   {
     const std::lock_guard<std::mutex> lock(this->dataPtr->mutex);
+    if (env)
+      this->dataPtr->drops.SetEnvironment(*env);
     if (!_info.paused)
     {
       this->dataPtr->drops.Step(
@@ -389,6 +433,7 @@ void LensDrops::PostUpdate(const UpdateInfo &_info,
       this->dataPtr->simTime = _info.simTime;
     }
     params = this->dataPtr->drops.Parameters();
+    used = this->dataPtr->drops.Env();
     count = this->dataPtr->drops.List().size();
     sliding = this->dataPtr->drops.Sliding();
     covered = this->dataPtr->covered;
@@ -412,6 +457,9 @@ void LensDrops::PostUpdate(const UpdateInfo &_info,
   SetDouble(msg, "contact_angle", params.contactAngle);
   SetDouble(msg, "slide_radius", params.slideRadius);
   SetDouble(msg, "covered", covered);
+  SetDouble(msg, "flux", used.flux);
+  SetDouble(msg, "gravity_x", used.gravityX);
+  SetDouble(msg, "gravity_y", used.gravityY);
   msgs::Any &slidingValue = (*msg.mutable_params())["sliding"];
   slidingValue.set_type(msgs::Any::INT32);
   slidingValue.set_int_value(static_cast<int>(sliding));
@@ -437,6 +485,58 @@ void LensDrops::Reset(const UpdateInfo &, EntityComponentManager &)
   }
   this->dataPtr->lastState = std::chrono::steady_clock::duration::zero();
   this->dataPtr->published = false;
+  this->dataPtr->havePosition = false;
+}
+
+//////////////////////////////////////////////////
+lens_drops::Environment LensDropsPrivate::Environment(
+    const UpdateInfo &_info, const EntityComponentManager &_ecm)
+{
+  lens_drops::Environment env;
+  if (this->link == kNullEntity)
+    return env;
+
+  // The sensor's world pose. A Gazebo camera looks along +X; the image's
+  // right is -Y and its down is -Z.
+  math::Pose3d pose = worldPose(this->link, _ecm);
+  if (auto *local = _ecm.Component<components::Pose>(this->sensor))
+    pose = pose * local->Data();
+  const math::Quaterniond &q = pose.Rot();
+  const math::Vector3d right = q.RotateVector(-math::Vector3d::UnitY);
+  const math::Vector3d down = q.RotateVector(-math::Vector3d::UnitZ);
+  const math::Vector3d forward = q.RotateVector(math::Vector3d::UnitX);
+  const math::Vector3d position = pose.Pos();
+
+  // Its velocity from the last step; none on the first step or after a
+  // jump, such as a teleport.
+  const double dt = std::chrono::duration<double>(_info.dt).count();
+  math::Vector3d velocity = math::Vector3d::Zero;
+  if (this->havePosition && dt > 0.0 &&
+      (position - this->lastPosition).Length() <= 50.0)
+  {
+    velocity = (position - this->lastPosition) / dt;
+  }
+  this->lastPosition = position;
+  this->havePosition = true;
+
+  math::Vector3d wind = math::Vector3d::Zero;
+  if (this->useWind && this->sampler.Sync(_ecm))
+    wind = this->sampler.At(position, _info.simTime);
+
+  const math::Vector3d gravity(0.0, 0.0, -1.0);
+  env.gravityX = gravity.Dot(right);
+  env.gravityY = gravity.Dot(down);
+  const math::Vector3d air = wind - velocity;
+  env.airX = air.Dot(right);
+  env.airY = air.Dot(down);
+  // Rain falls at its terminal speed and drifts with the wind; what hits
+  // the lens is what moves into it.
+  const math::Vector3d rain =
+      wind + math::Vector3d(0.0, 0.0, -lens_drops::kRainTerminalSpeed);
+  const math::Vector3d relative = rain - velocity;
+  env.flux = std::max(0.0, -relative.Dot(forward)) /
+      lens_drops::kRainTerminalSpeed;
+  return env;
 }
 
 //////////////////////////////////////////////////

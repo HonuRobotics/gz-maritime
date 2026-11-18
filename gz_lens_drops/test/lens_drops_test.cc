@@ -347,6 +347,82 @@ TEST(LensDropsSystem, NotOnACamera)
   EXPECT_TRUE(found) << "the cameras' topics were not listed either";
 }
 
+namespace
+{
+/// \brief The topics of a camera in the pose world.
+/// \param[in] _model The model.
+/// \param[in] _leaf `set` or `state`.
+/// \return The topic.
+std::string PoseTopic(const std::string &_model, const std::string &_leaf)
+{
+  return "/world/lens_drops_pose/model/" + _model +
+      "/link/link/sensor/camera/lens_drops/" + _leaf;
+}
+
+/// \brief A server on the pose world.
+/// \return Its configuration.
+ServerConfig PoseConfig()
+{
+  ServerConfig config;
+  config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, "lens_drops_pose.sdf"));
+  return config;
+}
+}  // namespace
+
+//////////////////////////////////////////////////
+TEST(LensDropsEnvironment, LevelCameraFeelsGravityDown)
+{
+  State level(PoseTopic("level", "state"));
+  Server server(PoseConfig());
+  Advance(server, 500);
+  ASSERT_TRUE(level.WaitFor(0.401));
+  EXPECT_NEAR(level.Value("gravity_x"), 0.0, 0.01);
+  EXPECT_NEAR(level.Value("gravity_y"), 1.0, 0.01);
+  EXPECT_NEAR(level.Value("flux"), 0.0, 1e-6);
+}
+
+//////////////////////////////////////////////////
+TEST(LensDropsEnvironment, RolledCameraFeelsGravitySideways)
+{
+  State rolled(PoseTopic("rolled", "state"));
+  Server server(PoseConfig());
+  Advance(server, 500);
+  ASSERT_TRUE(rolled.WaitFor(0.401));
+  EXPECT_NEAR(std::abs(rolled.Value("gravity_x")), 1.0, 0.01);
+  EXPECT_NEAR(rolled.Value("gravity_y"), 0.0, 0.01);
+}
+
+//////////////////////////////////////////////////
+TEST(LensDropsEnvironment, UpCameraCatchesRain)
+{
+  State up(PoseTopic("up", "state"));
+  Server server(PoseConfig());
+  Advance(server, 500);
+  ASSERT_TRUE(up.WaitFor(0.401));
+  EXPECT_NEAR(up.Value("flux"), 1.0, 0.01);
+  EXPECT_LT(std::hypot(up.Value("gravity_x"), up.Value("gravity_y")), 0.01);
+}
+
+//////////////////////////////////////////////////
+TEST(LensDropsEnvironment, WindBringsRain)
+{
+  // 20 m/s at 10 m coming from +x, blowing into the level camera's lens;
+  // lower at its 1 m, but still well over the rain's fall speed.
+  State level(PoseTopic("level", "state"));
+  Server server(PoseConfig());
+  Advance(server, 10);
+  ASSERT_TRUE(Set("/world/lens_drops_pose/wind/set",
+      {{"speed", 20.0}, {"direction", 90.0}}));
+  bool wet = false;
+  for (int i = 0; i < 20 && !wet; ++i)
+  {
+    Advance(server, 200);
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    wet = level.Value("flux") > 0.5;
+  }
+  EXPECT_TRUE(wet) << "flux " << level.Value("flux");
+}
+
 //////////////////////////////////////////////////
 int main(int _argc, char **_argv)
 {

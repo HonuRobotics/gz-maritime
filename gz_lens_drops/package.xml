@@ -19,6 +19,8 @@
   <!-- The render pass, behind a dlopen'd bridge to Ogre Next. -->
   <depend>gz_rendering_vendor</depend>
   <depend>gz_ogre_next_vendor</depend>
+  <!-- The world's wind, which brings rain onto the lens and pushes drops. -->
+  <depend>gz_wind</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
