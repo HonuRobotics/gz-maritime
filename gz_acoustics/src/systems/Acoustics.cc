@@ -20,7 +20,6 @@
 #include <chrono>
 #include <cstdint>
 #include <deque>
-#include <functional>
 #include <limits>
 #include <list>
 #include <optional>
@@ -36,7 +35,6 @@
 #include <gz/common/Console.hh>
 #include <gz/math/Helpers.hh>
 #include <gz/math/Pose3.hh>
-#include <gz/math/Rand.hh>
 #include <gz/msgs/Utility.hh>
 #include <gz/plugin/Register.hh>
 #include <gz/sensors/SensorFactory.hh>
@@ -51,6 +49,7 @@
 
 #include "gz/sim/acoustics/Hearing.hh"
 #include "gz/sim/acoustics/Pinger.hh"
+#include "gz/sim/acoustics/Random.hh"
 #include "gz/sim/components/AcousticPinger.hh"
 
 #include "AcousticReceiver.hh"
@@ -80,19 +79,26 @@ struct ReceiverMount
   /// \brief Its scoped name, from the world.
   public: std::string name;
 
-  /// \brief Draws its dropouts and outliers.
-  public: std::mt19937 rng;
+  /// \brief Draws its noise, dropouts and outliers.
+  public: acoustics::Generator rng;
 
-  /// \brief Readings that arrived and wait one pulse length, so a ping
-  /// arriving on top of one can mark both invalid.
+  /// \brief Readings that arrived, in order of arrival, each with its
+  /// pulse length: a reading waits that long, so a ping arriving on top of
+  /// it can mark both invalid.
   public: std::deque<std::pair<ReceiverReading, acoustics::Duration>> held;
 };
 
 /// \brief One ping on its way.
 struct Ping
 {
-  /// \brief The pinger, as it was when it pinged.
-  public: acoustics::PingerData pinger;
+  /// \brief Hz, as the pinger was set when it pinged.
+  public: double frequency{0.0};
+
+  /// \brief m, the farthest it is heard; 0 is no limit.
+  public: double reach{0.0};
+
+  /// \brief How long it lasts at a receiver.
+  public: acoustics::Duration pulse{0};
 
   /// \brief World position it was sent from.
   public: math::Vector3d origin;
@@ -108,13 +114,17 @@ class gz::sim::maritime::AcousticsPrivate
 {
   /// \brief Find the receivers the system has not seen.
   /// \param[in] _ecm The entity component manager.
-  /// \param[in] _all Scan every sensor, not only the new ones.
-  public: void FindReceivers(const EntityComponentManager &_ecm, bool _all);
+  /// \param[in] _candidates Sensors to look at; with _all, ignored.
+  /// \param[in] _all Scan every sensor, not only the candidates.
+  public: void FindReceivers(const EntityComponentManager &_ecm,
+                             std::vector<Entity> _candidates, bool _all);
 
-  /// \brief Send the pings due in (last, now].
+  /// \brief Send the pings due in (after, now].
+  /// \param[in] _after Exclusive start of the window.
   /// \param[in] _now Simulation time.
   /// \param[in] _ecm The entity component manager.
-  public: void Emit(const acoustics::Duration &_now,
+  public: void Emit(const acoustics::Duration &_after,
+                    const acoustics::Duration &_now,
                     const EntityComponentManager &_ecm);
 
   /// \brief Move the pings on, and hand each to the receivers it reaches.
@@ -127,18 +137,22 @@ class gz::sim::maritime::AcousticsPrivate
   /// \param[in] _mount The receiver.
   /// \param[in] _pose Its world pose now.
   /// \param[in] _ping The ping.
-  /// \param[in] _now Simulation time, when it arrives.
+  /// \param[in] _arrived When the sound gets there: a time between two
+  /// steps, not the step that notices it.
   public: void Hear(ReceiverMount &_mount, const math::Pose3d &_pose,
-                    const Ping &_ping, const acoustics::Duration &_now);
+                    const Ping &_ping, const acoustics::Duration &_arrived);
 
   /// \brief Publish the readings whose pulse has passed.
   /// \param[in] _now Simulation time.
   public: void Flush(const acoustics::Duration &_now);
 
-  /// \brief Publish the pingers' ground truth.
+  /// \brief Publish the pingers' ground truth and the list of receivers,
+  /// at the publish rate: on simulation time while the world runs, on wall
+  /// time while it is paused, so a GUI opened on a paused world gets both.
   /// \param[in] _now Simulation time.
+  /// \param[in] _paused Whether the world is paused.
   /// \param[in] _ecm The entity component manager.
-  public: void PublishPingers(const acoustics::Duration &_now,
+  public: void PublishPingers(const acoustics::Duration &_now, bool _paused,
                               const EntityComponentManager &_ecm);
 
   /// \brief World position of a pinger.
@@ -161,9 +175,6 @@ class gz::sim::maritime::AcousticsPrivate
 
   /// \brief Pings on their way.
   public: std::list<Ping> pings;
-
-  /// \brief Custom sensors made since the last scan.
-  public: std::vector<Entity> newSensors;
 
   /// \brief Scan every sensor at the next update.
   public: bool rescan{true};
@@ -197,6 +208,10 @@ class gz::sim::maritime::AcousticsPrivate
 
   /// \brief Simulation time of the last ground truth.
   public: std::optional<acoustics::Duration> lastPublish;
+
+  /// \brief Wall time of the last ground truth sent while paused.
+  public: std::optional<std::chrono::steady_clock::time_point>
+      lastPausedPublish;
 };
 
 //////////////////////////////////////////////////
@@ -215,10 +230,9 @@ bool AcousticsPrivate::Wet(const math::Vector3d &_point) const
 
 //////////////////////////////////////////////////
 void AcousticsPrivate::FindReceivers(const EntityComponentManager &_ecm,
-    bool _all)
+    std::vector<Entity> _candidates, bool _all)
 {
-  std::vector<Entity> candidates;
-  candidates.swap(this->newSensors);
+  std::vector<Entity> candidates = std::move(_candidates);
   if (_all)
   {
     this->receivers.clear();
@@ -267,26 +281,23 @@ void AcousticsPrivate::FindReceivers(const EntityComponentManager &_ecm,
     mount.sensor = std::move(created);
     mount.name = scoped;
     // Its own sequence, from the world's seed and its name, so two
-    // receivers do not draw the same numbers.
-    mount.rng.seed(this->seed ^
-        static_cast<std::uint32_t>(std::hash<std::string>{}(scoped)));
+    // receivers do not draw the same numbers; a hash that is the same on
+    // every standard library, so a seeded run repeats everywhere.
+    mount.rng.seed(this->seed ^ acoustics::Hash(scoped));
+    mount.sensor->DrawBias(mount.rng);
     this->receivers[sensor] = std::move(mount);
   }
 }
 
 //////////////////////////////////////////////////
-void AcousticsPrivate::Emit(const acoustics::Duration &_now,
-    const EntityComponentManager &_ecm)
+void AcousticsPrivate::Emit(const acoustics::Duration &_after,
+    const acoustics::Duration &_now, const EntityComponentManager &_ecm)
 {
-  // Before the first update every ping from time zero is due, a ping at
-  // time zero included.
-  const acoustics::Duration after =
-      this->last.value_or(-acoustics::Duration(1));
   _ecm.Each<components::AcousticPinger>(
       [&](const Entity &_link, const components::AcousticPinger *_comp) -> bool
       {
         const auto &pinger = _comp->Data();
-        const auto times = acoustics::EmissionTimes(pinger, after, _now);
+        const auto times = acoustics::EmissionTimes(pinger, _after, _now);
         if (times.empty())
           return true;
         // A pinger out of the water sends nothing.
@@ -297,7 +308,9 @@ void AcousticsPrivate::Emit(const acoustics::Duration &_now,
         for (const auto &t : times)
         {
           Ping ping;
-          ping.pinger = pinger;
+          ping.frequency = pinger.frequency;
+          ping.reach = pinger.reach;
+          ping.pulse = acoustics::FromSeconds(pinger.pulse_length);
           ping.origin = origin;
           ping.emitted = t;
           for (const auto &[sensor, mount] : this->receivers)
@@ -328,7 +341,7 @@ void AcousticsPrivate::Propagate(const acoustics::Duration &_now,
 
   for (auto ping = this->pings.begin(); ping != this->pings.end();)
   {
-    const double reach = ping->pinger.reach;
+    const double reach = ping->reach;
     const auto elapsed = std::chrono::duration<double>(
         _now - ping->emitted).count();
     // How far the sound has gone; with no speed, everywhere at once.
@@ -359,7 +372,10 @@ void AcousticsPrivate::Propagate(const acoustics::Duration &_now,
         ++r;
         continue;
       }
-      this->Hear(this->receivers[*r], pose->second, *ping, _now);
+      // It arrived between the last step and this one: when, from the
+      // distance, not from the step that notices it.
+      this->Hear(this->receivers[*r], pose->second, *ping, ping->emitted +
+          acoustics::TravelTime(distance, this->speedOfSound));
       r = ping->waiting.erase(r);
     }
 
@@ -373,55 +389,68 @@ void AcousticsPrivate::Propagate(const acoustics::Duration &_now,
 //////////////////////////////////////////////////
 void AcousticsPrivate::Hear(ReceiverMount &_mount,
     const math::Pose3d &_pose, const Ping &_ping,
-    const acoustics::Duration &_now)
+    const acoustics::Duration &_arrived)
 {
   if (!this->Wet(_pose.Pos()))
     return;
   const ReceiverSettings settings = _mount.sensor->Settings();
-  if (!acoustics::InBand(_ping.pinger.frequency, settings.frequency,
+  if (!acoustics::InBand(_ping.frequency, settings.frequency,
                          settings.bandwidth))
   {
     return;
   }
 
-  std::uniform_real_distribution<double> uniform(0.0, 1.0);
   const acoustics::Direction truth =
       acoustics::Measure(_pose, _ping.origin);
+  if (!acoustics::InElevation(truth.elevation, settings.minElevation,
+                              settings.maxElevation))
+  {
+    return;
+  }
   const double lose = acoustics::DropoutProbability(truth.range,
-      _ping.pinger.reach, settings.dropoutStart);
-  if (lose > 0.0 && uniform(_mount.rng) < lose)
+      _ping.reach, settings.dropoutStart);
+  if (lose > 0.0 && acoustics::Uniform(_mount.rng) < lose)
     return;
 
   ReceiverReading reading;
   using Channel = AcousticReceiver::Channel;
-  reading.bearing = _mount.sensor->ApplyNoise(Channel::kBearing,
-                                              truth.bearing);
+  const auto &sensor = *_mount.sensor;
+  reading.bearing = sensor.ApplyNoise(Channel::kBearing, truth.bearing,
+                                      _mount.rng);
   if (settings.outlierProbability > 0.0 &&
-      uniform(_mount.rng) < settings.outlierProbability)
+      acoustics::Uniform(_mount.rng) < settings.outlierProbability)
   {
     reading.bearing = acoustics::WrapAngle(
-        (2.0 * uniform(_mount.rng) - 1.0) * GZ_PI);
+        (2.0 * acoustics::Uniform(_mount.rng) - 1.0) * GZ_PI);
   }
-  reading.elevation = _mount.sensor->ApplyNoise(Channel::kElevation,
-                                                truth.elevation);
-  reading.range = _mount.sensor->ApplyNoise(Channel::kRange, truth.range);
-  reading.frequency = _ping.pinger.frequency;
-  reading.amplitude = acoustics::Amplitude(truth.range);
+  reading.elevation = sensor.ApplyNoise(Channel::kElevation, truth.elevation,
+                                        _mount.rng);
+  reading.range = sensor.ApplyNoise(Channel::kRange, truth.range, _mount.rng);
+  reading.frequency = _ping.frequency;
+  reading.amplitude = sensor.ApplyNoise(Channel::kAmplitude,
+      acoustics::Amplitude(truth.range), _mount.rng);
   reading.emitted = _ping.emitted;
-  reading.arrived = _now;
+  reading.arrived = _arrived;
 
-  // Two pings in band closer than a pulse are both spoilt.
-  const auto pulse = std::chrono::duration_cast<acoustics::Duration>(
-      std::chrono::duration<double>(_ping.pinger.pulse_length));
+  // Two pings in band, the later arriving while the earlier still sounds,
+  // are both spoilt.
   for (auto &[held, heldPulse] : _mount.held)
   {
-    if (_now - held.arrived < std::max(pulse, heldPulse))
+    if (acoustics::Overlap(held.arrived, heldPulse, _arrived, _ping.pulse))
     {
       held.valid = false;
       reading.valid = false;
     }
   }
-  _mount.held.emplace_back(reading, pulse);
+  // Two pings can be noticed in one step in either order: keep the
+  // readings in order of arrival, which is the order they are published in.
+  const auto at = std::upper_bound(_mount.held.begin(), _mount.held.end(),
+      _arrived,
+      [](const acoustics::Duration &_t, const auto &_held)
+      {
+        return _t < _held.first.arrived;
+      });
+  _mount.held.emplace(at, reading, _ping.pulse);
 }
 
 //////////////////////////////////////////////////
@@ -429,6 +458,8 @@ void AcousticsPrivate::Flush(const acoustics::Duration &_now)
 {
   for (auto &[sensor, mount] : this->receivers)
   {
+    // A reading leaves once its pulse has passed: any ping that could
+    // spoil it has been noticed by then.
     while (!mount.held.empty() &&
            mount.held.front().first.arrived + mount.held.front().second <=
            _now)
@@ -441,11 +472,25 @@ void AcousticsPrivate::Flush(const acoustics::Duration &_now)
 
 //////////////////////////////////////////////////
 void AcousticsPrivate::PublishPingers(const acoustics::Duration &_now,
-    const EntityComponentManager &_ecm)
+    bool _paused, const EntityComponentManager &_ecm)
 {
-  if (this->lastPublish && _now - *this->lastPublish < this->publishPeriod)
-    return;
-  this->lastPublish = _now;
+  if (_paused)
+  {
+    // Simulation time stands still: keep the rate on wall time.
+    const auto wall = std::chrono::steady_clock::now();
+    if (this->lastPausedPublish &&
+        wall - *this->lastPausedPublish < this->publishPeriod)
+    {
+      return;
+    }
+    this->lastPausedPublish = wall;
+  }
+  else
+  {
+    if (this->lastPublish && _now - *this->lastPublish < this->publishPeriod)
+      return;
+    this->lastPublish = _now;
+  }
 
   msgs::Param msg;
   *msg.mutable_header()->mutable_stamp() = msgs::Convert(_now);
@@ -503,6 +548,8 @@ void AcousticsPrivate::PublishPingers(const acoustics::Duration &_now,
     setDouble("frequency", settings.frequency);
     setDouble("bandwidth", settings.bandwidth);
     setDouble("dropout_start", settings.dropoutStart);
+    setDouble("min_elevation", settings.minElevation);
+    setDouble("max_elevation", settings.maxElevation);
   }
   this->receiversPub.Publish(receiversMsg);
 }
@@ -530,16 +577,9 @@ void Acoustics::Configure(const Entity &_entity,
       _sdf->Get<bool>("underwater_only", d.underwaterOnly).first;
 
   const auto seed = _sdf->Get<std::uint32_t>("seed", 0u).first;
-  if (0u != seed)
-  {
-    d.seed = seed;
-    // The noise blocks draw from gz-math's generator.
-    math::Rand::Seed(seed);
-  }
-  else
-  {
-    d.seed = std::random_device{}();
-  }
+  // The seed of the receivers' own generators only: gz-math's global
+  // generator, which every other sensor draws from, is left alone.
+  d.seed = 0u != seed ? seed : std::random_device{}();
 
   const double rate = _sdf->Get<double>("publish_rate", 1.0).first;
   if (rate > 0.0)
@@ -566,22 +606,28 @@ void Acoustics::PostUpdate(const UpdateInfo &_info,
   // EachNew only sees an entity in the step it was made in; noting it in
   // PostUpdate, after every PreUpdate, catches it whatever order the
   // systems run in.
+  std::vector<Entity> newSensors;
   _ecm.EachNew<components::CustomSensor>(
       [&](const Entity &_sensor, const components::CustomSensor *) -> bool
       {
-        d.newSensors.push_back(_sensor);
+        newSensors.push_back(_sensor);
         return true;
       });
-  d.FindReceivers(_ecm, d.rescan);
+  d.FindReceivers(_ecm, std::move(newSensors), d.rescan);
   d.rescan = false;
 
+  // Paused, nothing pings, but the lists still go out.
+  d.PublishPingers(_info.simTime, _info.paused, _ecm);
   if (_info.paused)
     return;
 
-  d.Emit(_info.simTime, _ecm);
+  // At the first update only the step before is due, not every ping since
+  // time zero: the system may be added to a world that has run for long.
+  const acoustics::Duration after = d.last.value_or(
+      acoustics::FirstWindowStart(_info.simTime, _info.dt));
+  d.Emit(after, _info.simTime, _ecm);
   d.Propagate(_info.simTime, _ecm);
   d.Flush(_info.simTime);
-  d.PublishPingers(_info.simTime, _ecm);
   d.last = _info.simTime;
 }
 
@@ -591,10 +637,10 @@ void Acoustics::Reset(const UpdateInfo &, EntityComponentManager &)
   auto &d = *this->dataPtr;
   d.pings.clear();
   d.receivers.clear();
-  d.newSensors.clear();
   d.rescan = true;
   d.last.reset();
   d.lastPublish.reset();
+  d.lastPausedPublish.reset();
 }
 
 GZ_ADD_PLUGIN(Acoustics,
