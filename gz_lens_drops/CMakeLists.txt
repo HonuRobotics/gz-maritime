@@ -37,6 +37,48 @@ find_package(gz-msgs REQUIRED)
 find_package(gz_rendering_vendor REQUIRED)
 find_package(gz-rendering REQUIRED COMPONENTS ogre2)
 
+# Discover the Ogre Next headers. We must compile against the SAME Ogre Next the
+# resolved gz-rendering-ogre2 uses (mixing patch versions silently swaps in slow
+# Hlms/barrier paths). The previous approach parsed gz-rendering::ogre2's
+# LOCATION, but that property is empty for imported/interface targets (it is
+# NOTFOUND on the ROS gz vendor + Gazebo Jetty), so it wrongly fell back to a
+# hardcoded /usr/include/OGRE-2.3. Instead, search for the OGRE-Next headers,
+# seeded by the ogre2 target's own interface include dirs. PATH_SUFFIXES exclude
+# a bare "OGRE" so we never pick up classic Ogre 1.x (/usr/include/OGRE,
+# rviz_ogre_vendor), whose ABI-incompatible headers would break the build.
+get_target_property(_ogre2_incs gz-rendering::ogre2 INTERFACE_INCLUDE_DIRECTORIES)
+
+# A cached OGRE_NEXT_INCLUDE_DIR can go stale (e.g. the vendor was uninstalled);
+# find_path would keep the old value even though the dir is gone. Drop it first
+# so the search below re-runs whenever OgreRoot.h is no longer where we cached.
+if(OGRE_NEXT_INCLUDE_DIR AND NOT EXISTS "${OGRE_NEXT_INCLUDE_DIR}/OgreRoot.h")
+  unset(OGRE_NEXT_INCLUDE_DIR CACHE)
+endif()
+
+# Pass 1: vendor / target-hinted headers only. NO_DEFAULT_PATH skips the system
+# dirs so a stray /usr/include/OGRE-2.x (a plain libogre-next-dev) can't shadow
+# the gz vendor copy that gz-rendering-ogre2 was actually built against — mixing
+# patch versions silently swaps in the slow Hlms/barrier paths.
+find_path(OGRE_NEXT_INCLUDE_DIR
+  NAMES OgreRoot.h
+  HINTS ${_ogre2_incs}
+  PATHS /opt/ros/$ENV{ROS_DISTRO}/opt/gz_ogre_next_vendor/include
+  PATH_SUFFIXES OGRE-Next OGRE-2.4 OGRE-2.3
+  NO_DEFAULT_PATH
+)
+# Pass 2: fall back to the system paths (a plain libogre-next-dev with no vendor
+# present). Only runs when pass 1 left OGRE_NEXT_INCLUDE_DIR unset.
+find_path(OGRE_NEXT_INCLUDE_DIR
+  NAMES OgreRoot.h
+  PATH_SUFFIXES OGRE-Next OGRE-2.4 OGRE-2.3
+)
+if(NOT OGRE_NEXT_INCLUDE_DIR)
+  message(FATAL_ERROR
+    "OGRE-Next headers (OgreRoot.h) not found. Install libogre-next-dev or the "
+    "gz_ogre_next_vendor package.")
+endif()
+message(STATUS "Ogre Next headers: ${OGRE_NEXT_INCLUDE_DIR}")
+
 # --------------------------------------------------------------------------
 # Core library: the drops on a lens, apart from any world or renderer.
 # --------------------------------------------------------------------------
@@ -57,6 +99,21 @@ install(
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 
+# --------------------------------------------------------------------------
+# The Ogre Next bridge: the render pass, the only code that links
+# gz-rendering-ogre2 and Ogre. The system loads it with dlopen, so its
+# symbols never enter the system's link map; a DT_NEEDED on
+# libgz-rendering-ogre2.so breaks gz-rendering's own engine loader (see
+# gz_waves_rendering).
+# --------------------------------------------------------------------------
+add_library(lens-drops-ogre2-bridge SHARED src/systems/Ogre2LensDropsBridge.cc)
+target_link_libraries(lens-drops-ogre2-bridge PRIVATE
+  gz-rendering::gz-rendering gz-rendering::ogre2 gz-common::gz-common)
+target_include_directories(lens-drops-ogre2-bridge SYSTEM PRIVATE ${OGRE_NEXT_INCLUDE_DIR})
+target_compile_definitions(lens-drops-ogre2-bridge PRIVATE OGRE_IGNORE_UNKNOWN_DEBUG)
+install(TARGETS lens-drops-ogre2-bridge LIBRARY DESTINATION lib)
+install(DIRECTORY share/shaders DESTINATION share/${PROJECT_NAME})
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
@@ -72,6 +129,11 @@ if(BUILD_TESTING)
     target_link_libraries(lens_drops_core_test ${PROJECT_NAME})
   endif()
 endif()
+
+# GZ_SIM_SYSTEM_PLUGIN_PATH, so gz-sim finds the system, and
+# GZ_LENS_DROPS_SHADER_PATH, so it finds the shaders.
+ament_environment_hooks("hooks/hook.dsv.in")
+ament_environment_hooks("hooks/hook.sh.in")
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
