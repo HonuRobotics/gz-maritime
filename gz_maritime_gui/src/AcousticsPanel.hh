@@ -32,8 +32,9 @@ namespace gz::sim::maritime_gui
   /// \brief See the acoustic pingers and what the receivers hear, and
   /// switch the pingers.
   ///
-  /// A GUI system with a panel. It reads the pingers from the GUI's ECM,
-  /// the AcousticPinger components gz_acoustics writes, and lists them with
+  /// A GUI system with a panel. It reads the pingers from the acoustics
+  /// system's list on `/world/<world>/acoustics/pingers` and, newer, from
+  /// the AcousticPinger components in the GUI's ECM, and lists them with
   /// their frequency, period, offset and reach, each with a switch that sends
   /// `active` on the pinger's `set` topic. It hears the receivers the
   /// acoustics system lists on `/world/<world>/acoustics/receivers`, and each
@@ -47,10 +48,11 @@ namespace gz::sim::maritime_gui
   ///   on, grey and dashed when it is off;
   /// * the pings: a ring per ping, where its sound meets that plane,
   ///   spreading at the speed of sound slowed down so the eye can follow it,
-  ///   fading out at the reach;
+  ///   fading out at the reach; only pings that were sent, and at most a
+  ///   few rings per pinger;
   /// * the readings: a ray from each receiver along the bearing and
-  ///   elevation of its last reading, a while after it came; red when the
-  ///   reading was invalid.
+  ///   elevation of its last reading, from the pose it had when the reading
+  ///   came, a while after it came; red when the reading was invalid.
   ///
   /// The reach and the pings are drawn on a horizontal plane: the water, as
   /// a boat sees them; a depth under it; or the depth of a receiver,
@@ -59,8 +61,11 @@ namespace gz::sim::maritime_gui
   /// water they are behind the drawn sea, seen from an underwater camera or
   /// with the water hidden.
   ///
-  /// A plugin added from the menu after the world is up missed the pingers;
-  /// it then asks the world's state service once.
+  /// The reach and the rays are sent when they change, paused or not.
+  ///
+  /// A plugin added from the menu after the world is up has in the ECM
+  /// only the pingers that changed since; the list fills in the rest. It
+  /// never asks the world's state service.
   ///
   /// Configuration, all optional:
   ///
@@ -98,28 +103,31 @@ namespace gz::sim::maritime_gui
 
     /// \brief Draw the reach.
     Q_PROPERTY(bool showReach READ ShowReach WRITE SetShowReach
-               NOTIFY DrawingChanged)
+               NOTIFY ShowReachChanged)
 
     /// \brief Draw the pings.
     Q_PROPERTY(bool showPings READ ShowPings WRITE SetShowPings
-               NOTIFY DrawingChanged)
+               NOTIFY ShowPingsChanged)
 
     /// \brief Draw the readings.
     Q_PROPERTY(bool showReadings READ ShowReadings WRITE SetShowReadings
-               NOTIFY DrawingChanged)
+               NOTIFY ShowReadingsChanged)
 
-    /// \brief How many times slower than sound the rings spread.
-    Q_PROPERTY(double slowDown READ SlowDown NOTIFY DrawingChanged)
+    /// \brief How many times slower than sound the rings spread. A signal
+    /// of its own, as each drawing property has: one shared by all would
+    /// put the old value back in the field while a new one is typed and a
+    /// check box ticked.
+    Q_PROPERTY(double slowDown READ SlowDown NOTIFY SlowDownChanged)
 
     /// \brief What the reach and the pings are drawn on: water, depth or
     /// receiver.
-    Q_PROPERTY(QString plane READ CurrentPlane NOTIFY DrawingChanged)
+    Q_PROPERTY(QString plane READ CurrentPlane NOTIFY PlaneChanged)
 
     /// \brief m under the water, for the depth plane.
-    Q_PROPERTY(double planeDepth READ PlaneDepth NOTIFY DrawingChanged)
+    Q_PROPERTY(double planeDepth READ PlaneDepth NOTIFY PlaneChanged)
 
     /// \brief The topic of the receiver the receiver plane follows.
-    Q_PROPERTY(QString planeReceiver READ PlaneReceiver NOTIFY DrawingChanged)
+    Q_PROPERTY(QString planeReceiver READ PlaneReceiver NOTIFY PlaneChanged)
 
     /// \brief The world z drawn at now, as text.
     Q_PROPERTY(QString planeText READ PlaneText NOTIFY StatusChanged)
@@ -240,8 +248,20 @@ namespace gz::sim::maritime_gui
     /// \brief A reading came.
     signals: void ReadingsChanged();
 
-    /// \brief A drawing setting changed.
-    signals: void DrawingChanged();
+    /// \brief The reach is drawn, or no longer.
+    signals: void ShowReachChanged();
+
+    /// \brief The pings are drawn, or no longer.
+    signals: void ShowPingsChanged();
+
+    /// \brief The readings are drawn, or no longer.
+    signals: void ShowReadingsChanged();
+
+    /// \brief The rings spread at another speed.
+    signals: void SlowDownChanged();
+
+    /// \brief The plane drawn on, its depth or its receiver changed.
+    signals: void PlaneChanged();
 
     /// \brief The status changed.
     signals: void StatusChanged();

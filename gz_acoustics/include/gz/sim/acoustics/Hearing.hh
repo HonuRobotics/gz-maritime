@@ -67,12 +67,28 @@ std::vector<Duration> EmissionTimes(const PingerData &_pinger,
 Direction Measure(const math::Pose3d &_receiver,
                   const math::Vector3d &_source);
 
+/// \brief The start of the first window of pings a system sends: the step
+/// before, so a system added to a world that has run for an hour does not
+/// send an hour of pings at once. At the world's first step a ping at time
+/// zero is in the window.
+/// \param[in] _now Simulation time of the first update.
+/// \param[in] _dt The step.
+/// \return The exclusive start of the window that ends at _now.
+Duration FirstWindowStart(const Duration &_now, const Duration &_dt);
+
 /// \brief Whether a frequency is inside a receiver's band.
 /// \param[in] _frequency Hz of the ping.
 /// \param[in] _centre Hz, the band's centre; 0 or less hears everything.
 /// \param[in] _bandwidth Hz, the band's full width.
 /// \return True if heard.
 bool InBand(double _frequency, double _centre, double _bandwidth);
+
+/// \brief Whether a ping comes from inside a receiver's field of view.
+/// \param[in] _elevation rad, where the ping comes from, positive up.
+/// \param[in] _min rad, the lowest elevation heard.
+/// \param[in] _max rad, the highest elevation heard.
+/// \return True if heard.
+bool InElevation(double _elevation, double _min, double _max);
 
 /// \brief The chance a ping at a distance is lost: none up to the start of
 /// the dropout zone, rising in a straight line to certain at the reach.
@@ -94,6 +110,21 @@ double Amplitude(double _distance);
 /// \param[in] _speedOfSound m/s; 0 or less arrives at once.
 /// \return The delay.
 Duration TravelTime(double _distance, double _speedOfSound);
+
+/// \brief Seconds as a simulation duration, to the nanosecond.
+/// \param[in] _seconds s.
+/// \return The duration.
+Duration FromSeconds(double _seconds);
+
+/// \brief Whether two pings at one receiver overlap: the later one arrives
+/// while the earlier one still sounds. Both readings are then invalid.
+/// \param[in] _a When one arrives.
+/// \param[in] _aPulse How long it lasts.
+/// \param[in] _b When the other arrives.
+/// \param[in] _bPulse How long it lasts.
+/// \return True if they overlap; never with a pulse of zero first.
+bool Overlap(const Duration &_a, const Duration &_aPulse,
+             const Duration &_b, const Duration &_bPulse);
 
 /// \brief Wrap an angle into (-pi, pi].
 /// \param[in] _angle rad.

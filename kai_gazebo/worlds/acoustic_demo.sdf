@@ -5,10 +5,10 @@
   kai_gazebo's model://acoustic_pinger with its own name, colour and
   settings.
 
-  * buoy_green (40, 15) and buoy_red (40, -15) carry the course pingers,
+  * pinger_green (40, 15) and pinger_red (40, -15) carry the course pingers,
     both 30 kHz, once a second, 300 m reach. Only one pings at a time, the
     green one to start with, as the RobotX 2026 survey task has it.
-  * buoy_yellow (-30, 30) carries a decoy at 37 kHz: a receiver tuned to
+  * pinger_yellow (-30, 30) carries a decoy at 37 kHz: a receiver tuned to
     30 kHz never hears it.
 
   Switch the active pinger while it runs (bridged to ROS by the demo launch
@@ -20,7 +20,8 @@
           -p 'params { key: "active" value { type: BOOLEAN bool_value: true } }'
 
   Every pinger, where it is and how it is set, is published on
-  /world/default/acoustics/pingers.
+  /world/default/acoustics/pingers. Launch it with a boat that homes on the
+  pinger: ros2 launch kai_custom_vehicle acoustic_demo.launch.xml
 -->
 <sdf version="1.12" xmlns:gz="http://gazebosim.org/schema" xmlns:experimental="http://sdformat.org/schemas/experimental">
   <world name="default">

@@ -21,13 +21,15 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <memory>
 #include <optional>
-#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <gz/common/Console.hh>
-#include <gz/msgs/boolean.pb.h>
-#include <gz/msgs/marker_v.pb.h>
-#include <gz/transport/Node.hh>
+
+#include "gz/sim/maritime_gui/MarkerLayer.hh"
 
 namespace gz::sim::maritime_gui
 {
@@ -37,6 +39,10 @@ namespace
   /// gives a marker with id 0 a new random id, so every redraw would add
   /// one.
   constexpr std::uint64_t kFirstId{1};
+
+  /// \brief The names of the two drawings of the field itself.
+  const char kArrowsKind[] = "arrows";
+  const char kTrailsKind[] = "trails";
 
   /// \brief Period of simulation time between two frames of the trails.
   constexpr std::chrono::milliseconds kTrailPeriod{40};
@@ -63,67 +69,29 @@ namespace
 
 class FieldDrawingPrivate
 {
-  /// \brief Send a marker to MarkerManager. Its service is one way: it
-  /// takes a marker and answers nothing.
-  /// \param[in] _marker The marker.
-  public: void SendMarker(const msgs::Marker &_marker)
+  /// \brief A drawing of this panel on the scene, made at its first use,
+  /// so after the configuration named the marker service.
+  /// \param[in] _kind Its name: the namespace's last part.
+  /// \return The layer.
+  public: MarkerLayer &Layer(const std::string &_kind)
   {
-    this->node.Request(this->markerService, _marker);
-  }
-
-  /// \brief Send a drawing's colour bins in one request to MarkerManager's
-  /// array service: the bins with points added or replaced, and the bins
-  /// drawn before and empty now deleted, since a marker sent with no points
-  /// keeps its old ones.
-  /// \param[in] _bins The bins.
-  /// \param[in] _ns The drawing's namespace.
-  /// \param[in,out] _drawn The ids on the scene.
-  public: void SendBins(const ColorBins &_bins, const std::string &_ns,
-                        std::set<std::uint64_t> &_drawn)
-  {
-    msgs::Marker_V markers;
-    for (auto &m : _bins.Markers(_ns, kFirstId))
+    auto it = this->layers.find(_kind);
+    if (it == this->layers.end())
     {
-      if (m.point_size() > 0)
-      {
-        _drawn.insert(m.id());
-        *markers.add_marker() = std::move(m);
-      }
-      else if (_drawn.erase(m.id()) > 0u)
-      {
-        *markers.add_marker() = DeleteMarker(_ns, m.id());
-      }
+      it = this->layers.emplace(_kind, std::make_unique<MarkerLayer>(
+          this->ns + "/" + _kind, this->markerService)).first;
     }
-    if (markers.marker_size() > 0)
-      this->SendArray(markers);
+    return *it->second;
   }
 
-  /// \brief Take a drawing off the scene.
-  /// \param[in] _ns The drawing's namespace.
-  /// \param[in,out] _drawn The ids on the scene, emptied.
-  public: void ClearBins(const std::string &_ns,
-                         std::set<std::uint64_t> &_drawn)
+  /// \brief Take a drawing off the scene, if it was ever made.
+  /// \param[in] _kind Its name.
+  public: void ClearLayer(const std::string &_kind)
   {
-    msgs::Marker_V markers;
-    for (const auto id : _drawn)
-      *markers.add_marker() = DeleteMarker(_ns, id);
-    _drawn.clear();
-    if (markers.marker_size() > 0)
-      this->SendArray(markers);
+    const auto it = this->layers.find(_kind);
+    if (it != this->layers.end() && it->second->Drawn())
+      it->second->Clear();
   }
-
-  /// \brief Send markers to the array service, without waiting.
-  /// \param[in] _markers The markers.
-  public: void SendArray(const msgs::Marker_V &_markers)
-  {
-    std::function<void(const msgs::Boolean &, const bool)> cb =
-        [](const msgs::Boolean &, const bool) {};
-    this->node.Request(this->markerService + "_array", _markers, cb);
-  }
-
-  /// \brief The namespaces of the arrows and of the trails.
-  public: std::string ArrowsNs() const { return this->ns + "/arrows"; }
-  public: std::string TrailsNs() const { return this->ns + "/trails"; }
 
   /// \brief The field's name on its topics.
   public: std::string field;
@@ -154,7 +122,7 @@ class FieldDrawingPrivate
   public: double scale{1.0};
 
   /// \brief MarkerManager's service.
-  public: std::string markerService{"/marker"};
+  public: std::string markerService{kMarkerService};
 
   /// \brief The grid.
   public: Grid grid;
@@ -162,12 +130,9 @@ class FieldDrawingPrivate
   /// \brief How the field is drawn.
   public: Display display{Display::kOff};
 
-  /// \brief The colour bins of each drawing on the scene.
-  public: std::set<std::uint64_t> arrowsDrawn;
-  public: std::set<std::uint64_t> trailsDrawn;
-
-  /// \brief The markers on the scene of each extra drawing, by its name.
-  public: std::map<std::string, std::set<std::uint64_t>> extraDrawn;
+  /// \brief The drawings on the scene, by name: the arrows, the trails and
+  /// each extra one. Each takes what it drew off the scene when it goes.
+  public: std::map<std::string, std::unique_ptr<MarkerLayer>> layers;
 
   /// \brief Whether the arrows were drawn since they were last cleared,
   /// even if the field was still and no bin had points.
@@ -186,9 +151,6 @@ class FieldDrawingPrivate
   /// \brief Simulation time of the last drawing.
   public: std::chrono::steady_clock::duration lastDraw{0};
 
-  /// \brief Transport node, for MarkerManager. Last, so it is destroyed
-  /// first.
-  public: transport::Node node;
 };
 
 //////////////////////////////////////////////////
@@ -204,15 +166,8 @@ FieldDrawing::FieldDrawing(const FieldSpec &_spec, const std::string &_log)
 }
 
 //////////////////////////////////////////////////
-FieldDrawing::~FieldDrawing()
-{
-  // Closing the panel takes its drawing off the scene.
-  auto &d = *this->dataPtr;
-  d.ClearBins(d.ArrowsNs(), d.arrowsDrawn);
-  d.ClearBins(d.TrailsNs(), d.trailsDrawn);
-  for (auto &[kind, drawn] : d.extraDrawn)
-    d.ClearBins(d.ns + "/" + kind, drawn);
-}
+// Closing the panel takes its drawings off the scene: each layer does.
+FieldDrawing::~FieldDrawing() = default;
 
 //////////////////////////////////////////////////
 void FieldDrawing::LoadConfig(const tinyxml2::XMLElement *_elem)
@@ -287,12 +242,12 @@ void FieldDrawing::Draw(bool _available, std::uint64_t _generation,
   // Take off what this display does not draw.
   if (display != Display::kArrows)
   {
-    d.ClearBins(d.ArrowsNs(), d.arrowsDrawn);
+    d.ClearLayer(kArrowsKind);
     d.arrowsShown = false;
   }
   if (display != Display::kTrails)
   {
-    d.ClearBins(d.TrailsNs(), d.trailsDrawn);
+    d.ClearLayer(kTrailsKind);
     d.trailTime.reset();
   }
 
@@ -303,8 +258,9 @@ void FieldDrawing::Draw(bool _available, std::uint64_t _generation,
         (_timeVarying && _simTime - d.lastDraw >= kRedrawPeriod);
     if (!due)
       return;
-    d.SendBins(ColoredArrows(GridPoints(d.grid, _z), _velocity, d.scale,
-                             d.colormap), d.ArrowsNs(), d.arrowsDrawn);
+    auto &layer = d.Layer(kArrowsKind);
+    layer.Draw(ColoredArrows(GridPoints(d.grid, _z), _velocity, d.scale,
+                             d.colormap).Markers(layer.Ns(), kFirstId));
     d.arrowsShown = true;
     d.dirty = false;
     d.recolor = false;
@@ -332,7 +288,8 @@ void FieldDrawing::Draw(bool _available, std::uint64_t _generation,
         0.0;
     d.trailTime = _simTime;
     d.particles.Step(dt, _velocity);
-    d.SendBins(d.particles.Trails(d.colormap), d.TrailsNs(), d.trailsDrawn);
+    auto &layer = d.Layer(kTrailsKind);
+    layer.Draw(d.particles.Trails(d.colormap).Markers(layer.Ns(), kFirstId));
     d.recolor = false;
   }
 }
@@ -341,37 +298,13 @@ void FieldDrawing::Draw(bool _available, std::uint64_t _generation,
 void FieldDrawing::DrawExtra(const std::string &_kind,
     std::vector<msgs::Marker> _markers)
 {
-  auto &d = *this->dataPtr;
-  const std::string ns = d.ns + "/" + _kind;
-  auto &drawn = d.extraDrawn[_kind];
-  std::set<std::uint64_t> now;
-  msgs::Marker_V out;
-  for (auto &m : _markers)
-  {
-    m.set_ns(ns);
-    if (m.point_size() > 0)
-    {
-      now.insert(m.id());
-      *out.add_marker() = std::move(m);
-    }
-  }
-  for (const auto id : drawn)
-  {
-    if (now.count(id) == 0u)
-      *out.add_marker() = DeleteMarker(ns, id);
-  }
-  drawn = now;
-  if (out.marker_size() > 0)
-    d.SendArray(out);
+  this->dataPtr->Layer(_kind).Draw(_markers);
 }
 
 //////////////////////////////////////////////////
 void FieldDrawing::ClearExtra(const std::string &_kind)
 {
-  auto &d = *this->dataPtr;
-  auto it = d.extraDrawn.find(_kind);
-  if (it != d.extraDrawn.end())
-    d.ClearBins(d.ns + "/" + _kind, it->second);
+  this->dataPtr->ClearLayer(_kind);
 }
 
 //////////////////////////////////////////////////

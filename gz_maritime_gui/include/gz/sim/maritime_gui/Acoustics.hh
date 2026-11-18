@@ -36,10 +36,11 @@
 #include "gz/sim/acoustics/Pinger.hh"
 
 /// \brief The acoustics as the GUI shows them, without Qt: the pingers
-/// read from the GUI's ECM, the receivers and their readings heard on the
-/// acoustics system's topics, and the drawings of each (the reach of a
-/// pinger on the water, its pings spreading, and the bearing each receiver
-/// reports), as MarkerManager markers.
+/// read from the GUI's ECM and from the acoustics system's ground truth,
+/// the receivers and their readings heard on the acoustics system's topics,
+/// and the drawings of each (the reach of a pinger on the water, its pings
+/// spreading, and the bearing each receiver reports), as MarkerManager
+/// markers.
 namespace gz::sim::maritime_gui
 {
 /// \brief One pinger as the GUI sees it.
@@ -50,12 +51,65 @@ struct PingerView
 
   /// \brief Its world position.
   public: math::Vector3d position;
+
+  /// \brief Simulation time its schedule last changed, or it went under
+  /// the water: no ping before it is drawn, since none was sent as drawn.
+  /// Unset for a pinger not seen to change.
+  public: std::optional<std::chrono::steady_clock::duration> since;
 };
 
 /// \brief Every pinger in an ECM, by name.
-/// \param[in] _ecm The GUI's ECM, or a copy of the world's state.
+/// \param[in] _ecm The GUI's ECM.
 /// \return The pingers, sorted by name.
 std::vector<PingerView> ReadPingers(const EntityComponentManager &_ecm);
+
+/// \brief The acoustics system's ground truth message as a list.
+/// \param[in] _msg The message on `/world/<world>/acoustics/pingers`.
+/// \return The pingers, sorted by name.
+std::vector<PingerView> ParsePingers(const msgs::Param &_msg);
+
+/// \brief The pingers a panel shows: those the acoustics system lists, each
+/// replaced by the GUI's own state of it when the GUI has one, which is
+/// newer. A panel loaded with the GUI has every pinger in its state; one
+/// loaded later has only those that changed since, and the list fills in
+/// the rest.
+/// \param[in] _listed The pingers of the ground truth topic.
+/// \param[in] _state The pingers of the GUI's ECM.
+/// \return The pingers, sorted by name.
+std::vector<PingerView> MergePingers(std::vector<PingerView> _listed,
+                                     const std::vector<PingerView> &_state);
+
+/// \brief Follows the pingers from one update to the next, to know since
+/// when each pings as it does now: the rings are drawn from the schedule,
+/// and a pinger switched on a moment ago has sent no ping before that.
+class PingerChanges
+{
+  /// \brief Set each pinger's `since`: the time its schedule (active,
+  /// period, offset) changed or it went under the water, unset while it is
+  /// as it was first seen.
+  /// \param[in,out] _pingers The pingers.
+  /// \param[in] _now Simulation time; going back, a reset, forgets all.
+  /// \param[in] _waterLevel World z of the water.
+  public: void Track(std::vector<PingerView> &_pingers,
+                     const std::chrono::steady_clock::duration &_now,
+                     double _waterLevel);
+
+  /// \brief What a pinger was last seen as.
+  private: struct Seen
+  {
+    /// \brief Its schedule and whether it was under the water, as text.
+    public: std::string schedule;
+
+    /// \brief When that changed, if it was seen to.
+    public: std::optional<std::chrono::steady_clock::duration> since;
+  };
+
+  /// \brief The pingers by name.
+  private: std::map<std::string, Seen> seen;
+
+  /// \brief Simulation time of the last call.
+  private: std::chrono::steady_clock::duration last{0};
+};
 
 /// \brief One receiver, as the acoustics system lists it.
 struct ReceiverInfo
@@ -190,19 +244,30 @@ std::vector<msgs::Marker> ReachMarkers(const std::vector<PingerView> &_pingers,
                                        double _planeZ,
                                        const std::string &_ns);
 
-/// \brief The pings spreading from each active pinger, where their sound
-/// meets a horizontal plane: a ring per ping, out to the pinger's reach or
-/// to `_maxRadius`, fading as it grows.
+/// \brief The most rings drawn for one pinger. Slowed down a lot, more
+/// pings than this are on their way at once: every second, third... ping is
+/// then drawn, always the same ones, so the rings still go out to the reach
+/// and what is sent stays bounded.
+constexpr int kMaxRings{6};
+
+/// \brief The pings spreading from each active pinger under the water,
+/// where their sound meets a horizontal plane: a ring per ping, out to the
+/// pinger's reach, fading as it grows. Only the pings the pinger sent: none
+/// from a pinger above the water, none from before its `since`.
 /// \param[in] _pingers The pingers.
 /// \param[in] _planeZ World z of the plane: the water, or a depth under it.
+/// \param[in] _waterLevel World z of the water: a pinger at or above it
+/// sends nothing.
 /// \param[in] _now Simulation time.
 /// \param[in] _speed m/s the rings spread at: the speed of sound, or less
 /// so the eye can follow them.
-/// \param[in] _maxRadius m, the farthest a ring is drawn.
+/// \param[in] _maxRadius m, the farthest a ring is drawn for a pinger with
+/// no reach limit; one with a reach is drawn out to its reach.
 /// \param[in] _ns Marker namespace.
 /// \return LINE_LIST markers, a few per pinger, one per shade.
 std::vector<msgs::Marker> PingMarkers(const std::vector<PingerView> &_pingers,
-    double _planeZ, const std::chrono::steady_clock::duration &_now,
+    double _planeZ, double _waterLevel,
+    const std::chrono::steady_clock::duration &_now,
     double _speed, double _maxRadius, const std::string &_ns);
 
 /// \brief A wireframe sphere as LINE_LIST segments, cut at a height: its
@@ -229,9 +294,11 @@ std::vector<msgs::Marker> ReachSpheres(const std::vector<PingerView> &_pingers,
                                        double _waterLevel,
                                        const std::string &_ns);
 
-/// \brief The pings spreading from each active pinger as wireframe
-/// spheres, sparser than the reach, cut at the water, out to the reach or
-/// `_maxRadius`, fading as they grow.
+/// \brief The pings spreading from each active pinger under the water as
+/// wireframe spheres, sparser than the reach, cut at the water, fading as
+/// they grow: the same pings as PingMarkers draws as rings, so only those
+/// sent, out to the reach (`_maxRadius` for a pinger with none), and at
+/// most kMaxRings of them.
 /// \param[in] _pingers The pingers.
 /// \param[in] _waterLevel World z of the water.
 /// \param[in] _now Simulation time.
@@ -260,7 +327,9 @@ std::vector<msgs::Marker> DropoutMarkers(
 /// \brief A bearing a receiver reported, to draw.
 struct BearingRay
 {
-  /// \brief The receiver's world pose when it was drawn.
+  /// \brief The receiver's world pose when the reading came: the bearing
+  /// is in the sensor frame as it was then, so a ray drawn from a later
+  /// pose would turn with the vehicle and point away from the pinger.
   public: math::Pose3d pose;
 
   /// \brief The reading.
@@ -270,6 +339,28 @@ struct BearingRay
   /// fades towards white.
   public: double fade{0.0};
 };
+
+/// \brief Keep, for each receiver, its last reading with the pose the
+/// receiver had when the reading came: a new reading takes the pose given
+/// now, one already kept keeps its own.
+/// \param[in,out] _kept The rays, by the receiver's topic.
+/// \param[in] _last The last reading of each receiver, by topic.
+/// \param[in] _poses The receivers' world poses now, by topic; a new
+/// reading of a receiver without one waits for it.
+void KeepRays(std::map<std::string, BearingRay> &_kept,
+              const std::map<std::string, HeardPing> &_last,
+              const std::map<std::string, math::Pose3d> &_poses);
+
+/// \brief The rays still to draw: those whose reading arrived within a
+/// lifetime of now.
+/// \param[in] _kept The rays, by the receiver's topic.
+/// \param[in] _now Simulation time.
+/// \param[in] _lifetime How long a ray stays.
+/// \return The rays.
+std::vector<BearingRay> LiveRays(
+    const std::map<std::string, BearingRay> &_kept,
+    const std::chrono::steady_clock::duration &_now,
+    const std::chrono::steady_clock::duration &_lifetime);
 
 /// \brief A ray from each receiver along the bearing and elevation of its
 /// last reading, in its frequency's colour, red when the reading was
@@ -281,43 +372,8 @@ struct BearingRay
 std::vector<msgs::Marker> RayMarkers(const std::vector<BearingRay> &_rays,
                                      double _length, const std::string &_ns);
 
-/// \brief A drawing on the scene, through MarkerManager's array service:
-/// the markers drawn last are replaced, and those no longer drawn deleted.
-class MarkerLayer
-{
-  /// \brief Constructor.
-  /// \param[in] _ns The drawing's namespace.
-  /// \param[in] _service MarkerManager's service.
-  public: MarkerLayer(const std::string &_ns, const std::string &_service);
-
-  /// \brief Destructor: takes the drawing off the scene.
-  public: ~MarkerLayer();
-
-  /// \brief Draw: the markers with points added or replaced, those drawn
-  /// before and empty or missing now deleted.
-  /// \param[in] _markers The markers, in this layer's namespace.
-  public: void Draw(const std::vector<msgs::Marker> &_markers);
-
-  /// \brief Take the drawing off the scene.
-  public: void Clear();
-
-  /// \brief Whether anything is drawn.
-  /// \return True if it is.
-  public: bool Drawn() const;
-
-  /// \brief The namespace.
-  /// \return It.
-  public: const std::string &Ns() const;
-
-  /// \brief The private data.
-  private: struct Impl;
-
-  /// \brief Private data pointer.
-  private: std::unique_ptr<Impl> impl;
-};
-
-/// \brief Listens to the acoustics system: the receivers it lists, and the
-/// readings each publishes. Thread safe.
+/// \brief Listens to the acoustics system: the pingers and the receivers
+/// it lists, and the readings each receiver publishes. Thread safe.
 class AcousticListener
 {
   /// \brief Constructor.
@@ -334,6 +390,10 @@ class AcousticListener
   /// \brief The receivers, as last listed.
   /// \return They, by name.
   public: std::vector<ReceiverInfo> Receivers() const;
+
+  /// \brief The pingers, as the ground truth last listed them.
+  /// \return They, by name.
+  public: std::vector<PingerView> Pingers() const;
 
   /// \brief The last reading of each receiver that has published one.
   /// \return Readings by topic.

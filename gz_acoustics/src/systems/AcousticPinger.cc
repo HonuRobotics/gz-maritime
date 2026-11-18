@@ -60,7 +60,8 @@ class gz::sim::maritime::AcousticPingerPrivate
   /// \brief Changes queued by the topic, applied at the next step.
   public: std::vector<std::pair<std::string, double>> pending;
 
-  /// \brief Guards the queue across the transport and ECM threads.
+  /// \brief Guards the queue and the pinger across the transport and ECM
+  /// threads.
   public: std::mutex mutex;
 
   /// \brief Transport node for the set topic.
@@ -146,6 +147,23 @@ void AcousticPinger::Configure(const Entity &_entity,
     return;
   }
 
+  // The name scopes the set topic, so two pingers of one name would share
+  // it and change together.
+  bool taken{false};
+  _ecm.Each<components::AcousticPinger>(
+      [&](const Entity &, const components::AcousticPinger *_other) -> bool
+      {
+        taken = _other->Data().name == d.pinger.name;
+        return !taken;
+      });
+  if (taken)
+  {
+    gzerr << "AcousticPinger [" << d.pinger.name << "]: the world already "
+          << "has a pinger of this name; give this one its own <name>\n";
+    d.link = kNullEntity;
+    return;
+  }
+
   d.pinger.pose = _sdf->Get<math::Pose3d>("pose", math::Pose3d::Zero).first;
   d.pinger.active = _sdf->Get<bool>("active", true).first;
 #define GZ_ACOUSTICS_LOAD(m, key)                                       \
@@ -209,10 +227,13 @@ void AcousticPinger::Reset(const UpdateInfo &, EntityComponentManager &_ecm)
   auto &d = *this->dataPtr;
   if (kNullEntity == d.link)
     return;
-  // Back to what the SDF set, under a new generation.
+  // Back to what the SDF set, under a new generation. The set topic's
+  // handler reads the pinger on a transport thread.
+  const std::lock_guard<std::mutex> lock(d.mutex);
   const auto generation = d.pinger.generation;
   d.pinger = d.initial;
   d.pinger.generation = generation;
+  d.pending.clear();
   d.Write(_ecm);
 }
 

@@ -74,6 +74,9 @@
       </collision>
     </link>
 
+    <!-- The pulse is as long as the worlds' 4 ms step, which is fine: two
+         pings overlap on the times they arrive (sent plus the distance over
+         the speed of sound), not on the steps that notice them. -->
     <plugin filename="gz-maritime-acoustic-pinger-system"
             name="gz::sim::maritime::AcousticPinger">
       <pose>0 0 -1.5 0 0 0</pose>
