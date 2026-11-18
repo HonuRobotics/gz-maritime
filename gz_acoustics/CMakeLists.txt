@@ -39,6 +39,7 @@ add_library(${PROJECT_NAME} SHARED
   src/components.cc
   src/Pinger.cc
   src/Hearing.cc
+  src/Random.cc
 )
 target_include_directories(${PROJECT_NAME}
   PUBLIC
@@ -109,7 +110,8 @@ if(BUILD_TESTING)
   endif()
 
   # The systems in running worlds.
-  ament_add_gtest(acoustics_test test/acoustics_test.cc TIMEOUT 300)
+  ament_add_gtest(acoustics_test test/acoustics_test.cc TIMEOUT 300
+    SKIP_LINKING_MAIN_LIBRARIES)
   if(TARGET acoustics_test)
     target_compile_definitions(acoustics_test PRIVATE
       "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
@@ -118,7 +120,9 @@ if(BUILD_TESTING)
       gz-transport::core
       gz-msgs::core)
     # The plugin libraries are loaded by name from the build tree so the
-    # test runs before install.
+    # test runs before install. The test sets a GZ_PARTITION of its own in
+    # its main, one per process, so its fixed topics stay apart from other
+    # tests and from a second copy of itself run at the same time.
     set_tests_properties(acoustics_test PROPERTIES
       ENVIRONMENT "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}")
   endif()

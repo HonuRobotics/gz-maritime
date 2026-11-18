@@ -5,10 +5,12 @@
 
   * listener, 150 m east, 2 m down, turned 90 degrees to port, so the
     pinger is on its port beam: bearing +pi/2, elevation 0, range 150, the
-    ping 0.1 s late. It reports the range.
+    ping 0.1 s late. It reports the range and the time the ping was sent.
   * deaf, 20 m north, tuned to 40 kHz: out of band.
   * far, 600 m north: out of reach.
   * dry, 20 m south, 5 m above the water: out of the water.
+  * blinkered, 20 m under the pinger, hearing no higher than 0.5 rad: the
+    pinger is straight above it, out of its field of view.
 -->
 <sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
   <world name="pingers">
@@ -46,6 +48,7 @@
           <frame_id>listener/receiver</frame_id>
           <gz:acoustic_receiver>
             <range>true</range>
+            <emit_time>true</emit_time>
           </gz:acoustic_receiver>
         </sensor>
       </link>
@@ -78,6 +81,18 @@
       <link name="link">
         <sensor name="receiver" type="custom" gz:type="acoustic_receiver">
           <topic>/dry</topic>
+        </sensor>
+      </link>
+    </model>
+    <model name="blinkered">
+      <static>true</static>
+      <pose>0 0 -22 0 0 0</pose>
+      <link name="link">
+        <sensor name="receiver" type="custom" gz:type="acoustic_receiver">
+          <topic>/blinkered</topic>
+          <gz:acoustic_receiver>
+            <max_elevation>0.5</max_elevation>
+          </gz:acoustic_receiver>
         </sensor>
       </link>
     </model>

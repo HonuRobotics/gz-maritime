@@ -118,7 +118,10 @@ course with hardware that cannot give one.
 **Solution.** The reading is bearing, elevation, frequency, amplitude and a
 valid flag. `<range>true</range>` adds the slant range for VRX
 compatibility and for vehicles that carry a ranging device. The amplitude
-falls with distance, so a team can still tell near from far.
+falls with distance, so a team can still tell near from far; it takes a
+noise block, since without noise it gives the range back exactly. The time
+the ping was sent, which with the stamp also gives the range, is reported
+only with `<emit_time>true</emit_time>`.
 
 ## 5. What a receiver can and cannot hear
 
@@ -144,9 +147,10 @@ setup:
 - **Outliers.** A small probability of a wrong bearing, standing in for
   multipath.
 
-Noise stays the gz-sensors `<noise>` block per channel, as in VRX, with the
-bearing wrapped and the range kept positive. Every random draw comes from a
-seed, so a run repeats.
+Noise stays the `<noise>` block of a Gazebo sensor per channel, as in VRX,
+with the bearing wrapped and the range kept positive. Every random draw
+comes from a seed, so a run repeats, and from each receiver's own
+generator, so the seed changes no other sensor's noise.
 
 Occlusion by hulls or terrain is left out of this phase: gz-sim gives a
 system no cheap ray query, and it needs its own look.
@@ -174,7 +178,7 @@ built in pairs.
 
 **Solution (proposed).** Keep `gz.msgs.Param` to `ParamVec` in this phase,
 with VRX's keys (`range`, `bearing`, `elevation`) plus `frequency`,
-`amplitude`, `valid`, `emit_time`, so VRX code keeps working and nothing new
+`amplitude`, `valid` and, when asked for, `emit_time`, so VRX code keeps working and nothing new
 is needed to bridge it. Revisit a typed message together with the sonar
 issue (#21), which will hit the same question.
 

@@ -23,10 +23,12 @@
 
 #include <gz/msgs/param.pb.h>
 
-#include <gz/sensors/Noise.hh>
+#include <gz/math/Helpers.hh>
 #include <gz/sensors/Sensor.hh>
 #include <gz/transport/Node.hh>
 #include <sdf/Sensor.hh>
+
+#include "gz/sim/acoustics/Random.hh"
 
 namespace gz::sim::maritime
 {
@@ -43,6 +45,16 @@ namespace gz::sim::maritime
 
     /// \brief Whether a reading carries the slant range.
     public: bool range{false};
+
+    /// \brief Whether a reading carries the time the ping was sent, which
+    /// with the stamp gives the range.
+    public: bool emitTime{false};
+
+    /// \brief rad, the lowest elevation it hears from.
+    public: double minElevation{-0.5 * GZ_PI};
+
+    /// \brief rad, the highest elevation it hears from.
+    public: double maxElevation{0.5 * GZ_PI};
 
     /// \brief Chance that a reading's bearing is anything at all, a stand in
     /// for multipath.
@@ -93,9 +105,11 @@ namespace gz::sim::maritime
   ///
   /// The message's keys: `bearing` (rad, counter clockwise from the sensor's
   /// x), `elevation` (rad, positive up), `frequency` (Hz), `amplitude` (dB
-  /// relative to 1 m, -20 log10 of the distance), `valid` (boolean),
-  /// `emit_time` (s of simulation time the pinger sent it) and, with
-  /// `<range>` on, `range` (m). The header stamp is when it arrived.
+  /// relative to 1 m, -20 log10 of the distance, with its noise), `valid`
+  /// (boolean), with `<range>` on, `range` (m) and, with `<emit_time>` on,
+  /// `emit_time` (s of simulation time the pinger sent it). The header
+  /// stamp is when the ping arrived: when it was sent plus the distance
+  /// over the speed of sound, not the step it was noticed in.
   ///
   /// Its `<gz:acoustic_receiver>` block:
   ///
@@ -103,10 +117,18 @@ namespace gz::sim::maritime
   /// * `<bandwidth>`: Hz, the band's full width, default 1000.
   /// * `<range>`: report the slant range too, default false; a passive
   ///   receiver hears a direction, not a distance.
-  /// * `<bearing_noise>`, `<elevation_noise>`, `<range_noise>`: each a
-  ///   standard gz-sensors `<noise>` block. The bearing is wrapped into
+  /// * `<emit_time>`: report when the ping was sent too, default false;
+  ///   the stamp less that time is the range over the speed of sound.
+  /// * `<min_elevation>`, `<max_elevation>`: rad, its field of view; a ping
+  ///   from below the first or above the second is not heard. Default
+  ///   -pi/2 and pi/2, which hear every direction.
+  /// * `<bearing_noise>`, `<elevation_noise>`, `<range_noise>`,
+  ///   `<amplitude_noise>`: each a gaussian `<noise>` block as on any
+  ///   Gazebo sensor (mean, stddev, bias_mean, bias_stddev, precision),
+  ///   drawn from the receiver's own generator. The bearing is wrapped into
   ///   (-pi, pi], the elevation clamped to [-pi/2, pi/2] and the range kept
-  ///   positive.
+  ///   positive. Without `<amplitude_noise>` the amplitude gives the range
+  ///   away exactly.
   /// * `<outlier_probability>`: chance a reading's bearing is uniformly
   ///   random, default 0.
   /// * `<dropout_start>`: fraction of a pinger's reach where its pings start
@@ -117,8 +139,11 @@ namespace gz::sim::maritime
   /// `bandwidth`.
   class AcousticReceiver : public sensors::Sensor
   {
-    /// \brief The three measured channels, for noise.
-    public: enum class Channel { kBearing = 0, kElevation = 1, kRange = 2 };
+    /// \brief The measured channels, for noise.
+    public: enum class Channel
+    {
+      kBearing = 0, kElevation = 1, kRange = 2, kAmplitude = 3
+    };
 
     // Documentation inherited.
     public: bool Load(const sdf::Sensor &_sdf) override;
@@ -139,11 +164,17 @@ namespace gz::sim::maritime
     /// \return A copy.
     public: ReceiverSettings Settings() const;
 
+    /// \brief Draw each channel's constant bias, once, before any reading.
+    /// \param[in,out] _rng The receiver's generator.
+    public: void DrawBias(acoustics::Generator &_rng);
+
     /// \brief Apply a channel's noise.
     /// \param[in] _channel The channel.
     /// \param[in] _value The true value.
+    /// \param[in,out] _rng The receiver's generator.
     /// \return The value with noise, unchanged without a noise block.
-    public: double ApplyNoise(Channel _channel, double _value);
+    public: double ApplyNoise(Channel _channel, double _value,
+                              acoustics::Generator &_rng) const;
 
     /// \brief Publish one reading.
     /// \param[in] _reading The reading.
@@ -160,8 +191,11 @@ namespace gz::sim::maritime
     /// \brief Guards the settings across the transport and ECM threads.
     private: mutable std::mutex mutex;
 
-    /// \brief Noise per channel; null without noise.
-    private: std::array<sensors::NoisePtr, 3> noise;
+    /// \brief Noise per channel; all zero without a noise block.
+    private: std::array<acoustics::Noise, 4> noise;
+
+    /// \brief Mean and standard deviation of each channel's bias.
+    private: std::array<std::array<double, 2>, 4> bias{};
 
     /// \brief Transport node.
     private: transport::Node node;

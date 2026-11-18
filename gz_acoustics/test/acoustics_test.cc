@@ -21,8 +21,11 @@
 #include <gz/msgs/param.pb.h>
 #include <gz/msgs/Utility.hh>
 
+#include <unistd.h>
+
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <utility>
@@ -210,19 +213,20 @@ TEST(Acoustics, OneReadingPerPingFromThePingersDirection)
     EXPECT_NEAR(-20.0 * std::log10(150.0), Get(r, "amplitude"), 1e-6);
     EXPECT_TRUE(GetBool(r, "valid"));
     EXPECT_NEAR(static_cast<double>(i), Get(r, "emit_time"), 1e-9);
-    // Heard at the first step the sound has covered the distance.
-    EXPECT_GE(Stamp(r) - Get(r, "emit_time"), 0.1 - 1e-9);
-    EXPECT_LT(Stamp(r) - Get(r, "emit_time"), 0.1 + kStep);
+    // Stamped when the sound got there, 150 m at 1500 m/s, not at the
+    // step that noticed it.
+    EXPECT_NEAR(0.1, Stamp(r) - Get(r, "emit_time"), 1e-9);
     ASSERT_GT(r.header().data_size(), 0);
     EXPECT_EQ("listener/receiver", r.header().data(0).value(0));
   }
 }
 
 //////////////////////////////////////////////////
-/// Out of band, out of reach and out of the water, nothing is heard; a
-/// receiver without range on reports none.
-TEST(Acoustics, BandReachAndWater)
+/// Out of band, out of reach, out of the water and out of the field of
+/// view, nothing is heard.
+TEST(Acoustics, BandReachWaterAndFieldOfView)
 {
+  Readings blinkered("/blinkered");
   Readings deaf("/deaf");
   Readings far("/far");
   Readings dry("/dry");
@@ -231,11 +235,13 @@ TEST(Acoustics, BandReachAndWater)
   EXPECT_EQ(0u, deaf.Count());
   EXPECT_EQ(0u, far.Count());
   EXPECT_EQ(0u, dry.Count());
+  EXPECT_EQ(0u, blinkered.Count());
 }
 
 //////////////////////////////////////////////////
-/// A receiver retuned on its set topic hears the band it moved to; a pinger
-/// switched off on its set topic falls silent.
+/// A receiver retuned on its set topic hears the band it moved to, and
+/// reports neither the range nor the time the ping was sent, not having
+/// been asked to; a pinger switched off on its set topic falls silent.
 TEST(Acoustics, SetTopicsRetuneAndSwitchOff)
 {
   Readings deaf("/deaf");
@@ -252,6 +258,7 @@ TEST(Acoustics, SetTopicsRetuneAndSwitchOff)
     // 20 m north of the pinger, unturned: the pinger is to starboard.
     EXPECT_NEAR(-GZ_PI / 2, Get(r, "bearing"), 1e-6);
     EXPECT_TRUE(std::isnan(Get(r, "range")));
+    EXPECT_TRUE(std::isnan(Get(r, "emit_time")));
   }
 
   Send("/world/pingers/acoustics/buoy/set", "active", 0);
@@ -291,7 +298,7 @@ TEST(Acoustics, ReceiversList)
   const auto all = list.All();
   ASSERT_FALSE(all.empty());
   const auto &last = all.back();
-  ASSERT_EQ(4, last.children_size());
+  ASSERT_EQ(5, last.children_size());
   bool deaf{false};
   for (const auto &r : last.children())
   {
@@ -304,6 +311,43 @@ TEST(Acoustics, ReceiversList)
     EXPECT_DOUBLE_EQ(1000.0, p.at("bandwidth").double_value());
   }
   EXPECT_TRUE(deaf);
+}
+
+//////////////////////////////////////////////////
+/// A paused world still lists its pingers and receivers, so a GUI opened
+/// before play finds them.
+TEST(Acoustics, ListsWhilePaused)
+{
+  Readings pingers("/world/pingers/acoustics/pingers");
+  Readings receivers("/world/pingers/acoustics/receivers");
+  Readings listener("/listener");
+  AcousticWorld world("pingers.sdf");
+  // Paused and in the background: a paused run does not count steps.
+  ASSERT_TRUE(world.fixture.Server()->Run(false, 0, true));
+  for (int i = 0; i < 100 &&
+       (pingers.All().empty() || receivers.All().empty()); ++i)
+  {
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  }
+  world.fixture.Server()->Stop();
+  ASSERT_GT(pingers.Count(), 0u);
+  ASSERT_GT(receivers.Count(), 0u);
+  EXPECT_EQ(1, pingers.All().back().children_size());
+  EXPECT_EQ(5, receivers.All().back().children_size());
+  // Nothing pings while paused.
+  EXPECT_EQ(0u, listener.Count());
+}
+
+//////////////////////////////////////////////////
+/// A pinger that takes the name of another is refused: the world lists two
+/// pingers, not three.
+TEST(Acoustics, APingersNameIsItsOwn)
+{
+  Readings truth("/world/two_pingers/acoustics/pingers");
+  AcousticWorld world("two_pingers.sdf");
+  ASSERT_TRUE(world.Run(0.1));
+  ASSERT_GT(truth.Count(), 0u);
+  EXPECT_EQ(2, truth.All().back().children_size());
 }
 
 //////////////////////////////////////////////////
@@ -376,6 +420,55 @@ TEST(Acoustics, InTurnThenOverlapping)
 }
 
 //////////////////////////////////////////////////
+/// Two pings overlap when the later one arrives while the earlier one still
+/// sounds, on the times the sound gets there, not on the 4 ms steps that
+/// notice it.
+TEST(Acoustics, OverlapIsOnArrivalTimes)
+{
+  Readings middle("/middle");
+  AcousticWorld world("two_pingers.sdf");
+  const std::string a = "/world/two_pingers/acoustics/pinger_a/set";
+  const std::string b = "/world/two_pingers/acoustics/pinger_b/set";
+
+  // The readings of two seconds, once a change has settled.
+  auto next = [&]()
+  {
+    EXPECT_TRUE(world.Run(0.5));
+    middle.Clear();
+    EXPECT_TRUE(world.Run(2.0));
+    middle.Count();
+    return middle.All();
+  };
+  auto valid = [](const std::vector<msgs::Param> &_readings)
+  {
+    std::size_t count{0};
+    for (const auto &r : _readings)
+      count += GetBool(r, "valid") ? 1 : 0;
+    return count;
+  };
+
+  // 0.13 ms apart, inside one step, with 4 ms pulses: on top of each other.
+  Send(b, "offset", 0.00013);
+  auto readings = next();
+  ASSERT_EQ(4u, readings.size());
+  EXPECT_EQ(0u, valid(readings));
+  EXPECT_NEAR(0.00013, Stamp(readings[1]) - Stamp(readings[0]), 1e-9);
+
+  // 3.7 ms apart, noticed in two steps, still inside the 4 ms pulse.
+  Send(b, "offset", 0.0037);
+  readings = next();
+  ASSERT_EQ(4u, readings.size());
+  EXPECT_EQ(0u, valid(readings));
+
+  // The earlier ping, a's, now lasts 1 ms and is over when b's arrives:
+  // both are heard, however long b's lasts.
+  Send(a, "pulse_length", 0.001);
+  readings = next();
+  ASSERT_EQ(4u, readings.size());
+  EXPECT_EQ(4u, valid(readings));
+}
+
+//////////////////////////////////////////////////
 /// Everything random comes from the world's seed: the same seed hears the
 /// same pings with the same values, noise, outliers and dropouts included;
 /// another seed hears others.
@@ -393,7 +486,11 @@ TEST(Acoustics, SeededRunsRepeat)
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     Run out;
     for (const auto &r : readings.All())
+    {
       out.emplace_back(Get(r, "emit_time"), Get(r, "bearing"));
+      // The amplitude follows the same seed.
+      out.emplace_back(Get(r, "emit_time"), Get(r, "amplitude"));
+    }
     return out;
   };
 
@@ -404,12 +501,20 @@ TEST(Acoustics, SeededRunsRepeat)
 
   // Half the 40 pings are lost on average at 150 m of a 200 m reach whose
   // dropout starts half way, and the bearings are noisy.
-  EXPECT_GT(first.size(), 5u);
-  EXPECT_LT(first.size(), 35u);
+  EXPECT_GT(first.size(), 2u * 5u);
+  EXPECT_LT(first.size(), 2u * 35u);
   double spread{0.0};
-  for (const auto &[t, b] : first)
-    spread = std::max(spread, std::abs(std::abs(b) - GZ_PI));
+  double loud{0.0};
+  for (std::size_t i = 0; i + 1 < first.size(); i += 2)
+  {
+    spread = std::max(spread,
+        std::abs(std::abs(first[i].second) - GZ_PI));
+    // With its noise the amplitude no longer gives the 150 m away.
+    loud = std::max(loud, std::abs(first[i + 1].second +
+                                   20.0 * std::log10(150.0)));
+  }
   EXPECT_GT(spread, 0.0);
+  EXPECT_GT(loud, 0.5);
 
   // Another seed, the same world otherwise.
   std::ifstream in(World("seeded.sdf"));
@@ -426,3 +531,14 @@ TEST(Acoustics, SeededRunsRepeat)
   EXPECT_NE(first, third);
 }
 
+//////////////////////////////////////////////////
+/// The tests use fixed topics, so each process takes a partition of its
+/// own: two copies run at the same time do not hear each other.
+int main(int _argc, char **_argv)
+{
+  ::testing::InitGoogleTest(&_argc, _argv);
+  const std::string partition =
+      "gz_acoustics_test_" + std::to_string(::getpid());
+  ::setenv("GZ_PARTITION", partition.c_str(), 1);
+  return RUN_ALL_TESTS();
+}

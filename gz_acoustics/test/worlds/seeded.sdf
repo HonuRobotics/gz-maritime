@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 <!--
   Everything random at once, from one seed: a pinger every 0.25 s with a
-  200 m reach, and a receiver 150 m away with noise on its bearing, outliers
+  200 m reach, and a receiver 150 m away with noise on its bearing and on
+  its amplitude (which without noise gives the range away), outliers
   and a dropout zone starting half way, so half the pings are lost. Run
   twice with the same seed, it must hear the same pings with the same
   values. The test changes the seed by rewriting <seed>.
@@ -36,6 +37,10 @@
             <bearing_noise>
               <noise type="gaussian"><mean>0</mean><stddev>0.1</stddev></noise>
             </bearing_noise>
+            <amplitude_noise>
+              <noise type="gaussian"><mean>0</mean><stddev>3</stddev></noise>
+            </amplitude_noise>
+            <emit_time>true</emit_time>
             <outlier_probability>0.2</outlier_probability>
             <dropout_start>0.5</dropout_start>
           </gz:acoustic_receiver>
