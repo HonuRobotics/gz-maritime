@@ -24,6 +24,7 @@ from its files.
 - [Dive in the aquatic centre](aquatic-centre.md)
 - [Use your own world](own-world.md)
 - [Change and see the wind and the current](wind-and-current.md)
+- [Put rain on a camera's lens](lens-drops.md)
 - [Troubleshooting](faq.md)
 
 ```{toctree}
@@ -40,5 +41,6 @@ site-worlds
 aquatic-centre
 own-world
 wind-and-current
+lens-drops
 faq
 ```
