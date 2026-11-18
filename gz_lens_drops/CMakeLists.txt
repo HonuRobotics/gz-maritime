@@ -114,6 +114,25 @@ target_compile_definitions(lens-drops-ogre2-bridge PRIVATE OGRE_IGNORE_UNKNOWN_D
 install(TARGETS lens-drops-ogre2-bridge LIBRARY DESTINATION lib)
 install(DIRECTORY share/shaders DESTINATION share/${PROJECT_NAME})
 
+# --------------------------------------------------------------------------
+# The system: inside a camera sensor, it steps the drops and adds the render
+# pass to the camera. Never link gz-rendering::ogre2 here.
+# --------------------------------------------------------------------------
+add_library(gz-maritime-lens-drops-system SHARED src/systems/LensDrops.cc)
+target_compile_definitions(gz-maritime-lens-drops-system PRIVATE
+  "LENS_DROPS_SHADER_DIR=\"${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}/shaders\"")
+target_link_libraries(gz-maritime-lens-drops-system PRIVATE
+  ${PROJECT_NAME}
+  gz-sim::core
+  gz-plugin::register
+  gz-rendering::gz-rendering
+  gz-common::gz-common
+  gz-transport::core
+  gz-msgs::core
+  ${CMAKE_DL_LIBS})
+install(TARGETS gz-maritime-lens-drops-system
+  LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
@@ -127,6 +146,21 @@ if(BUILD_TESTING)
   ament_add_gtest(lens_drops_core_test test/lens_drops_core_test.cc)
   if(TARGET lens_drops_core_test)
     target_link_libraries(lens_drops_core_test ${PROJECT_NAME})
+  endif()
+
+  # The system in a world that does not render. The test sets a
+  # GZ_PARTITION of its own in its main, one per process.
+  ament_add_gtest(lens_drops_test test/lens_drops_test.cc TIMEOUT 120
+    SKIP_LINKING_MAIN_LIBRARIES)
+  if(TARGET lens_drops_test)
+    target_compile_definitions(lens_drops_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(lens_drops_test
+      gz-sim::core gz-transport::core gz-msgs::core)
+    # The system is loaded by name from the build tree, so the test runs
+    # before install.
+    set_tests_properties(lens_drops_test PROPERTIES
+      ENVIRONMENT "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}")
   endif()
 endif()
 
