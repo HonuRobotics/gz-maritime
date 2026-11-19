@@ -571,10 +571,11 @@ What it settled:
   camera passes through when the GPU path is on (an `UnderwaterRendering`
   marker component on the world).
 - **The GUI uses it**: checked with screenshots on a virtual display.
-- **Not done, against the plan**: unlit materials are drawn as in air (only
-  PBS is shaded). The sky, the background and the water surface were too,
-  until the fixes below. Depth is from
-  the still water level, not the waves. No throughput benchmark in CI yet
+- **Not done, against the plan**: unlit materials were drawn as in air (only
+  PBS was shaded) until the fix below. The sky, the background and the water surface were too,
+  until the fixes below. Depth was from
+  the still water level, not the waves, until the fix below. No throughput
+  benchmark in CI yet
   (the PBS change costs a few ALU instructions per fragment).
 - **Video**: *Same water, every camera*: the reference and the GPU images of
   one scene side by side, with their difference, and the GUI.
@@ -706,6 +707,14 @@ below.** What this phase built is everything the comparison needs:
   (a fail, as it should). That example report is in the docs, labelled as
   not a validation.
 - Docs: how to shoot the footage, simulate it, mark the patches and compare.
+
+### After the phases: depth below the waves, and unlit materials, on `ahcorde/uw_wave_depth_and_unlit`
+
+The shader took the still level as the surface. Each camera now has the
+level of the wave over it, which the plugin asks the wave field for every
+step, as the reference camera does. And Ogre's unlit shaders (in
+gz-rendering, a particle emitter's particles) get the fade and the veil:
+their own colour, no daylight, no lamps. Terrain is still drawn as in air.
 
 ## Open questions
 

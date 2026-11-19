@@ -93,6 +93,16 @@ class Capture
     return {};
   }
 
+  /// \brief The last _n frames of a topic, or as many as there are.
+  public: std::vector<msgs::Image> Last(const std::string &_topic,
+                                        std::size_t _n)
+  {
+    const std::lock_guard<std::mutex> lock(this->mutex);
+    auto &f = this->frames[_topic];
+    return std::vector<msgs::Image>(f.end() - std::min(_n, f.size()),
+                                    f.end());
+  }
+
   public: transport::Node node;
   public: std::unique_ptr<Server> server;
   private: std::mutex mutex;
@@ -359,4 +369,115 @@ TEST(MarineSnow, DarkWithoutLamps)
   for (std::size_t i = 0; i < f[0].data().size(); ++i)
     bright += static_cast<std::uint8_t>(f[0].data()[i]) > 2;
   EXPECT_EQ(bright, 0) << "something glows with no light";
+}
+
+/////////////////////////////////////////////////
+// Depth is measured below the wave over the camera, not below the still
+// water: under a wave of amplitude 0.5 m a camera 0.15 m above the still
+// level is under water for part of each period (40 % of it) and one 0.15 m
+// below is in air for as long. Under water the panel 2 m away is dim.
+TEST(WaveDepth, TheCameraIsUnderTheWaveNotTheStillLevel)
+{
+  Capture c("wave_depth.sdf", {"/uwwavedepth/above", "/uwwavedepth/below"});
+  // Let the wave grow.
+  c.Next("/uwwavedepth/above", 30);
+  // Eight seconds, two periods.
+  c.Next("/uwwavedepth/above", 80);
+  c.Next("/uwwavedepth/below", 1);
+  c.server.reset();
+  const auto above = c.Last("/uwwavedepth/above", 80);
+  const auto below = c.Last("/uwwavedepth/below", 80);
+  ASSERT_EQ(above.size(), 80u);
+  ASSERT_EQ(below.size(), 80u);
+  // The bottom rows: rays that go down, so all their range is in water.
+  const auto brightness = [](const msgs::Image &_m)
+  {
+    double sum = 0;
+    int n = 0;
+    for (std::uint32_t v = 3 * _m.height() / 4; v < _m.height(); ++v)
+      for (std::uint32_t u = 0; u < _m.width(); ++u, ++n)
+        sum += G(_m, u, v);
+    return sum / n;
+  };
+  const auto stamp = [](const msgs::Image &_m)
+  {
+    return _m.header().stamp().sec() * 1000000000LL +
+           _m.header().stamp().nsec();
+  };
+  double air = 0;
+  for (const auto &m : above)
+    air = std::max(air, brightness(m));
+  ASSERT_GT(air, 0.1) << "the panel is not in view";
+  std::map<long long, bool> aboveUnder;
+  int nAbove = 0, nBelow = 0, both = 0, wrong = 0;
+  for (const auto &m : above)
+  {
+    const bool under = brightness(m) < 0.5 * air;
+    aboveUnder[stamp(m)] = under;
+    nAbove += under;
+  }
+  for (const auto &m : below)
+  {
+    const bool under = brightness(m) < 0.5 * air;
+    nBelow += under;
+    const auto it = aboveUnder.find(stamp(m));
+    if (it == aboveUnder.end())
+      continue;
+    ++both;
+    // The higher camera is never under water while the lower is in air.
+    wrong += it->second && !under;
+  }
+  std::cout << "under water: the camera above the still level in " << nAbove
+            << " of 80 frames (32 expected), the one below in " << nBelow << " (48)"
+            << "; frames of the same instant " << both << "\n";
+  EXPECT_GE(nAbove, 24) << "never under the crest";
+  EXPECT_LE(nAbove, 40);
+  EXPECT_GE(nBelow, 40);
+  EXPECT_LE(nBelow, 56) << "never above the trough";
+  EXPECT_GT(both, 60);
+  EXPECT_EQ(wrong, 0);
+}
+
+/////////////////////////////////////////////////
+// What nothing lights (Ogre's unlit shaders: a particle emitter's particles)
+// is seen through the water too: particles 2 m away have the colour they
+// have in air, faded over the 2 m, plus the veil built over them.
+TEST(Unlit, FadesAndTakesTheVeil)
+{
+  Capture c("unlit.sdf", {"/uwunlit/air", "/uwunlit/water"});
+  // The middle of the image: 2 m of water, within 1 %.
+  const auto centre = [](const msgs::Image &_m)
+  {
+    double sum = 0;
+    int n = 0;
+    for (std::uint32_t v = _m.height() / 2 - 4; v < _m.height() / 2 + 4; ++v)
+      for (std::uint32_t u = _m.width() / 2 - 4; u < _m.width() / 2 + 4;
+           ++u, ++n)
+        sum += G(_m, u, v);
+    return sum / n;
+  };
+  // The emitter starts after a while of the clock's time, not the
+  // simulation's: wait for the first particle, up to 30 s.
+  std::vector<msgs::Image> air, water;
+  for (int i = 0; i < 300; ++i)
+  {
+    air = c.Next("/uwunlit/air", 1);
+    ASSERT_EQ(air.size(), 1u);
+    if (centre(air[0]) > 0.1)
+      break;
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+  air = c.Next("/uwunlit/air", 2);
+  water = c.Next("/uwunlit/water", 2);
+  c.server.reset();
+  ASSERT_EQ(air.size(), 2u);
+  ASSERT_EQ(water.size(), 2u);
+  const double inAir = centre(air[1]);
+  const double inWater = centre(water[1]);
+  const double expected = inAir * std::exp(-0.5 * 2) +
+                          0.2 * (1 - std::exp(-0.5 * 2));
+  std::cout << "particles, linear green: in air " << inAir << ", in water "
+            << inWater << ", expected " << expected << "\n";
+  ASSERT_GT(inAir, 0.1) << "no particles in view";
+  EXPECT_NEAR(inWater, expected, 0.02);
 }
