@@ -52,6 +52,10 @@ namespace gz::sim::maritime
   /// * `<shot_noise>`, `<read_noise>`: Gaussian noise on linear light, of
   ///   variance shot_noise * signal + read_noise^2; default 0.
   /// * `<seed>`: of the noise, default 1.
+  /// * `<forward_scatter>`: forward scatter, a blur growing with range,
+  ///   radians per metre; default 0.
+  /// * `<port>`: `none` (default), `flat` (refraction remap) or `dome`
+  ///   (centred on the lens: no remap); `<water_index>` default 1.333.
   class UnderwaterCamera
     : public System,
       public ISystemConfigure,

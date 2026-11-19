@@ -142,6 +142,42 @@ struct Response
   double readNoise{0.0};
 };
 
+/// \brief The water's effect on the image beyond the model: forward
+/// scatter and the camera's port.
+struct Optics
+{
+  /// \brief Forward scatter: a Gaussian blur whose width grows with range,
+  /// sigma = forwardScatter * range radians (so fx * forwardScatter * range
+  /// pixels). Zero for none.
+  double forwardScatter{0.0};
+
+  /// \brief The port in front of the lens.
+  enum class Port { kNone, kFlat, kDome };
+  Port port{Port::kNone};
+
+  /// \brief Refractive index of the water, for a flat port.
+  double waterIndex{1.333};
+};
+
+/// \brief A Gaussian blur of a linear image, in place, by a recursive
+/// filter (Young and van Vliet 1995): its cost does not depend on sigma.
+/// \param[in,out] _img Image, row by row.
+/// \param[in] _w Width.
+/// \param[in] _h Height.
+/// \param[in] _sigma Standard deviation, pixels; below 0.5, no blur.
+void GaussianBlur(std::vector<Rgb> &_img, std::uint32_t _w, std::uint32_t _h,
+                  double _sigma);
+
+/// \brief Where a flat port moves a pixel: the radius, from the principal
+/// point, in the rendered (in-air) image that the port shows at radius _r.
+/// A ray leaving the lens at angle a in air left the water at w,
+/// sin a = n sin w: r_rendered = f tan(asin(sin(atan(_r / f)) / n)).
+/// \param[in] _r Radius in the output image, pixels.
+/// \param[in] _f Focal length, pixels.
+/// \param[in] _n Refractive index of the water.
+/// \return Radius in the rendered image, pixels.
+double FlatPortSource(double _r, double _f, double _n);
+
 /// \brief What one frame did, for the tests and the ground truth.
 struct FrameStats
 {
@@ -165,7 +201,9 @@ struct FrameStats
 ///   lit = J exp(-K_d max(z, 0))
 ///   I   = lit exp(-attenuation w) + veil (1 - exp(-backscatter w))
 ///
-/// then the response: exposure, white balance, noise. A pixel with no
+/// then forward scatter (a blur growing with range) and the port (a flat
+/// port's refraction remap), then the response: exposure, white balance,
+/// noise. A pixel with no
 /// depth (nothing hit, or beyond the far clip) sees the open water: w is the
 /// distance to the surface for a climbing ray, otherwise infinite, so it is
 /// the veil. With the camera at or above the surface the image is copied
@@ -183,7 +221,8 @@ FrameStats MakeUnderwater(const std::vector<std::uint8_t> &_rgb,
                           const std::vector<float> &_depth,
                           const RayTable &_rays, const Water &_water,
                           const Response &_response, std::mt19937 &_rng,
-                          std::vector<std::uint8_t> &_out);
+                          std::vector<std::uint8_t> &_out,
+                          const Optics &_optics = Optics{});
 }  // namespace gz::sim::underwater_camera
 
 #endif  // GZ_SIM_UNDERWATER_CAMERA_UNDERWATERIMAGE_HH_

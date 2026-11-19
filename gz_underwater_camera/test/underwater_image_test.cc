@@ -126,6 +126,44 @@ TEST(Srgb, RoundTripsEveryValue)
 }
 
 /////////////////////////////////////////////////
+// LinearToSrgb looks its answer up; the answer is the formula's, for a
+// million values across [0, 1] and for the values right at each step.
+TEST(Srgb, LookupIsTheFormula)
+{
+  const auto formula = [](double _v)
+  {
+    const double c = _v <= 0.0031308 ? 12.92 * _v
+                                     : 1.055 * std::pow(_v, 1.0 / 2.4) - 0.055;
+    return static_cast<std::uint8_t>(std::lround(c * 255.0));
+  };
+  int wrong = 0;
+  for (int i = 1; i < 1000000; ++i)
+  {
+    // Denser near zero, where the steps are narrow.
+    const double u = i / 1e6;
+    for (const double v : {u, u * u * u})
+      wrong += LinearToSrgb(v) != formula(v);
+  }
+  for (int k = 0; k < 256; ++k)
+  {
+    const double at = SrgbToLinear(static_cast<std::uint8_t>(k));
+    double v = at;
+    for (int n = 0; n < 4 && v < 1.0; ++n)
+    {
+      wrong += LinearToSrgb(v) != formula(v);
+      v = std::nextafter(v, 2.0);
+    }
+    v = at;
+    for (int n = 0; n < 4 && v > 0.0; ++n)
+    {
+      wrong += LinearToSrgb(v) != formula(v);
+      v = std::nextafter(v, -1.0);
+    }
+  }
+  EXPECT_EQ(wrong, 0);
+}
+
+/////////////////////////////////////////////////
 // The model on a synthetic frame: every pixel against the closed form,
 // with its own range and its object's depth.
 TEST(Model, ClosedFormPerPixel)
@@ -394,6 +432,40 @@ TEST(Throughput, VgaAt15Hz)
 }
 
 /////////////////////////////////////////////////
+// The pipeline runs its rows on several cores. A frame large enough for
+// that (1280x720, with noise, forward scatter and a flat port) is the same
+// frame every time: the noise is drawn in pixel order from one generator.
+TEST(Throughput, ParallelFramesAreTheSame)
+{
+  const Intrinsics k = Camera(1280, 720, 1.2);
+  const RayTable rays(k);
+  std::vector<std::uint8_t> rgb;
+  std::vector<float> z;
+  Uniform(k, 120, 140, 160, 6.0f, rgb, z);
+  for (std::size_t i = 0; i < z.size(); ++i)
+  {
+    z[i] = 2.0f + 6.0f * static_cast<float>(i / k.width) / k.height;
+    rgb[3 * i] = static_cast<std::uint8_t>((i * 7) & 255);
+  }
+  const Water w = CoastalAt(5.0);
+  Response r;
+  r.shotNoise = 1e-4;
+  r.readNoise = 2e-3;
+  Optics o;
+  o.forwardScatter = 0.002;
+  o.port = Optics::Port::kFlat;
+  std::vector<std::uint8_t> first, again;
+  std::mt19937 rng(11);
+  MakeUnderwater(rgb, z, rays, w, r, rng, first, o);
+  for (int n = 0; n < 3; ++n)
+  {
+    rng.seed(11);
+    MakeUnderwater(rgb, z, rays, w, r, rng, again, o);
+    EXPECT_EQ(first, again);
+  }
+}
+
+/////////////////////////////////////////////////
 // Every plugin parameter is in the reference docs and the README.
 TEST(Docs, EveryParameterDocumented)
 {
@@ -410,9 +482,118 @@ TEST(Docs, EveryParameterDocumented)
   ASSERT_FALSE(readme.empty());
   for (const std::string tag : {"output_topic", "exposure", "max_gain",
                                 "white_balance", "shot_noise", "read_noise",
-                                "seed"})
+                                "seed", "forward_scatter", "port",
+                                "water_index"})
   {
     EXPECT_NE(reference.find("`<" + tag + ">`"), std::string::npos) << tag;
     EXPECT_NE(readme.find("`<" + tag + ">`"), std::string::npos) << tag;
+  }
+}
+
+/////////////////////////////////////////////////
+// Forward scatter: a black-to-white edge in clear water, at 2, 4 and 8 m,
+// blurs as a Gaussian of sigma fx * forward_scatter * range: its 10-90 %
+// width is 2.563 sigma, within 10 %, after the 0.8 px a sharp edge between
+// two pixels already measures (added in quadrature). With none, no blur.
+TEST(Optics, ForwardScatterGrowsWithRange)
+{
+  const Intrinsics k = Camera(320, 60, 1.0);
+  const RayTable rays(k);
+  Water clear;
+  clear.cameraDepth = 2.0;
+  Optics optics;
+  optics.forwardScatter = 0.003;
+  for (const double r : {2.0, 4.0, 8.0})
+  {
+    std::vector<std::uint8_t> rgb;
+    std::vector<float> z;
+    Uniform(k, 0, 0, 0, static_cast<float>(r), rgb, z);
+    for (std::uint32_t v = 0; v < k.height; ++v)
+      for (std::uint32_t u = k.width / 2; u < k.width; ++u)
+        for (int c = 0; c < 3; ++c)
+          rgb[3 * (v * k.width + u) + c] = 255;
+    std::mt19937 rng(1);
+    std::vector<std::uint8_t> out;
+    MakeUnderwater(rgb, z, rays, clear, Response{}, rng, out, optics);
+    // The range at the edge, on the centre row.
+    const std::uint32_t v = k.height / 2;
+    const double range = r * rays.RangeFactor(k.width / 2, v);
+    const double sigma = k.fx * optics.forwardScatter * range;
+    double u10 = 0, u90 = 0;
+    for (std::uint32_t u = 1; u < k.width; ++u)
+    {
+      const double a = SrgbToLinear(out[3 * (v * k.width + u - 1) + 1]);
+      const double b = SrgbToLinear(out[3 * (v * k.width + u) + 1]);
+      if (a < 0.1 && b >= 0.1)
+        u10 = u - 1 + (0.1 - a) / (b - a);
+      if (a < 0.9 && b >= 0.9)
+        u90 = u - 1 + (0.9 - a) / (b - a);
+    }
+    const double expected = std::hypot(2.563 * sigma, 0.8);
+    std::cout << "range " << range << ": sigma " << sigma << " px, 10-90 "
+              << u90 - u10 << " px, expected " << expected << "\n";
+    EXPECT_NEAR(u90 - u10, expected, 0.1 * expected) << r;
+  }
+}
+
+/////////////////////////////////////////////////
+// A flat port: a point at radius r_src in the rendered image appears at the
+// radius the refraction model gives, within half a pixel; a dome port
+// changes nothing.
+TEST(Optics, FlatPortRefracts)
+{
+  const Intrinsics k = Camera(401, 401, 1.4);
+  const RayTable rays(k);
+  Water clear;
+  clear.cameraDepth = 2.0;
+  for (const double rOut : {40.0, 100.0, 160.0})
+  {
+    // Where the port takes the point from.
+    const double rSrc = FlatPortSource(rOut, k.fx, 1.333);
+    std::vector<std::uint8_t> rgb;
+    std::vector<float> z;
+    Uniform(k, 0, 0, 0, 3.0f, rgb, z);
+    // A 3x3 white square centred on (cx + rSrc, cy).
+    const int cu = static_cast<int>(std::lround(k.cx - 0.5 + rSrc));
+    const int cv = static_cast<int>(std::lround(k.cy - 0.5));
+    for (int dv = -1; dv <= 1; ++dv)
+      for (int du = -1; du <= 1; ++du)
+        for (int c = 0; c < 3; ++c)
+          rgb[3 * ((cv + dv) * k.width + cu + du) + c] = 255;
+    const double srcCentre = cu + 0.5 - k.cx;
+    const double expected = [&]
+    {
+      // Invert the port's map at the square's actual centre.
+      double lo = 0, hi = k.width;
+      for (int i = 0; i < 60; ++i)
+      {
+        const double mid = 0.5 * (lo + hi);
+        (FlatPortSource(mid, k.fx, 1.333) < srcCentre ? lo : hi) = mid;
+      }
+      return 0.5 * (lo + hi);
+    }();
+    Optics flat;
+    flat.port = Optics::Port::kFlat;
+    std::mt19937 rng(1);
+    std::vector<std::uint8_t> out;
+    MakeUnderwater(rgb, z, rays, clear, Response{}, rng, out, flat);
+    double sum = 0, sumU = 0;
+    for (std::uint32_t v = 0; v < k.height; ++v)
+      for (std::uint32_t u = 0; u < k.width; ++u)
+      {
+        const double val = SrgbToLinear(out[3 * (v * k.width + u)]);
+        sum += val;
+        sumU += val * (u + 0.5);
+      }
+    const double measured = sumU / sum - k.cx;
+    std::cout << "flat port: source radius " << srcCentre << " px appears at "
+              << measured << ", model " << expected << "\n";
+    EXPECT_NEAR(measured, expected, 0.5);
+    EXPECT_GT(expected, srcCentre) << "a flat port magnifies";
+
+    Optics dome;
+    dome.port = Optics::Port::kDome;
+    MakeUnderwater(rgb, z, rays, clear, Response{}, rng, out, dome);
+    EXPECT_EQ(out, rgb) << "a dome centred on the lens does not refract";
   }
 }
