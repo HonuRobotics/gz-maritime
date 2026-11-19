@@ -236,6 +236,19 @@ TEST(WrapAngle, IntoHalfOpenTurn)
 }
 
 //////////////////////////////////////////////////
+/// Spread, an unknown bias or a moving dynamic bias hide the range; a
+/// fixed bias mean, readable in the SDF, does not.
+TEST(HidesRange, SpreadOrABiasTheReceiverCannotRead)
+{
+  EXPECT_FALSE(HidesRange(0.0, 0.0, 0.0, 0.0));
+  EXPECT_TRUE(HidesRange(1.0, 0.0, 0.0, 0.0));
+  EXPECT_TRUE(HidesRange(0.0, 6.0, 0.0, 0.0));
+  EXPECT_TRUE(HidesRange(0.0, 0.0, 3.0, 100.0));
+  // A dynamic bias with no correlation time never moves.
+  EXPECT_FALSE(HidesRange(0.0, 0.0, 3.0, 0.0));
+}
+
+//////////////////////////////////////////////////
 /// Parameters are set by name, and out of range values are refused.
 TEST(Pinger, SetParameter)
 {
