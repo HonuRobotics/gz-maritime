@@ -121,8 +121,9 @@ bool AcousticReceiver::Load(const sdf::Sensor &_sdf)
     this->noise[i] = sensors::NoiseFactory::NewNoiseModel(noiseSdf);
     if (i == static_cast<std::size_t>(Channel::kAmplitude))
     {
-      amplitudeHidden = noiseSdf.StdDev() > 0.0 ||
-          noiseSdf.BiasStdDev() > 0.0 || noiseSdf.BiasMean() != 0.0;
+      amplitudeHidden = acoustics::HidesRange(noiseSdf.StdDev(),
+          noiseSdf.BiasStdDev(), noiseSdf.DynamicBiasStdDev(),
+          noiseSdf.DynamicBiasCorrelationTime());
     }
   }
 
