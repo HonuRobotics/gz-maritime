@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<!--
+  A 0.5 m/s ocean current setting east, owned by the world, and a body
+  that writes its hydrodynamics at its centre of mass, 0.2 m below its link
+  origin, through <center_of_pressure>. No gravity and no buoyancy: the
+  damping against the water is all that moves it.
+-->
+<sdf version="1.9">
+  <world name="center_of_pressure_world_current">
+    <gravity>0 0 0</gravity>
+    <physics name="1ms" type="dart">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-maritime-ocean-current-system"
+            name="gz::sim::maritime::OceanCurrent">
+      <speed>0.5</speed>
+      <direction>90</direction>
+    </plugin>
+    <model name="at_point">
+      <pose>0 0 0 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <pose>0 0 -0.2 0 0 0</pose>
+          <mass>10</mass>
+          <inertia>
+            <ixx>0.1</ixx><iyy>0.1</iyy><izz>0.1</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+      </link>
+      <plugin filename="gz-maritime-hydrodynamics-system"
+              name="gz::sim::maritime::Hydrodynamics">
+        <link_name>link</link_name>
+        <center_of_pressure>0 0 -0.2</center_of_pressure>
+        <xU>-40</xU><yV>-40</yV><zW>-40</zW>
+        <kP>-1</kP><mQ>-1</mQ><nR>-1</nR>
+      </plugin>
+    </model>
+  </world>
+</sdf>
