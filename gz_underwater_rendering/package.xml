@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>gz_underwater_rendering</name>
+  <version>0.1.0</version>
+  <description>The world's water drawn by the renderer: every PBS-shaded surface any ogre2 camera renders, in the server's sensors and in the GUI, is seen through the world's water (gz_water_optics), per fragment, on the GPU, by the same model as the reference underwater camera (gz_underwater_camera). Pieces in Ogre's PBS shaders and a listener chained to gz-rendering's own.</description>
+  <maintainer email="acordero@honurobotics.com">Alejandro Hernandez Cordero</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>gz_sim_vendor</depend>
+  <depend>gz_plugin_vendor</depend>
+  <depend>gz_common_vendor</depend>
+  <depend>gz_rendering_vendor</depend>
+  <depend>gz_ogre_next_vendor</depend>
+  <depend>gz_water_optics</depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <!-- The GPU image is checked against the reference camera's model. -->
+  <test_depend>gz_underwater_camera</test_depend>
+  <test_depend>gz_transport_vendor</test_depend>
+  <test_depend>gz_msgs_vendor</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -326,6 +326,17 @@ publishes `<topic>/underwater/image` (`gz.msgs.Image`, RGB 8 bit) and
 The water is the world's (`gz-maritime-water-optics-system`); without it the
 image is the plain camera's, and above the water it is copied unchanged.
 
+## Underwater rendering
+
+Include `model://underwater_optics` (from `gz_underwater_rendering`) in a
+world with water optics, and every ogre2 camera, and the GUI's 3D view, sees
+through the water: the same model as the underwater camera, per fragment, on
+the GPU. It takes no parameters; the water is the world's. Cameras above the
+water are untouched, and an underwater camera plugin in the same world passes
+its image through. Only surfaces Ogre's PBS shades are drawn through the
+water: the sky, the background, the water surface, markers and terrain are
+drawn as in air.
+
 ## Thruster command
 
 What a vehicle's Thruster plugins expect, with `gz-maritime-thruster-system`

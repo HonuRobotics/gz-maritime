@@ -33,6 +33,7 @@
 #include <gz/sim/Util.hh>
 #include <gz/sim/components/RgbdCamera.hh>
 
+#include "gz/sim/components/UnderwaterRendering.hh"
 #include "gz/sim/underwater_camera/UnderwaterImage.hh"
 #include "gz/sim/water_optics/WaterOpticsSampler.hh"
 
@@ -94,6 +95,9 @@ class gz::sim::maritime::UnderwaterCameraPrivate
 
   /// \brief Frames made.
   public: std::uint64_t frames{0};
+
+  /// \brief Whether the pass-through was announced.
+  public: bool warnedDrawn{false};
 };
 
 namespace
@@ -292,6 +296,10 @@ void UnderwaterCamera::PostUpdate(const UpdateInfo &_info,
   if (d.sensor == kNullEntity)
     return;
   d.sampler.Sync(_ecm);
+  // The renderer already draws the water into every camera's image: pass
+  // it through rather than apply the water twice.
+  const bool drawn = nullptr != _ecm.Component<components::UnderwaterRendering>(
+      worldEntity(_ecm));
   const auto pose = worldPose(d.sensor, _ecm);
   const double depth = d.sampler.Depth(pose.Pos(), _info.simTime);
   const auto &optics = d.sampler.Data();
@@ -301,7 +309,13 @@ void UnderwaterCamera::PostUpdate(const UpdateInfo &_info,
   d.water.backscatter = optics.backscatter;
   d.water.diffuseAttenuation = optics.diffuseAttenuation;
   d.water.veil = d.sampler.Veil(depth);
-  d.water.cameraDepth = depth;
+  d.water.cameraDepth = drawn ? 0.0 : depth;
+  if (drawn && !d.warnedDrawn)
+  {
+    gzmsg << "UnderwaterCamera: the renderer draws the water "
+          << "(gz_underwater_rendering); passing the image through\n";
+    d.warnedDrawn = true;
+  }
   d.water.cameraRotation = pose.Rot();
   d.haveWater = true;
 }

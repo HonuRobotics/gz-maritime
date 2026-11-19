@@ -1,0 +1,21 @@
+// The water, per pass, appended to the PBS pass buffer by the underwater
+// listener (gz_underwater_rendering). All float4, so it stays 16-byte
+// aligned whatever comes before it.
+@property( gz_underwater )
+	@piece( custom_passBuffer_underwater )
+		// xyz: the camera's world position; w: the still water level.
+		float4 uwCamPos_level;
+		// The view-to-world rotation, column by column (xyz).
+		float4 uwViewX;
+		float4 uwViewY;
+		float4 uwViewZ;
+		// xyz: beta^D, how fast an object's light fades, 1/m.
+		float4 uwAttenuation;
+		// xyz: beta^B, how fast the veil builds, 1/m.
+		float4 uwBackscatter;
+		// xyz: the veil, B-infinity, at the camera's depth.
+		float4 uwVeil;
+		// xyz: K_d, how fast the daylight fades with depth, 1/m.
+		float4 uwDiffuse;
+	@end
+@end
