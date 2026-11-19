@@ -61,6 +61,16 @@ bool Resolve(const WaterOpticsSpec &_spec, WaterOpticsData &_out,
     _error = "<daylight> must be a number, 0 or more";
     return false;
   }
+  if (!(_spec.caustics >= 0.0 && _spec.caustics <= 1.0))
+  {
+    _error = "<caustics> must be between 0 and 1";
+    return false;
+  }
+  if (!(_spec.marineSnow >= 0.0 && _spec.marineSnow <= 1.0))
+  {
+    _error = "<marine_snow> must be between 0 and 1";
+    return false;
+  }
 
   Rgb a = type->absorption;
   Rgb b = type->scattering;
@@ -99,6 +109,8 @@ bool Resolve(const WaterOpticsSpec &_spec, WaterOpticsData &_out,
   out.diffuseAttenuation = kd;
   out.waterLevel = _spec.waterLevel;
   out.daylight = _spec.daylight;
+  out.caustics = _spec.caustics;
+  out.marineSnow = _spec.marineSnow;
 
   struct Override
   {

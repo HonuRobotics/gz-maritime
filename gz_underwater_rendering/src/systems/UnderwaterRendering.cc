@@ -16,7 +16,10 @@
  */
 #include <dlfcn.h>
 
+#include <algorithm>
 #include <array>
+#include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <memory>
 #include <mutex>
@@ -34,6 +37,8 @@
 #include <gz/sim/rendering/Events.hh>
 
 #include "gz/sim/components/UnderwaterRendering.hh"
+#include "gz/sim/components/Wavefield.hh"
+#include "gz/sim/waves/Eval.hh"
 #include "gz/sim/water_optics/WaterOpticsSampler.hh"
 
 namespace gz::sim::maritime
@@ -52,9 +57,25 @@ class UnderwaterRendering
     public ISystemConfigure,
     public ISystemPreUpdate
 {
-  public: void Configure(const Entity &, const std::shared_ptr<const sdf::Element> &,
+  public: void Configure(const Entity &,
+                         const std::shared_ptr<const sdf::Element> &_sdf,
                          EntityComponentManager &, EventManager &_eventMgr) override
   {
+    // <quality>: how finely the lamps' beams are marched, how far marine
+    // snow is drawn and how many lamps are used. low, medium or high.
+    if (_sdf && _sdf->HasElement("quality"))
+    {
+      const auto q = _sdf->Get<std::string>("quality");
+      if (q == "low")
+        this->quality = 0.0f;
+      else if (q == "medium")
+        this->quality = 1.0f;
+      else if (q == "high")
+        this->quality = 2.0f;
+      else
+        gzerr << "UnderwaterRendering: <quality> is low, medium or high, "
+              << "not [" << q << "]; using medium\n";
+    }
     this->sceneUpdate = _eventMgr.Connect<events::SceneUpdate>(
         [this]() { this->OnSceneUpdate(); });
     this->teardown = _eventMgr.Connect<events::RenderTeardown>(
@@ -63,7 +84,7 @@ class UnderwaterRendering
     this->piecesDir = dir ? dir : UW_PIECES_DIR;
   }
 
-  public: void PreUpdate(const UpdateInfo &, EntityComponentManager &_ecm) override
+  public: void PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm) override
   {
     this->sampler.Sync(_ecm);
     // Mark the world: the renderer draws the water. In the GUI's own
@@ -81,7 +102,31 @@ class UnderwaterRendering
       return;
     }
     const auto &o = this->sampler.Data();
-    std::array<float, 14> v{};
+    // How high the waves are, for the caustics: Hs = 4 sigma of the surface
+    // at 64 points on a golden-angle spiral out to 50 m, which spans many
+    // wavelengths and phases, smoothed over the steps.
+    const double t = std::chrono::duration<double>(_info.simTime).count();
+    if (const auto *f = _ecm.Component<components::Wavefield>(world);
+        f && f->Data().simulation)
+    {
+      double sum = 0, sum2 = 0;
+      const int n = 64;
+      for (int i = 0; i < n; ++i)
+      {
+        const double r = 50.0 * std::sqrt((i + 0.5) / n);
+        const double a = i * 2.399963229728653;
+        const double e = waves::SurfaceElevation(f->Data(), r * std::cos(a),
+                                                 r * std::sin(a), t);
+        sum += e;
+        sum2 += e * e;
+      }
+      const double mean = sum / n;
+      const double hs = 4.0 * std::sqrt(std::max(0.0, sum2 / n - mean * mean));
+      this->waveHeight = this->waveHeightSet
+          ? 0.98 * this->waveHeight + 0.02 * hs : hs;
+      this->waveHeightSet = true;
+    }
+    std::array<float, 18> v{};
     for (int c = 0; c < 3; ++c)
     {
       v[c] = static_cast<float>(o.attenuation[c]);
@@ -91,6 +136,12 @@ class UnderwaterRendering
     }
     v[12] = static_cast<float>(o.waterLevel);
     v[13] = static_cast<float>(o.daylight);
+    // Caustics need waves: full strength from a 0.5 m sea.
+    v[14] = static_cast<float>(o.caustics *
+                               std::clamp(this->waveHeight / 0.5, 0.0, 1.0));
+    v[15] = static_cast<float>(o.marineSnow);
+    v[16] = static_cast<float>(std::fmod(t, 1000.0));
+    v[17] = this->quality;
     this->water = v;
   }
 
@@ -153,7 +204,7 @@ class UnderwaterRendering
 
   private: water_optics::WaterOpticsSampler sampler;
   private: std::mutex mutex;
-  private: std::optional<std::array<float, 14>> water;
+  private: std::optional<std::array<float, 18>> water;
   private: std::string piecesDir;
   private: void *handle{nullptr};
   private: int (*install)(const char *){nullptr};
@@ -162,6 +213,10 @@ class UnderwaterRendering
   private: bool installed{false};
   private: bool failed{false};
   private: std::optional<bool> announced;
+  /// \brief <quality>: 0 low, 1 medium, 2 high.
+  private: float quality{1.0f};
+  private: double waveHeight{0.0};
+  private: bool waveHeightSet{false};
   private: common::ConnectionPtr sceneUpdate;
   private: common::ConnectionPtr teardown;
 };

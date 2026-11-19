@@ -27,11 +27,13 @@
 //   rest is always the installed gz-rendering's own;
 // * gz-rendering's Hlms listener: ours calls it first, then appends.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -48,9 +50,17 @@
 #include <OgreRoot.h>
 #include <OgreSceneManager.h>
 #include <OgreHlmsPbs.h>
+#include <OgreHlmsPbsDatablock.h>
+#include <OgreItem.h>
 #include <OgreLight.h>
 #include <OgreMatrix4.h>
+#include <OgreMesh2.h>
+#include <OgreMeshManager2.h>
+#include <OgreRenderSystem.h>
 #include <OgreSceneNode.h>
+#include <OgreSubItem.h>
+#include <OgreSubMesh2.h>
+#include <Vao/OgreVaoManager.h>
 
 namespace
 {
@@ -63,6 +73,10 @@ struct Water
   float diffuse[3]{0, 0, 0};
   float level{0};
   float daylight{1};
+  float caustics{0};
+  float snow{0};
+  float time{0};
+  int quality{1};
   bool active{false};
 };
 
@@ -77,23 +91,224 @@ constexpr int kLampFloat4 = 5;
 /// \brief Bytes the underwater block adds: the water (8 float4), the beam
 /// (2) and the lamps.
 constexpr Ogre::uint32 kBlockBytes =
-    (10u + kMaxLamps * kLampFloat4) * 4u * sizeof(float);
+    (11u + kMaxLamps * kLampFloat4) * 4u * sizeof(float);
 
 /// \brief Henyey-Greenstein asymmetry of the water's scattering, and the
 /// beam's ray march.
 constexpr float kPhaseG = 0.9f;
-constexpr float kBeamSteps = 12.0f;
 constexpr float kBeamRange = 20.0f;
+
+/// \brief What the plugin's <quality> sets, for low, medium and high: the
+/// steps of each lamp's beam march, how far from the camera marine snow is
+/// drawn, m, and how many lamps are used (the first in the scene).
+constexpr float kBeamSteps[3] = {8.0f, 12.0f, 16.0f};
+constexpr float kSnowRange[3] = {1.5f, 3.0f, 3.0f};
+constexpr int kQualityLamps[3] = {2, 4, 4};
 
 /// \brief A lamp dimmer than this (its power scale times its brightest
 /// diffuse channel) counts as off: the shader neither lights with it nor
 /// marches its beam. With every lamp off the lamp code is compiled out.
 constexpr float kLampMinPower = 0.01f;
 
+/// \brief The backdrop's size, m: its half width, how far above the water
+/// its top is and how far below its bottom. Farther than any camera sees.
+constexpr float kBackdropHalfWidth = 50000.0f;
+constexpr float kBackdropAbove = 100.0f;
+constexpr float kBackdropBelow = 12000.0f;
+
+/// \brief What marks the backdrop's material for the shader (its first
+/// user value), which draws it for underwater cameras only.
+constexpr float kBackdropMark = 1977.0f;
+
+/// \brief Water behind everything: a black box around the world, seen from
+/// inside, drawn after the sky and at the far plane wherever nothing else
+/// is. Through the water it is the water's own colour, the veil, as open
+/// water is; without it a camera under water would see the sky or the
+/// background colour past the last thing in view. The shader makes it
+/// clear (alpha 0) for cameras above the water.
+class Backdrop
+{
+  /// \brief Show it in every scene, around the water level, or hide it.
+  public: void Update(bool _show, float _level)
+  {
+    Ogre::Root *root = Ogre::Root::getSingletonPtr();
+    if (!root)
+      return;
+    auto managers = root->getSceneManagerIterator();
+    while (managers.hasMoreElements())
+    {
+      Ogre::SceneManager *sm = managers.getNext();
+      auto it = this->items.find(sm);
+      if (it == this->items.end())
+      {
+        if (!_show || this->failed || !this->Create(root, sm))
+          continue;
+        it = this->items.find(sm);
+      }
+      const float half = 0.5f * (kBackdropAbove + kBackdropBelow);
+      Ogre::SceneNode *node = it->second->getParentSceneNode();
+      node->setPosition(0.0f, 0.0f, _level + kBackdropAbove - half);
+      node->setScale(kBackdropHalfWidth, kBackdropHalfWidth, half);
+      it->second->setVisible(_show);
+    }
+  }
+
+  /// \brief Call before each pass of a scene. gz-rendering's solid-colour
+  /// cameras (segmentation, thermal, selection) read custom parameter 1
+  /// from every renderable, set it on the visuals they know and take it
+  /// off all of them afterwards, so the backdrop gets its own here; the
+  /// shader makes the backdrop clear for those cameras.
+  public: void BeforePass(Ogre::SceneManager *_sm)
+  {
+    const auto it = this->items.find(_sm);
+    if (it == this->items.end())
+      return;
+    for (std::size_t i = 0; i < it->second->getNumSubItems(); ++i)
+    {
+      it->second->getSubItem(i)->setCustomParameter(1u,
+                                                    Ogre::Vector4::ZERO);
+    }
+  }
+
+  /// \brief Take it out of the scenes that are still there.
+  public: void Destroy()
+  {
+    Ogre::Root *root = Ogre::Root::getSingletonPtr();
+    if (root)
+    {
+      auto managers = root->getSceneManagerIterator();
+      while (managers.hasMoreElements())
+      {
+        Ogre::SceneManager *sm = managers.getNext();
+        auto it = this->items.find(sm);
+        if (it == this->items.end())
+          continue;
+        Ogre::SceneNode *node = it->second->getParentSceneNode();
+        node->detachObject(it->second);
+        sm->destroyItem(it->second);
+        sm->destroySceneNode(node);
+      }
+    }
+    this->items.clear();
+  }
+
+  /// \brief The box in one scene.
+  private: bool Create(Ogre::Root *_root, Ogre::SceneManager *_sm)
+  try
+  {
+    const char *name = "gz_underwater_backdrop";
+    Ogre::MeshPtr mesh = Ogre::MeshManager::getSingleton().getByName(name);
+    if (!mesh)
+      mesh = this->Mesh(_root, name);
+    auto *pbs = static_cast<Ogre::HlmsPbs *>(
+        _root->getHlmsManager()->getHlms(Ogre::HLMS_PBS));
+    Ogre::HlmsDatablock *datablock = pbs->getDatablock(name);
+    if (!datablock)
+    {
+      // Seen from inside, whichever way its faces wind, and past the far
+      // plane: clamped onto it instead of clipped.
+      Ogre::HlmsMacroblock macroblock;
+      macroblock.mCullMode = Ogre::CULL_NONE;
+      macroblock.mDepthClamp = true;
+      macroblock.mDepthWrite = false;
+      // Blended by alpha: the shader writes 1 for a camera under water and
+      // 0 for any other, which then sees through it.
+      Ogre::HlmsBlendblock blendblock;
+      blendblock.setBlendType(Ogre::SBT_TRANSPARENT_ALPHA);
+      auto *block = static_cast<Ogre::HlmsPbsDatablock *>(
+          pbs->createDatablock(name, name, macroblock, blendblock,
+                               Ogre::HlmsParamVec()));
+      block->setDiffuse(Ogre::Vector3::ZERO);
+      block->setSpecular(Ogre::Vector3::ZERO);
+      block->setUserValue(0, Ogre::Vector4(kBackdropMark, 0, 0, 0));
+      datablock = block;
+    }
+    Ogre::Item *item = _sm->createItem(mesh, Ogre::SCENE_DYNAMIC);
+    item->setDatablock(datablock);
+    item->setCastShadows(false);
+    // After the sky, which gz-rendering draws between its queues 1 and 2
+    // wherever the depth is still the far plane's.
+    item->setRenderQueueGroup(2u);
+    _sm->getRootSceneNode()->createChildSceneNode()->attachObject(item);
+    this->items[_sm] = item;
+    return true;
+  }
+  catch (const std::exception &_e)
+  {
+    gzerr << "[underwater] no backdrop: " << _e.what() << "\n";
+    this->failed = true;
+    return false;
+  }
+
+  /// \brief A box from -1 to 1, with normals facing in.
+  private: Ogre::MeshPtr Mesh(Ogre::Root *_root, const char *_name)
+  {
+    Ogre::VaoManager *vao = _root->getRenderSystem()->getVaoManager();
+    Ogre::MeshPtr mesh = Ogre::MeshManager::getSingleton().createManual(
+        _name, Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
+    Ogre::SubMesh *sub = mesh->createSubMesh();
+    Ogre::VertexElement2Vec elements;
+    elements.push_back(Ogre::VertexElement2(Ogre::VET_FLOAT3,
+                                            Ogre::VES_POSITION));
+    elements.push_back(Ogre::VertexElement2(Ogre::VET_FLOAT3,
+                                            Ogre::VES_NORMAL));
+    // Six faces of four vertices: the face's axis, then its two others.
+    auto *vertices = reinterpret_cast<float *>(OGRE_MALLOC_SIMD(
+        sizeof(float) * 6 * 24, Ogre::MEMCATEGORY_GEOMETRY));
+    auto *indices = reinterpret_cast<Ogre::uint16 *>(OGRE_MALLOC_SIMD(
+        sizeof(Ogre::uint16) * 36, Ogre::MEMCATEGORY_GEOMETRY));
+    float *v = vertices;
+    Ogre::uint16 *ix = indices;
+    for (int face = 0; face < 6; ++face)
+    {
+      const int axis = face / 2;
+      const float side = (face % 2) ? 1.0f : -1.0f;
+      const int a = (axis + 1) % 3, b = (axis + 2) % 3;
+      const float corners[4][2] = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+      for (const auto &c : corners)
+      {
+        float pos[3], normal[3] = {0, 0, 0};
+        pos[axis] = side;
+        pos[a] = c[0];
+        pos[b] = c[1];
+        normal[axis] = -side;
+        for (float f : pos)
+          *v++ = f;
+        for (float f : normal)
+          *v++ = f;
+      }
+      const Ogre::uint16 base = static_cast<Ogre::uint16>(4 * face);
+      for (int k : {0, 1, 2, 0, 2, 3})
+        *ix++ = static_cast<Ogre::uint16>(base + k);
+    }
+    Ogre::VertexBufferPacked *vertexBuffer = vao->createVertexBuffer(
+        elements, 24, Ogre::BT_IMMUTABLE, vertices, true);
+    Ogre::IndexBufferPacked *indexBuffer = vao->createIndexBuffer(
+        Ogre::IndexBufferPacked::IT_16BIT, 36, Ogre::BT_IMMUTABLE, indices,
+        true);
+    Ogre::VertexBufferPackedVec buffers;
+    buffers.push_back(vertexBuffer);
+    Ogre::VertexArrayObject *object = vao->createVertexArrayObject(
+        buffers, indexBuffer, Ogre::OT_TRIANGLE_LIST);
+    sub->mVao[Ogre::VpNormal].push_back(object);
+    sub->mVao[Ogre::VpShadow].push_back(object);
+    mesh->_setBounds(Ogre::Aabb(Ogre::Vector3::ZERO,
+                                Ogre::Vector3::UNIT_SCALE), false);
+    mesh->_setBoundingSphereRadius(1.7320508f);
+    return mesh;
+  }
+
+  private: std::map<Ogre::SceneManager *, Ogre::Item *> items;
+
+  /// \brief Set when the box could not be made: not tried again.
+  private: bool failed{false};
+};
+
 class UnderwaterListener : public Ogre::HlmsListener
 {
   public: Ogre::HlmsListener *previous{nullptr};
   public: Water water;
+  public: Backdrop backdrop;
 
   private: bool On(bool _caster) const
   { return this->water.active && !_caster; }
@@ -145,7 +360,8 @@ class UnderwaterListener : public Ogre::HlmsListener
     auto it = _sm->getMovableObjectIterator(
         Ogre::LightFactory::FACTORY_TYPE_NAME);
     while (it.hasMoreElements() &&
-           static_cast<int>(this->lamps.size()) < kMaxLamps)
+           static_cast<int>(this->lamps.size()) <
+               kQualityLamps[this->water.quality])
     {
       auto *light = static_cast<Ogre::Light *>(it.getNext());
       if (!this->hidden.count(light) || !light->getParentNode())
@@ -212,6 +428,7 @@ class UnderwaterListener : public Ogre::HlmsListener
   {
     if (this->previous)
       this->previous->preparePassHash(_shadow, _caster, _dual, _sm, _hlms);
+    this->backdrop.BeforePass(_sm);
     if (!this->On(_caster))
       return;
     _hlms->_setProperty("gz_underwater", 1);
@@ -276,8 +493,9 @@ class UnderwaterListener : public Ogre::HlmsListener
     // phase function's asymmetry.
     put4(w.veil[0] * w.attenuation[0], w.veil[1] * w.attenuation[1],
          w.veil[2] * w.attenuation[2], kPhaseG);
-    put4(static_cast<float>(this->lamps.size()), kBeamSteps, kBeamRange,
-         1.0f);
+    put4(static_cast<float>(this->lamps.size()), kBeamSteps[w.quality],
+         kBeamRange, 1.0f);
+    put4(w.caustics, w.snow, w.time, kSnowRange[w.quality]);
     // The lamps, in view space, as Ogre's own light buffer has them.
     Ogre::Matrix4 view = Ogre::Matrix4::IDENTITY;
     if (camera)
@@ -441,9 +659,11 @@ catch (const std::exception &_e)
 }
 
 //////////////////////////////////////////////////
-/// \brief Set the water: 14 floats, beta^D, beta^B, the veil at the surface
-/// and K_d (each r g b), then the still water level and the daylight. A
-/// null pointer turns the water off.
+/// \brief Set the water: 18 floats, beta^D, beta^B, the veil at the surface
+/// and K_d (each r g b), then the still water level, the daylight, the
+/// caustics' strength (already scaled by the waves), the marine snow's
+/// density, the time, s, and the quality (0 low, 1 medium, 2 high). A null
+/// pointer turns the water off.
 void uw_ogre2_set(const float *_v)
 {
   auto &s = State();
@@ -461,6 +681,7 @@ void uw_ogre2_set(const float *_v)
   // Lamps that appear later (a vehicle spawned with its lights) are hidden
   // on the frame they appear.
   s.listener.HideLamps(w.active);
+  s.listener.backdrop.Update(s.done && w.active, _v ? _v[12] : 0.0f);
   if (!_v)
     return;
   std::memcpy(w.attenuation, _v, 3 * sizeof(float));
@@ -469,6 +690,10 @@ void uw_ogre2_set(const float *_v)
   std::memcpy(w.diffuse, _v + 9, 3 * sizeof(float));
   w.level = _v[12];
   w.daylight = _v[13];
+  w.caustics = _v[14];
+  w.snow = _v[15];
+  w.time = _v[16];
+  w.quality = std::clamp(static_cast<int>(std::lround(_v[17])), 0, 2);
 }
 
 //////////////////////////////////////////////////
@@ -482,6 +707,7 @@ try
   if (Ogre::Root::getSingletonPtr() && s.pbs)
   {
     s.listener.HideLamps(false);
+    s.listener.backdrop.Destroy();
     s.pbs->setListener(s.listener.previous);
     s.pbs->reloadFrom(s.pbs->getDataFolder(), &s.originalLibrary);
   }

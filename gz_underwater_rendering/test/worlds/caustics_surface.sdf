@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<!--
+  The caustics world with the water's surface drawn above the seabeds and a
+  sun that casts shadows: the surface must not shade what is under it.
+-->
+<sdf version="1.9">
+  <world name="uwcaustics">
+    <physics name="p" type="ignored"><max_step_size>0.01</max_step_size><real_time_factor>0</real_time_factor></physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors"><render_engine>ogre2</render_engine></plugin>
+    <plugin filename="gz-sim-waves-gerstner-system" name="gz::sim::systems::GerstnerWaves">
+      <update_rate>30</update_rate>
+      <wave><model>CWR</model><number>1</number><amplitude>0.3</amplitude><period>4</period><direction>0</direction><steepness>0</steepness><tau>0.5</tau></wave>
+    </plugin>
+    <plugin filename="gz-maritime-water-optics-system" name="gz::sim::maritime::WaterOptics">
+      <attenuation>0 0 0</attenuation><backscatter>0 0 0</backscatter><veil>0 0 0</veil>
+      <diffuse_attenuation>0.2 0.2 0.2</diffuse_attenuation>
+    </plugin>
+    <scene><ambient>0.2 0.2 0.2 1</ambient><background>0 0 0 1</background></scene>
+    <light type="directional" name="sun"><direction>0 0 -1</direction><diffuse>0.8 0.8 0.8 1</diffuse><cast_shadows>true</cast_shadows></light>
+    <model name="seabed_3"><static>true</static><pose>0 0 -3 0 0 0</pose><link name="l"><visual name="v"><geometry><plane><normal>0 0 1</normal><size>40 40</size></plane></geometry><material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.6 0.6 0.6 1</diffuse><specular>0 0 0 1</specular></material></visual></link></model>
+    <model name="seabed_8"><static>true</static><pose>200 0 -8 0 0 0</pose><link name="l"><visual name="v"><geometry><plane><normal>0 0 1</normal><size>40 40</size></plane></geometry><material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.6 0.6 0.6 1</diffuse><specular>0 0 0 1</specular></material></visual></link></model>
+    <model name="rig"><static>true</static>
+      <link name="a"><pose>0 0 -0.5 0 1.5707963 0</pose><sensor name="cam" type="camera"><topic>uwcaustics/a</topic><update_rate>10</update_rate><always_on>1</always_on>
+        <camera><horizontal_fov>1.4</horizontal_fov><image><width>160</width><height>120</height></image><clip><near>0.1</near><far>60</far></clip></camera></sensor></link>
+      <link name="b"><pose>200 0 -5.5 0 1.5707963 0</pose><sensor name="cam" type="camera"><topic>uwcaustics/b</topic><update_rate>10</update_rate><always_on>1</always_on>
+        <camera><horizontal_fov>1.4</horizontal_fov><image><width>160</width><height>120</height></image><clip><near>0.1</near><far>60</far></clip></camera></sensor></link>
+    </model>
+    <include><uri>model://underwater_optics</uri></include>
+    <include><uri>model://water_surface</uri></include>
+  </world>
+</sdf>

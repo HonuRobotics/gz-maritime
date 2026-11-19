@@ -142,6 +142,30 @@ if(BUILD_TESTING)
       ENVIRONMENT
       "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH};GZ_PARTITION=gz_underwater_lamps_test")
   endif()
+
+  # The surface from below: Snell's window, in gz_waves_rendering's water
+  # shader. Needs a GPU.
+  ament_add_gtest(snell_test test/snell_test.cc TIMEOUT 300)
+  if(TARGET snell_test)
+    target_compile_definitions(snell_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(snell_test gz-sim::core gz-transport::core gz-msgs::core)
+    set_tests_properties(snell_test PROPERTIES
+      ENVIRONMENT "GZ_PARTITION=gz_underwater_snell_test")
+  endif()
+
+  # Caustics and marine snow. Needs a GPU.
+  ament_add_gtest(effects_test test/effects_test.cc TIMEOUT 600)
+  if(TARGET effects_test)
+    target_compile_definitions(effects_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(effects_test
+      gz_underwater_camera::gz_underwater_camera
+      gz-sim::core gz-transport::core gz-msgs::core)
+    set_tests_properties(effects_test PROPERTIES
+      ENVIRONMENT
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH};GZ_PARTITION=gz_underwater_effects_test")
+  endif()
 endif()
 
 ament_environment_hooks("hooks/hook.dsv.in")

@@ -25,6 +25,7 @@ find_package(ament_cmake REQUIRED)
 find_package(gz_sim_vendor REQUIRED)
 find_package(gz-sim REQUIRED)
 find_package(gz_waves REQUIRED)   # IWaveField + WaveField2D + Wavefield component
+find_package(gz_water_optics REQUIRED)   # the water an underwater camera sees the surface through
 find_package(gz_math_vendor REQUIRED)
 find_package(gz-math REQUIRED)
 find_package(gz_common_vendor REQUIRED)
@@ -129,6 +130,7 @@ target_link_libraries(gz-sim-water-visual-system
   PRIVATE
     gz_waves::gz_waves        # IWaveField + Field() + Wavefield component +
                               # CreateWaveSimulation (engine-agnostic registry)
+    gz_water_optics::gz_water_optics
     gz-sim::core
     gz-math::gz-math
     gz-plugin::register

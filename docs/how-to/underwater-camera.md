@@ -139,8 +139,8 @@ plugin on each, include the `underwater_optics` model:
 
 The renderer then draws the water into every surface, on the GPU. An
 underwater camera plugin in the same world passes its image through, so the
-water is not applied twice. The sky and the water surface are not drawn
-through the water yet: point the GUI at a seabed or a structure.
+water is not applied twice. The water surface seen from below fades into
+the water too, and open water with nothing in view is the water's colour.
 
 ## Lights at depth
 
@@ -162,11 +162,22 @@ scatters back to the camera:
 ```
 
 Turn a lamp off or move it while running with the world's `light_config`
-service, like any light. Lamps cast no shadows here, and their beams show
-where something is drawn behind them (a seabed, a structure).
+service, like any light. Lamps cast no shadows here. A lamp set to an
+intensity of 0 costs nothing.
 
-## What comes next
+## More of the water
 
-Forward scatter, marine snow, caustics, the surface from below and the
-camera's port. The plan is in
+- **Forward scatter** blurs what is far: `<forward_scatter>0.01</forward_scatter>`
+  in the camera plugin.
+- **The camera's port**: `<port>flat</port>` refracts like a flat port
+  (a narrower, magnified view); `<port>dome</port>` changes nothing.
+- **Caustics** dance on a shallow seabed under waves: on by default with the
+  `underwater_optics` model (`<caustics>` in the water optics, 0 to turn
+  them off). None on flat water.
+- **Marine snow**: `<marine_snow>0.2</marine_snow>` in the water optics;
+  specks show in the lamps' light.
+- **The surface from below** shows Snell's window: the sky through a
+  48.6 degree cone overhead, a mirror of the water outside it. The surface
+  casts no shadow: the sun, and the caustics, reach the seabed under it
+  whether or not the sun casts shadows. The plan is in
 [UNDERWATER_CAMERA_PLAN.md](https://github.com/HonuRobotics/gz-maritime/blob/lyrical/UNDERWATER_CAMERA_PLAN.md).

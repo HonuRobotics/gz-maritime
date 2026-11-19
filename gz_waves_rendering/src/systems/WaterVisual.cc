@@ -10,6 +10,7 @@
 
 #include "WaterVisual.hh"
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -47,7 +48,9 @@
 #include <sdf/Element.hh>
 #include <sdf/Mesh.hh>
 
+#include "gz/sim/components/UnderwaterRendering.hh"
 #include "gz/sim/components/Wavefield.hh"
+#include "gz/sim/water_optics/WaterOpticsSampler.hh"
 #include "gz/sim/waves/WaveSimulation.hh"
 #include "gz/sim/waves/Wavefield.hh"
 
@@ -131,6 +134,17 @@ class WaterVisual::Implementation
   public: std::mutex mutex_;
   public: std::uint64_t cachedGeneration{0};        ///< guarded by mutex_
   public: std::uint64_t lastUploadedGeneration{0};  ///< guarded by mutex_
+
+  /// \brief The world's water optics, read on the ECM thread.
+  public: gz::sim::water_optics::WaterOpticsSampler optics;
+
+  /// \brief What the water does to the light of the surface seen from
+  /// below, for the fragment shader: beta^D, beta^B, the veil just below
+  /// the surface (scaled by the daylight) and K_d, each r g b, then the
+  /// daylight. Empty when the renderer does not draw the water (no
+  /// gz_underwater_rendering in the world): the surface is then left as it
+  /// is, for the per-sensor underwater camera to fade. Guarded by mutex_.
+  public: std::optional<std::array<float, 13>> underwater;
 
   // Grid/displacement path state (engine + heightmap; its scalar cache is in
   // the 4-byte band). The engine is this visual's private instance, written by
@@ -280,16 +294,10 @@ bool WaterVisual::Implementation::ResolveVisual()
     mat->SetVertexShader(vsUri);
     mat->SetFragmentShader(this->fragmentShaderUri);
 
-    // Inherit CastShadows from the visual's existing material (mirrors the
-    // built-in shader_param plugin's behavior). Without this Ogre Next may
-    // refuse to apply our datablock and the mesh stays invisible.
-    gz::rendering::MaterialPtr oldMat;
-    if (this->visual->GeometryCount() > 0u)
-      oldMat = this->visual->GeometryByIndex(0u)->Material();
-    else
-      oldMat = this->visual->Material();
-    if (oldMat)
-      mat->SetCastShadows(oldMat->CastShadows());
+    // Water casts no shadow: sunlight goes through it. Left to cast, the
+    // surface (an opaque mesh to the renderer) would put everything below
+    // it in the sun's shadow, whenever the sun casts shadows.
+    mat->SetCastShadows(false);
 
     this->visual->SetMaterial(mat);
     this->scene->DestroyMaterial(mat);
@@ -547,6 +555,21 @@ void WaterVisual::Implementation::OnSceneUpdate()
   {
     auto vsParams = this->material->VertexShaderParams();
     (*vsParams)["t"] = this->currentSimTime;
+    // The water between an underwater camera and the surface above it.
+    auto fsParams = this->material->FragmentShaderParams();
+    const std::array<float, 13> none{};
+    const auto &u = this->underwater ? *this->underwater : none;
+    const char *names[] = {"uwAttenuation", "uwBackscatter", "uwVeil",
+                           "uwDiffuse"};
+    for (int k = 0; k < 4; ++k)
+    {
+      // w: 1 when the water is drawn (uwAttenuation), the daylight (uwVeil).
+      float v[4] = {u[3 * k], u[3 * k + 1], u[3 * k + 2],
+                    k == 0 ? (this->underwater ? 1.0f : 0.0f) :
+                    k == 2 ? u[12] : 0.0f};
+      (*fsParams)[names[k]].InitializeBuffer(4);
+      (*fsParams)[names[k]].UpdateBuffer(v);
+    }
   }
 
   // Drive the wave field's own Update each frame (the GUI process holds its
@@ -792,6 +815,28 @@ void WaterVisual::PreUpdate(
 
   const std::lock_guard<std::mutex> lock(this->dataPtr->mutex_);
   this->dataPtr->currentSimTime = t;
+
+  // When the renderer draws the water (gz_underwater_rendering marks the
+  // world), the surface seen from below fades into it like everything else.
+  if (this->dataPtr->optics.Sync(_ecm) && worldEnt != kNullEntity &&
+      _ecm.Component<components::UnderwaterRendering>(worldEnt))
+  {
+    const auto &o = this->dataPtr->optics.Data();
+    std::array<float, 13> u{};
+    for (int c = 0; c < 3; ++c)
+    {
+      u[c] = static_cast<float>(o.attenuation[c]);
+      u[3 + c] = static_cast<float>(o.backscatter[c]);
+      u[6 + c] = static_cast<float>(o.veil[c] * o.daylight);
+      u[9 + c] = static_cast<float>(o.diffuseAttenuation[c]);
+    }
+    u[12] = static_cast<float>(o.daylight);
+    this->dataPtr->underwater = u;
+  }
+  else
+  {
+    this->dataPtr->underwater.reset();
+  }
 
   // Prefer the replicated component — it carries the live generation bumps from
   // runtime set_parameters. Fall back to the pulled snapshot until the
