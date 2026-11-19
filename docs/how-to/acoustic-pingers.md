@@ -154,13 +154,27 @@ It publishes one message per ping it hears, a `gz.msgs.Param` bridged to
 The stamp of a reading is when the ping arrived: when it was sent plus the
 distance over the speed of sound.
 
-A passive receiver hears a direction, not a distance, so `range` and
-`emit_time` are off unless asked for. The amplitude would give the distance
-away too: without noise, 10^(-amplitude / 20) is the distance exactly. The
-custom USV's receiver carries 1 dB of `<amplitude_noise>` for that reason,
-and a receiver with `<range>` off and no amplitude noise warns when it
-loads. Use the amplitude to tell near from far, as `pinger_homing.py` does
-with the median of the last three, not as a range.
+A passive receiver hears a direction, not a distance, but four things give
+the distance away:
+
+- **`range` and `emit_time`.** Both are off unless asked for.
+- **The stamp.** It is the exact arrival, and a pinger pings on a known
+  schedule, so the stamp less the time the ping was sent is the distance
+  over the speed of sound. A real receiver in step with the pinger can do
+  the same, so this one stays.
+- **The amplitude.** Without noise, 10^(-amplitude / 20) is the distance
+  exactly. Noise around zero only blurs it, since it averages out over a few
+  pings. What hides the range is a bias, which stands for a source level the
+  receiver does not know: a `<bias_stddev>` in its `<amplitude_noise>`, with
+  some `<stddev>`. A receiver with `<range>` off and neither spread nor bias
+  on its amplitude warns when it loads.
+
+The custom USV's receiver has 1 dB of amplitude noise and no bias, on
+purpose. `pinger_homing.py` stops when the median of the last three
+amplitudes is louder than -16 dB, which is a distance only with a known
+source level. A receiver that must hide its range needs the bias and
+another way to tell it is close, such as the elevation, which steepens as
+the boat closes on a pinger that hangs deeper than the hydrophone.
 
 Bridge the readings and the retuning topic:
 
@@ -175,7 +189,8 @@ heard when both ends are under the water, the receiver is within the
 pinger's reach, the frequency is in the receiver's band, it comes from
 inside the receiver's field of view (`<min_elevation>` to `<max_elevation>`,
 every direction by default), and it isn't lost to the dropout near the
-reach. The water is the flat `<water_level>`, not the waves. The full list of tags is in the
+reach. The water is the flat `<water_level>`, not the waves. The full list
+of tags is in the
 [gz_acoustics README](https://github.com/HonuRobotics/gz-maritime/blob/lyrical/gz_acoustics/README.md).
 
 ## Coming from VRX
