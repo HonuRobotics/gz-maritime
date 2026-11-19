@@ -83,6 +83,7 @@ message(STATUS "Ogre Next headers: ${OGRE_NEXT_INCLUDE_DIR}")
 # Core library: the drops on a lens, apart from any world or renderer.
 # --------------------------------------------------------------------------
 add_library(${PROJECT_NAME} SHARED
+  src/DropMap.cc
   src/Drops.cc
 )
 target_include_directories(${PROJECT_NAME}
@@ -146,6 +147,12 @@ if(BUILD_TESTING)
   ament_add_gtest(lens_drops_core_test test/lens_drops_core_test.cc)
   if(TARGET lens_drops_core_test)
     target_link_libraries(lens_drops_core_test ${PROJECT_NAME})
+  endif()
+
+  # The drop map, on the CPU.
+  ament_add_gtest(drop_map_test test/drop_map_test.cc)
+  if(TARGET drop_map_test)
+    target_link_libraries(drop_map_test ${PROJECT_NAME})
   endif()
 
   # The system in a world that does not render. The test sets a
