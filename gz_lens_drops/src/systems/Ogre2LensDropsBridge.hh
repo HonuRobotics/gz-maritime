@@ -23,21 +23,28 @@
 // liblens-drops-ogre2-bridge.so and is loaded with dlopen() on the render
 // thread, after the render engine. Every function must be called on the
 // render thread. No exception crosses the boundary.
+//
+// Version 2: the pass draws a drop map, a texture of the height of water
+// and the wet film per texel, by refraction (see lens_drops_fs_330.glsl).
 
 extern "C"
 {
   /// \brief Opaque handle to one render pass, for one camera.
   typedef void *lens_drops_pass_t;
 
-  /// \brief The most drops a pass draws.
-  /// \return 64.
-  int lens_drops_ogre2_max_drops(void);
+  /// \brief The version of this ABI.
+  /// \return 2.
+  int lens_drops_ogre2_abi_version(void);
 
   /// \brief Create a pass. It is not on a camera yet.
   /// \param[in] _vs GLSL source of the vertex shader, not a file name.
   /// \param[in] _fs GLSL source of the fragment shader, not a file name.
-  /// \return The pass, or NULL if a source is NULL or empty.
-  lens_drops_pass_t lens_drops_ogre2_create(const char *_vs, const char *_fs);
+  /// \param[in] _mapWidth Texels across the drop map, in [1, 4096].
+  /// \param[in] _mapHeight Texels down the drop map, in [1, 4096].
+  /// \return The pass, or NULL if a source is NULL or empty or a size is
+  /// out of range.
+  lens_drops_pass_t lens_drops_ogre2_create(const char *_vs, const char *_fs,
+      int _mapWidth, int _mapHeight);
 
   /// \brief Add the pass to a camera, after the passes it already has.
   /// \param[in] _pass The pass.
@@ -46,18 +53,19 @@ extern "C"
   /// \return 1 if added, 0 if an argument is NULL or Ogre refused.
   int lens_drops_ogre2_attach(lens_drops_pass_t _pass, void *_camera);
 
-  /// \brief Set what the pass draws from the next frame on.
-  /// \param[in] _pass The pass. NULL does nothing.
-  /// \param[in] _drops `_count` drops of four floats each: x and y in
-  /// [0, 1] from the image's top left, the radius as a fraction of the
-  /// image height, and one unused. May be NULL when `_count` is 0.
-  /// \param[in] _count How many drops; clamped to [0, 64].
-  /// \param[in] _focus 0 for drops on the lens, wide and blurred, to 1 for
-  /// drops on a port ahead of it, sharp.
-  void lens_drops_ogre2_set(lens_drops_pass_t _pass, const float *_drops,
-      int _count, float _focus);
+  /// \brief Give the pass a new drop map, copied; it is uploaded before the
+  /// pass next draws.
+  /// \param[in] _pass The pass.
+  /// \param[in] _rgba Width * height * 4 floats, row 0 at the top: height of
+  /// water in image heights, wet film in [0, 1], 0, 0.
+  /// \param[in] _width Must be the width the pass was created with.
+  /// \param[in] _height Must be the height the pass was created with.
+  /// \param[in] _focus 0 blurred to 1 sharp, clamped.
+  /// \return 1 if taken, 0 if an argument is NULL or a size differs.
+  int lens_drops_ogre2_set_map(lens_drops_pass_t _pass, const float *_rgba,
+      int _width, int _height, float _focus);
 
-  /// \brief Take the pass off its camera and free it.
+  /// \brief Take the pass off its camera and free it, with its texture.
   /// \param[in] _pass The pass. NULL does nothing.
   /// \param[in] _camera The camera it was attached to, or NULL if it never
   /// was or the camera is gone.

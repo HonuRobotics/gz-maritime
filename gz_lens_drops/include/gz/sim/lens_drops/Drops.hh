@@ -61,10 +61,12 @@ inline constexpr double kAirPush = 15.0;
 /// \brief Largest turn of a sliding drop, rad per second of sliding.
 inline constexpr double kMeander = 0.6;
 
-/// \brief Image heights slid between two beads left behind.
+/// \brief Image heights slid between two beads left behind, on average;
+/// each spacing is drawn from 0.5 to 1.5 of it.
 inline constexpr double kShedDistance = 0.03;
 
-/// \brief Radius of a bead over the radius of the drop that leaves it.
+/// \brief Largest radius of a bead over the radius of the drop that leaves
+/// it; each is drawn from 0.5 to 1 of it.
 inline constexpr double kBeadFraction = 0.3;
 
 /// \brief New drops per second, per mm/h of rain, at flux 1 and exposure 1.

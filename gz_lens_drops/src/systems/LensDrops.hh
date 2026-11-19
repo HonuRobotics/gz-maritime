@@ -32,26 +32,36 @@ class LensDropsPrivate;
 /// ```xml
 /// <plugin filename="gz-maritime-lens-drops-system"
 ///         name="gz::sim::maritime::LensDrops">
-///   <rain_rate>10</rain_rate>   <!-- mm/h; default 0 -->
-///   <exposure>1</exposure>      <!-- 0 sheltered to 1 open; default 1 -->
-///   <focus>0.5</focus>          <!-- 0 blurred to 1 sharp; default 0.5 -->
-///   <dry_time>20</dry_time>     <!-- s a drop lasts; default 20 -->
-///   <seed>0</seed>              <!-- 0 draws one -->
+///   <rain_rate>10</rain_rate>          <!-- mm/h; default 0 -->
+///   <exposure>1</exposure>             <!-- 0 sheltered to 1 open; default 1 -->
+///   <focus>0.5</focus>                 <!-- 0 blurred to 1 sharp; default 0.5 -->
+///   <dry_time>20</dry_time>            <!-- s a drop lasts; default 20 -->
+///   <contact_angle>0.96</contact_angle><!-- rad; default 0.96, glass -->
+///   <slide_radius>0.03</slide_radius>  <!-- image heights; default 0.03 -->
+///   <map_scale>0.5</map_scale>         <!-- drop map over image size -->
+///   <mask>false</mask>                 <!-- publish the drop mask -->
+///   <seed>0</seed>                     <!-- 0 draws one -->
 /// </plugin>
 /// ```
 ///
-/// The drops are stepped on simulation time and drawn on the GPU by a
-/// render pass on the sensor's camera (ogre2 only), so only the sensor's
-/// images show them, not the GUI's view.
+/// The drops are stepped on simulation time. On the render thread they are
+/// drawn into a drop map, the height of water per texel, which a render
+/// pass on the sensor's camera (ogre2 only) uses to refract the image by
+/// Snell's law, so only the sensor's images show them.
 ///
 /// Topics, with `<sensor>` the sensor's scoped name, as
 /// `/world/<w>/model/<m>/link/<l>/sensor/<s>`:
 ///
 /// * `<sensor>/lens_drops/set`, `gz.msgs.Param`: `rain_rate`, `exposure`,
-///   `focus`, `dry_time`, and `clear` (non-zero wipes the lens).
+///   `focus`, `dry_time`, `contact_angle`, `slide_radius`, `clear`
+///   (non-zero wipes the lens), and `add_x`, `add_y`, `add_radius`
+///   together to put one drop on the lens.
 /// * `<sensor>/lens_drops/state`, `gz.msgs.Param`, every 0.2 s of
-///   simulation time: the four parameters, `count` (drops on the lens) and
-///   `attached` (true once the render pass is on the camera).
+///   simulation time: the parameters, `count`, `sliding`, `covered` (share
+///   of the map with water) and `attached` (true once the render pass is on
+///   the camera).
+/// * `<sensor>/lens_drops/mask`, `gz.msgs.Image`, `L_INT8` at the map's
+///   size, 255 where a drop is, with `<mask>true</mask>` only.
 class LensDrops
     : public System,
       public ISystemConfigure,

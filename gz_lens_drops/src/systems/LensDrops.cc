@@ -25,11 +25,15 @@
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
+#include <map>
 #include <mutex>
+#include <optional>
 #include <random>
 #include <sstream>
 #include <string>
+#include <vector>
 
+#include <gz/msgs/image.pb.h>
 #include <gz/msgs/param.pb.h>
 
 #include <gz/common/Console.hh>
@@ -45,32 +49,37 @@
 #include <gz/transport/TopicUtils.hh>
 
 #include "Ogre2LensDropsBridge.hh"
+#include "gz/sim/lens_drops/DropMap.hh"
 #include "gz/sim/lens_drops/Drops.hh"
 
 namespace
 {
+/// \brief The bridge ABI this system speaks.
+constexpr int kBridgeAbi = 2;
+
 /// \brief The dlopen'd bridge: the library handle and its functions.
 struct BridgeApi
 {
   /// \brief dlopen handle of liblens-drops-ogre2-bridge.so.
   void *handle{nullptr};
 
-  /// \brief lens_drops_ogre2_max_drops.
-  int (*maxDrops)(void){nullptr};
+  /// \brief lens_drops_ogre2_abi_version.
+  int (*abiVersion)(void){nullptr};
 
   /// \brief lens_drops_ogre2_create.
-  lens_drops_pass_t (*create)(const char *, const char *){nullptr};
+  lens_drops_pass_t (*create)(const char *, const char *, int, int){nullptr};
 
   /// \brief lens_drops_ogre2_attach.
   int (*attach)(lens_drops_pass_t, void *){nullptr};
 
-  /// \brief lens_drops_ogre2_set.
-  void (*set)(lens_drops_pass_t, const float *, int, float){nullptr};
+  /// \brief lens_drops_ogre2_set_map.
+  int (*setMap)(lens_drops_pass_t, const float *, int, int, float){nullptr};
 
   /// \brief lens_drops_ogre2_destroy.
   void (*destroy)(lens_drops_pass_t, void *){nullptr};
 
-  /// \brief True once the library and every function resolved.
+  /// \brief True once the library, every function and the right ABI
+  /// version were found.
   bool loaded{false};
 };
 
@@ -91,23 +100,31 @@ const BridgeApi &LoadBridge()
             << (error ? error : "unknown") << "\n";
       return;
     }
-    api.maxDrops = reinterpret_cast<int (*)(void)>(
-        dlsym(api.handle, "lens_drops_ogre2_max_drops"));
+    api.abiVersion = reinterpret_cast<int (*)(void)>(
+        dlsym(api.handle, "lens_drops_ogre2_abi_version"));
     api.create = reinterpret_cast<lens_drops_pass_t (*)(const char *,
-        const char *)>(dlsym(api.handle, "lens_drops_ogre2_create"));
+        const char *, int, int)>(dlsym(api.handle, "lens_drops_ogre2_create"));
     api.attach = reinterpret_cast<int (*)(lens_drops_pass_t, void *)>(
         dlsym(api.handle, "lens_drops_ogre2_attach"));
-    api.set = reinterpret_cast<void (*)(lens_drops_pass_t, const float *, int,
-        float)>(dlsym(api.handle, "lens_drops_ogre2_set"));
+    api.setMap = reinterpret_cast<int (*)(lens_drops_pass_t, const float *,
+        int, int, float)>(dlsym(api.handle, "lens_drops_ogre2_set_map"));
     api.destroy = reinterpret_cast<void (*)(lens_drops_pass_t, void *)>(
         dlsym(api.handle, "lens_drops_ogre2_destroy"));
-    api.loaded = api.maxDrops && api.create && api.attach && api.set &&
-        api.destroy;
-    if (!api.loaded)
+    if (!api.abiVersion || !api.create || !api.attach || !api.setMap ||
+        !api.destroy)
     {
       gzerr << "[LensDrops] liblens-drops-ogre2-bridge.so is missing one or "
             << "more functions\n";
+      return;
     }
+    if (api.abiVersion() != kBridgeAbi)
+    {
+      gzerr << "[LensDrops] liblens-drops-ogre2-bridge.so speaks ABI "
+            << api.abiVersion() << ", this system needs " << kBridgeAbi
+            << "\n";
+      return;
+    }
+    api.loaded = true;
   });
   return api;
 }
@@ -185,7 +202,7 @@ class LensDropsPrivate
   /// thread.
   public: void OnTeardown();
 
-  /// \brief Guards drops, attached and seed.
+  /// \brief Guards drops, attached, seed, covered and simTime.
   public: std::mutex mutex;
 
   /// \brief The drops on the lens.
@@ -196,6 +213,34 @@ class LensDropsPrivate
 
   /// \brief The seed, before the camera's name is mixed in.
   public: std::uint32_t seed{0};
+
+  /// \brief Share of the last map with water on it, from the render
+  /// thread.
+  public: double covered{0.0};
+
+  /// \brief Simulation time of the last step, for the mask's stamp.
+  public: std::chrono::steady_clock::duration simTime{0};
+
+  /// \brief Map size over image size. Set in Configure.
+  public: double mapScale{0.5};
+
+  /// \brief True to publish the mask. Set in Configure.
+  public: bool publishMask{false};
+
+  /// \brief The drop map. Render thread only; made on attach.
+  public: std::unique_ptr<lens_drops::DropMap> map;
+
+  /// \brief Generation of the drops last drawn. Render thread only.
+  public: std::uint64_t drawn{0};
+
+  /// \brief True once a map was drawn. Render thread only.
+  public: bool drewOnce{false};
+
+  /// \brief The mask, reused. Render thread only.
+  public: std::vector<std::uint8_t> mask;
+
+  /// \brief Publisher of the mask.
+  public: transport::Node::Publisher maskPub;
 
   /// \brief The camera's name in the rendering scene. Set in Configure.
   public: std::string cameraName;
@@ -270,6 +315,14 @@ void LensDrops::Configure(const Entity &_entity,
   params.exposure = _sdf->Get<double>("exposure", params.exposure).first;
   params.focus = _sdf->Get<double>("focus", params.focus).first;
   params.dryTime = _sdf->Get<double>("dry_time", params.dryTime).first;
+  params.contactAngle =
+      _sdf->Get<double>("contact_angle", params.contactAngle).first;
+  params.slideRadius =
+      _sdf->Get<double>("slide_radius", params.slideRadius).first;
+  const double mapScale = _sdf->Get<double>("map_scale", 0.5).first;
+  this->dataPtr->mapScale =
+      std::isfinite(mapScale) ? std::clamp(mapScale, 0.125, 1.0) : 0.5;
+  this->dataPtr->publishMask = _sdf->Get<bool>("mask", false).first;
   std::uint32_t seed = _sdf->Get<unsigned int>("seed", 0u).first;
   if (seed == 0u)
     seed = std::random_device{}();
@@ -296,6 +349,11 @@ void LensDrops::Configure(const Entity &_entity,
       &LensDropsPrivate::OnSet, this->dataPtr.get());
   this->dataPtr->statePub = this->dataPtr->node.Advertise<msgs::Param>(
       this->dataPtr->base + "/state");
+  if (this->dataPtr->publishMask)
+  {
+    this->dataPtr->maskPub = this->dataPtr->node.Advertise<msgs::Image>(
+        this->dataPtr->base + "/mask");
+  }
 
   this->dataPtr->preRenderConn = _eventMgr.Connect<events::PreRender>(
       std::bind(&LensDropsPrivate::OnPreRender, this->dataPtr.get()));
@@ -319,6 +377,8 @@ void LensDrops::PostUpdate(const UpdateInfo &_info,
 
   lens_drops::Params params;
   std::size_t count{0};
+  std::size_t sliding{0};
+  double covered{0.0};
   bool attached{false};
   {
     const std::lock_guard<std::mutex> lock(this->dataPtr->mutex);
@@ -326,9 +386,12 @@ void LensDrops::PostUpdate(const UpdateInfo &_info,
     {
       this->dataPtr->drops.Step(
           std::chrono::duration<double>(_info.dt).count());
+      this->dataPtr->simTime = _info.simTime;
     }
     params = this->dataPtr->drops.Parameters();
     count = this->dataPtr->drops.List().size();
+    sliding = this->dataPtr->drops.Sliding();
+    covered = this->dataPtr->covered;
     attached = this->dataPtr->attached;
   }
 
@@ -346,6 +409,12 @@ void LensDrops::PostUpdate(const UpdateInfo &_info,
   SetDouble(msg, "exposure", params.exposure);
   SetDouble(msg, "focus", params.focus);
   SetDouble(msg, "dry_time", params.dryTime);
+  SetDouble(msg, "contact_angle", params.contactAngle);
+  SetDouble(msg, "slide_radius", params.slideRadius);
+  SetDouble(msg, "covered", covered);
+  msgs::Any &slidingValue = (*msg.mutable_params())["sliding"];
+  slidingValue.set_type(msgs::Any::INT32);
+  slidingValue.set_int_value(static_cast<int>(sliding));
   msgs::Any &countValue = (*msg.mutable_params())["count"];
   countValue.set_type(msgs::Any::INT32);
   countValue.set_int_value(static_cast<int>(count));
@@ -376,11 +445,14 @@ void LensDropsPrivate::OnSet(const msgs::Param &_msg)
   const std::lock_guard<std::mutex> lock(this->mutex);
   lens_drops::Params params = this->drops.Parameters();
   bool clear = false;
+  std::map<std::string, double> add;
   for (const auto &[key, value] : _msg.params())
   {
     double number{0.0};
     const bool known = key == "rain_rate" || key == "exposure" ||
-        key == "focus" || key == "dry_time" || key == "clear";
+        key == "focus" || key == "dry_time" || key == "clear" ||
+        key == "contact_angle" || key == "slide_radius" ||
+        key == "add_x" || key == "add_y" || key == "add_radius";
     if (!known)
     {
       gzwarn << "[LensDrops] unknown key [" << key << "] on " << this->base
@@ -400,12 +472,35 @@ void LensDropsPrivate::OnSet(const msgs::Param &_msg)
       params.focus = number;
     else if (key == "dry_time")
       params.dryTime = number;
-    else
+    else if (key == "contact_angle")
+      params.contactAngle = number;
+    else if (key == "slide_radius")
+      params.slideRadius = number;
+    else if (key == "clear")
       clear = number != 0.0;
+    else
+      add[key] = number;
   }
   this->drops.SetParams(params);
   if (clear)
     this->drops.Clear();
+  if (!add.empty())
+  {
+    if (add.size() != 3)
+    {
+      gzwarn << "[LensDrops] add_x, add_y and add_radius go together; no "
+             << "drop added\n";
+    }
+    else
+    {
+      lens_drops::Drop drop;
+      drop.x = add["add_x"];
+      drop.y = add["add_y"];
+      drop.radius = std::clamp(add["add_radius"], 0.0,
+          lens_drops::kMaxMergedRadius);
+      this->drops.Add(drop);
+    }
+  }
 }
 
 //////////////////////////////////////////////////
@@ -459,7 +554,14 @@ void LensDropsPrivate::OnPreRender()
       this->camera.reset();
       return;
     }
-    this->pass = api.create(vs.c_str(), fs.c_str());
+    const auto side = [this](unsigned int _pixels)
+    {
+      return std::clamp(static_cast<int>(std::lround(_pixels * this->mapScale)),
+          1, lens_drops::kMaxMapSize);
+    };
+    const int mapWidth = side(this->camera->ImageWidth());
+    const int mapHeight = side(this->camera->ImageHeight());
+    this->pass = api.create(vs.c_str(), fs.c_str(), mapWidth, mapHeight);
     if (!this->pass || !api.attach(this->pass, this->camera.get()))
     {
       api.destroy(this->pass, nullptr);
@@ -470,6 +572,7 @@ void LensDropsPrivate::OnPreRender()
       this->camera.reset();
       return;
     }
+    this->map = std::make_unique<lens_drops::DropMap>(mapWidth, mapHeight);
     {
       const std::lock_guard<std::mutex> lock(this->mutex);
       this->attached = true;
@@ -478,20 +581,47 @@ void LensDropsPrivate::OnPreRender()
           std::max(1u, this->camera->ImageHeight());
       this->drops.SetParams(params);
     }
-    gzmsg << "[LensDrops] render pass on [" << this->cameraName << "]\n";
+    gzmsg << "[LensDrops] render pass on [" << this->cameraName << "], map "
+          << mapWidth << "x" << mapHeight << "\n";
   }
 
-  const BridgeApi &api = LoadBridge();
-  std::array<float, lens_drops::kMaxDrops * lens_drops::kDropFloats> buf{};
-  std::size_t n{0};
-  double focus{0.5};
+  // Draw the map again only when the drops changed. The copy is taken
+  // under the lock; the drawing, the upload and the mask are not.
+  std::optional<lens_drops::Drops> copy;
+  std::chrono::steady_clock::duration stamp{0};
   {
     const std::lock_guard<std::mutex> lock(this->mutex);
-    n = this->drops.Pack(buf.data(), lens_drops::kMaxDrops);
-    focus = this->drops.Parameters().focus;
+    if (this->drewOnce && this->drops.Generation() == this->drawn)
+      return;
+    copy.emplace(this->drops);
+    stamp = this->simTime;
+    this->drawn = this->drops.Generation();
   }
-  api.set(this->pass, buf.data(), static_cast<int>(n),
-      static_cast<float>(focus));
+  this->drewOnce = true;
+  this->map->Render(*copy);
+  const BridgeApi &api = LoadBridge();
+  api.setMap(this->pass, this->map->Data().data(), this->map->Width(),
+      this->map->Height(), static_cast<float>(copy->Parameters().focus));
+
+  const double texels =
+      static_cast<double>(this->map->Width()) * this->map->Height();
+  {
+    const std::lock_guard<std::mutex> lock(this->mutex);
+    this->covered = static_cast<double>(this->map->Covered()) / texels;
+  }
+
+  if (this->publishMask)
+  {
+    this->map->Mask(this->mask);
+    msgs::Image image;
+    *image.mutable_header()->mutable_stamp() = convert<msgs::Time>(stamp);
+    image.set_width(static_cast<unsigned int>(this->map->Width()));
+    image.set_height(static_cast<unsigned int>(this->map->Height()));
+    image.set_step(static_cast<unsigned int>(this->map->Width()));
+    image.set_pixel_format_type(msgs::PixelFormatType::L_INT8);
+    image.set_data(this->mask.data(), this->mask.size());
+    this->maskPub.Publish(image);
+  }
 }
 
 //////////////////////////////////////////////////

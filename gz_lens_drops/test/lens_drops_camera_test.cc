@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <functional>
 #include <cstdint>
 #include <cstdlib>
 #include <map>
@@ -146,6 +147,14 @@ class State
     return this->seen ? this->count : -1;
   }
 
+  /// \brief Share of the drop map with water on it.
+  /// \return The share, or -1 before a state came.
+  public: double Covered()
+  {
+    const std::lock_guard<std::mutex> lock(this->mutex);
+    return this->seen ? this->covered : -1.0;
+  }
+
   /// \brief Whether the render pass is on the camera.
   /// \return The flag.
   public: bool Attached()
@@ -181,6 +190,8 @@ class State
     {
       if (key == "count")
         this->count = value.int_value();
+      else if (key == "covered")
+        this->covered = value.double_value();
       else if (key == "attached")
         this->attached = value.bool_value();
     }
@@ -194,6 +205,9 @@ class State
 
   /// \brief The last state's count.
   private: int count{0};
+
+  /// \brief The last state's covered share.
+  private: double covered{0.0};
 
   /// \brief The last state's attached flag.
   private: bool attached{false};
@@ -272,6 +286,115 @@ TEST(LensDropsCamera, DropsShowAndClear)
   const auto d = images.Next(std::chrono::seconds(10));
   ASSERT_TRUE(d);
   EXPECT_LT(Changed(*a, *d), 10);
+
+  server.Stop();
+}
+
+//////////////////////////////////////////////////
+TEST(LensDropsCamera, RefractionInvertsHorizon)
+{
+  // A drop is a lens: a drop centred on the horizon shows the sea in its
+  // upper part and the sky in its lower part, the other way round from the
+  // scene beside it. With a contact angle of 55 degrees, the water's
+  // surface 0.8 radius from the centre is tilted 41 degrees; the ray there,
+  // 3.5 degrees above the horizon in this camera, leaves the water about 13
+  // degrees below it, and its mirror image below the centre about 13 above.
+  const std::string base =
+      "/world/lens_drops_horizon/model/camera/link/link/sensor/camera/"
+      "lens_drops";
+  Images images("/lens_drops_horizon/image");
+  State state(base + "/state");
+
+  // The mask's last image.
+  std::mutex maskMutex;
+  std::string maskData;
+  unsigned int maskWidth{0};
+  unsigned int maskHeight{0};
+  transport::Node node;
+  std::function<void(const msgs::Image &)> onMask =
+      [&](const msgs::Image &_msg)
+  {
+    const std::lock_guard<std::mutex> lock(maskMutex);
+    maskData = _msg.data();
+    maskWidth = _msg.width();
+    maskHeight = _msg.height();
+  };
+  node.Subscribe(base + "/mask", onMask);
+
+  ServerConfig config;
+  config.SetSdfFile(
+      common::joinPaths(TEST_WORLD_DIR, "lens_drops_horizon.sdf"));
+  config.SetHeadlessRendering(true);
+  Server server(config);
+  server.Run(false, 0, false);
+
+  if (!images.Next(std::chrono::seconds(20)))
+  {
+    server.Stop();
+    GTEST_SKIP() << "no camera image: this machine cannot render";
+  }
+  ASSERT_TRUE(state.WaitUntil([&]() { return state.Attached(); },
+      std::chrono::seconds(10)));
+
+  const double x = 0.5;
+  const double y = 0.5;
+  const double r = 0.1;
+  ASSERT_TRUE(Set(base + "/set",
+      {{"add_x", x}, {"add_y", y}, {"add_radius", r}}));
+  ASSERT_TRUE(state.WaitUntil([&]() { return state.Covered() > 0.0; },
+      std::chrono::seconds(10))) << "the drop never reached the map";
+  const auto image = images.Next(std::chrono::seconds(10));
+  ASSERT_TRUE(image);
+
+  const int width = 320;
+  const int height = 180;
+  ASSERT_EQ(image->size(), static_cast<std::size_t>(width * height * 3));
+  // Grey level at an image point, x across the width, y down the height.
+  const auto grey = [&](double _x, double _y)
+  {
+    const int i = static_cast<int>(_x * width);
+    const int j = static_cast<int>(_y * height);
+    const std::size_t k = (static_cast<std::size_t>(j) * width + i) * 3;
+    return (static_cast<unsigned char>((*image)[k]) +
+            static_cast<unsigned char>((*image)[k + 1]) +
+            static_cast<unsigned char>((*image)[k + 2])) / 3;
+  };
+  const double aspect = static_cast<double>(width) / height;
+  const double side = x + 3.0 * r / aspect;
+  const int upper = grey(x, y - 0.8 * r);
+  const int lower = grey(x, y + 0.8 * r);
+  const int upperBeside = grey(side, y - 0.8 * r);
+  const int lowerBeside = grey(side, y + 0.8 * r);
+  EXPECT_GE(lower - upper, 40)
+      << "upper " << upper << ", lower " << lower << ": the drop does not "
+      << "show the sea up and the sky down";
+  EXPECT_GE(upperBeside - upper, 40)
+      << "upper " << upper << ", beside it " << upperBeside;
+  EXPECT_GE(lower - lowerBeside, 40)
+      << "lower " << lower << ", beside it " << lowerBeside;
+
+  // The mask has the drop, at the map's size.
+  bool gotMask = false;
+  for (int k = 0; k < 250 && !gotMask; ++k)
+  {
+    {
+      const std::lock_guard<std::mutex> lock(maskMutex);
+      gotMask = !maskData.empty() &&
+          std::count(maskData.begin(), maskData.end(), '\xff') > 0;
+    }
+    if (!gotMask)
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  ASSERT_TRUE(gotMask) << "no mask with the drop came";
+  {
+    const std::lock_guard<std::mutex> lock(maskMutex);
+    ASSERT_EQ(maskData.size(), static_cast<std::size_t>(maskWidth) * maskHeight);
+    const double set = static_cast<double>(
+        std::count(maskData.begin(), maskData.end(), '\xff'));
+    const double expected = 3.141592653589793 *
+        (r * maskHeight) * (r * maskHeight);
+    EXPECT_NEAR(set, expected, 0.15 * expected);
+  }
 
   server.Stop();
 }

@@ -245,8 +245,12 @@ void Drops::Step(double _dt)
     {
       // The bead stays at the drop's tail, just clear of it, so it does
       // not merge straight back.
+      // Beads come at uneven spacing and in uneven sizes, as on glass: two
+      // draws per bead, in this order.
+      const double size = 0.5 + 0.5 * Uniform(this->rng);
+      const double spacing = Uniform(this->rng) - 0.5;
       Drop bead;
-      bead.radius = kBeadFraction * d.radius;
+      bead.radius = kBeadFraction * size * d.radius;
       // Water off the same drop: it dries with it.
       bead.age = d.age;
       const double back = 1.05 * (d.radius + bead.radius);
@@ -254,7 +258,8 @@ void Drops::Step(double _dt)
       bead.y = d.y - uy * back;
       beads.push_back(bead);
       d.radius = std::cbrt(std::max(0.0, Volume(d) - Volume(bead)));
-      d.travelled = 0.0;
+      // The next bead after 0.5 to 1.5 shed distances.
+      d.travelled = spacing * kShedDistance;
 
       if (this->trails.size() >= kMaxTrails)
         this->trails.erase(this->trails.begin());
