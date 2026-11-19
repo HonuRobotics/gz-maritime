@@ -66,6 +66,10 @@ struct WaterOpticsSpec
 
   /// \brief World z of the still water, m.
   double waterLevel{0.0};
+
+  /// \brief How strong the daylight is, against the renderer's sun: it
+  /// scales the veil. 1 by day, 0 at night (only lamps light the water).
+  double daylight{1.0};
 };
 
 /// \brief The water's optics, resolved: what every consumer reads.
@@ -95,6 +99,10 @@ struct WaterOpticsData
 
   /// \brief World z of the still water, m.
   double waterLevel{0.0};
+
+  /// \brief How strong the daylight is, against the renderer's sun; scales
+  /// the veil. 0 at night.
+  double daylight{1.0};
 
   /// \brief Goes up on every change, so a consumer knows to re-read.
   std::uint64_t generation{0};
@@ -139,7 +147,7 @@ inline std::ostream &operator<<(std::ostream &_os, const WaterOpticsData &_d)
 {
   const auto old = _os.precision(std::numeric_limits<double>::max_digits10);
   _os << std::quoted(_d.jerlov) << ' ' << _d.generation << ' '
-      << _d.waterLevel;
+      << _d.waterLevel << ' ' << _d.daylight;
   for (const Rgb *v : {&_d.attenuation, &_d.backscatter, &_d.veil,
                        &_d.diffuseAttenuation})
   {
@@ -155,7 +163,8 @@ inline std::ostream &operator<<(std::ostream &_os, const WaterOpticsData &_d)
 /// \return The stream.
 inline std::istream &operator>>(std::istream &_is, WaterOpticsData &_d)
 {
-  _is >> std::quoted(_d.jerlov) >> _d.generation >> _d.waterLevel;
+  _is >> std::quoted(_d.jerlov) >> _d.generation >> _d.waterLevel
+      >> _d.daylight;
   for (Rgb *v : {&_d.attenuation, &_d.backscatter, &_d.veil,
                  &_d.diffuseAttenuation})
   {

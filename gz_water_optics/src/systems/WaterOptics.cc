@@ -175,7 +175,7 @@ bool WaterOpticsPrivate::Apply(const msgs::Param &_msg)
       spec.jerlov = value.string_value();
       continue;
     }
-    if ("visibility" == key || "water_level" == key)
+    if ("visibility" == key || "water_level" == key || "daylight" == key)
     {
       if ("visibility" == key && empty)
       {
@@ -191,6 +191,8 @@ bool WaterOpticsPrivate::Apply(const msgs::Param &_msg)
       }
       if ("visibility" == key)
         spec.visibility = *number;
+      else if ("daylight" == key)
+        spec.daylight = *number;
       else
         spec.waterLevel = *number;
       continue;
@@ -273,6 +275,7 @@ void WaterOptics::Configure(const Entity &_entity,
   // Every element the plugin reads; any other is warned about, so a typo
   // such as <visibilty> does not leave the water unchanged in silence.
   const std::set<std::string> known{"jerlov", "visibility", "water_level",
+      "daylight",
       "publish_rate", "attenuation", "backscatter", "veil",
       "diffuse_attenuation"};
   for (auto e = _sdf->GetFirstElement(); e; e = e->GetNextElement())
@@ -289,6 +292,7 @@ void WaterOptics::Configure(const Entity &_entity,
   if (_sdf->HasElement("visibility"))
     spec.visibility = _sdf->Get<double>("visibility");
   spec.waterLevel = _sdf->Get<double>("water_level", 0.0).first;
+  spec.daylight = _sdf->Get<double>("daylight", 1.0).first;
   for (const auto &tag : kVectorTags)
   {
     if (!_sdf->HasElement(tag.name))
@@ -385,6 +389,7 @@ void WaterOptics::PostUpdate(const UpdateInfo &_info,
   setText("veil", ToText(d.optics.veil));
   setText("diffuse_attenuation", ToText(d.optics.diffuseAttenuation));
   setNumber("water_level", d.optics.waterLevel);
+  setNumber("daylight", d.optics.daylight);
   setNumber("generation", static_cast<double>(d.optics.generation));
   d.pub.Publish(msg);
   d.lastPublish = _info.simTime;

@@ -142,7 +142,31 @@ underwater camera plugin in the same world passes its image through, so the
 water is not applied twice. The sky and the water surface are not drawn
 through the water yet: point the GUI at a seabed or a structure.
 
+## Lights at depth
+
+At night, or deep, there is no daylight: set the world's water to
+`<daylight>0</daylight>` and give the vehicle spot lights. With the
+`underwater_optics` model in the world, every spot and point light is a lamp
+whose light fades through the water both ways, and whose beam the water
+scatters back to the camera:
+
+```xml
+<light type="spot" name="lamp_port">
+  <pose>0.3 0.2 0 0 0 0</pose>
+  <direction>1 0.1 -0.1</direction>
+  <intensity>40</intensity>
+  <attenuation><range>40</range><quadratic>0.02</quadratic></attenuation>
+  <spot><inner_angle>0.5</inner_angle><outer_angle>1.0</outer_angle><falloff>1</falloff></spot>
+  <cast_shadows>false</cast_shadows>
+</light>
+```
+
+Turn a lamp off or move it while running with the world's `light_config`
+service, like any light. Lamps cast no shadows here, and their beams show
+where something is drawn behind them (a seabed, a structure).
+
 ## What comes next
 
-The vehicle's own lights. The plan is in
+Forward scatter, marine snow, caustics, the surface from below and the
+camera's port. The plan is in
 [UNDERWATER_CAMERA_PLAN.md](https://github.com/HonuRobotics/gz-maritime/blob/lyrical/UNDERWATER_CAMERA_PLAN.md).

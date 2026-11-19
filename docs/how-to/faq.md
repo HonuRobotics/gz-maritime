@@ -171,8 +171,10 @@ clearer type, or a larger `<visibility>`.
 ## The underwater image gets black at depth
 
 The daylight fades with depth, red first: in coastal water there is little
-left at 20 m. That is the water, not a bug. Vehicle lights come with a later
-step; meanwhile `<exposure>auto</exposure>` brightens what light there is.
+left at 20 m. That is the water, not a bug. Give the vehicle lamps (spot
+lights) and include the `underwater_optics` model
+([Lights at depth](underwater-camera.md#lights-at-depth)), or use
+`<exposure>auto</exposure>` to brighten what light there is.
 
 ## The GUI and the underwater camera differ
 

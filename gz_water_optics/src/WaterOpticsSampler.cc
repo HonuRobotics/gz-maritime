@@ -115,7 +115,7 @@ Rgb WaterOpticsSampler::Veil(double _depth) const
 {
   if (_depth < 0.0)
     return Rgb::Zero;
-  const Rgb light = this->Daylight(_depth);
+  const Rgb light = this->Daylight(_depth) * this->dataPtr->data.daylight;
   const Rgb &v = this->dataPtr->data.veil;
   return Rgb(v.X() * light.X(), v.Y() * light.Y(), v.Z() * light.Z());
 }

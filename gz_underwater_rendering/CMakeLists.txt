@@ -125,6 +125,23 @@ if(BUILD_TESTING)
       ENVIRONMENT
       "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH};GZ_PARTITION=gz_underwater_rendering_test")
   endif()
+
+  # Lamps at night: the lit plate faded both ways and the beam, against the
+  # model integrated in the test. Needs a GPU.
+  ament_add_gtest(lamps_test test/lamps_test.cc TIMEOUT 600)
+  if(TARGET lamps_test)
+    target_compile_definitions(lamps_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(lamps_test
+      gz_underwater_camera::gz_underwater_camera
+      gz_water_optics::gz_water_optics
+      gz-sim::core
+      gz-transport::core
+      gz-msgs::core)
+    set_tests_properties(lamps_test PROPERTIES
+      ENVIRONMENT
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH};GZ_PARTITION=gz_underwater_lamps_test")
+  endif()
 endif()
 
 ament_environment_hooks("hooks/hook.dsv.in")
