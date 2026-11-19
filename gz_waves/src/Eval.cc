@@ -109,8 +109,8 @@ gz::math::Vector3d WaterVelocity(const WavefieldData &_wf, double _waterLevel,
     return gz::math::Vector3d::Zero;
   const gz::math::Vector3d surface =
       _wf.simulation->ParticleVelocity(_x, _y, _t);
-  const double depth =
-      _waterLevel + _wf.simulation->Elevation(_x, _y, _t) - _z;
+  // Depth below the drawn surface, the one the wave buoyancy floats on.
+  const double depth = _waterLevel + SurfaceHeight(_wf, _x, _y, _t) - _z;
   if (depth <= 0.0)
     return surface;
 

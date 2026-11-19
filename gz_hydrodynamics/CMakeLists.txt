@@ -109,8 +109,16 @@ if(BUILD_TESTING)
 
   # The waves' water velocity: a body is carried by them in a world whose
   # physics follows the waves, and not in one whose waves are drawn only.
-  # The wave engine and both buoyancy systems come from the sourced
-  # workspace's plugin path.
+  # The wave engine and both buoyancy systems are found where their packages
+  # install them (the lib folder beside each package's share folder), so
+  # the path does not depend on the shell that ran CMake.
+  find_package(gz_waves_provider_gerstner REQUIRED)
+  find_package(gz_buoyancy REQUIRED)
+  string(JOIN ":" _waves_plugin_path
+    "${CMAKE_CURRENT_BINARY_DIR}"
+    "${gz_waves_provider_gerstner_DIR}/../../../lib"
+    "${gz_waves_buoyancy_DIR}/../../../lib"
+    "${gz_buoyancy_DIR}/../../../lib")
   ament_add_gtest(hydrodynamics_waves_test test/hydrodynamics_waves_test.cc
     TIMEOUT 300)
   if(TARGET hydrodynamics_waves_test)
@@ -121,7 +129,7 @@ if(BUILD_TESTING)
       gz-common::gz-common)
     set_tests_properties(hydrodynamics_waves_test PROPERTIES
       ENVIRONMENT
-      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH}")
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${_waves_plugin_path};GZ_PARTITION=gz_hydrodynamics_waves_test")
   endif()
 endif()
 

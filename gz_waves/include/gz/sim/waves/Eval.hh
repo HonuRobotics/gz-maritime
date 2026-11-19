@@ -69,8 +69,9 @@ gz::math::Vector3d ParticleVelocity(const WavefieldData &_wf,
                                  double _x, double _y, double _t);
 
 /// \brief Water velocity at a point under the surface [m/s]: the surface
-/// particle velocity above it, faded with the depth below the local surface
-/// as e^(-k d), k the deep-water wavenumber of the sea's peak period
+/// particle velocity above it, faded with the depth below the drawn surface
+/// over it (`SurfaceHeight`, the one the wave buoyancy floats on) as
+/// e^(-k d), k the deep-water wavenumber of the sea's peak period
 /// (`WithSeaState(params).period`), as linear wave theory gives for one
 /// wave. A sea of many wave lengths fades its short waves faster, so this
 /// overstates their reach at depth. At or above the surface: the surface

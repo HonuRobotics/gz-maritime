@@ -83,11 +83,13 @@ The system also tags the world with its `WaveCoupling` component
 `gz_hydrodynamics` sees it and damps a vehicle against the current **plus**
 the waves' water velocity at its centre of pressure: the surface particle
 velocity, faded with depth as e^(-k d), with k the deep-water wavenumber of
-the sea's peak period (`waves::WaterVelocity`). The depth is measured below
-the still water the world's ocean current recipe gives (`<water_level>`, 0
-without a recipe). A vehicle near the surface is carried back and forth by
-the waves; one deep down hardly feels them. In a world without the wave
-buoyancy, where the waves are only drawn, nothing changes.
+the sea's peak period (`waves::WaterVelocity`). The depth is measured from
+the drawn surface over that point (`waves::SurfaceHeight`, the one the
+buoyancy floats on), above the still water the world's ocean current recipe
+gives (`<water_level>`, 0 without a recipe). A vehicle near the surface is
+carried back and forth by the waves; one deep down hardly feels them. In a
+world without the wave buoyancy, where the waves are only drawn, nothing
+changes.
 
 ## Tests
 
@@ -125,5 +127,12 @@ colcon test --packages-select gz_waves_buoyancy gz_hydrodynamics
   A real sea fades its short waves faster, so deep down the motion is
   overstated: at 30 m, 40 to 80 % more than linear theory at sea states 5
   to 9.
-- Added mass sees the waves' velocity but not their acceleration (the
-  Froude–Krylov force); vehicles here carry no added mass.
+- The waves' velocity is added to the current, so a vehicle is carried
+  through its damping alone. The force from the water's acceleration (the
+  Froude–Krylov force, and the added mass's share of it) is not there,
+  though for a body small against the wavelength it is usually the larger
+  one; added mass sees the waves' velocity but not their acceleration, and
+  vehicles here carry none.
+- The velocity is sampled at one point, the centre of pressure. A hull
+  longer than the chop gets the full velocity of the short waves, where the
+  buoyancy averages them over its fitted plane.

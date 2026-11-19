@@ -661,7 +661,9 @@ void Hydrodynamics::PreUpdate(
   // world's current recipe, so a vehicle near the surface is carried by the
   // waves and one deep down hardly feels them. Where the waves are only
   // drawn, the vehicle floats on flat water and nothing is added.
-  const Entity world = worldEntity(_ecm);
+  if (kNullEntity == this->dataPtr->world)
+    this->dataPtr->world = worldEntity(_ecm);
+  const Entity world = this->dataPtr->world;
   const auto *field = _ecm.Component<components::Wavefield>(world);
   if (field && field->Data().simulation &&
       _ecm.EntityHasComponentType(world, components::WaveCoupling::typeId))
