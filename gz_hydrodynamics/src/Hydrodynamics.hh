@@ -71,7 +71,11 @@ namespace maritime
   /// this plugin automatically applies a Coriolis correction so that
   /// the Coriolis force uses the relative velocity v_r rather than
   /// the absolute velocity v. This correction is zero when there is
-  /// no current.
+  /// no current. It covers the Coriolis terms only: the added mass still
+  /// accelerates against the ground, so a small error remains for a body
+  /// that turns in a current. The plugin's own Coriolis force, from its
+  /// added mass parameters, is not applied to such a link, since the
+  /// physics engine already applies it.
   ///
   /// ## SNAME Naming Convention
   ///
@@ -95,6 +99,22 @@ namespace maritime
   /// ### Required
   ///   * `<link_name>` - Link to apply hydrodynamic forces to.
   ///     [string]
+  ///
+  /// ### Optional
+  ///   * `<center_of_pressure>` - The centre of pressure (CP): the point
+  ///     of the link, in the link frame, about which the coefficients
+  ///     below are defined, their moment reference point. The
+  ///     coefficients stay in the link's axes. The velocity and the
+  ///     current are taken there and the forces act there, so the model
+  ///     is the same as one whose link frame is at that point. Put it
+  ///     where the coefficients were identified; for coefficients without
+  ///     coupling terms (no surge to pitch, sway to roll), all the drag
+  ///     acts through this point, so put it where the drag acts on the
+  ///     hull. Without it the point is the link origin (Fossen's CO), as
+  ///     upstream, and the current is asked there too, where upstream
+  ///     asks it at the centre of mass. The correction for a link's
+  ///     `<fluid_added_mass>` stays at the link origin, where that matrix
+  ///     is defined. [m]
   ///
   /// ### Damping (Drag)
   ///
@@ -154,8 +174,9 @@ namespace maritime
   /// When the world carries a gz-maritime ocean current (the
   /// `OceanCurrentfield` recipe, written by
   /// `gz-maritime-ocean-current-system`), the plugin keeps an
-  /// `ocean_current::OceanCurrentSampler`, asks it at the link's centre of
-  /// mass every step and damps against that; the world owns the current, so
+  /// `ocean_current::OceanCurrentSampler`, asks it every step at the link
+  /// origin, or at `<center_of_pressure>` when given, and damps
+  /// against that; the world owns the current, so
   /// the tags and the topic below are then ignored, with a warning for a tag
   /// set and for the first message on the topic. Without one, they work as
   /// upstream.

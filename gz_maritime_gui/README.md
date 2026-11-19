@@ -159,7 +159,7 @@ It never writes into the GUI's ECM.
 | `src/OceanCurrentPanel.*`, `src/WindPanel.*`, `src/ScenarioPanel.*`, `src/AcousticsPanel.*` | The four GUI systems and their QML panels. |
 | `src/Compass.qml`, `src/Legend.qml`, `src/NumberField.qml` | The steering compass, the colour legend and the number field both panels use. |
 | `test/fields_test.cc` | gtests on the core. |
-| `test/test_gui_reads_recipes.py` | The plugins in a running GUI on Qt's offscreen platform, reading the recipes from the GUI's state and, in a world without a wind, asking the state service; the acoustics panel's drawings, as `test/marker_recorder.cc` receives them in MarkerManager's place, and a world without pingers. |
+| `test/test_gui_reads_recipes.py` | The plugins in a running GUI on Qt's offscreen platform, reading the recipes from the GUI's state and, in a world without a wind, asking the state service; the acoustics panel's drawings, as `test/marker_recorder.cc` receives them in MarkerManager's place, redrawn at once while the world is paused (a buoy dragged, a pinger switched off), the panel added late from the plugin menu (`test/MenuLoader.cc` does what the menu does), and a world without pingers. |
 
 The core (`gz_maritime_gui_core`, the first six rows) has no Qt. The
 plugins install to `lib/gz_maritime_gui`, a folder of their own, and the
