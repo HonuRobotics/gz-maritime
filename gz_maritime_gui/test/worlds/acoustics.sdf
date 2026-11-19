@@ -3,6 +3,7 @@
   A world with acoustics for the GUI test: one pinger under a buoy and one
   receiver 20 m away, both under the water. The acoustics panel reads the
   pinger from the GUI's state and hears the receiver listed and its pings.
+  The test pauses it and drags the buoy, so it takes user commands.
 -->
 <sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
   <world name="default">
@@ -10,6 +11,8 @@
             name="gz::sim::systems::Physics"/>
     <plugin filename="gz-sim-scene-broadcaster-system"
             name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
     <plugin filename="gz-maritime-acoustics-system"
             name="gz::sim::maritime::Acoustics"/>
     <model name="buoy">

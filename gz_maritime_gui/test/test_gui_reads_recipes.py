@@ -25,7 +25,10 @@ hears the receivers the acoustics system lists.
 The 3D view cannot run offscreen, so MarkerManager cannot either: a small
 program, marker_recorder, serves its array service in its place and prints
 what it is sent, and the test reads what the acoustics panel drew: the
-reach circle's radius, the rings and the ray of a reading.
+reach circle's radius, the rings and the ray of a reading, and that they
+are redrawn at once on a paused world. The menu cannot be clicked
+offscreen, so a test plugin, MenuLoader, adds the acoustics panel late the
+way the menu does.
 """
 
 import math
@@ -48,10 +51,11 @@ WORLDS = HERE / 'worlds'
 class Gui:
     """A server and a GUI in a partition of their own, and the GUI's log."""
 
-    def __init__(self, world):
+    def __init__(self, world, config=CONFIG):
         env = dict(os.environ,
                    GZ_PARTITION='gz_maritime_gui_test_' + uuid.uuid4().hex,
                    QT_QPA_PLATFORM='offscreen')
+        self.env = env
         self.lines = []
         self.markers = []
         # In MarkerManager's place, before the GUI draws anything.
@@ -66,7 +70,7 @@ class Gui:
             env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             start_new_session=True)
         self.gui = subprocess.Popen(
-            ['gz', 'sim', '-g', '-v', '4', '--gui-config', str(CONFIG)],
+            ['gz', 'sim', '-g', '-v', '4', '--gui-config', str(config)],
             env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, start_new_session=True)
         self.reader = threading.Thread(target=self._read, daemon=True,
@@ -119,6 +123,19 @@ class Gui:
         """Whether a line so far has the text."""
         return any(text in line for line in self.lines)
 
+    def service(self, name, reqtype, req):
+        """Call a world service with the gz tool; return whether it said yes."""
+        out = subprocess.run(
+            ['gz', 'service', '-s', name, '--reqtype', reqtype,
+             '--reptype', 'gz.msgs.Boolean', '--timeout', '5000', '--req', req],
+            env=self.env, capture_output=True, text=True, timeout=30)
+        return 'data: true' in out.stdout
+
+    def publish(self, topic, msgtype, msg):
+        """Publish one message with the gz tool."""
+        subprocess.run(['gz', 'topic', '-t', topic, '-m', msgtype, '-p', msg],
+                       env=self.env, check=True, timeout=30)
+
     def stop(self):
         procs = (self.gui, self.server, self.recorder)
         for proc in procs:
@@ -136,8 +153,8 @@ class Gui:
 def gui():
     started = []
 
-    def start(world):
-        started.append(Gui(WORLDS / world))
+    def start(world, config=CONFIG):
+        started.append(Gui(WORLDS / world, config))
         return started[-1]
 
     yield start
@@ -240,6 +257,86 @@ def test_acoustics_draws_what_it_shows(gui):
     time.sleep(3.0)
     assert sum(1 for line in g.markers
                if line.startswith(f'marker {NS}/reach ')) == sent, g.markers
+
+
+def wait_until(check, timeout=30.0):
+    """Wait for a check to pass; return whether it did."""
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        if check():
+            return True
+        time.sleep(0.2)
+    return False
+
+
+def centre(marker):
+    """Return the middle of a marker's box, (x, y)."""
+    _, min_x, max_x, min_y, max_y = marker
+    return (min_x + max_x) / 2.0, (min_y + max_y) / 2.0
+
+
+def test_acoustics_redraws_while_paused(gui):
+    """
+    A paused world never reaches the timed redraw.
+
+    A buoy dragged and a pinger switched off while paused must still show
+    at once: the reach circle and the rings move with the buoy, and the
+    circle turns dashed and the rings go when the pinger is off.
+    """
+    g = gui('acoustics.sdf')
+    assert g.wait_for('Loaded plugin [AcousticsPanel]'), ''.join(g.lines)
+    reach = g.wait_drawn(NS + '/reach')
+    assert reach, g.markers
+    assert g.wait_drawn(NS + '/pings'), g.markers
+    solid = reach[1][0]
+
+    assert g.service('/world/default/control', 'gz.msgs.WorldControl', 'pause: true')
+    # Dragged to (10, 5) while paused: the circle and the rings follow.
+    assert g.service('/world/default/set_pose', 'gz.msgs.Pose',
+                     'name: "buoy" position { x: 10 y: 5 z: 0 }')
+
+    def moved(ns):
+        scene = g.drawn(ns)
+        return bool(scene) and all(
+            centre(m) == (pytest.approx(10.0, abs=0.05), pytest.approx(5.0, abs=0.05))
+            for m in scene.values())
+    assert wait_until(lambda: moved(NS + '/reach')), g.drawn(NS + '/reach')
+    assert wait_until(lambda: moved(NS + '/pings')), g.drawn(NS + '/pings')
+
+    # Switched off while paused: the circle is drawn dashed, the rings go.
+    # A one-shot publish can go out before discovery finds the subscriber,
+    # so it is sent until it shows; switching off twice changes nothing.
+    def switched_off():
+        g.publish('/world/default/acoustics/pinger/set', 'gz.msgs.Param',
+                  'params { key: "active" value { type: BOOLEAN bool_value: false } }')
+        return g.drawn(NS + '/reach').get(1, (solid,))[0] != solid
+    assert wait_until(switched_off), g.drawn(NS + '/reach')
+    assert wait_until(lambda: not g.drawn(NS + '/pings')), g.drawn(NS + '/pings')
+    assert moved(NS + '/reach'), g.drawn(NS + '/reach')
+
+
+def test_acoustics_added_from_the_menu(gui):
+    """
+    A panel added from the plugin menu, after the GUI has its state.
+
+    It finds the pinger, from the acoustics system's list if the GUI's state
+    does not have it, and the receiver, asks nobody, and draws nothing
+    until asked: the menu gives it no configuration.
+    """
+    g = gui('acoustics.sdf', HERE / 'gui_menu.config')
+    assert g.wait_for('MenuLoader: adding [AcousticsPanel]'), ''.join(g.lines)
+    assert g.wait_for('Loaded plugin [AcousticsPanel]'), ''.join(g.lines)
+    assert g.wait_for('AcousticsPanel: pingers from'), ''.join(g.lines)
+    line = next(ln for ln in g.lines if 'AcousticsPanel: pingers from' in ln)
+    assert re.search(r'pingers from [^:]*: 1\b', line), line
+    assert g.wait_for('AcousticsPanel: receivers listed by the acoustics system: 1'), \
+        ''.join(g.lines)
+    time.sleep(3.0)
+    assert g.gui.poll() is None, ''.join(g.lines)
+    assert not g.has('AcousticsPanel.qml:'), ''.join(g.lines)
+    assert not any('AcousticsPanel' in ln and 'asking' in ln
+                   for ln in g.lines), ''.join(g.lines)
+    assert not any(ln.startswith(f'marker {NS}/') for ln in g.markers), g.markers
 
 
 def test_acoustics_in_a_world_without_pingers(gui):
