@@ -36,6 +36,7 @@ find_package(gz_msgs_vendor REQUIRED)
 find_package(gz-msgs REQUIRED)
 find_package(gz_rendering_vendor REQUIRED)
 find_package(gz-rendering REQUIRED COMPONENTS ogre2)
+find_package(gz_wind REQUIRED)
 
 # Discover the Ogre Next headers. We must compile against the SAME Ogre Next the
 # resolved gz-rendering-ogre2 uses (mixing patch versions silently swaps in slow
@@ -124,6 +125,7 @@ target_compile_definitions(gz-maritime-lens-drops-system PRIVATE
   "LENS_DROPS_SHADER_DIR=\"${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}/shaders\"")
 target_link_libraries(gz-maritime-lens-drops-system PRIVATE
   ${PROJECT_NAME}
+  gz_wind::gz_wind
   gz-sim::core
   gz-plugin::register
   gz-rendering::gz-rendering
@@ -166,8 +168,10 @@ if(BUILD_TESTING)
       gz-sim::core gz-transport::core gz-msgs::core)
     # The system is loaded by name from the build tree, so the test runs
     # before install.
+    # The pose world runs the world's wind too, from gz_wind's lib.
     set_tests_properties(lens_drops_test PROPERTIES
-      ENVIRONMENT "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}")
+      ENVIRONMENT
+        "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:${gz_wind_DIR}/../../../lib")
   endif()
 
   # The drops show in a camera's images. Needs a GPU; skips without one.
