@@ -39,6 +39,7 @@
 #include <gz/math/Helpers.hh>
 #include <gz/transport/Node.hh>
 
+#include <gz/sim/ServerConfig.hh>
 #include <gz/sim/TestFixture.hh>
 
 using namespace gz;
@@ -176,6 +177,29 @@ class AcousticWorld
     : fixture(World(_file))
   {
     this->fixture.Finalize();
+  }
+
+  /// \brief Load a world with a seed for gz-math's generator, as
+  /// `gz sim --seed` gives one: the receivers' noise draws from it.
+  /// \param[in] _file World file name.
+  /// \param[in] _seed The seed.
+  public: AcousticWorld(const std::string &_file, unsigned int _seed)
+    : fixture(Config(_file, _seed))
+  {
+    this->fixture.Finalize();
+  }
+
+  /// \brief A server configuration with a seed.
+  /// \param[in] _file World file name.
+  /// \param[in] _seed The seed.
+  /// \return The configuration.
+  private: static ServerConfig Config(const std::string &_file,
+                                      unsigned int _seed)
+  {
+    ServerConfig config;
+    config.SetSdfFile(World(_file));
+    config.SetSeed(_seed);
+    return config;
   }
 
   /// \brief Run a span of simulation time.
@@ -469,18 +493,20 @@ TEST(Acoustics, OverlapIsOnArrivalTimes)
 }
 
 //////////////////////////////////////////////////
-/// Everything random comes from the world's seed: the same seed hears the
-/// same pings with the same values, noise, outliers and dropouts included;
-/// another seed hears others.
+/// A seeded run repeats: the world's `<seed>` drives the dropouts and the
+/// outliers, and gz-math's seed, `gz sim --seed`, the noise, as for every
+/// other sensor. The same two seeds hear the same pings with the same
+/// values; another `<seed>` hears other pings; another gz-math seed hears
+/// the same pings with other noise.
 TEST(Acoustics, SeededRunsRepeat)
 {
   // What a run hears: when each ping was sent, and its bearing.
   using Run = std::vector<std::pair<double, double>>;
-  auto run = [](const std::string &_file)
+  auto run = [](const std::string &_file, unsigned int _seed = 5)
   {
     Readings readings("/seeded");
     {
-      AcousticWorld world(_file);
+      AcousticWorld world(_file, _seed);
       EXPECT_TRUE(world.Run(10.0));
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -529,6 +555,50 @@ TEST(Acoustics, SeededRunsRepeat)
   std::ofstream(other) << sdf;
   const Run third = run(other);
   EXPECT_NE(first, third);
+
+  // Another gz-math seed, the same <seed>: the same pings heard, which the
+  // world's seed decides, with other noise.
+  const Run fourth = run("seeded.sdf", 6);
+  ASSERT_EQ(first.size(), fourth.size());
+  bool sameTimes = true;
+  bool otherValues = false;
+  for (std::size_t i = 0; i < first.size(); ++i)
+  {
+    sameTimes = sameTimes && first[i].first == fourth[i].first;
+    otherValues = otherValues || first[i].second != fourth[i].second;
+  }
+  EXPECT_TRUE(sameTimes);
+  EXPECT_TRUE(otherValues);
+}
+
+//////////////////////////////////////////////////
+/// A world reset starts the pings again from time zero and drops the pings
+/// still on their way: none sent before the reset arrives after it.
+TEST(Acoustics, ResetDropsPingsOnTheirWay)
+{
+  Readings listener("/listener");
+  AcousticWorld world("pingers.sdf");
+  // Pings at 0, 1 and 2 s; the one sent at 2 s is still on its way, 0.1 s
+  // from the receiver.
+  ASSERT_TRUE(world.Run(2.05));
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+  ASSERT_EQ(2u, listener.Count());
+  listener.Clear();
+
+  world.fixture.Server()->ResetAll();
+  ASSERT_TRUE(world.Run(2.5));
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+  // After the reset: the pings sent at 0, 1 and 2 s, once each, and not
+  // the one sent at 2 s before it.
+  const auto readings = listener.All();
+  ASSERT_EQ(3u, readings.size());
+  for (std::size_t i = 0; i < readings.size(); ++i)
+  {
+    EXPECT_NEAR(static_cast<double>(i), Get(readings[i], "emit_time"), 1e-6);
+    const auto &stamp = readings[i].header().stamp();
+    EXPECT_NEAR(i + 0.1, stamp.sec() + stamp.nsec() * 1e-9, 1e-6);
+  }
 }
 
 //////////////////////////////////////////////////

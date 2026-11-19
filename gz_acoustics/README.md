@@ -78,7 +78,7 @@ gz topic -t /world/default/acoustics/pinger_green/set -m gz.msgs.Param \
     <bearing_noise><noise type="gaussian"><mean>0</mean><stddev>0.03</stddev></noise></bearing_noise>
     <elevation_noise><noise type="gaussian"><mean>0</mean><stddev>0.03</stddev></noise></elevation_noise>
     <range_noise><noise type="gaussian"><mean>0</mean><stddev>1</stddev></noise></range_noise>
-    <amplitude_noise><noise type="gaussian"><mean>0</mean><stddev>3</stddev></noise></amplitude_noise>
+    <amplitude_noise><noise type="gaussian"><mean>0</mean><stddev>1</stddev><bias_stddev>6</bias_stddev></noise></amplitude_noise>
     <outlier_probability>0.02</outlier_probability>  <!-- random bearing -->
     <dropout_start>0.8</dropout_start>  <!-- fraction of a pinger's reach -->
   </gz:acoustic_receiver>
@@ -104,17 +104,33 @@ between two steps. Bridge it to `ros_gz_interfaces/msg/ParamVec`. Its keys:
 reads them unchanged. There is no `<update_rate>`: the rate is the pings'.
 Retune it on `<topic>/set` with `frequency` and `bandwidth`.
 
-A passive receiver hears a direction, not a distance, and three things
-would give the distance away. `range` and `emit_time` (the stamp less it is
-the distance over the speed of sound) are off unless asked for. The
-amplitude is the spreading loss, so without noise 10^(-amplitude / 20) is
-the distance exactly: give a receiver that must not know its range an
-`<amplitude_noise>`. A receiver with `<range>` off and no spread on its
-amplitude says so in a warning when it loads.
+A passive receiver hears a direction, not a distance, and four things would
+give the distance away:
 
-Each `*_noise` is a gaussian `<noise>` block as on any Gazebo sensor
-(`mean`, `stddev`, `bias_mean`, `bias_stddev`, and `precision` with
-`type="gaussian_quantized"`); a dynamic bias is not modelled.
+- **`range` and `emit_time`.** Both are off unless asked for. The stamp
+  less `emit_time` is the distance over the speed of sound.
+- **The amplitude.** It is the spreading loss, so without noise
+  10^(-amplitude / 20) is the distance exactly. Noise around zero averages
+  out: over 25 pings, 3 dB of it gives the amplitude to about 0.6 dB, which
+  is the range to about 7 %. What hides the range is a bias, which stands
+  for the source level the receiver does not know: give a receiver that
+  must not know its range an `<amplitude_noise>` with a `<bias_stddev>`
+  and some `<stddev>`. A receiver with `<range>` off and neither spread
+  nor bias on its amplitude says so in a warning when it loads; one with no
+  `<gz:acoustic_receiver>` block at all loads quietly.
+- **The stamp.** It is the exact arrival, and a pinger fires at
+  `offset + k * period`. With a known schedule the stamp gives the range:
+  in `test/worlds/pingers.sdf` the listener's stamps are whole seconds plus
+  0.1 s, its 150 m at 1500 m/s. A real receiver in step with the pinger can
+  do the same, so this one is left as it is.
+
+Each `*_noise` is a `<noise>` block as on any Gazebo sensor, and gz-sensors'
+noise model does the work:
+
+- the types `gaussian` and `gaussian_quantized`, with `mean`, `stddev`,
+  `bias_mean`, `bias_stddev` and `precision`;
+- the dynamic bias (`dynamic_bias_stddev`, `dynamic_bias_correlation_time`),
+  which steps with the time between two readings.
 
 ## Who hears what
 
@@ -168,12 +184,15 @@ so a GUI opened before play finds them.
 A system added to a world that already runs starts with the pings of the
 step before, not every ping since time zero.
 
-Each receiver draws its noise, dropouts and outliers from its own
-generator, seeded from `<seed>` and its scoped name. Nothing draws from
-gz-math's global generator and `<seed>` does not seed it, so the acoustics
-change the noise of no other sensor. The draws are written out (a Mersenne
-Twister, an FNV-1a hash of the name), so a seed repeats on every standard
-library.
+Two seeds make a run repeat:
+
+- **The noise** is gz-sensors', drawn from gz-math's generator as for every
+  other sensor, so it repeats with `gz sim --seed`.
+- **The dropouts and outliers** are the acoustics' own rules. Each receiver
+  draws them from a generator of its own, seeded from `<seed>` and its
+  scoped name, so `<seed>` changes no other sensor. Those draws are written
+  out (a Mersenne Twister, an FNV-1a hash of the name), so a seed repeats on
+  every standard library.
 
 ## Compared with VRX
 
@@ -204,5 +223,6 @@ serialization without a world; `acoustics_test` runs the systems in
 right delay, band, reach, water and field of view, the set topics, the
 ground truth, the lists on a paused world, a refused second pinger of one
 name, a receiver spawned at run time, two pingers in turn and then on top
-of each other, pings that overlap inside one step and across two, and a
-seeded run repeating.
+of each other, pings that overlap inside one step and across two, a seeded
+run repeating (the noise with gz-math's seed, the dropouts and outliers
+with `<seed>`), and a world reset dropping the pings still on their way.
