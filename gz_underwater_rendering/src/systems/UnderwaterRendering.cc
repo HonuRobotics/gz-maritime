@@ -25,6 +25,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <gz/common/Console.hh>
 #include <gz/plugin/Register.hh>
@@ -126,6 +127,20 @@ class UnderwaterRendering
           ? 0.98 * this->waveHeight + 0.02 * hs : hs;
       this->waveHeightSet = true;
     }
+    // The wave over each camera the renderer drew with: depth is measured
+    // below the water's surface there, as the reference camera does.
+    this->elevations.clear();
+    if (const auto *f = _ecm.Component<components::Wavefield>(world);
+        f && f->Data().simulation)
+    {
+      for (std::size_t i = 0; i + 2 < this->cameras.size(); i += 3)
+      {
+        this->elevations.push_back(this->cameras[i]);
+        this->elevations.push_back(static_cast<float>(
+            waves::SurfaceElevation(f->Data(), this->cameras[i + 1],
+                                    this->cameras[i + 2], t)));
+      }
+    }
     std::array<float, 18> v{};
     for (int c = 0; c < 3; ++c)
     {
@@ -175,7 +190,12 @@ class UnderwaterRendering
           dlsym(this->handle, "uw_ogre2_set"));
       this->uninstall = reinterpret_cast<void (*)()>(
           dlsym(this->handle, "uw_ogre2_uninstall"));
+      this->listCameras = reinterpret_cast<int (*)(float *, int)>(
+          dlsym(this->handle, "uw_ogre2_cameras"));
+      this->setElevations = reinterpret_cast<void (*)(const float *, int)>(
+          dlsym(this->handle, "uw_ogre2_set_elevations"));
       if (!this->install || !this->set || !this->uninstall ||
+          !this->listCameras || !this->setElevations ||
           !this->install(this->piecesDir.c_str()))
       {
         this->failed = true;
@@ -185,6 +205,13 @@ class UnderwaterRendering
     }
     const std::lock_guard<std::mutex> lock(this->mutex);
     this->set(this->water ? this->water->data() : nullptr);
+    // Where the cameras are, for PreUpdate to ask the wave field, and what
+    // it last answered.
+    this->cameras.resize(3 * kMaxCameras);
+    this->cameras.resize(3 * this->listCameras(this->cameras.data(),
+                                               kMaxCameras));
+    this->setElevations(this->elevations.data(),
+                        static_cast<int>(this->elevations.size() / 2));
     if (!this->announced || *this->announced != this->water.has_value())
     {
       gzmsg << "UnderwaterRendering: "
@@ -210,6 +237,14 @@ class UnderwaterRendering
   private: int (*install)(const char *){nullptr};
   private: void (*set)(const float *){nullptr};
   private: void (*uninstall)(){nullptr};
+  private: int (*listCameras)(float *, int){nullptr};
+  private: void (*setElevations)(const float *, int){nullptr};
+  /// \brief The cameras the renderer drew with: id, x, y each (the bridge's
+  /// uw_ogre2_cameras). Guarded by mutex.
+  private: std::vector<float> cameras;
+  /// \brief The wave over each of them: id, height each. Guarded by mutex.
+  private: std::vector<float> elevations;
+  private: static constexpr int kMaxCameras = 32;
   private: bool installed{false};
   private: bool failed{false};
   private: std::optional<bool> announced;

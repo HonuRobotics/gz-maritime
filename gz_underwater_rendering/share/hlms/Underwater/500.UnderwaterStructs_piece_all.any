@@ -3,7 +3,8 @@
 // aligned whatever comes before it.
 @property( gz_underwater )
 	@piece( custom_passBuffer_underwater )
-		// xyz: the camera's world position; w: the still water level.
+		// xyz: the camera's world position; w: the water's surface over the
+		// camera (the still level and the wave there).
 		float4 uwCamPos_level;
 		// The view-to-world rotation, column by column (xyz).
 		float4 uwViewX;

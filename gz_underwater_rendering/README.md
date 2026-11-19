@@ -154,6 +154,13 @@ off, set its intensity to 0: it then costs nothing.
   by the `gz_underwater` property; never in shadow-caster or depth-only
   passes, nor on gz-rendering's solid colours (segmentation keeps its exact
   labels).
+- **Unlit shaders** (`share/hlms/UnderwaterUnlit`): a smaller block in the
+  unlit pass buffer and the fade and the veil at the end of the unlit pixel
+  shader. Those shaders have no world position, so the vertex shader works
+  out the ray from the camera from the clip-space position, and they do
+  not say whether the image keeps linear light, so the listener does.
+  Where gz-rendering gives the unlit shaders no composite pieces of its
+  own, these are the only ones.
 - **Chained, not replaced.** gz-rendering's own composite pieces
   (`Hlms/Gz/Pbs`) are read at run time and copied with one more
   `@insertpiece` each; gz-rendering's Hlms listener is called first and the
@@ -168,10 +175,18 @@ off, set its intensity to 0: it then costs nothing.
 
 ## Limits
 
-- **Only what PBS shades**, and the water surface (in its own shader).
-  Unlit materials (markers) and terrain are drawn as in air.
-- **Depth from the still water level**, not the wave surface, unlike the
-  reference camera.
+- **What PBS and the unlit shaders shade**, and the water surface (in its
+  own shader). Terrain (heightmaps) is drawn as in air.
+- **Unlit materials** (a particle emitter's particles; gz-rendering draws
+  markers, lines and the grid with PBS) keep their own colour, faded over
+  the range, with the veil: no daylight fades them and no lamp lights them.
+  The lamps' beams and marine snow in front of them are not drawn, nor is
+  the water for an orthographic camera.
+- **Depth below the wave over the camera.** As in the reference camera,
+  the water's surface is a flat level for each camera: the still level
+  plus the wave over the camera, which the plugin asks the wave field for
+  every step. The wave over each thing in view is not followed. A camera's
+  level is that of the place it had a frame before.
 - **Lamps**: up to four; lit by their diffuse term (no specular), with no
   shadows. The reference camera has no lamps.
 - **ogre2 and GLSL only** (the pieces use GLSL's `fract`).
@@ -195,7 +210,12 @@ murky water keeping it nearer the lamp.
 `effects_test`, rendered: caustics' contrast at 8 m against 3 m deep is
 `exp(−K_d · 5)` within 6 % (time-averaged), none on flat water; marine snow
 specks fixed frame to frame, none once the snow is off, the depth image
-unchanged; at night with the lamps off, nothing to see.
+unchanged; at night with the lamps off, nothing to see. Under a wave of
+0.5 m, a camera 0.15 m above the still water is under water in 34 of 80
+frames (two periods; 32 expected) and one 0.15 m below it in 46 (48), and
+the higher one never while the lower is in air. A particle emitter's
+particles 2 m away, in water that fades and veils: 0.3095 in linear light
+for 0.3092 from the formula and their colour in air.
 
 `snell_test`, rendered: Snell's window's half-angle 48.5 degrees (Snell's
 law: 48.6), from 5 m below near-flat water.
