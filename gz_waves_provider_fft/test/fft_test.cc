@@ -319,6 +319,74 @@ TEST(FFTWaveSimulation, DeterministicAcrossRunsWithSameSeed)
 }
 
 //////////////////////////////////////////////////
+/// An update prepared on the worker thread is the synchronous update, bit
+/// for bit: every grid, and the particle velocity read after it.
+TEST(FFTWaveSimulation, PreparedUpdateIsTheSynchronousOne)
+{
+  auto plain = MakeSim(/*seed=*/42);
+  auto ahead = MakeSim(/*seed=*/42);
+  for (double t : {0.5, 1.0, 3.25, 7.0})
+  {
+    SCOPED_TRACE(t);
+    plain.Update(t);
+    ahead.Prepare(t);
+    ahead.Update(t);
+    EXPECT_EQ(plain.HeightGrid(), ahead.HeightGrid());
+    EXPECT_EQ(plain.DispXGrid(), ahead.DispXGrid());
+    EXPECT_EQ(plain.DispYGrid(), ahead.DispYGrid());
+    const gsw::WaveField2D *a = plain.Field();
+    const gsw::WaveField2D *b = ahead.Field();
+    for (std::size_t i = 0; i < a->n * a->n; ++i)
+      ASSERT_EQ(a->foam[i], b->foam[i]) << i;
+    EXPECT_EQ(plain.ParticleVelocity(12.0, 34.0, t),
+              ahead.ParticleVelocity(12.0, 34.0, t));
+  }
+}
+
+//////////////////////////////////////////////////
+/// A hint that turns out wrong costs nothing but the work: an update for
+/// another time, a repeated or replaced hint, and a reconfigure with a job
+/// in flight all give the field a plain engine gives.
+TEST(FFTWaveSimulation, AWrongHintChangesNothing)
+{
+  auto plain = MakeSim(/*seed=*/7);
+  auto ahead = MakeSim(/*seed=*/7);
+
+  // Hinted 2.0, asked 1.5; then the stale 2.0 result must not be served
+  // for 2.5.
+  ahead.Prepare(2.0);
+  ahead.Update(1.5);
+  plain.Update(1.5);
+  EXPECT_EQ(plain.HeightGrid(), ahead.HeightGrid());
+  ahead.Update(2.5);
+  plain.Update(2.5);
+  EXPECT_EQ(plain.HeightGrid(), ahead.HeightGrid());
+
+  // A hint replaced before it is used, and one given twice.
+  ahead.Prepare(4.0);
+  ahead.Prepare(5.0);
+  ahead.Prepare(5.0);
+  ahead.Update(5.0);
+  plain.Update(5.0);
+  EXPECT_EQ(plain.HeightGrid(), ahead.HeightGrid());
+  // The time already current is not prepared again.
+  ahead.Prepare(5.0);
+
+  // Reconfigured with a job in flight: the new recipe's field, not the old.
+  gsw::WaveParameters p = DefaultParams();
+  p.tileSize = 100.0;
+  p.gridSize = 64;
+  p.seed = 9;
+  ahead.Prepare(6.0);
+  ahead.SetParameters(p);
+  plain.SetParameters(p);
+  ahead.Update(6.0);
+  plain.Update(6.0);
+  EXPECT_EQ(plain.HeightGrid(), ahead.HeightGrid());
+  EXPECT_EQ(plain.DispXGrid(), ahead.DispXGrid());
+}
+
+//////////////////////////////////////////////////
 TEST(FFTWaveSimulation, DifferentSeedsProduceDifferentFields)
 {
   auto a = MakeSim(/*seed=*/1);
