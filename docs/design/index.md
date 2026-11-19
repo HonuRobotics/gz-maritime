@@ -97,6 +97,34 @@ USV drives the BlueBoat unchanged, and an autopilot's servo outputs map onto
 it directly. The mode is on its way upstream; when a Gazebo release carries
 it, vehicles switch the plugin's filename and name and nothing else.
 
+## Pingers in the world, receivers on vehicles
+
+VRX's acoustic pinger plugin lived on the receiving boat and held the pinger
+as a position of its own: each boat had its own copy of the pinger, a
+scoring plugin kept the copies in step over a topic, and a pinger hung under
+a buoy did not move with it. `gz_acoustics` turns that round, the way the
+buoyancy and wind marks do:
+
+- **A pinger is a thing in the world.** A model plugin writes it as a
+  component on a link, so it moves with whatever carries it, every vehicle
+  hears the same one, and the world can list them all.
+- **A receiver is a sensor.** A gz-sensors custom sensor on any link, found
+  by the world's acoustics system on any model, spawned at any time; its
+  reading is in its own frame.
+- **Behaviour, not acoustics.** A ping is an event on a schedule, carried at
+  the speed of sound to each receiver, and heard or not by a few rules
+  (water, reach, band, field of view, dropout, overlap), each of which can
+  be switched off.
+  Nothing models how sound bends, echoes or fades beyond spherical
+  spreading; a team testing its own signal processing will need more than
+  this, which is left for later (time differences per hydrophone).
+- **The world owns the switch.** A pinger changes on its own `set` topic;
+  choosing which one pings in a task belongs to whoever runs the task, such
+  as a competition server, which only has to send `set` messages.
+
+The plan, the survey of other simulators it draws on and what is left are
+in [ACOUSTIC_PINGER_PLAN.md](https://github.com/HonuRobotics/gz-maritime/blob/lyrical/ACOUSTIC_PINGER_PLAN.md).
+
 ## Buoyancy that follows the waves
 
 Vehicles float on the flat water level by default, and the drawn waves pass
