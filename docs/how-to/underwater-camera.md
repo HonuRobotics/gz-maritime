@@ -165,6 +165,28 @@ Turn a lamp off or move it while running with the world's `light_config`
 service, like any light. Lamps cast no shadows here. A lamp set to an
 intensity of 0 costs nothing.
 
+## Check it against real footage
+
+To know how close the simulation is to your water, photograph a colour chart
+under water, and simulate the same shot:
+
+1. **Dive with a chart.** A ColorChecker (24 patches) facing the camera at a
+   measured range (1 to 4 m), at a measured depth, in daylight; note the
+   water's visibility (or measure its Jerlov type). Shoot a few frames at
+   each range, with the camera's white balance and exposure fixed.
+2. **Simulate the shot.** `make_chart_world.py --out chart.sdf --range 2
+   --depth 5 --jerlov 3C --width 1280 --height 720 --hfov 1.2`, with your
+   camera's resolution and field of view, then run it and save one frame of
+   `chart/camera/underwater/image`.
+3. **Mark the patches** in your photo: a `chart.json` of the 24 boxes, in
+   the same order (the simulated one shows the format).
+4. **Compare.** `chart_validation.py --real dive.png --sim sim.png
+   --patches chart.json --report report.png`. Under 10 degrees on average is
+   the target; OceanSim reports 8 to 14 for its scenes.
+
+Adjust the water (`<jerlov>`, `<visibility>`, or explicit coefficients)
+until the error is smallest: those are your water's optics.
+
 ## More of the water
 
 - **Forward scatter** blurs what is far: `<forward_scatter>0.01</forward_scatter>`
