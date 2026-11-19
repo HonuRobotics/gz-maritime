@@ -79,7 +79,7 @@ struct ReceiverMount
   /// \brief Its scoped name, from the world.
   public: std::string name;
 
-  /// \brief Draws its noise, dropouts and outliers.
+  /// \brief Draws its dropouts and outliers; its noise is gz-sensors'.
   public: acoustics::Generator rng;
 
   /// \brief Readings that arrived, in order of arrival, each with its
@@ -232,20 +232,19 @@ bool AcousticsPrivate::Wet(const math::Vector3d &_point) const
 void AcousticsPrivate::FindReceivers(const EntityComponentManager &_ecm,
     std::vector<Entity> _candidates, bool _all)
 {
-  std::vector<Entity> candidates = std::move(_candidates);
   if (_all)
   {
     this->receivers.clear();
-    candidates.clear();
+    _candidates.clear();
     _ecm.Each<components::CustomSensor>(
         [&](const Entity &_sensor, const components::CustomSensor *) -> bool
         {
-          candidates.push_back(_sensor);
+          _candidates.push_back(_sensor);
           return true;
         });
   }
 
-  for (const Entity sensor : candidates)
+  for (const Entity sensor : _candidates)
   {
     const auto *custom = _ecm.Component<components::CustomSensor>(sensor);
     const auto *parent = _ecm.Component<components::ParentEntity>(sensor);
@@ -280,11 +279,11 @@ void AcousticsPrivate::FindReceivers(const EntityComponentManager &_ecm,
     mount.pose = pose->Data();
     mount.sensor = std::move(created);
     mount.name = scoped;
-    // Its own sequence, from the world's seed and its name, so two
-    // receivers do not draw the same numbers; a hash that is the same on
-    // every standard library, so a seeded run repeats everywhere.
+    // Its own sequence for the dropouts and outliers, from the world's seed
+    // and its name, so two receivers do not draw the same numbers; a hash
+    // that is the same on every standard library, so a seeded run repeats
+    // everywhere.
     mount.rng.seed(this->seed ^ acoustics::Hash(scoped));
-    mount.sensor->DrawBias(mount.rng);
     this->receivers[sensor] = std::move(mount);
   }
 }
@@ -414,21 +413,21 @@ void AcousticsPrivate::Hear(ReceiverMount &_mount,
 
   ReceiverReading reading;
   using Channel = AcousticReceiver::Channel;
-  const auto &sensor = *_mount.sensor;
-  reading.bearing = sensor.ApplyNoise(Channel::kBearing, truth.bearing,
-                                      _mount.rng);
+  auto &sensor = *_mount.sensor;
+  const double dt = sensor.SinceLastReading(_arrived);
+  reading.bearing = sensor.ApplyNoise(Channel::kBearing, truth.bearing, dt);
   if (settings.outlierProbability > 0.0 &&
       acoustics::Uniform(_mount.rng) < settings.outlierProbability)
   {
     reading.bearing = acoustics::WrapAngle(
         (2.0 * acoustics::Uniform(_mount.rng) - 1.0) * GZ_PI);
   }
-  reading.elevation = sensor.ApplyNoise(Channel::kElevation, truth.elevation,
-                                        _mount.rng);
-  reading.range = sensor.ApplyNoise(Channel::kRange, truth.range, _mount.rng);
+  reading.elevation =
+      sensor.ApplyNoise(Channel::kElevation, truth.elevation, dt);
+  reading.range = sensor.ApplyNoise(Channel::kRange, truth.range, dt);
   reading.frequency = _ping.frequency;
   reading.amplitude = sensor.ApplyNoise(Channel::kAmplitude,
-      acoustics::Amplitude(truth.range), _mount.rng);
+      acoustics::Amplitude(truth.range), dt);
   reading.emitted = _ping.emitted;
   reading.arrived = _arrived;
 

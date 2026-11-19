@@ -190,7 +190,8 @@ class gz::sim::maritime_gui::AcousticsPanelPrivate
   /// \brief Each receiver's last reading with the pose it was heard at.
   public: std::map<std::string, BearingRay> rays;
 
-  /// \brief The pingers as the rings were last drawn from, as text.
+  /// \brief The pingers as the rings were last drawn from, as text; with
+  /// their positions only while the world was paused.
   public: std::string ringsKey;
 
   /// \brief m/s, the world's speed of sound.
@@ -546,11 +547,12 @@ void AcousticsPanel::Update(const UpdateInfo &_info,
     }
   }
 
+  // The receivers' poses: for the plane that follows one, and for the
+  // rays, which keep a reading's pose even while they are hidden.
+  const auto poses = d.ReceiverPoses(_ecm, receivers);
+
   // The plane the reach and the pings are drawn on; a receiver's moves with
   // it.
-  std::map<std::string, math::Pose3d> poses;
-  if (d.plane == Plane::kReceiver || d.showReadings)
-    poses = d.ReceiverPoses(_ecm, receivers);
   std::optional<double> receiverZ;
   std::string followed;
   if (d.plane == Plane::kReceiver)
@@ -624,22 +626,24 @@ void AcousticsPanel::Update(const UpdateInfo &_info,
     d.reachLayer->Clear();
   }
 
+  // A reading keeps the pose its receiver had when it came, hidden or
+  // not, so a ray shown again later still points the way it was heard.
+  KeepRays(d.rays, last, poses);
   if (d.showReadings)
   {
-    // A reading keeps the pose its receiver had when it came.
-    KeepRays(d.rays, last, poses);
     d.rayLayer->DrawIfChanged(RayMarkers(
         LiveRays(d.rays, now, d.rayLifetime), d.rayLength, d.rayLayer->Ns()));
   }
-  else
+  else if (d.rayLayer->Drawn())
   {
-    d.rays.clear();
-    if (d.rayLayer->Drawn())
-      d.rayLayer->Clear();
+    d.rayLayer->Clear();
   }
 
   // The rings move with simulation time: a frame every so often of it,
-  // and at once when a pinger or a setting changed.
+  // and at once when a pinger or a setting changed. The rings follow their
+  // pinger, but its position is in the key only while the world is paused:
+  // running, the frames every so often follow it, and a pinger on anything
+  // that moves would otherwise send a frame at every update.
   auto tracked = pingers;
   d.changes.Track(tracked, now, d.waterLevel);
   std::ostringstream key;
@@ -647,7 +651,10 @@ void AcousticsPanel::Update(const UpdateInfo &_info,
   {
     key << p.data.name << ' ' << p.data.active << ' ' << p.data.frequency
         << ' ' << p.data.period << ' ' << p.data.offset << ' '
-        << p.data.reach << ' ' << p.position << ';';
+        << p.data.reach;
+    if (_info.paused)
+      key << ' ' << p.position;
+    key << ';';
   }
   // The plane the rings lie on, which a receiver's depth moves.
   key << static_cast<int>(d.plane) << ' ' << d.planeZ;
