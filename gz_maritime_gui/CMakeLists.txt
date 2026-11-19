@@ -162,6 +162,15 @@ if(BUILD_TESTING)
   target_link_libraries(marker_recorder ${PROJECT_NAME}_core
     gz-transport::core gz-msgs::core)
 
+  # Adds a plugin late, as the plugin menu does, in the offscreen GUI test;
+  # built next to the panels, on the test's GZ_GUI_PLUGIN_PATH, never
+  # installed.
+  qt6_wrap_cpp(MenuLoader_moc test/MenuLoader.hh)
+  qt6_add_resources(MenuLoader_rcc test/MenuLoader.qrc)
+  add_library(MenuLoader SHARED
+    test/MenuLoader.cc ${MenuLoader_moc} ${MenuLoader_rcc})
+  target_link_libraries(MenuLoader PRIVATE gz-gui::gz-gui tinyxml2::tinyxml2)
+
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(test_gui_reads_recipes test/test_gui_reads_recipes.py
     TIMEOUT 240

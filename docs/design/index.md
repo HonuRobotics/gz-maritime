@@ -99,21 +99,30 @@ it, vehicles switch the plugin's filename and name and nothing else.
 
 ## Buoyancy that follows the waves
 
-Today vehicles float on the flat water level, and the drawn waves pass
+Vehicles float on the flat water level by default, and the drawn waves pass
 through their hulls ([Waves and physics today](../how-to/own-vehicle.md#waves-and-physics-today)).
-Coupling buoyancy to the waves is planned, as a separate consumer of the wave
-field. The main points it has to handle:
+`gz_waves_buoyancy` couples buoyancy to the waves, as a separate consumer of
+the wave field that a world runs instead of the flat buoyancy. How it meets
+each point:
 
-- **A local water surface per collision shape.** Sample the wave height
-  around each shape, fit a plane, and measure the volume under that plane
-  instead of under z = 0.
+- **A local water surface per collision shape.** It samples the height of the
+  drawn surface at each shape's centre and at the ends of its footprint, fits
+  a plane, and measures the volume under that plane instead of under z = 0.
 - **Long hulls.** One plane per shape is only good when the shape is short
-  compared to the wavelength, so long hulls need splitting into segments.
+  compared to the wavelength; the plane averages a shorter chop, and a long
+  hull is better split into segments.
 - **Update rate.** The wave field updates at `<update_rate>` (30 Hz in
-  `open_water.sdf`), slower than physics (250 Hz), so the forces need
-  interpolating.
+  `open_water.sdf`), slower than physics (250 Hz). Advancing it every step
+  costs about four times the run time and changes the motion by nothing
+  measurable, so the buoyancy reads the field as last advanced. A world that
+  wants smoother forces sets `<update_rate>0</update_rate>` on the wave
+  system.
 - **Choppy seas.** The high-fidelity sea also moves the surface sideways;
-  finding the true height at a point needs that displacement.
+  `waves::SurfaceHeight` undoes that displacement to find the height of the
+  surface as drawn.
+- **Hydrostatic only.** The water pushes straight up with the weight
+  displaced: no pressure change with depth under the wave, no horizontal wave
+  force.
 
 ## Related
 

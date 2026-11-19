@@ -115,9 +115,11 @@ give the distance away:
   is the range to about 7 %. What hides the range is a bias, which stands
   for the source level the receiver does not know: give a receiver that
   must not know its range an `<amplitude_noise>` with a `<bias_stddev>`
-  and some `<stddev>`. A receiver with `<range>` off and neither spread
-  nor bias on its amplitude says so in a warning when it loads; one with no
-  `<gz:acoustic_receiver>` block at all loads quietly.
+  and some `<stddev>`. A receiver with `<range>` off and no spread, no
+  `<bias_stddev>` and no dynamic bias on its amplitude says so in a warning
+  when it loads; a fixed `<bias_mean>` does not count, since it can be read
+  in the SDF. One with no `<gz:acoustic_receiver>` block at all loads
+  quietly.
 - **The stamp.** It is the exact arrival, and a pinger fires at
   `offset + k * period`. With a known schedule the stamp gives the range:
   in `test/worlds/pingers.sdf` the listener's stamps are whole seconds plus
@@ -130,7 +132,9 @@ noise model does the work:
 - the types `gaussian` and `gaussian_quantized`, with `mean`, `stddev`,
   `bias_mean`, `bias_stddev` and `precision`;
 - the dynamic bias (`dynamic_bias_stddev`, `dynamic_bias_correlation_time`),
-  which steps with the time between two readings.
+  which steps with the time between two readings. As on gz-sensors' IMU,
+  `dynamic_bias_stddev` is a density: the bias wanders to about
+  `dynamic_bias_stddev * sqrt(dynamic_bias_correlation_time / 2)`.
 
 ## Who hears what
 
@@ -224,7 +228,9 @@ serialization without a world; `acoustics_test` runs the systems in
 `test/worlds`: one reading per ping from the right bearing and after the
 right delay, band, reach, water and field of view, the set topics, the
 ground truth, the lists on a paused world, a refused second pinger of one
-name, a receiver spawned at run time, two pingers in turn and then on top
-of each other, pings that overlap inside one step and across two, a seeded
-run repeating (the noise with gz-math's seed, the dropouts and outliers
-with `<seed>`), and a world reset dropping the pings still on their way.
+name, a receiver and a pinger spawned at run time, a pinger and a receiver
+removed, a pinger and a receiver moved (the bearing, the range and the
+arrival from where each is), two pingers in turn and then on top of each
+other, pings that overlap inside one step and across two, a seeded run
+repeating (the noise with gz-math's seed, the dropouts and outliers with
+`<seed>`), and a world reset dropping the pings still on their way.

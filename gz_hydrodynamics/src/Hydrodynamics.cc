@@ -16,6 +16,8 @@
  */
 #include <atomic>
 #include <cmath>
+#include <optional>
+#include <sstream>
 #include <string>
 
 #include <Eigen/Eigen>
@@ -105,6 +107,12 @@ class gz::sim::maritime::HydrodynamicsPrivateData
 
   /// \brief Link entity
   public: Entity linkEntity;
+
+  /// \brief The centre of pressure: the point of the link, in the link
+  /// frame, the coefficients are defined about. The velocity and the
+  /// current are taken there and the wrench acts there. The link origin
+  /// without the tag.
+  public: math::Vector3d centerOfPressure;
 
   /// \brief World entity, whose Environment component holds the current
   /// table
@@ -314,6 +322,24 @@ void AddWorldLinearVelocity(
 }
 
 /////////////////////////////////////////////////
+/// \brief Read a point from the text of an SDF element. sdformat's own
+/// conversion reports a text it cannot read as the point 0 0 0.
+/// \param[in] _text The element's text.
+/// \return The point, or nothing unless the text is three finite numbers.
+std::optional<math::Vector3d> ParsePoint(const std::string &_text)
+{
+  std::istringstream stream(_text);
+  double x{0}, y{0}, z{0};
+  std::string rest;
+  if (!(stream >> x >> y >> z) || (stream >> rest) ||
+      !std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z))
+  {
+    return std::nullopt;
+  }
+  return math::Vector3d(x, y, z);
+}
+
+/////////////////////////////////////////////////
 double SdfParamDouble(
     const std::shared_ptr<const sdf::Element> &_sdf,
     const std::string& _field,
@@ -441,6 +467,28 @@ void Hydrodynamics::Configure(
     return;
   }
 
+  // The centre of pressure: the link origin unless given. A value that
+  // does not parse is an error and leaves the point at the link origin.
+  if (_sdf->HasElement("center_of_pressure"))
+  {
+    const auto text = _sdf->Get<std::string>("center_of_pressure");
+    if (const auto point = ParsePoint(text))
+    {
+      this->dataPtr->centerOfPressure = *point;
+    }
+    else
+    {
+      gzerr << "Link [" << linkName << "]: <center_of_pressure> [" << text
+        << "] is not three finite numbers; it is ignored." << std::endl;
+    }
+  }
+
+  // The link's components this system reads. The world pose comes first:
+  // the fluid added mass below can only be read once it exists.
+  AddWorldPose(this->dataPtr->linkEntity, _ecm);
+  AddAngularVelocityComponent(this->dataPtr->linkEntity, _ecm);
+  AddWorldLinearVelocity(this->dataPtr->linkEntity, _ecm);
+
   // Cache the fluid added mass matrix if present on this link.
   // This is used for the Coriolis current-velocity correction.
   {
@@ -518,10 +566,6 @@ void Hydrodynamics::Configure(
       _sdf->Get<std::string>("lookup_current_z");
   }
 
-
-  AddWorldPose(this->dataPtr->linkEntity, _ecm);
-  AddAngularVelocityComponent(this->dataPtr->linkEntity, _ecm);
-  AddWorldLinearVelocity(this->dataPtr->linkEntity, _ecm);
 }
 
 /////////////////////////////////////////////////
@@ -576,39 +620,44 @@ void Hydrodynamics::PreUpdate(
     return;
   }
 
+  // Transform state to local frame
+  auto pose = baseLink.WorldPose(_ecm);
+  const math::Vector3d &centerOfPressure = this->dataPtr->centerOfPressure;
+
+  // From the link origin to the centre of pressure, in the world. The
+  // water is asked at the centre of pressure, the point the velocity is
+  // taken at, so the two make the velocity relative to the water there.
+  const math::Vector3d worldArm = pose->Rot() * centerOfPressure;
+  const math::Vector3d waterPosition = pose->Pos() + worldArm;
+
   // Get current vector
   math::Vector3d currentVector(0, 0, 0);
 
   if (worldCurrent)
   {
-    // The world owns the current: ask it at the centre of mass.
-    auto position = baseLink.WorldInertialPose(_ecm);
-    if (position.has_value())
-    {
-      currentVector = this->dataPtr->oceanCurrent.At(
-        position.value().Pos(), _info.simTime);
-    }
+    // The world owns the current.
+    currentVector = this->dataPtr->oceanCurrent.At(
+      waterPosition, _info.simTime);
   }
   else if (this->dataPtr->useCurrentTable)
   {
-    auto position = baseLink.WorldInertialPose(_ecm);
-    if (position.has_value())
-    {
-      currentVector = this->dataPtr->GetWaterCurrentFromEnvironment(
-        _ecm, _info.simTime, position.value().Pos());
-    }
+    currentVector = this->dataPtr->GetWaterCurrentFromEnvironment(
+      _ecm, _info.simTime, waterPosition);
   }
   else
   {
     std::lock_guard lock(this->dataPtr->mtx);
     currentVector = this->dataPtr->currentVector;
   }
-  // Transform state to local frame
-  auto pose = baseLink.WorldPose(_ecm);
-  // Since we are transforming angular and linear velocity we only care about
-  // rotation. Also this is where we apply the effects of current to the link
+
+  // The velocity of the centre of pressure: the origin's plus what the
+  // rotation adds there. Only the rotation of the pose matters from here
+  // on, and this is where the current enters: the state is the velocity
+  // relative to the water.
+  const math::Vector3d pointVelocity = linearVelocity->Data() +
+    rotationalVelocity->Cross(worldArm);
   auto localLinearVelocity = pose->Rot().Inverse() *
-    (linearVelocity->Data() - currentVector);
+    (pointVelocity - currentVector);
   auto localRotationalVelocity = pose->Rot().Inverse() * *rotationalVelocity;
 
   state(0) = localLinearVelocity.X();
@@ -650,10 +699,16 @@ void Hydrodynamics::PreUpdate(
   // diagonal terms here. Have yet to add the cross terms here. Also note, since
   // $M_a(0,0) = \dot X_u $ , $M_a(1,1) = \dot Y_v $ and so forth, we simply
   // load the stability derivatives from $M_a$.
-  if (!this->dataPtr->disableCoriolis)
+  //
+  // A link with <fluid_added_mass> gets these terms from the physics engine,
+  // so the plugin's own would count them twice.
+  if (!this->dataPtr->disableCoriolis && !this->dataPtr->hasFluidAddedMass)
   {
+    // kTotalWrench gathers the left hand side of Fossen's equation,
+    // M_A * dv/dt + C_A(v) * v + D(v) * v, and is applied negated below,
+    // so C_A * v enters it with a plus sign like the other two terms.
     Cmat = hydro::buildCoriolisMatrix(this->dataPtr->Ma, state);
-    const Eigen::Matrix<double, 6, 1> kCmatVec = - Cmat * state;
+    const Eigen::Matrix<double, 6, 1> kCmatVec = Cmat * state;
     kTotalWrench += kCmatVec;
   }
 
@@ -676,26 +731,38 @@ void Hydrodynamics::PreUpdate(
   //   Applied = -kTotalWrench, so we add (Ca_rel*v_r - Ca_abs*v) to
   //   kTotalWrench, which produces external force (Ca_abs*v - Ca_rel*v_r).
   //   Combined with DART's implicit -C_A(v)*v, the total becomes -C_A(v_r)*v_r.
+  //
+  // That matrix belongs to the link, not to the centre of pressure, so the
+  // correction is built from the velocity of the link origin and acts there.
   if (this->dataPtr->hasFluidAddedMass)
   {
-    // Build absolute body-frame velocity (without current subtraction).
-    // Angular velocity is unaffected by ocean current.
-    Eigen::Matrix<double, 6, 1> absState;
-    auto localAbsLinearVelocity = pose->Rot().Inverse() *
+    // Body-frame velocity of the link origin, absolute and relative to the
+    // water. Angular velocity is unaffected by ocean current.
+    const auto localAbsLinearVelocity = pose->Rot().Inverse() *
       linearVelocity->Data();
-    absState(0) = localAbsLinearVelocity.X();
-    absState(1) = localAbsLinearVelocity.Y();
-    absState(2) = localAbsLinearVelocity.Z();
-    absState(3) = localRotationalVelocity.X();
-    absState(4) = localRotationalVelocity.Y();
-    absState(5) = localRotationalVelocity.Z();
+    const auto localRelLinearVelocity = pose->Rot().Inverse() *
+      (linearVelocity->Data() - currentVector);
+    Eigen::Matrix<double, 6, 1> absState;
+    Eigen::Matrix<double, 6, 1> relState;
+    absState << localAbsLinearVelocity.X(), localAbsLinearVelocity.Y(),
+      localAbsLinearVelocity.Z(), state.tail<3>();
+    relState << localRelLinearVelocity.X(), localRelLinearVelocity.Y(),
+      localRelLinearVelocity.Z(), state.tail<3>();
 
     auto Ca_abs = hydro::buildFullCoriolisMatrix(
       this->dataPtr->fluidAddedMass, absState);
     auto Ca_rel = hydro::buildFullCoriolisMatrix(
-      this->dataPtr->fluidAddedMass, state);
+      this->dataPtr->fluidAddedMass, relState);
 
-    kTotalWrench += Ca_rel * state - Ca_abs * absState;
+    // kTotalWrench acts at the centre of pressure. The same wrench at the
+    // link origin is the same force there, and the moment less what that
+    // force makes from the point.
+    Eigen::Matrix<double, 6, 1> correction =
+      Ca_rel * relState - Ca_abs * absState;
+    const Eigen::Vector3d arm(
+      centerOfPressure.X(), centerOfPressure.Y(), centerOfPressure.Z());
+    correction.tail<3>() -= arm.cross(correction.head<3>());
+    kTotalWrench += correction;
   }
 
   math::Vector3d totalForce(
@@ -703,10 +770,13 @@ void Hydrodynamics::PreUpdate(
   math::Vector3d totalTorque(
     -kTotalWrench(3),  -kTotalWrench(4), -kTotalWrench(5));
 
+  // The force acts at the centre of pressure, so the offset overload adds
+  // the moment it makes about the link origin.
   baseLink.AddWorldWrench(
     _ecm,
     pose->Rot()*(totalForce),
-    pose->Rot()*totalTorque);
+    pose->Rot()*totalTorque,
+    centerOfPressure);
 }
 
 /////////////////////////////////////////////////
