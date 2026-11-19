@@ -193,7 +193,8 @@ class gz::sim::maritime_gui::AcousticsPanelPrivate
   /// \brief Each receiver's last reading with the pose it was heard at.
   public: std::map<std::string, BearingRay> rays;
 
-  /// \brief The pingers as the rings were last drawn from, as text.
+  /// \brief The pingers as the rings were last drawn from, as text; with
+  /// their positions only while the world was paused.
   public: std::string ringsKey;
 
   /// \brief m/s, the world's speed of sound.
@@ -530,22 +531,24 @@ void AcousticsPanel::Update(const UpdateInfo &_info,
     d.reachLayer->Clear();
   }
 
+  // A reading keeps the pose its receiver had when it came, hidden or
+  // not, so a ray shown again later still points the way it was heard.
+  KeepRays(d.rays, last, d.ReceiverPoses(_ecm, receivers));
   if (d.showReadings)
   {
-    // A reading keeps the pose its receiver had when it came.
-    KeepRays(d.rays, last, d.ReceiverPoses(_ecm, receivers));
     d.rayLayer->DrawIfChanged(RayMarkers(
         LiveRays(d.rays, now, d.rayLifetime), d.rayLength, d.rayLayer->Ns()));
   }
-  else
+  else if (d.rayLayer->Drawn())
   {
-    d.rays.clear();
-    if (d.rayLayer->Drawn())
-      d.rayLayer->Clear();
+    d.rayLayer->Clear();
   }
 
   // The rings move with simulation time: a frame every so often of it,
-  // and at once when a pinger or a setting changed.
+  // and at once when a pinger or a setting changed. The rings follow their
+  // pinger, but its position is in the key only while the world is paused:
+  // running, the frames every so often follow it, and a pinger on anything
+  // that moves would otherwise send a frame at every update.
   auto tracked = pingers;
   d.changes.Track(tracked, now, d.waterLevel);
   std::ostringstream key;
@@ -553,7 +556,10 @@ void AcousticsPanel::Update(const UpdateInfo &_info,
   {
     key << p.data.name << ' ' << p.data.active << ' ' << p.data.frequency
         << ' ' << p.data.period << ' ' << p.data.offset << ' '
-        << p.data.reach << ' ' << p.position << ';';
+        << p.data.reach;
+    if (_info.paused)
+      key << ' ' << p.position;
+    key << ';';
   }
   const bool changed = d.dirty || key.str() != d.ringsKey;
   const bool ringsDue = changed || !d.lastRings || now < *d.lastRings ||

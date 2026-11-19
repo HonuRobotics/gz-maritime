@@ -150,7 +150,6 @@ class FieldDrawingPrivate
 
   /// \brief Simulation time of the last drawing.
   public: std::chrono::steady_clock::duration lastDraw{0};
-
 };
 
 //////////////////////////////////////////////////
