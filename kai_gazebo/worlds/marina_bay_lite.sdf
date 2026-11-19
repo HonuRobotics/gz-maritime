@@ -519,7 +519,8 @@
          and only the one under the green buoy pings. About 35 m out from the
          course B start point (-15 -8, facing 0.55 rad), 10 m apart across the
          course, which keeps both clear of a vehicle spawned at the origin
-         heading +x: the nearer one, the red, is 6 m off that line. Switch them on /world/default/acoustics/pinger_green/set and
+         heading +x: the nearer one, the red, is 6 m off that line. Switch
+         them on /world/default/acoustics/pinger_green/set and
          /world/default/acoustics/pinger_red/set (key active). -->
     <!-- Green: pinging. -->
     <include>
