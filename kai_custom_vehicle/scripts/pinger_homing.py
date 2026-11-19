@@ -31,8 +31,9 @@ one.
 Close is loud: the receiver gives no range, and its amplitude (the
 spreading loss, 20 dB down for each ten times the distance) is noisy, 1 dB
 on the custom USV. So the boat stops on the median of the last three
-amplitudes, not on one ping: louder than stop_amplitude, -16 dB, which is
-6.3 m without noise and between about 5.5 and 7 m with it.
+amplitudes, once three have come, not on one ping: louder than
+stop_amplitude, -16 dB, which is 6.3 m without noise and between about 5.5
+and 7 m with it.
 
     ros2 run kai_custom_vehicle pinger_homing.py --ros-args -r __ns:=/custom_usv
 """
@@ -110,11 +111,12 @@ class PingerHoming(Node):
             f"{r.get('amplitude', float('nan')):.1f} dB")
 
     def loud(self) -> bool:
-        """Return whether the last pings say the pinger is close."""
-        # The median, so one loud draw of the noise does not stop the boat
-        # short, nor one quiet draw send it off again.
-        return (bool(self.amplitudes) and
-                sorted(self.amplitudes)[len(self.amplitudes) // 2] >= self.stop_amplitude)
+        """Return whether the last three pings say the pinger is close."""
+        # The median of a full window of three, so one loud draw of the
+        # noise does not stop the boat short, nor one quiet draw send it off
+        # again; with fewer, the first ping alone would decide.
+        return (len(self.amplitudes) == 3 and
+                sorted(self.amplitudes)[1] >= self.stop_amplitude)
 
     def drive(self, port: float, stbd: float):
         self.port.publish(Float64(data=max(-1.0, min(1.0, port))))

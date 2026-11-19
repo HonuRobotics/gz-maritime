@@ -128,7 +128,7 @@ def wait_until_near(env, name, point, sim_budget, wall_timeout=300):
     A call that fails is not a failure of the test: every reading is polled
     for, so a slow answer on a busy machine is asked for again.
     """
-    seen = {}
+    seen = {'failing': 0}
 
     def started():
         seen['start'] = sim_seconds(env)
@@ -141,11 +141,20 @@ def wait_until_near(env, name, point, sim_budget, wall_timeout=300):
         now = sim_seconds(env)
         if now is not None:
             seen['now'] = now
+        # Polls in a row where a gz call failed, to tell a broken gz from a
+        # stalled simulation when the time runs out.
+        seen['failing'] = seen['failing'] + 1 if seen['d'] is None or now is None else 0
         return seen['d'] is not None and now is not None and now - seen['start'] > sim_budget
 
+    def why():
+        if seen['failing'] > 0:
+            return (f"gz calls failed for the last {seen['failing']} polls while "
+                    f'waiting for {name}: the pose or the world stats cannot be read')
+        return (f'sim time stalled while waiting for {name}, at '
+                f"{seen.get('now', seen['start']):.1f} s")
+
     poll_until(started, 60, 'cannot read world stats', interval=1)
-    poll_until(near_or_out_of_time, wall_timeout,
-               f'sim time stalled while waiting for {name}', interval=1)
+    poll_until(near_or_out_of_time, wall_timeout, why, interval=1)
     assert seen['d'] < ARRIVED, (
         f"{name} is {seen['d']:.1f} m from {point} after "
         f"{seen.get('now', seen['start']) - seen['start']:.0f} s of sim time")
