@@ -218,7 +218,13 @@
          retuned on /<name>/acoustic_receiver/set. The noise and the
          dropout near a pinger's reach are those of a small hydrophone
          array; no range, which a passive receiver cannot measure, and noise
-         on the amplitude, which without it would give the range exactly. -->
+         on the amplitude, which without it would give the range exactly.
+         The amplitude has no bias, so it still gives the range on average:
+         the homing demo stops on it, which needs a known source level. A
+         receiver that must hide its range needs a <bias_stddev> on the
+         amplitude and another stop rule, such as the elevation, which
+         steepens as the boat closes on a pinger hanging deeper than the
+         hydrophone. -->
     <xacro:sensor_link sensor_name="acoustic_receiver" frame="hydrophone_link">
       <sensor name="acoustic_receiver" type="custom" gz:type="acoustic_receiver">
         <frame_id>${name}/hydrophone_link</frame_id>

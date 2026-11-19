@@ -310,6 +310,11 @@ std::vector<msgs::Marker> PingSpheres(const std::vector<PingerView> &_pingers,
     double _waterLevel, const std::chrono::steady_clock::duration &_now,
     double _speed, double _maxRadius, const std::string &_ns);
 
+/// \brief The first id of the dropout rings, which share the reach's
+/// layer: far after the reach's own ids, which count up from 1, one per
+/// pinger.
+constexpr std::uint64_t kDropoutFirstId{1001};
+
 /// \brief Where pings start to drop around each pinger with a reach: a
 /// dashed ring, lighter than the reach, for each dropout start the
 /// receivers use, where the sphere of that radius cuts a horizontal plane.
@@ -322,7 +327,8 @@ std::vector<msgs::Marker> PingSpheres(const std::vector<PingerView> &_pingers,
 /// \return One LINE_LIST marker per pinger and start that meets the plane.
 std::vector<msgs::Marker> DropoutMarkers(
     const std::vector<PingerView> &_pingers, std::vector<double> _starts,
-    double _planeZ, const std::string &_ns, std::uint64_t _firstId = 1001);
+    double _planeZ, const std::string &_ns,
+    std::uint64_t _firstId = kDropoutFirstId);
 
 /// \brief A bearing a receiver reported, to draw.
 struct BearingRay
