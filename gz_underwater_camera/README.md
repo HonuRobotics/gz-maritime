@@ -51,6 +51,9 @@ it the image is the plain camera's.
 | `<white_balance>` | `none` | `none`, or `grey_world`: each channel's mean made the mean luminance, so the water's tint is taken out, as a camera's auto white balance does. |
 | `<shot_noise>`, `<read_noise>` | `0` | Gaussian noise on linear light, of variance shot_noise · signal + read_noise². |
 | `<seed>` | `1` | The noise's seed. |
+| `<forward_scatter>` | `0` | Forward scatter: a Gaussian blur whose width grows with the range through the water, sigma = forward_scatter · range radians. `0.005` to `0.02` looks like coastal water. |
+| `<port>` | `none` | The port in front of the lens: `flat` refracts (Snell's law: the image is magnified about 1.33 times at the centre, more at the edges), `dome` (centred on the lens) does not. |
+| `<water_index>` | `1.333` | The water's refractive index, for a flat port. |
 
 ## What it computes
 
@@ -74,10 +77,24 @@ For each pixel, from the in-air frame's colour J and z-depth:
    with B∞(z_cam) = B∞ exp(−K_d z_cam), the veil at the camera's depth, in
    units of a white surface lit by the surface daylight. A pixel that hits
    nothing sees the open water: the veil, or the sky through the surface.
-5. **The camera.** Exposure, white balance, noise; back to sRGB.
+5. **Forward scatter**, a blur whose width grows with range (recursive
+   Gaussian levels, each pixel between the two around its sigma), and the
+   **port**: a flat one maps each output radius r to the rendered radius
+   f tan(asin(sin(atan(r / f)) / n)).
+6. **The camera.** Exposure, white balance, noise; back to sRGB.
 
 With the camera above the water, the image is copied unchanged. Depth comes
 from the world's water optics: below the wave field's local surface.
+
+## Speed
+
+The image pipeline runs on the CPU, its rows on up to 16 cores. A
+1920x1080 frame on a 13th generation Core laptop: 24 ms for the water
+alone, 28 ms with auto exposure and white balance, about 90 ms with noise
+(its random numbers are drawn one by one, in order, so a seed gives the same
+frame), 55 ms with a flat port, 320 ms with forward scatter. For every
+camera at full frame rate, use the GPU path
+([`gz_underwater_rendering`](../gz_underwater_rendering/README.md)).
 
 ## Limits
 
@@ -87,8 +104,9 @@ from the world's water optics: below the wave field's local surface.
   frame's exact render.
 - The sensor's own `<noise>` and `<distortion>` apply to its in-air image,
   before the water.
-- No vehicle lights, forward scatter, marine snow or port refraction yet;
-  see the [plan](../UNDERWATER_CAMERA_PLAN.md).
+- No vehicle lights, caustics or marine snow: those are drawn by the GPU
+  path ([`gz_underwater_rendering`](../gz_underwater_rendering/README.md)).
+  The `CameraInfo` stays the in-air pinhole's, also with a flat port.
 
 ## Tests
 
@@ -97,12 +115,14 @@ colcon test --packages-select gz_underwater_camera
 ```
 
 - `underwater_image_test`: the ray table against its formula; sRGB round
-  trip for all 256 values; the model, every pixel against the closed form,
+  trip for all 256 values, and its lookup against the formula; the model, every pixel against the closed form,
   at two ranges and with the object's depth; β^D ≠ β^B against the fog
   model; a climbing ray clipped at the surface; nothing hit is the veil; in
   air and in clear water the image unchanged; fixed and auto exposure; grey
   world neutralising a tint; the noise's mean and variance; 640×480 within a
-  15 Hz frame; every parameter documented.
+  15 Hz frame, and a parallel frame the same every time; forward scatter's edge width at 2, 4 and 8 m within 10 % of
+  the Gaussian's; a flat port's points within half a pixel of Snell's law,
+  a dome port unchanged; every parameter documented.
 - `underwater_camera_test`, rendered (needs a GPU): the published image
   against the model computed in the test from the in-air frame, pixel by
   pixel; the far wall fading into the veil more than the near plate; above

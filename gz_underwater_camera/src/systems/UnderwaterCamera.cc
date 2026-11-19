@@ -63,6 +63,9 @@ class gz::sim::maritime::UnderwaterCameraPrivate
   /// \brief The camera's response.
   public: uc::Response response;
 
+  /// \brief Forward scatter and the port.
+  public: uc::Optics optics;
+
   /// \brief Noise.
   public: std::mt19937 rng{1};
 
@@ -186,7 +189,7 @@ void UnderwaterCameraPrivate::TryProcess()
 
   std::vector<std::uint8_t> out;
   uc::MakeUnderwater(rgb, z, *this->rays, this->water, this->response,
-                     this->rng, out);
+                     this->rng, out, this->optics);
 
   msgs::Image msg;
   *msg.mutable_header() = img.header();
@@ -272,6 +275,16 @@ void UnderwaterCamera::Configure(const Entity &_entity,
   d.response.readNoise = std::max(0.0, _sdf->Get<double>("read_noise",
                                                          0.0).first);
   d.rng.seed(_sdf->Get<unsigned int>("seed", 1u).first);
+  d.optics.forwardScatter = std::max(0.0,
+      _sdf->Get<double>("forward_scatter", 0.0).first);
+  const std::string port = _sdf->Get<std::string>("port", "none").first;
+  if (port == "flat")
+    d.optics.port = uc::Optics::Port::kFlat;
+  else if (port == "dome")
+    d.optics.port = uc::Optics::Port::kDome;
+  else if (port != "none")
+    gzerr << "UnderwaterCamera: unknown <port> '" << port << "'; using none\n";
+  d.optics.waterIndex = _sdf->Get<double>("water_index", 1.333).first;
 
   std::string base = "/" + topic;
   while (base.size() > 1 && base[1] == '/')
