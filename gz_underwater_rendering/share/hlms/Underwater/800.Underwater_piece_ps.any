@@ -17,6 +17,27 @@
 // (segmentation and the like), which must keep their exact values.
 @property( gz_underwater )
 @piece( custom_ps_functions )
+	// A hash of a cell, in [0, 1).
+	float uwHash( float3 p )
+	{
+		p = fract( p * 0.3183099 + float3( 0.11, 0.17, 0.13 ) ) * 17.0;
+		return fract( p.x * p.y * p.z * ( p.x + p.y + p.z ) );
+	}
+	// Three hashes of a cell at once, each in [0, 1).
+	float3 uwHash3( float3 p )
+	{
+		float3 q = fract( p * float3( 0.1031, 0.1030, 0.0973 ) );
+		q += dot( q, q.yxz + 33.33 );
+		return fract( ( q.xxy + q.yxx ) * q.zyx );
+	}
+	// Caustics: two crossing families of moving ridges, as light focused by
+	// the waves draws on a seabed.
+	float uwCaustic( float2 p, float t )
+	{
+		float a = sin( p.x * 0.9 + 1.7 * sin( p.y * 1.3 + t * 0.8 ) + t );
+		float b = sin( p.y * 1.1 + 1.5 * sin( p.x * 0.7 - t * 0.9 ) - t * 1.1 );
+		return pow( max( 0.0, 1.0 - 0.6 * abs( a + b ) ), 6.0 );
+	}
 	// Whether a point at f from a spot lamp is inside its cone (its axis,
 	// the cosine of its half angle).
 	bool uwInCone( float3 f, float3 axis, float cosOuter )
@@ -25,11 +46,24 @@
 	}
 @end
 @piece( custom_ps_posExecution_underwater )
+@property( gz_render_solid_color && !hlms_shadowcaster )
+	// The backdrop is water, not a thing: segmentation, thermal and the
+	// other solid-colour cameras do not see it. Its material blends by
+	// alpha, so an alpha of 0 leaves what is there. (Not a discard: one in
+	// these shaders would cost every surface its early depth test.)
+	if( abs( material.userValue[0].x - 1977.0 ) < 0.5 )
+		outPs_colour0.w = 0.0;
+@end
 @property( !hlms_shadowcaster && !hlms_render_depth_only && !gz_render_solid_color && ( hlms_normal || hlms_qtangent ) )
 	{
 		float uwLevel = passBuf.uwCamPos_level.w;
 		float3 uwCam = passBuf.uwCamPos_level.xyz;
 		float uwCamDepth = uwLevel - uwCam.z;
+		// The backdrop (the water behind everything, marked by its material's
+		// first user value) is for cameras under water only: its material
+		// blends by alpha, so above the water an alpha of 0 leaves the sky.
+		if( abs( material.userValue[0].x - 1977.0 ) < 0.5 )
+			outPs_colour0.w = uwCamDepth > 0.0 ? 1.0 : 0.0;
 		float3 uwV = inPs.pos.xyz;
 		float3 uwWorld = uwCam + uwV.x * passBuf.uwViewX.xyz +
 		                 uwV.y * passBuf.uwViewY.xyz + uwV.z * passBuf.uwViewZ.xyz;
@@ -84,6 +118,20 @@
 			if( uwClimb > 1e-6 )
 				uwW = min( uwRange, uwCamDepth / uwClimb );
 			float uwObjDepth = max( 0.0, uwLevel - uwWorld.z );
+			// Caustics on what faces up, fading with depth like the daylight
+			// that draws them.
+			if( passBuf.uwEffects.x > 0.0 && uwFragUnder )
+			{
+				float3 uwNW = normalize( pixelData.normal.x * passBuf.uwViewX.xyz +
+				                         pixelData.normal.y * passBuf.uwViewY.xyz +
+				                         pixelData.normal.z * passBuf.uwViewZ.xyz );
+				if( uwNW.z > 0.2 )
+				{
+					float uwC = uwCaustic( uwWorld.xy * 3.0, passBuf.uwEffects.z );
+					uwJ *= 1.0 + 2.0 * passBuf.uwEffects.x * uwNW.z * ( uwC - 0.18 ) *
+					       exp( -passBuf.uwDiffuse.y * uwObjDepth );
+				}
+			}
 			float3 uwLit = uwJ * exp( -passBuf.uwDiffuse.xyz * uwObjDepth ) + uwLamps;
 		@property( gz_underwater_lamps )
 			// The beams: single scatter along the view ray, up to the fragment.
@@ -197,6 +245,79 @@
 			               passBuf.uwVeil.xyz *
 			               ( float3( 1.0, 1.0, 1.0 ) - exp( -passBuf.uwBackscatter.xyz * uwW ) ) +
 			               uwBeams;
+			// Marine snow: specks fixed in the world, one per cell where the
+			// cell's hash says so, found by walking the 25 cm cells the view
+			// ray crosses (3D DDA) up to the snow's range or the fragment. The
+			// walk stops at the first speck the ray touches, which is then lit
+			// once, by the lamps and faintly by the daylight's veil.
+			if( passBuf.uwEffects.y > 0.0 )
+			{
+				float uwCell = 0.25;
+				float3 uwDirW = ( uwWorld - uwCam ) / max( uwRange, 1e-6 );
+				float uwTMax = min( uwRange, passBuf.uwEffects.w );
+				float3 uwPos = uwCam / uwCell;
+				float3 uwIdx = floor( uwPos );
+				float3 uwStep = sign( uwDirW );
+				float3 uwInv = 1.0 / max( abs( uwDirW ), float3( 1e-6, 1e-6, 1e-6 ) );
+				float3 uwNext = ( uwStep * ( uwIdx - uwPos ) + uwStep * 0.5 + 0.5 ) * uwInv * uwCell;
+				float uwT = 0.0;
+				float uwCover = 0.0;
+				float uwTc = 0.0;
+				float3 uwP = float3( 0.0, 0.0, 0.0 );
+				for( int k = 0; k < 24 && uwT < uwTMax && uwCover <= 0.0; ++k )
+				{
+					if( uwHash( uwIdx ) < passBuf.uwEffects.y )
+					{
+						// Where in its cell the speck is, and how big.
+						float3 uwOff = uwHash3( uwIdx );
+						uwP = ( uwIdx + 0.1 + 0.8 * uwOff ) * uwCell;
+						uwTc = dot( uwP - uwCam, uwDirW );
+						if( uwTc > 0.05 && uwTc < uwTMax )
+						{
+							float uwRad = 0.002 + 0.002 * fract( uwOff.x * 7.3 + uwOff.y * 3.1 + uwOff.z );
+							float uwPerp = length( uwP - ( uwCam + uwDirW * uwTc ) );
+							uwCover = saturate( 1.0 - uwPerp / ( uwRad + 0.0008 * uwTc ) );
+						}
+					}
+					// The next cell.
+					if( uwNext.x < uwNext.y && uwNext.x < uwNext.z )
+					{ uwT = uwNext.x; uwNext.x += uwInv.x * uwCell; uwIdx.x += uwStep.x; }
+					else if( uwNext.y < uwNext.z )
+					{ uwT = uwNext.y; uwNext.y += uwInv.y * uwCell; uwIdx.y += uwStep.y; }
+					else
+					{ uwT = uwNext.z; uwNext.z += uwInv.z * uwCell; uwIdx.z += uwStep.z; }
+				}
+				if( uwCover > 0.0 )
+				{
+					float3 uwLight = passBuf.uwVeil.xyz * 0.5;
+				@property( gz_underwater_lamps )
+					float3 uwPv = float3( dot( uwP - uwCam, passBuf.uwViewX.xyz ),
+					                      dot( uwP - uwCam, passBuf.uwViewY.xyz ),
+					                      dot( uwP - uwCam, passBuf.uwViewZ.xyz ) );
+					int uwN = int( passBuf.uwLampInfo.x );
+					for( int i = 0; i < uwN; ++i )
+					{
+						float4 lp = passBuf.uwLamp[i * 5];
+						float4 ld = passBuf.uwLamp[i * 5 + 1];
+						float4 lc = passBuf.uwLamp[i * 5 + 2];
+						float4 ls = passBuf.uwLamp[i * 5 + 3];
+						float3 fromLamp = uwPv - lp.xyz;
+						float d = length( fromLamp );
+						float spotAtten = 1.0;
+						if( lp.w > 0.5 )
+						{
+							float c = dot( fromLamp / max( d, 1e-6 ), ld.xyz );
+							spotAtten = c >= ls.y ? pow( saturate( ( c - ls.y ) * ls.x ), ls.z ) : 0.0;
+						}
+						if( d <= ld.w )
+							uwLight += 0.4 / 3.14159 * lc.xyz * spotAtten /
+							           ( 0.5 + ( lc.w + ls.w * d ) * d ) *
+							           exp( -passBuf.uwAttenuation.xyz * d );
+					}
+				@end
+					uwOut += uwCover * uwLight * exp( -passBuf.uwAttenuation.xyz * uwTc );
+				}
+			}
 		@property( hw_gamma_write )
 			outPs_colour0.xyz = uwOut;
 		@else

@@ -446,7 +446,8 @@ TEST(Docs, EveryElementAndPresetDocumented)
   ASSERT_FALSE(readme.empty()) << PACKAGE_README;
   for (const std::string tag : {"jerlov", "visibility", "attenuation",
                                 "backscatter", "veil", "diffuse_attenuation",
-                                "water_level", "publish_rate", "daylight"})
+                                "water_level", "publish_rate", "daylight",
+                                "caustics", "marine_snow"})
   {
     EXPECT_NE(reference.find("`<" + tag + ">`"), std::string::npos)
         << "<" << tag << "> is not in " << DOCS_REFERENCE;

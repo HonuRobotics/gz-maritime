@@ -175,7 +175,8 @@ bool WaterOpticsPrivate::Apply(const msgs::Param &_msg)
       spec.jerlov = value.string_value();
       continue;
     }
-    if ("visibility" == key || "water_level" == key || "daylight" == key)
+    if ("visibility" == key || "water_level" == key || "daylight" == key ||
+        "caustics" == key || "marine_snow" == key)
     {
       if ("visibility" == key && empty)
       {
@@ -193,6 +194,10 @@ bool WaterOpticsPrivate::Apply(const msgs::Param &_msg)
         spec.visibility = *number;
       else if ("daylight" == key)
         spec.daylight = *number;
+      else if ("caustics" == key)
+        spec.caustics = *number;
+      else if ("marine_snow" == key)
+        spec.marineSnow = *number;
       else
         spec.waterLevel = *number;
       continue;
@@ -275,7 +280,7 @@ void WaterOptics::Configure(const Entity &_entity,
   // Every element the plugin reads; any other is warned about, so a typo
   // such as <visibilty> does not leave the water unchanged in silence.
   const std::set<std::string> known{"jerlov", "visibility", "water_level",
-      "daylight",
+      "daylight", "caustics", "marine_snow",
       "publish_rate", "attenuation", "backscatter", "veil",
       "diffuse_attenuation"};
   for (auto e = _sdf->GetFirstElement(); e; e = e->GetNextElement())
@@ -293,6 +298,8 @@ void WaterOptics::Configure(const Entity &_entity,
     spec.visibility = _sdf->Get<double>("visibility");
   spec.waterLevel = _sdf->Get<double>("water_level", 0.0).first;
   spec.daylight = _sdf->Get<double>("daylight", 1.0).first;
+  spec.caustics = _sdf->Get<double>("caustics", 1.0).first;
+  spec.marineSnow = _sdf->Get<double>("marine_snow", 0.0).first;
   for (const auto &tag : kVectorTags)
   {
     if (!_sdf->HasElement(tag.name))
@@ -390,6 +397,8 @@ void WaterOptics::PostUpdate(const UpdateInfo &_info,
   setText("diffuse_attenuation", ToText(d.optics.diffuseAttenuation));
   setNumber("water_level", d.optics.waterLevel);
   setNumber("daylight", d.optics.daylight);
+  setNumber("caustics", d.optics.caustics);
+  setNumber("marine_snow", d.optics.marineSnow);
   setNumber("generation", static_cast<double>(d.optics.generation));
   d.pub.Publish(msg);
   d.lastPublish = _info.simTime;

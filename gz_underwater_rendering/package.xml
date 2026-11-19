@@ -21,6 +21,7 @@
   <test_depend>ament_lint_common</test_depend>
   <!-- The GPU image is checked against the reference camera's model. -->
   <test_depend>gz_underwater_camera</test_depend>
+  <test_depend>gz_waves_rendering</test_depend>
   <test_depend>gz_transport_vendor</test_depend>
   <test_depend>gz_msgs_vendor</test_depend>
 
