@@ -24,6 +24,7 @@
 #include <gz/common/Console.hh>
 #include <gz/math/Helpers.hh>
 #include <gz/msgs/Utility.hh>
+#include <gz/sensors/Noise.hh>
 #include <sdf/Noise.hh>
 
 #include "gz/sim/acoustics/Hearing.hh"
@@ -67,21 +68,10 @@ bool AcousticReceiver::Load(const sdf::Sensor &_sdf)
   if (!this->node.Subscribe(setTopic, &AcousticReceiver::OnSet, this))
     gzerr << "AcousticReceiver: cannot subscribe to " << setTopic << "\n";
 
-  // A receiver that hides its range still reports an amplitude, which
-  // without noise is the range again.
-  auto warnOfTheAmplitude = [this]()
-  {
-    gzwarn << "AcousticReceiver [" << this->Name() << "]: reports no range, "
-           << "but its amplitude has no noise and gives the range exactly; "
-           << "add an <amplitude_noise>\n";
-  };
-
+  // A receiver with no block of its own loads quietly with the defaults.
   const auto elem = _sdf.Element();
   if (!elem || !elem->HasElement(kBlock))
-  {
-    warnOfTheAmplitude();
     return true;
-  }
   const auto block = elem->FindElement(kBlock);
 
   auto &s = this->settings;
@@ -101,9 +91,10 @@ bool AcousticReceiver::Load(const sdf::Sensor &_sdf)
   s.dropoutStart = std::clamp(
       block->Get<double>("dropout_start", 1.0).first, 0.0, 1.0);
 
-  // The same <noise> as any Gazebo sensor, one block per channel, but
-  // drawn from the receiver's generator: gz-sensors' noise models draw from
-  // gz-math's global one, which a seed here must not touch.
+  // The same <noise> as any Gazebo sensor, one block per channel, and the
+  // same models: gz-sensors' noise, which draws from gz-math's generator,
+  // so it repeats with `gz sim --seed` as every other sensor's does.
+  bool amplitudeHidden = false;
   const char *channels[] = {"bearing_noise", "elevation_noise", "range_noise",
                             "amplitude_noise"};
   for (std::size_t i = 0; i < this->noise.size(); ++i)
@@ -127,21 +118,25 @@ bool AcousticReceiver::Load(const sdf::Sensor &_sdf)
     }
     if (noiseSdf.Type() == sdf::NoiseType::NONE)
       continue;
-    this->noise[i].mean = noiseSdf.Mean();
-    this->noise[i].stddev = std::max(noiseSdf.StdDev(), 0.0);
-    if (noiseSdf.Type() == sdf::NoiseType::GAUSSIAN_QUANTIZED)
-      this->noise[i].precision = std::max(noiseSdf.Precision(), 0.0);
-    this->bias[i] = {noiseSdf.BiasMean(),
-                     std::max(noiseSdf.BiasStdDev(), 0.0)};
-    if (noiseSdf.DynamicBiasStdDev() > 0.0)
+    this->noise[i] = sensors::NoiseFactory::NewNoiseModel(noiseSdf);
+    if (i == static_cast<std::size_t>(Channel::kAmplitude))
     {
-      gzwarn << "AcousticReceiver [" << this->Name() << "]: <" << channels[i]
-             << "> has a dynamic bias, which is not modelled\n";
+      amplitudeHidden = noiseSdf.StdDev() > 0.0 ||
+          noiseSdf.BiasStdDev() > 0.0 || noiseSdf.BiasMean() != 0.0;
     }
   }
-  const auto &loud = this->noise[static_cast<std::size_t>(Channel::kAmplitude)];
-  if (!s.range && !(loud.stddev > 0.0))
-    warnOfTheAmplitude();
+
+  // A receiver that hides its range still reports an amplitude, which
+  // without noise is the range again. Noise around zero averages out over
+  // a few pings; what hides the range is a bias, a source level the
+  // receiver does not know.
+  if (!s.range && !amplitudeHidden)
+  {
+    gzwarn << "AcousticReceiver [" << this->Name() << "]: reports no range, "
+           << "but its amplitude has no noise and gives the range exactly; "
+           << "add an <amplitude_noise> with a <bias_stddev> and some "
+           << "<stddev>\n";
+  }
   return true;
 }
 
@@ -165,22 +160,24 @@ ReceiverSettings AcousticReceiver::Settings() const
 }
 
 //////////////////////////////////////////////////
-void AcousticReceiver::DrawBias(acoustics::Generator &_rng)
+double AcousticReceiver::SinceLastReading(
+    const std::chrono::steady_clock::duration &_arrived)
 {
-  for (std::size_t i = 0; i < this->noise.size(); ++i)
-  {
-    const auto &[mean, stddev] = this->bias[i];
-    this->noise[i].bias = stddev > 0.0 ?
-        acoustics::Normal(_rng, mean, stddev) : mean;
-  }
+  // The first reading, and one noticed out of order, have no time step.
+  double dt{0.0};
+  if (this->lastArrival && _arrived > *this->lastArrival)
+    dt = Seconds(_arrived - *this->lastArrival);
+  if (!this->lastArrival || _arrived > *this->lastArrival)
+    this->lastArrival = _arrived;
+  return dt;
 }
 
 //////////////////////////////////////////////////
 double AcousticReceiver::ApplyNoise(Channel _channel, double _value,
-    acoustics::Generator &_rng) const
+    double _dt)
 {
-  const double value = acoustics::ApplyNoise(
-      this->noise[static_cast<std::size_t>(_channel)], _value, _rng);
+  const auto &model = this->noise[static_cast<std::size_t>(_channel)];
+  const double value = model ? model->Apply(_value, _dt) : _value;
   switch (_channel)
   {
     case Channel::kBearing:

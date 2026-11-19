@@ -210,57 +210,19 @@ TEST(Random, TheSameEverywhere)
   Generator rng;
   EXPECT_DOUBLE_EQ(3499211612.0 / 4294967296.0, Uniform(rng));
 
+  // Two generators of one seed draw the same numbers, spread evenly.
   Generator one(7), two(7);
-  double sum{0.0}, squares{0.0};
+  double sum{0.0};
   const int n = 20000;
   for (int i = 0; i < n; ++i)
   {
     const double u = Uniform(one);
     ASSERT_GE(u, 0.0);
     ASSERT_LT(u, 1.0);
-    const double x = Normal(one, 2.0, 0.5);
-    Uniform(two);
-    ASSERT_DOUBLE_EQ(x, Normal(two, 2.0, 0.5));
-    sum += x;
-    squares += x * x;
+    ASSERT_DOUBLE_EQ(u, Uniform(two));
+    sum += u;
   }
-  const double mean = sum / n;
-  EXPECT_NEAR(2.0, mean, 0.02);
-  EXPECT_NEAR(0.5, std::sqrt(squares / n - mean * mean), 0.02);
-}
-
-//////////////////////////////////////////////////
-/// A channel's noise: nothing without a block, a constant bias, a spread,
-/// and rounding to a precision.
-TEST(Random, ChannelNoise)
-{
-  Generator rng(3);
-  const Generator untouched = rng;
-  Noise none;
-  EXPECT_DOUBLE_EQ(1.25, ApplyNoise(none, 1.25, rng));
-  // No noise, no draw: a receiver without noise leaves the sequence alone.
-  EXPECT_EQ(untouched, rng);
-
-  Noise bias;
-  bias.bias = 0.5;
-  EXPECT_DOUBLE_EQ(1.75, ApplyNoise(bias, 1.25, rng));
-
-  Noise coarse;
-  coarse.precision = 0.5;
-  EXPECT_DOUBLE_EQ(1.5, ApplyNoise(coarse, 1.3, rng));
-
-  Noise spread;
-  spread.stddev = 0.1;
-  double sum{0.0}, squares{0.0};
-  const int n = 20000;
-  for (int i = 0; i < n; ++i)
-  {
-    const double e = ApplyNoise(spread, 3.0, rng) - 3.0;
-    sum += e;
-    squares += e * e;
-  }
-  EXPECT_NEAR(0.0, sum / n, 0.005);
-  EXPECT_NEAR(0.1, std::sqrt(squares / n), 0.005);
+  EXPECT_NEAR(0.5, sum / n, 0.01);
 }
 
 //////////////////////////////////////////////////

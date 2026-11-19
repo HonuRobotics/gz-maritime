@@ -22,11 +22,12 @@
 #include <string>
 
 /// \file
-/// \brief The random draws of the acoustics, from a generator of their own:
-/// nothing here touches gz-math's global generator, so a seed for the
-/// acoustics changes no other sensor or system. Every draw is written out
-/// here, not left to the standard library's distributions, so a seed gives
-/// the same numbers on every standard library.
+/// \brief The random draws of the acoustics' rules, the dropouts and the
+/// outliers, from a generator of their own: nothing here touches gz-math's
+/// global generator, so a seed for the acoustics changes no other sensor or
+/// system. Every draw is written out here, not left to the standard
+/// library's distributions, so a seed gives the same numbers on every
+/// standard library. A receiver's noise is gz-sensors', as on any sensor.
 
 namespace gz::sim::acoustics
 {
@@ -43,37 +44,6 @@ std::uint32_t Hash(const std::string &_text);
 /// \param[in,out] _rng The generator.
 /// \return The number.
 double Uniform(Generator &_rng);
-
-/// \brief A number from a normal distribution.
-/// \param[in,out] _rng The generator.
-/// \param[in] _mean Its mean.
-/// \param[in] _stddev Its standard deviation.
-/// \return The number.
-double Normal(Generator &_rng, double _mean, double _stddev);
-
-/// \brief The noise of one measured channel, as a Gazebo sensor's gaussian
-/// `<noise>` block sets it.
-struct Noise
-{
-  /// \brief Mean of the noise added to every reading.
-  double mean{0.0};
-
-  /// \brief Standard deviation of the noise added to every reading.
-  double stddev{0.0};
-
-  /// \brief A constant added to every reading, drawn once.
-  double bias{0.0};
-
-  /// \brief Readings are rounded to a multiple of this; 0 does not round.
-  double precision{0.0};
-};
-
-/// \brief A value with a channel's noise.
-/// \param[in] _noise The noise.
-/// \param[in] _value The true value.
-/// \param[in,out] _rng The generator.
-/// \return The noisy value.
-double ApplyNoise(const Noise &_noise, double _value, Generator &_rng);
 }  // namespace gz::sim::acoustics
 
 #endif  // GZ_SIM_ACOUSTICS_RANDOM_HH_
