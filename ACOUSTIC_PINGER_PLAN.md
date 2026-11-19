@@ -148,9 +148,10 @@ setup:
   multipath.
 
 Noise stays the `<noise>` block of a Gazebo sensor per channel, as in VRX,
-with the bearing wrapped and the range kept positive. Every random draw
-comes from a seed, so a run repeats, and from each receiver's own
-generator, so the seed changes no other sensor's noise.
+through gz-sensors' noise models, with the bearing wrapped and the range
+kept positive; it repeats with `gz sim --seed`, as every sensor's does. The
+dropouts and outliers come from each receiver's own generator, seeded from
+`<seed>`, so that seed changes no other sensor.
 
 Occlusion by hulls or terrain is left out of this phase: gz-sim gives a
 system no cheap ray query, and it needs its own look.

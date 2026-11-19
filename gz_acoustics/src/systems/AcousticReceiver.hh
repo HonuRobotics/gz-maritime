@@ -20,15 +20,16 @@
 #include <array>
 #include <chrono>
 #include <mutex>
+#include <optional>
 
 #include <gz/msgs/param.pb.h>
 
 #include <gz/math/Helpers.hh>
+#include <gz/sensors/Noise.hh>
 #include <gz/sensors/Sensor.hh>
 #include <gz/transport/Node.hh>
 #include <sdf/Sensor.hh>
 
-#include "gz/sim/acoustics/Random.hh"
 
 namespace gz::sim::maritime
 {
@@ -123,13 +124,16 @@ namespace gz::sim::maritime
   ///   from below the first or above the second is not heard. Default
   ///   -pi/2 and pi/2, which hear every direction.
   /// * `<bearing_noise>`, `<elevation_noise>`, `<range_noise>`,
-  ///   `<amplitude_noise>`: each a gaussian `<noise>` block as on any
-  ///   Gazebo sensor (mean, stddev, bias_mean, bias_stddev, precision),
-  ///   drawn from the receiver's own generator. The bearing is wrapped into
-  ///   (-pi, pi], the elevation clamped to [-pi/2, pi/2] and the range kept
-  ///   positive. Without `<amplitude_noise>` the amplitude gives the range
-  ///   away exactly, and a receiver with `<range>` off warns of it when it
-  ///   loads.
+  ///   `<amplitude_noise>`: each a `<noise>` block, gz-sensors' noise model
+  ///   as on any Gazebo sensor (gaussian or gaussian_quantized, with bias
+  ///   and dynamic bias), drawn from gz-math's generator, so it repeats
+  ///   with `gz sim --seed`. The dynamic bias steps with the time between
+  ///   readings. The bearing is wrapped into (-pi, pi], the elevation
+  ///   clamped to [-pi/2, pi/2] and the range kept positive. Without noise
+  ///   the amplitude gives the range away exactly, and noise around zero
+  ///   averages out over a few pings: a receiver with `<range>` off and no
+  ///   spread or bias on its amplitude warns of it when it loads. A
+  ///   `<bias_stddev>` stands for the source level it does not know.
   /// * `<outlier_probability>`: chance a reading's bearing is uniformly
   ///   random, default 0.
   /// * `<dropout_start>`: fraction of a pinger's reach where its pings start
@@ -165,17 +169,22 @@ namespace gz::sim::maritime
     /// \return A copy.
     public: ReceiverSettings Settings() const;
 
-    /// \brief Draw each channel's constant bias, once, before any reading.
-    /// \param[in,out] _rng The receiver's generator.
-    public: void DrawBias(acoustics::Generator &_rng);
+    /// \brief The time since the last reading, for the noise's dynamic
+    /// bias, and remember this one. Call once per reading.
+    /// \param[in] _arrived When this reading arrived.
+    /// \return Seconds since the last reading; 0 for the first, and for a
+    /// reading that arrived before the last.
+    public: double SinceLastReading(
+        const std::chrono::steady_clock::duration &_arrived);
 
-    /// \brief Apply a channel's noise.
+    /// \brief Apply a channel's noise. On the ECM thread only: the models
+    /// keep their dynamic bias.
     /// \param[in] _channel The channel.
     /// \param[in] _value The true value.
-    /// \param[in,out] _rng The receiver's generator.
+    /// \param[in] _dt Seconds since the last reading, from
+    /// SinceLastReading.
     /// \return The value with noise, unchanged without a noise block.
-    public: double ApplyNoise(Channel _channel, double _value,
-                              acoustics::Generator &_rng) const;
+    public: double ApplyNoise(Channel _channel, double _value, double _dt);
 
     /// \brief Publish one reading.
     /// \param[in] _reading The reading.
@@ -192,11 +201,12 @@ namespace gz::sim::maritime
     /// \brief Guards the settings across the transport and ECM threads.
     private: mutable std::mutex mutex;
 
-    /// \brief Noise per channel; all zero without a noise block.
-    private: std::array<acoustics::Noise, 4> noise;
+    /// \brief gz-sensors' noise model per channel; null without a noise
+    /// block.
+    private: std::array<sensors::NoisePtr, 4> noise;
 
-    /// \brief Mean and standard deviation of each channel's bias.
-    private: std::array<std::array<double, 2>, 4> bias{};
+    /// \brief When the last reading arrived, for the dynamic bias.
+    private: std::optional<std::chrono::steady_clock::duration> lastArrival;
 
     /// \brief Transport node.
     private: transport::Node node;
