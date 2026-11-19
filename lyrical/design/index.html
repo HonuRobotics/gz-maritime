@@ -779,21 +779,30 @@ it, vehicles switch the plugin’s filename and name and nothing else.</p>
 </section>
 <section id="buoyancy-that-follows-the-waves">
 <h2>Buoyancy that follows the waves<a class="headerlink" href="#buoyancy-that-follows-the-waves" title="Link to this heading"></a></h2>
-<p>Today vehicles float on the flat water level, and the drawn waves pass
+<p>Vehicles float on the flat water level by default, and the drawn waves pass
 through their hulls (<a class="reference internal" href="../how-to/own-vehicle.html#waves-and-physics-today"><span class="std std-ref">Waves and physics today</span></a>).
-Coupling buoyancy to the waves is planned, as a separate consumer of the wave
-field. The main points it has to handle:</p>
+<code class="docutils literal notranslate"><span class="pre">gz_waves_buoyancy</span></code> couples buoyancy to the waves, as a separate consumer of
+the wave field that a world runs instead of the flat buoyancy. How it meets
+each point:</p>
 <ul class="simple">
-<li><p><strong>A local water surface per collision shape.</strong> Sample the wave height
-around each shape, fit a plane, and measure the volume under that plane
-instead of under z = 0.</p></li>
+<li><p><strong>A local water surface per collision shape.</strong> It samples the height of the
+drawn surface at each shape’s centre and at the ends of its footprint, fits
+a plane, and measures the volume under that plane instead of under z = 0.</p></li>
 <li><p><strong>Long hulls.</strong> One plane per shape is only good when the shape is short
-compared to the wavelength, so long hulls need splitting into segments.</p></li>
+compared to the wavelength; the plane averages a shorter chop, and a long
+hull is better split into segments.</p></li>
 <li><p><strong>Update rate.</strong> The wave field updates at <code class="docutils literal notranslate"><span class="pre">&lt;update_rate&gt;</span></code> (30 Hz in
-<code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code>), slower than physics (250 Hz), so the forces need
-interpolating.</p></li>
+<code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code>), slower than physics (250 Hz). Advancing it every step
+costs about four times the run time and changes the motion by nothing
+measurable, so the buoyancy reads the field as last advanced. A world that
+wants smoother forces sets <code class="docutils literal notranslate"><span class="pre">&lt;update_rate&gt;0&lt;/update_rate&gt;</span></code> on the wave
+system.</p></li>
 <li><p><strong>Choppy seas.</strong> The high-fidelity sea also moves the surface sideways;
-finding the true height at a point needs that displacement.</p></li>
+<code class="docutils literal notranslate"><span class="pre">waves::SurfaceHeight</span></code> undoes that displacement to find the height of the
+surface as drawn.</p></li>
+<li><p><strong>Hydrostatic only.</strong> The water pushes straight up with the weight
+displaced: no pressure change with depth under the wave, no horizontal wave
+force.</p></li>
 </ul>
 </section>
 <section id="related">
