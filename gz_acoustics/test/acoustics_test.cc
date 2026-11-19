@@ -17,8 +17,10 @@
 #include <gtest/gtest.h>
 
 #include <gz/msgs/boolean.pb.h>
+#include <gz/msgs/entity.pb.h>
 #include <gz/msgs/entity_factory.pb.h>
 #include <gz/msgs/param.pb.h>
+#include <gz/msgs/pose.pb.h>
 #include <gz/msgs/Utility.hh>
 
 #include <unistd.h>
@@ -213,6 +215,58 @@ class AcousticWorld
   /// \brief The fixture.
   public: TestFixture fixture;
 };
+}
+
+/// \brief Ask the world a service while it runs a moment: the server's own
+/// thread serves it, so it must be stepping.
+/// \param[in,out] _world The world.
+/// \param[in] _service The service.
+/// \param[in] _req The request.
+/// \return True if the world took it.
+template <typename Request>
+bool Ask(AcousticWorld &_world, const std::string &_service,
+         const Request &_req)
+{
+  transport::Node node;
+  msgs::Boolean rep;
+  bool result{false};
+  std::thread runner([&]() { _world.Run(0.1); });
+  const bool answered = node.Request(_service, _req, 5000, rep, result);
+  runner.join();
+  return answered && result && rep.data();
+}
+
+/// \brief Remove a model from the pingers world.
+/// \param[in,out] _world The world.
+/// \param[in] _name The model.
+/// \return True if the world took it.
+bool Remove(AcousticWorld &_world, const std::string &_name)
+{
+  msgs::Entity req;
+  req.set_name(_name);
+  req.set_type(msgs::Entity::MODEL);
+  return Ask(_world, "/world/pingers/remove", req);
+}
+
+/// \brief Move a model of the pingers world.
+/// \param[in,out] _world The world.
+/// \param[in] _name The model.
+/// \param[in] _x World x, m.
+/// \param[in] _y World y, m.
+/// \param[in] _z World z, m.
+/// \param[in] _yaw rad.
+/// \return True if the world took it.
+bool Move(AcousticWorld &_world, const std::string &_name, double _x,
+          double _y, double _z, double _yaw)
+{
+  msgs::Pose req;
+  req.set_name(_name);
+  req.mutable_position()->set_x(_x);
+  req.mutable_position()->set_y(_y);
+  req.mutable_position()->set_z(_z);
+  req.mutable_orientation()->set_w(std::cos(_yaw / 2));
+  req.mutable_orientation()->set_z(std::sin(_yaw / 2));
+  return Ask(_world, "/world/pingers/set_pose", req);
 }
 
 //////////////////////////////////////////////////
@@ -599,6 +653,155 @@ TEST(Acoustics, ResetDropsPingsOnTheirWay)
     const auto &stamp = readings[i].header().stamp();
     EXPECT_NEAR(i + 0.1, stamp.sec() + stamp.nsec() * 1e-9, 1e-6);
   }
+}
+
+//////////////////////////////////////////////////
+/// A pinger on a model spawned while the world runs pings, is heard, and is
+/// listed. It is 100 m north of the listener, which faces north, and pings
+/// half a period after the buoy.
+TEST(Acoustics, PingerSpawnedAtRunTime)
+{
+  Readings listener("/listener");
+  Readings truth("/world/pingers/acoustics/pingers");
+  AcousticWorld world("pingers.sdf");
+  ASSERT_TRUE(world.Run(0.2));
+
+  const std::string sdf = R"(
+    <sdf version="1.9">
+    <model name="late">
+      <static>true</static>
+      <pose>150 100 0 0 0 0</pose>
+      <link name="link"/>
+      <plugin filename="gz-maritime-acoustic-pinger-system"
+              name="gz::sim::maritime::AcousticPinger">
+        <pose>0 0 -2 0 0 0</pose>
+        <frequency>30000</frequency>
+        <period>1</period>
+        <offset>0.5</offset>
+      </plugin>
+    </model>
+    </sdf>)";
+  msgs::EntityFactory req;
+  req.set_sdf(sdf);
+  ASSERT_TRUE(Ask(world, "/world/pingers/create", req));
+  ASSERT_TRUE(world.Run(3.0));
+  listener.Count();
+
+  // Its pings, sent at 0.5, 1.5 and 2.5 s: dead ahead, 100 m away.
+  int late{0};
+  for (const auto &r : listener.All())
+  {
+    const double sent = Get(r, "emit_time");
+    if (std::abs(sent - std::round(sent)) < 0.25)
+      continue;
+    ++late;
+    EXPECT_NEAR(0.0, Get(r, "bearing"), 1e-6);
+    EXPECT_NEAR(100.0, Get(r, "range"), 1e-6);
+  }
+  EXPECT_GE(late, 2);
+
+  // And the world lists it.
+  const auto lists = truth.All();
+  ASSERT_FALSE(lists.empty());
+  bool listed{false};
+  for (const auto &p : lists.back().children())
+    listed = listed || p.params().at("name").string_value() == "late";
+  EXPECT_EQ(2, lists.back().children_size());
+  EXPECT_TRUE(listed);
+}
+
+//////////////////////////////////////////////////
+/// A pinger whose model is removed pings no more and is no longer listed;
+/// the receivers carry on.
+TEST(Acoustics, RemovedPingerFallsSilent)
+{
+  Readings listener("/listener");
+  Readings truth("/world/pingers/acoustics/pingers");
+  AcousticWorld world("pingers.sdf");
+  // Pings at 0 and 1 s, both arrived.
+  ASSERT_TRUE(world.Run(1.5));
+  ASSERT_EQ(2u, listener.Count());
+
+  ASSERT_TRUE(Remove(world, "buoy"));
+  truth.Clear();
+  ASSERT_TRUE(world.Run(2.5));
+
+  // Nothing sent after the removal.
+  for (const auto &r : listener.All())
+    EXPECT_LT(Get(r, "emit_time"), 1.5);
+  EXPECT_EQ(2u, listener.Count());
+  ASSERT_GT(truth.Count(), 0u);
+  EXPECT_EQ(0, truth.All().back().children_size());
+}
+
+//////////////////////////////////////////////////
+/// A receiver whose model is removed is forgotten: no more readings and
+/// no longer listed, while the others stay.
+TEST(Acoustics, RemovedReceiverIsForgotten)
+{
+  Readings listener("/listener");
+  Readings list("/world/pingers/acoustics/receivers");
+  AcousticWorld world("pingers.sdf");
+  // The ping at 0 s, arrived.
+  ASSERT_TRUE(world.Run(0.5));
+  ASSERT_EQ(1u, listener.Count());
+
+  ASSERT_TRUE(Remove(world, "listener"));
+  list.Clear();
+  ASSERT_TRUE(world.Run(2.5));
+
+  EXPECT_EQ(1u, listener.Count());
+  ASSERT_GT(list.Count(), 0u);
+  const auto lists = list.All();
+  const auto &last = lists.back();
+  EXPECT_EQ(4, last.children_size());
+  for (const auto &r : last.children())
+    EXPECT_NE("/listener", r.params().at("topic").string_value());
+}
+
+//////////////////////////////////////////////////
+/// A pinger moves with its model and a receiver hears in its frame as it
+/// moves. The buoy, moved 150 m north, is then 212 m from the listener at
+/// 45 degrees to port; the listener, turned back to face east, has it at
+/// 135 degrees.
+TEST(Acoustics, PingersAndReceiversMove)
+{
+  Readings listener("/listener");
+  AcousticWorld world("pingers.sdf");
+  ASSERT_TRUE(world.Run(1.5));
+  // The buoy floats at 0, its pinger 2 m under it; the listener is 2 m down.
+  ASSERT_TRUE(Move(world, "buoy", 0.0, 150.0, 0.0, 0.0));
+  ASSERT_TRUE(world.Run(1.9));
+  ASSERT_TRUE(Move(world, "listener", 150.0, 0.0, -2.0, 0.0));
+  ASSERT_TRUE(world.Run(1.9));
+  listener.Count();
+
+  const double diagonal = 150.0 * std::sqrt(2.0);
+  int checked{0};
+  for (const auto &r : listener.All())
+  {
+    const double sent = Get(r, "emit_time");
+    SCOPED_TRACE(sent);
+    double bearing{GZ_PI / 2};
+    double range{150.0};
+    if (sent > 3.5)
+    {
+      bearing = 3 * GZ_PI / 4;
+      range = diagonal;
+    }
+    else if (sent > 1.5)
+    {
+      bearing = GZ_PI / 4;
+      range = diagonal;
+    }
+    EXPECT_NEAR(bearing, Get(r, "bearing"), 1e-6);
+    EXPECT_NEAR(range, Get(r, "range"), 1e-6);
+    // The stamp is when it arrived, after the new distance.
+    EXPECT_NEAR(sent + range / 1500.0, Stamp(r), 1e-6);
+    ++checked;
+  }
+  // Pings at 0 to 5 s.
+  EXPECT_EQ(6, checked);
 }
 
 //////////////////////////////////////////////////

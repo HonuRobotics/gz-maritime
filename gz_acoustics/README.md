@@ -222,7 +222,9 @@ serialization without a world; `acoustics_test` runs the systems in
 `test/worlds`: one reading per ping from the right bearing and after the
 right delay, band, reach, water and field of view, the set topics, the
 ground truth, the lists on a paused world, a refused second pinger of one
-name, a receiver spawned at run time, two pingers in turn and then on top
-of each other, pings that overlap inside one step and across two, a seeded
-run repeating (the noise with gz-math's seed, the dropouts and outliers
-with `<seed>`), and a world reset dropping the pings still on their way.
+name, a receiver and a pinger spawned at run time, a pinger and a receiver
+removed, a pinger and a receiver moved (the bearing, the range and the
+arrival from where each is), two pingers in turn and then on top of each
+other, pings that overlap inside one step and across two, a seeded run
+repeating (the noise with gz-math's seed, the dropouts and outliers with
+`<seed>`), and a world reset dropping the pings still on their way.
