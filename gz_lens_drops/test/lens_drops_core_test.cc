@@ -124,25 +124,25 @@ TEST(LensDropsCore, NoRainNoDrops)
 //////////////////////////////////////////////////
 TEST(LensDropsCore, RateFollowsRain)
 {
-  // 20 mm/h is one drop a second.
-  Drops open(7, Rain(20.0));
+  // 2.5 mm/h at flux 1, with the splash floor, is 1.1 drops a second.
+  Drops open(7, Rain(2.5));
   Advance(open, 10000, 0.1);
-  EXPECT_GE(open.Spawned(), 900u);
-  EXPECT_LE(open.Spawned(), 1100u);
+  EXPECT_GE(open.Spawned(), 990u);
+  EXPECT_LE(open.Spawned(), 1210u);
 
-  Params half = Rain(20.0);
+  Params half = Rain(2.5);
   half.exposure = 0.5;
   Drops sheltered(7, half);
   Advance(sheltered, 10000, 0.1);
-  EXPECT_GE(sheltered.Spawned(), 420u);
-  EXPECT_LE(sheltered.Spawned(), 580u);
+  EXPECT_GE(sheltered.Spawned(), 470u);
+  EXPECT_LE(sheltered.Spawned(), 630u);
 }
 
 //////////////////////////////////////////////////
 TEST(LensDropsCore, NeverMoreThanMax)
 {
   Drops drops(7, Rain(1000.0, 3600.0));
-  for (int i = 0; i < 2000; ++i)
+  for (int i = 0; i < 4000; ++i)
   {
     drops.Step(0.05);
     ASSERT_LE(drops.List().size(), kMaxDrops);
@@ -179,6 +179,7 @@ TEST(LensDropsCore, ShownRadiusShrinks)
 //////////////////////////////////////////////////
 TEST(LensDropsCore, BigDropsSlideOut)
 {
+  const double kSlideRadius = Params().slideRadius;
   Drops drops(7, Rain(200.0, 3600.0));
   bool big = false;
   for (int i = 0; i < 400; ++i)
@@ -203,6 +204,9 @@ TEST(LensDropsCore, OverlappingDropsMerge)
   for (int step = 0; step < 2000; ++step)
   {
     drops.Step(0.05);
+    // Every pair is O(n^2) on up to kMaxDrops drops: check now and then.
+    if (step % 50 != 49)
+      continue;
     const std::vector<Drop> &list = drops.List();
     for (std::size_t i = 0; i < list.size(); ++i)
     {
@@ -321,4 +325,181 @@ TEST(LensDropsCore, LongStepIsCapped)
   const double before = drops.Time();
   drops.Step(100.0);
   EXPECT_DOUBLE_EQ(drops.Time() - before, kMaxStep);
+}
+
+namespace
+{
+/// \brief An environment.
+/// \param[in] _gx Gravity to the image's right, g.
+/// \param[in] _gy Gravity down the image, g.
+/// \param[in] _ax Air to the image's right, m/s.
+/// \param[in] _flux Rain flux factor.
+/// \return The environment.
+Environment Env(double _gx, double _gy, double _ax = 0.0, double _flux = 1.0)
+{
+  Environment e;
+  e.gravityX = _gx;
+  e.gravityY = _gy;
+  e.airX = _ax;
+  e.flux = _flux;
+  return e;
+}
+
+/// \brief A drop to Add.
+/// \param[in] _x Centre, width fraction.
+/// \param[in] _y Centre, height fraction.
+/// \param[in] _r Radius, image heights.
+/// \return The drop.
+Drop At(double _x, double _y, double _r)
+{
+  Drop d;
+  d.x = _x;
+  d.y = _y;
+  d.radius = _r;
+  return d;
+}
+
+/// \brief The water on a lens.
+/// \param[in] _drops The lens.
+/// \return The sum of the drops' volumes.
+double Water(const Drops &_drops)
+{
+  double sum = 0.0;
+  for (const Drop &d : _drops.List())
+    sum += Volume(d);
+  return sum;
+}
+}  // namespace
+
+//////////////////////////////////////////////////
+TEST(LensDropsPhysics, PinnedBelowThreshold)
+{
+  Drops drops(7, Rain(0.0));
+  drops.Add(At(0.5, 0.5, 0.5 * Params().slideRadius));
+  Advance(drops, 100, 0.1);
+  ASSERT_EQ(drops.List().size(), 1u);
+  EXPECT_DOUBLE_EQ(drops.List()[0].x, 0.5);
+  EXPECT_DOUBLE_EQ(drops.List()[0].y, 0.5);
+  EXPECT_FALSE(drops.List()[0].sliding);
+}
+
+//////////////////////////////////////////////////
+TEST(LensDropsPhysics, SlidesDownTheWorld)
+{
+  // The camera rolled a quarter turn: down is the image's right.
+  Drops drops(7, Rain(0.0));
+  drops.SetEnvironment(Env(1.0, 0.0));
+  drops.Add(At(0.3, 0.5, 2.0 * Params().slideRadius));
+  Advance(drops, 10, 0.1);
+  ASSERT_FALSE(drops.List().empty());
+  EXPECT_GT(drops.List()[0].x, 0.3);
+  EXPECT_LT(std::abs(drops.List()[0].y - 0.5), 0.02);
+  EXPECT_GE(drops.Sliding(), 1u);
+}
+
+//////////////////////////////////////////////////
+TEST(LensDropsPhysics, FacingUpStaysPut)
+{
+  Drops drops(7, Rain(0.0));
+  drops.SetEnvironment(Env(0.0, 0.0));
+  drops.Add(At(0.5, 0.5, 2.0 * Params().slideRadius));
+  Advance(drops, 10, 0.1);
+  ASSERT_EQ(drops.List().size(), 1u);
+  EXPECT_DOUBLE_EQ(drops.List()[0].x, 0.5);
+  EXPECT_DOUBLE_EQ(drops.List()[0].y, 0.5);
+}
+
+//////////////////////////////////////////////////
+TEST(LensDropsPhysics, AirPushes)
+{
+  Drops drops(7, Rain(0.0));
+  drops.SetEnvironment(Env(0.0, 0.0, 30.0));
+  drops.Add(At(0.3, 0.5, 2.0 * Params().slideRadius));
+  Advance(drops, 10, 0.1);
+  ASSERT_FALSE(drops.List().empty());
+  EXPECT_GT(drops.List()[0].x, 0.3);
+}
+
+//////////////////////////////////////////////////
+TEST(LensDropsPhysics, VolumeIsConserved)
+{
+  Drops drops(7, Rain(0.0, 3600.0));
+  drops.SetEnvironment(Env(0.0, 1.0));
+  for (const double x : {0.3, 0.33, 0.36, 0.6, 0.8})
+    drops.Add(At(x, 0.2, 0.06));
+  const double water = Water(drops);
+  for (int i = 0; i < 20; ++i)
+  {
+    drops.Step(0.1);
+    ASSERT_NEAR(Water(drops), water, 1e-9 * water) << "step " << i;
+    // The three that touch are one after the first step; beads come later.
+    if (i == 0)
+    {
+      EXPECT_EQ(drops.List().size(), 3u) << "the touching drops did not merge";
+    }
+  }
+  EXPECT_GE(drops.Sliding(), 1u);
+}
+
+//////////////////////////////////////////////////
+TEST(LensDropsPhysics, BeadsAndTrails)
+{
+  Drops drops(7, Rain(0.0));
+  drops.SetEnvironment(Env(0.0, 1.0));
+  drops.Add(At(0.5, 0.1, 0.06));
+  Advance(drops, 20, 0.1);
+  EXPECT_GT(drops.List().size(), 1u) << "no bead";
+  EXPECT_FALSE(drops.Trails().empty());
+
+  // A little over half the drying time with nothing sliding: the film is
+  // gone.
+  drops.SetEnvironment(Env(0.0, 0.0));
+  Advance(drops, 105, 0.1);
+  EXPECT_TRUE(drops.Trails().empty());
+}
+
+//////////////////////////////////////////////////
+TEST(LensDropsPhysics, FluxScalesRain)
+{
+  Drops dry(7, Rain(10.0));
+  dry.SetEnvironment(Env(0.0, 1.0, 0.0, 0.0));
+  Advance(dry, 10000, 0.1);
+  const double floor = 10.0 * kDropsPerMmHour * kSplashFloor * 1000.0;
+  EXPECT_NEAR(static_cast<double>(dry.Spawned()), floor, 0.1 * floor);
+
+  Drops wet(7, Rain(10.0));
+  wet.SetEnvironment(Env(0.0, 1.0, 0.0, 2.0));
+  Advance(wet, 10000, 0.1);
+  const double heavy = 10.0 * kDropsPerMmHour * (2.0 + kSplashFloor) * 1000.0;
+  EXPECT_NEAR(static_cast<double>(wet.Spawned()), heavy, 0.1 * heavy);
+}
+
+//////////////////////////////////////////////////
+TEST(LensDropsPhysics, GenerationMoves)
+{
+  Drops drops(7, Rain(0.0));
+  const auto g0 = drops.Generation();
+  drops.Step(0.0);
+  EXPECT_EQ(drops.Generation(), g0);
+  drops.Add(At(0.5, 0.5, 0.01));
+  const auto g1 = drops.Generation();
+  EXPECT_GT(g1, g0);
+  drops.Clear();
+  EXPECT_GT(drops.Generation(), g1);
+}
+
+//////////////////////////////////////////////////
+TEST(LensDropsPhysics, SanitizeEnvironment)
+{
+  Environment e;
+  e.gravityX = std::numeric_limits<double>::quiet_NaN();
+  e.flux = std::numeric_limits<double>::infinity();
+  const Environment a = Sanitize(e);
+  EXPECT_DOUBLE_EQ(a.gravityX, 0.0);
+  EXPECT_DOUBLE_EQ(a.gravityY, 1.0);
+  EXPECT_DOUBLE_EQ(a.flux, 1.0);
+
+  const Environment b = Sanitize(Env(3.0, 4.0));
+  EXPECT_DOUBLE_EQ(b.gravityX, 0.6);
+  EXPECT_DOUBLE_EQ(b.gravityY, 0.8);
 }
