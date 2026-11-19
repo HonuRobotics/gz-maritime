@@ -67,8 +67,8 @@ plane, straight up. Not modelled:
 - the pressure field tilting with the wave: the water pushes straight up,
   not along the surface normal, so a hull heels more than the slope, by
   BM / GM (the test box, 1.3 times);
-- water moving with the waves: the hydrodynamics still damps against still
-  water (or the current).
+- water moving with the waves, for a vehicle without `gz_hydrodynamics`:
+  only one with Fossen coefficients is damped against it (below).
 
 One plane per shape is right while the shape is short against the
 wavelength; the plane averages a chop shorter than the shape. A long hull is
@@ -76,10 +76,25 @@ better split into several marked shapes, as the BlueBoat's pontoons already
 are. A marked mesh does not float here (it warns once), as the flat
 buoyancy floats none.
 
+## Water that moves with the waves
+
+The system also tags the world with its `WaveCoupling` component
+(`include/gz/sim/components/WaveCoupling.hh`, a tag and nothing else).
+`gz_hydrodynamics` sees it and damps a vehicle against the current **plus**
+the waves' water velocity at its centre of pressure: the surface particle
+velocity, faded with depth as e^(-k d), with k the deep-water wavenumber of
+the sea's peak period (`waves::WaterVelocity`). The depth is measured from
+the drawn surface over that point (`waves::SurfaceHeight`, the one the
+buoyancy floats on), above the still water the world's ocean current recipe
+gives (`<water_level>`, 0 without a recipe). A vehicle near the surface is
+carried back and forth by the waves; one deep down hardly feels them. In a
+world without the wave buoyancy, where the waves are only drawn, nothing
+changes.
+
 ## Tests
 
 ```bash
-colcon test --packages-select gz_waves_buoyancy
+colcon test --packages-select gz_waves_buoyancy gz_hydrodynamics
 ```
 
 - `displacement_test`: the volume and centre under, and over, flat, raised,
@@ -98,6 +113,9 @@ colcon test --packages-select gz_waves_buoyancy
     hydrostatic model predicts; a neutral sphere 3 m down stays put (the
     limit above);
   - on the FFT engine's slight sea, the box follows the drawn surface.
+- `gz_hydrodynamics`' `hydrodynamics_waves_test`: two damped neutral spheres
+  under the same wave. The one 0.6 m down swings 0.37 m, the one 5 m down
+  0.12 m, as e^(-k d) predicts. With the waves only drawn, neither moves.
 
 ## Not yet
 
@@ -105,3 +123,16 @@ colcon test --packages-select gz_waves_buoyancy
   it yet.
 - The wind's and the current's marks still cut a shape at the flat
   `<water_level>`, not at the waves.
+- The water's motion fades with depth at one rate, the sea's peak wave's.
+  A real sea fades its short waves faster, so deep down the motion is
+  overstated: at 30 m, 40 to 80 % more than linear theory at sea states 5
+  to 9.
+- The waves' velocity is added to the current, so a vehicle is carried
+  through its damping alone. The force from the water's acceleration (the
+  Froude–Krylov force, and the added mass's share of it) is not there,
+  though for a body small against the wavelength it is usually the larger
+  one; added mass sees the waves' velocity but not their acceleration, and
+  vehicles here carry none.
+- The velocity is sampled at one point, the centre of pressure. A hull
+  longer than the chop gets the full velocity of the short waves, where the
+  buoyancy averages them over its fitted plane.

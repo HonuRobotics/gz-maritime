@@ -732,4 +732,7 @@ ros2 launch kai_bringup simulation.launch.xml
   shape (`Eval`'s `SurfaceHeight`, which undoes the horizontal displacement
   of the engine's render grid), opt-in per world instead of the flat
   buoyancy. It reads the field at the source system's `<update_rate>` and
-  never advances it. No `kai_gazebo` world runs it yet.
+  never advances it. It tags the world with its `WaveCoupling` component,
+  and there `gz_hydrodynamics` damps against the waves' water velocity too
+  (`waves::WaterVelocity`, faded with depth). No `kai_gazebo` world runs it
+  yet.

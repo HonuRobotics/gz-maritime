@@ -10,6 +10,8 @@
 
 #include "gz/sim/waves/Eval.hh"
 
+#include <cmath>
+
 #include <algorithm>
 #include <cmath>
 
@@ -97,6 +99,28 @@ gz::math::Vector3d ParticleVelocity(const WavefieldData &_wf,
 {
   return _wf.simulation ? _wf.simulation->ParticleVelocity(_x, _y, _t)
                         : gz::math::Vector3d::Zero;
+}
+
+//////////////////////////////////////////////////
+gz::math::Vector3d WaterVelocity(const WavefieldData &_wf, double _waterLevel,
+                                 double _x, double _y, double _z, double _t)
+{
+  if (!_wf.simulation)
+    return gz::math::Vector3d::Zero;
+  const gz::math::Vector3d surface =
+      _wf.simulation->ParticleVelocity(_x, _y, _t);
+  // Depth below the drawn surface, the one the wave buoyancy floats on.
+  const double depth = _waterLevel + SurfaceHeight(_wf, _x, _y, _t) - _z;
+  if (depth <= 0.0)
+    return surface;
+
+  // Deep-water dispersion, omega^2 = g k, at the peak period.
+  const WaveParameters p = WithSeaState(_wf.params);
+  if (!(p.period > 0.0) || !(p.gravity > 0.0))
+    return surface;
+  const double omega = 2.0 * GZ_PI / p.period;
+  const double k = omega * omega / p.gravity;
+  return surface * std::exp(-k * depth);
 }
 
 //////////////////////////////////////////////////

@@ -234,6 +234,44 @@ TEST(Eval, SurfaceHeightUndoesTheHorizontalDisplacement)
 }
 
 //////////////////////////////////////////////////
+TEST(Eval, WaterVelocityFadesWithDepth)
+{
+  // The stub's surface at (1, 2) and t 3 stands 6 m above the still water
+  // and moves at (1, 2, 3). A peak period of 2 pi s gives omega 1 rad/s,
+  // so with g 9.8 the wavenumber is 1 / 9.8 m^-1: 9.8 m under the local
+  // surface the water moves at e^-1 of the surface velocity.
+  gsw::WavefieldData wf;
+  wf.simulation = std::make_shared<StubWaveField>();
+  wf.params.period = 2.0 * GZ_PI;
+  wf.params.gravity = 9.8;
+  const gz::math::Vector3d surface(1.0, 2.0, 3.0);
+
+  // At and above the local surface: the surface velocity.
+  EXPECT_EQ(gsw::WaterVelocity(wf, 0.0, 1.0, 2.0, 6.0, 3.0), surface);
+  EXPECT_EQ(gsw::WaterVelocity(wf, 0.0, 1.0, 2.0, 7.5, 3.0), surface);
+
+  // Depth is measured from the local surface, over the still water level.
+  const auto deep = gsw::WaterVelocity(wf, 0.0, 1.0, 2.0, 6.0 - 9.8, 3.0);
+  const auto raised = gsw::WaterVelocity(wf, 2.0, 1.0, 2.0, 8.0 - 9.8, 3.0);
+  for (int i = 0; i < 3; ++i)
+  {
+    EXPECT_NEAR(deep[i], surface[i] * std::exp(-1.0), 1e-12);
+    EXPECT_NEAR(raised[i], deep[i], 1e-12);
+  }
+
+  // The fade is monotonic: deeper water moves less.
+  EXPECT_LT(gsw::WaterVelocity(wf, 0.0, 1.0, 2.0, -20.0, 3.0).Length(),
+            deep.Length());
+
+  // A sea state sets the peak period: a longer one reaches deeper.
+  gsw::WavefieldData slight = wf, rough = wf;
+  slight.params.seaState = 3;
+  rough.params.seaState = 6;
+  EXPECT_GT(gsw::WaterVelocity(rough, 0.0, 1.0, 2.0, -10.0, 3.0).Length(),
+            gsw::WaterVelocity(slight, 0.0, 1.0, 2.0, -10.0, 3.0).Length());
+}
+
+//////////////////////////////////////////////////
 TEST(Eval, NullEngineFallsBackToStillWater)
 {
   gsw::WavefieldData wf;  // no simulation
@@ -241,6 +279,8 @@ TEST(Eval, NullEngineFallsBackToStillWater)
 
   EXPECT_DOUBLE_EQ(gsw::SurfaceElevation(wf, 1.0, 2.0, 3.0), 0.0);
   EXPECT_EQ(gsw::ParticleVelocity(wf, 1.0, 2.0, 3.0), gz::math::Vector3d::Zero);
+  EXPECT_EQ(gsw::WaterVelocity(wf, 0.0, 1.0, 2.0, -3.0, 3.0),
+            gz::math::Vector3d::Zero);
   EXPECT_EQ(gsw::Normal(wf, 1.0, 2.0, 3.0), gz::math::Vector3d::UnitZ);
   EXPECT_DOUBLE_EQ(gsw::Jacobian(wf, 1.0, 2.0, 3.0), 1.0);
   EXPECT_DOUBLE_EQ(gsw::FoamMask(wf, 1.0, 2.0, 3.0), 0.0);

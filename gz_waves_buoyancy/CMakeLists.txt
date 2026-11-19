@@ -47,11 +47,24 @@ target_link_libraries(wave_displacement
 # --------------------------------------------------------------------------
 # The world system: buoyancy on the wave field.
 # --------------------------------------------------------------------------
+# The WaveCoupling tag, a header only component: the wave buoyancy writes
+# it, and a system that damps against the water reads it.
+add_library(${PROJECT_NAME} INTERFACE)
+target_include_directories(${PROJECT_NAME}
+  INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(${PROJECT_NAME} INTERFACE gz-sim::core)
+install(DIRECTORY include/ DESTINATION include)
+install(TARGETS ${PROJECT_NAME} EXPORT export_${PROJECT_NAME})
+
 add_library(gz-maritime-wave-buoyancy-system SHARED
   src/systems/WaveBuoyancy.cc
 )
 target_link_libraries(gz-maritime-wave-buoyancy-system
   PRIVATE
+    ${PROJECT_NAME}
     wave_displacement
     gz_waves::gz_waves
     gz-sim::core
@@ -92,5 +105,9 @@ endif()
 
 ament_environment_hooks("hooks/hook.dsv.in")
 ament_environment_hooks("hooks/hook.sh.in")
+
+ament_export_targets(export_${PROJECT_NAME})
+ament_export_include_directories(include)
+ament_export_dependencies(gz_sim_vendor)
 
 ament_package()
