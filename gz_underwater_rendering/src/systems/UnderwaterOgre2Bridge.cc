@@ -28,10 +28,13 @@
 // * gz-rendering's Hlms listener: ours calls it first, then appends.
 
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <string>
+#include <vector>
 #include <unistd.h>
 
 #include <gz/common/Console.hh>
@@ -45,6 +48,9 @@
 #include <OgreRoot.h>
 #include <OgreSceneManager.h>
 #include <OgreHlmsPbs.h>
+#include <OgreLight.h>
+#include <OgreMatrix4.h>
+#include <OgreSceneNode.h>
 
 namespace
 {
@@ -56,11 +62,33 @@ struct Water
   float veil[3]{0, 0, 0};
   float diffuse[3]{0, 0, 0};
   float level{0};
+  float daylight{1};
   bool active{false};
 };
 
-/// \brief Bytes the underwater block adds: eight float4.
-constexpr Ogre::uint32 kBlockBytes = 8u * 4u * sizeof(float);
+/// \brief Lamps the shader lights with and draws the beams of.
+constexpr int kMaxLamps = 4;
+
+/// \brief float4s per lamp: position (view) and type; direction (view) and
+/// range; diffuse and linear attenuation; spot parameters and quadratic
+/// attenuation; specular.
+constexpr int kLampFloat4 = 5;
+
+/// \brief Bytes the underwater block adds: the water (8 float4), the beam
+/// (2) and the lamps.
+constexpr Ogre::uint32 kBlockBytes =
+    (10u + kMaxLamps * kLampFloat4) * 4u * sizeof(float);
+
+/// \brief Henyey-Greenstein asymmetry of the water's scattering, and the
+/// beam's ray march.
+constexpr float kPhaseG = 0.9f;
+constexpr float kBeamSteps = 12.0f;
+constexpr float kBeamRange = 20.0f;
+
+/// \brief A lamp dimmer than this (its power scale times its brightest
+/// diffuse channel) counts as off: the shader neither lights with it nor
+/// marches its beam. With every lamp off the lamp code is compiled out.
+constexpr float kLampMinPower = 0.01f;
 
 class UnderwaterListener : public Ogre::HlmsListener
 {
@@ -69,6 +97,74 @@ class UnderwaterListener : public Ogre::HlmsListener
 
   private: bool On(bool _caster) const
   { return this->water.active && !_caster; }
+
+  /// \brief The scene's lamps (spot and point lights), as of the last
+  /// preparePassHash.
+  private: std::vector<const Ogre::Light *> lamps;
+
+  /// \brief Lamps this listener hid from Ogre's own lighting, so that the
+  /// shader lights with them once, through the water.
+  public: std::set<Ogre::Light *> hidden;
+
+  /// \brief Hide the scene's lamps from Ogre's lighting (the shader lights
+  /// with them), or give them back. Call before rendering.
+  public: void HideLamps(bool _hide)
+  {
+    Ogre::Root *root = Ogre::Root::getSingletonPtr();
+    if (!root)
+      return;
+    if (!_hide)
+    {
+      for (auto *l : this->hidden)
+        l->setVisible(true);
+      this->hidden.clear();
+      return;
+    }
+    auto managers = root->getSceneManagerIterator();
+    while (managers.hasMoreElements())
+    {
+      Ogre::SceneManager *sm = managers.getNext();
+      auto it = sm->getMovableObjectIterator(
+          Ogre::LightFactory::FACTORY_TYPE_NAME);
+      while (it.hasMoreElements())
+      {
+        auto *l = static_cast<Ogre::Light *>(it.getNext());
+        if ((l->getType() == Ogre::Light::LT_SPOTLIGHT ||
+             l->getType() == Ogre::Light::LT_POINT) && l->isVisible())
+        {
+          l->setVisible(false);
+          this->hidden.insert(l);
+        }
+      }
+    }
+  }
+
+  private: void CollectLamps(Ogre::SceneManager *_sm)
+  {
+    this->lamps.clear();
+    auto it = _sm->getMovableObjectIterator(
+        Ogre::LightFactory::FACTORY_TYPE_NAME);
+    while (it.hasMoreElements() &&
+           static_cast<int>(this->lamps.size()) < kMaxLamps)
+    {
+      auto *light = static_cast<Ogre::Light *>(it.getNext());
+      if (!this->hidden.count(light) || !light->getParentNode())
+        continue;
+      if (light->getType() != Ogre::Light::LT_SPOTLIGHT &&
+          light->getType() != Ogre::Light::LT_POINT)
+      {
+        continue;
+      }
+      // The beam's ray march is the costliest part of the shader and it
+      // runs for every lamp in the list, so a lamp that gives no light
+      // stays out of it.
+      const Ogre::ColourValue &c = light->getDiffuseColour();
+      const float power = light->getPowerScale() *
+          std::max(c.r, std::max(c.g, c.b));
+      if (power >= kLampMinPower)
+        this->lamps.push_back(light);
+    }
+  }
 
   public: void propertiesMergedPreGenerationStep(
       Ogre::Hlms *_hlms, const Ogre::HlmsCache &_passCache,
@@ -116,8 +212,14 @@ class UnderwaterListener : public Ogre::HlmsListener
   {
     if (this->previous)
       this->previous->preparePassHash(_shadow, _caster, _dual, _sm, _hlms);
-    if (this->On(_caster))
-      _hlms->_setProperty("gz_underwater", 1);
+    if (!this->On(_caster))
+      return;
+    _hlms->_setProperty("gz_underwater", 1);
+    this->CollectLamps(_sm);
+    // The shader lights with the lamps itself, through the water; they are
+    // hidden from Ogre's own lighting (HideLamps), so they count once.
+    if (!this->lamps.empty())
+      _hlms->_setProperty("gz_underwater_lamps", 1);
   }
 
   public: Ogre::uint32 getPassBufferSize(
@@ -140,6 +242,10 @@ class UnderwaterListener : public Ogre::HlmsListener
                                                _ptr);
     if (!this->On(_caster))
       return _ptr;
+    // Collect the lamps again for this pass: the block's size does not
+    // depend on how many there are, so the data never depends on the order
+    // Ogre calls the listener in.
+    this->CollectLamps(_sm);
     const Ogre::Camera *camera = _sm->getCamerasInProgress().renderingCamera;
     Ogre::Vector3 pos = Ogre::Vector3::ZERO;
     Ogre::Matrix3 rot = Ogre::Matrix3::IDENTITY;
@@ -162,10 +268,49 @@ class UnderwaterListener : public Ogre::HlmsListener
     }
     put4(w.attenuation[0], w.attenuation[1], w.attenuation[2], 0.0f);
     put4(w.backscatter[0], w.backscatter[1], w.backscatter[2], 0.0f);
-    put4(w.veil[0] * std::exp(-w.diffuse[0] * depth),
-         w.veil[1] * std::exp(-w.diffuse[1] * depth),
-         w.veil[2] * std::exp(-w.diffuse[2] * depth), 0.0f);
+    put4(w.daylight * w.veil[0] * std::exp(-w.diffuse[0] * depth),
+         w.daylight * w.veil[1] * std::exp(-w.diffuse[1] * depth),
+         w.daylight * w.veil[2] * std::exp(-w.diffuse[2] * depth), 0.0f);
     put4(w.diffuse[0], w.diffuse[1], w.diffuse[2], 0.0f);
+    // The scattering, b = veil c (the veil is b / c from the type), and the
+    // phase function's asymmetry.
+    put4(w.veil[0] * w.attenuation[0], w.veil[1] * w.attenuation[1],
+         w.veil[2] * w.attenuation[2], kPhaseG);
+    put4(static_cast<float>(this->lamps.size()), kBeamSteps, kBeamRange,
+         1.0f);
+    // The lamps, in view space, as Ogre's own light buffer has them.
+    Ogre::Matrix4 view = Ogre::Matrix4::IDENTITY;
+    if (camera)
+      view = camera->getViewMatrix(true);
+    Ogre::Matrix3 viewRot;
+    view.extract3x3Matrix(viewRot);
+    for (int i = 0; i < kMaxLamps; ++i)
+    {
+      if (i >= static_cast<int>(this->lamps.size()))
+      {
+        for (int k = 0; k < kLampFloat4; ++k)
+          put4(0, 0, 0, 0);
+        continue;
+      }
+      const Ogre::Light *l = this->lamps[i];
+      const bool spot = l->getType() == Ogre::Light::LT_SPOTLIGHT;
+      const Ogre::Vector3 p = view * l->getParentNode()->_getDerivedPosition();
+      const Ogre::Vector3 dir = (viewRot * l->getDerivedDirection())
+                                    .normalisedCopy();
+      const Ogre::ColourValue c = l->getDiffuseColour() * l->getPowerScale();
+      const Ogre::ColourValue sc = l->getSpecularColour() * l->getPowerScale();
+      const float inner = l->getSpotlightInnerAngle().valueRadians();
+      const float outer = l->getSpotlightOuterAngle().valueRadians();
+      const float cInner = std::cos(inner * 0.5f);
+      const float cOuter = std::cos(outer * 0.5f);
+      put4(p.x, p.y, p.z, spot ? 1.0f : 0.0f);
+      put4(dir.x, dir.y, dir.z, l->getAttenuationRange());
+      put4(c.r, c.g, c.b, l->getAttenuationLinear());
+      put4(spot ? 1.0f / std::max(cInner - cOuter, 1e-4f) : 0.0f,
+           spot ? cOuter : -1.0f, spot ? l->getSpotlightFalloff() : 1.0f,
+           l->getAttenuationQuadric());
+      put4(sc.r, sc.g, sc.b, 0.0f);
+    }
     return _ptr;
   }
 
@@ -296,13 +441,26 @@ catch (const std::exception &_e)
 }
 
 //////////////////////////////////////////////////
-/// \brief Set the water: 13 floats, beta^D, beta^B, the veil at the surface
-/// and K_d (each r g b), then the still water level. A null pointer turns
-/// the water off.
+/// \brief Set the water: 14 floats, beta^D, beta^B, the veil at the surface
+/// and K_d (each r g b), then the still water level and the daylight. A
+/// null pointer turns the water off.
 void uw_ogre2_set(const float *_v)
 {
-  auto &w = State().listener.water;
+  auto &s = State();
+  // gz-rendering sets its own Hlms listener again when its scene changes
+  // (a light added, for one); wrap whichever is there now.
+  if (s.done && s.pbs && s.pbs->getListener() != &s.listener)
+  {
+    s.listener.previous = s.pbs->getListener();
+    s.pbs->setListener(&s.listener);
+    gzmsg << "[underwater] listener re-attached after gz-rendering replaced "
+          << "it\n";
+  }
+  auto &w = s.listener.water;
   w.active = nullptr != _v;
+  // Lamps that appear later (a vehicle spawned with its lights) are hidden
+  // on the frame they appear.
+  s.listener.HideLamps(w.active);
   if (!_v)
     return;
   std::memcpy(w.attenuation, _v, 3 * sizeof(float));
@@ -310,6 +468,7 @@ void uw_ogre2_set(const float *_v)
   std::memcpy(w.veil, _v + 6, 3 * sizeof(float));
   std::memcpy(w.diffuse, _v + 9, 3 * sizeof(float));
   w.level = _v[12];
+  w.daylight = _v[13];
 }
 
 //////////////////////////////////////////////////
@@ -322,6 +481,7 @@ try
     return;
   if (Ogre::Root::getSingletonPtr() && s.pbs)
   {
+    s.listener.HideLamps(false);
     s.pbs->setListener(s.listener.previous);
     s.pbs->reloadFrom(s.pbs->getDataFolder(), &s.originalLibrary);
   }

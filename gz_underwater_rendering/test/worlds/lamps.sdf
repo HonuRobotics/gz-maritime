@@ -1,0 +1,78 @@
+<?xml version="1.0"?>
+<!--
+  Night, 20 m down (scene D of the plan): no sun, no ambient, no daylight in
+  the water. One spot lamp beside a camera, aimed ahead; a white plate 3 m
+  away on the left, dark (1 % albedo) so the lamp does not saturate it; a black
+  backdrop 12 m away. Starts in clear water; the
+  test changes the water on the topic.
+-->
+<sdf version="1.9">
+  <world name="uwlamps">
+    <physics name="p" type="ignored">
+      <max_step_size>0.01</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-maritime-water-optics-system"
+            name="gz::sim::maritime::WaterOptics">
+      <attenuation>0 0 0</attenuation>
+      <backscatter>0 0 0</backscatter>
+      <veil>0 0 0</veil>
+      <diffuse_attenuation>0 0 0</diffuse_attenuation>
+      <daylight>0</daylight>
+      <publish_rate>10</publish_rate>
+    </plugin>
+    <scene><ambient>0 0 0 1</ambient><background>0 0 0 1</background></scene>
+    <light type="spot" name="lamp">
+      <pose>0 0.35 -20.15 0 0 0</pose>
+      <direction>1 -0.12 0.02</direction>
+      <diffuse>1 1 1 1</diffuse>
+      <intensity>40</intensity>
+      <specular>0 0 0 1</specular>
+      <attenuation><range>40</range><linear>0</linear><quadratic>0.02</quadratic></attenuation>
+      <spot><inner_angle>0.6</inner_angle><outer_angle>1.2</outer_angle><falloff>1</falloff></spot>
+      <cast_shadows>false</cast_shadows>
+    </light>
+    <model name="plate">
+      <static>true</static>
+      <pose>3 0.9 -20 0 0 0</pose>
+      <link name="l"><visual name="v">
+        <geometry><box><size>0.02 1.0 1.4</size></box></geometry>
+        <material><ambient>0.01 0.01 0.01 1</ambient><diffuse>0.01 0.01 0.01 1</diffuse><specular>0 0 0 1</specular></material>
+      </visual></link>
+    </model>
+    <model name="backdrop">
+      <static>true</static>
+      <pose>12 0 -20 0 0 0</pose>
+      <link name="l"><visual name="v">
+        <geometry><box><size>0.02 60 40</size></box></geometry>
+        <material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material>
+      </visual></link>
+    </model>
+    <model name="rig">
+      <static>true</static>
+      <link name="cam">
+        <pose>0 0 -20 0 0 0</pose>
+        <sensor name="cam" type="rgbd_camera">
+          <topic>uwlamps/cam</topic>
+          <update_rate>10</update_rate>
+          <always_on>1</always_on>
+          <camera>
+            <horizontal_fov>1.2</horizontal_fov>
+            <image><width>160</width><height>120</height></image>
+            <clip><near>0.1</near><far>60</far></clip>
+            <depth_camera><clip><near>0.1</near><far>60</far></clip></depth_camera>
+          </camera>
+        </sensor>
+      </link>
+    </model>
+    <include>
+      <uri>model://underwater_optics</uri>
+    </include>
+  </world>
+</sdf>

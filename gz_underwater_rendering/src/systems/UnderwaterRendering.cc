@@ -81,7 +81,7 @@ class UnderwaterRendering
       return;
     }
     const auto &o = this->sampler.Data();
-    std::array<float, 13> v{};
+    std::array<float, 14> v{};
     for (int c = 0; c < 3; ++c)
     {
       v[c] = static_cast<float>(o.attenuation[c]);
@@ -90,6 +90,7 @@ class UnderwaterRendering
       v[9 + c] = static_cast<float>(o.diffuseAttenuation[c]);
     }
     v[12] = static_cast<float>(o.waterLevel);
+    v[13] = static_cast<float>(o.daylight);
     this->water = v;
   }
 
@@ -152,7 +153,7 @@ class UnderwaterRendering
 
   private: water_optics::WaterOpticsSampler sampler;
   private: std::mutex mutex;
-  private: std::optional<std::array<float, 13>> water;
+  private: std::optional<std::array<float, 14>> water;
   private: std::string piecesDir;
   private: void *handle{nullptr};
   private: int (*install)(const char *){nullptr};

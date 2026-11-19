@@ -32,6 +32,7 @@ world system:
 | `<attenuation>`, `<backscatter>`, `<diffuse_attenuation>` | Per red, green, blue, 1/m, as `r g b`: each replaces the value the type gives. Optional. |
 | `<veil>` | Per red, green, blue, the veil's colour just below the surface as a fraction of the daylight there. Optional. |
 | `<water_level>` | World z of the still water, m. Default 0. Under a wave field, depth is measured below the local wave surface. |
+| `<daylight>` | How strong the daylight is, against the renderer's sun: it scales the veil. Default 1; 0 at night, when only the vehicle's lamps light the water. |
 | `<publish_rate>` | Rate of the ground truth, Hz, simulation time. Default 1. |
 
 Any other element is warned about. A water type nobody knows, a visibility

@@ -17,5 +17,13 @@
 		float4 uwVeil;
 		// xyz: K_d, how fast the daylight fades with depth, 1/m.
 		float4 uwDiffuse;
+		// xyz: the scattering b, 1/m; w: the phase function's asymmetry g.
+		float4 uwScatter;
+		// x: lamps; y: beam steps; z: beam range, m; w: beam strength.
+		float4 uwLampInfo;
+		// Per lamp, 5 float4 (view space): position, type (1 spot, 0 point);
+		// direction, range; diffuse, linear attenuation; spot (1/(cos inner -
+		// cos outer), cos outer, falloff), quadratic attenuation; specular.
+		float4 uwLamp[20];
 	@end
 @end

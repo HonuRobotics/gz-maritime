@@ -74,7 +74,8 @@ class WaterOpticsSampler
   public: Rgb Daylight(double _depth) const;
 
   /// \brief The veil, B-infinity, at a depth, per channel, as a fraction of
-  /// the surface daylight: veil exp(-K_d depth). Zero above the surface.
+  /// the surface daylight: daylight veil exp(-K_d depth). Zero above the
+  /// surface, and at night.
   /// \param[in] _depth Depth, m.
   /// \return The veil.
   public: Rgb Veil(double _depth) const;

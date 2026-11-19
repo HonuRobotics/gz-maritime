@@ -279,6 +279,7 @@ What a world says to the water optics system,
 | `<veil>` | B∞, the veil just below the surface as a fraction of the daylight there, as `r g b`. Replaces b / c. |
 | `<diffuse_attenuation>` | K_d, how fast the daylight fades with depth, 1/m, as `r g b`. Replaces the type's K_d. |
 | `<water_level>` | World z of the still water, m, default 0. Under a wave field, depth is below the local wave surface. |
+| `<daylight>` | How strong the daylight is against the renderer's sun, default 1: it scales the veil. 0 at night, when only lamps light the water. |
 | `<publish_rate>` | Rate of the ground truth, 1 Hz by default. |
 
 Any other element is warned about and ignored. An unknown type, a visibility
@@ -335,7 +336,9 @@ the GPU. It takes no parameters; the water is the world's. Cameras above the
 water are untouched, and an underwater camera plugin in the same world passes
 its image through. Only surfaces Ogre's PBS shades are drawn through the
 water: the sky, the background, the water surface, markers and terrain are
-drawn as in air.
+drawn as in air. Every spot and point light (up to four) is a lamp: its light
+fades both ways through the water and its beam is drawn; set `<daylight>0` in
+the water optics for night.
 
 ## Thruster command
 

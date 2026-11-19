@@ -45,6 +45,43 @@ with w the range through the water, up to the surface for a climbing ray.
 The fragment's range and world position come from its view-space position;
 the camera's pose and the water come in the pass buffer.
 
+## The vehicle's lamps
+
+At depth, at night or in murky water, the vehicle's own lights are the only
+light. Every spot and point light in the world (up to four) is a lamp:
+
+- **Its light fades both ways**: from the lamp to what it lights, and from
+  there to the camera, `exp(−β^D (d_lamp + r))`.
+- **Its beam**: the light the water scatters back to the camera inside the
+  lamp's cone, ray-marched along each view ray (single scatter,
+  Henyey–Greenstein phase function, g = 0.9). Each lamp is marched only
+  over the part of the view ray it lights (inside its range and its cone),
+  in 12 steps spaced densely at the near end, over as far as light
+  survives; a ray that misses the cone costs nothing.
+
+Lamps are ordinary SDF lights, on the vehicle or in the world:
+
+```xml
+<light type="spot" name="lamp">
+  <pose>0.3 0.2 0 0 0 0</pose>
+  <direction>1 0 -0.1</direction>
+  <diffuse>1 0.95 0.85 1</diffuse>
+  <intensity>40</intensity>
+  <attenuation><range>40</range><quadratic>0.02</quadratic></attenuation>
+  <spot><inner_angle>0.5</inner_angle><outer_angle>1.0</outer_angle><falloff>1</falloff></spot>
+  <cast_shadows>false</cast_shadows>
+</light>
+```
+
+Set the world's `<daylight>` to 0 for night: then only the lamps light the
+water.
+
+The beams are the costliest part of the shader, and they are marched for
+every lamp. A lamp that gives no light (its `<intensity>` times pi times its
+brightest diffuse channel under 0.01) is left out, and with every lamp out
+the lamp code is not compiled into the shaders at all. So to switch a lamp
+off, set its intensity to 0: it then costs nothing.
+
 ## How it works
 
 - **Shader pieces** (`share/hlms/Underwater`): the water in the pass
@@ -57,6 +94,10 @@ the camera's pose and the water come in the pass buffer.
   (`Hlms/Gz/Pbs`) are read at run time and copied with one more
   `@insertpiece` each; gz-rendering's Hlms listener is called first and the
   water appended after it.
+- **Lamps.** The shader lights with them itself, so they are hidden from
+  Ogre's own lighting while the water is drawn (and given back when it is
+  not). Turning Ogre's Forward+ off instead would change the pass buffer's
+  layout under the listener's data; hiding the lamps does not.
 - **An Ogre bridge** (`libunderwater-ogre2-bridge.so`), loaded with dlopen,
   as `gz_waves_rendering` does: linking gz-rendering's ogre2 library into a
   plugin stops gz-rendering loading its engine.
@@ -71,6 +112,10 @@ the camera's pose and the water come in the pass buffer.
   and the background through a compositor listener.
 - **Depth from the still water level**, not the wave surface, unlike the
   reference camera.
+- **Lamps**: up to four; lit by their diffuse term (no specular), with no
+  shadows; their beams show only where something is drawn behind them (the
+  open water's background is not shaded). The reference camera has no
+  lamps.
 - **ogre2 only.**
 
 ## Tests
@@ -78,6 +123,12 @@ the camera's pose and the water come in the pass buffer.
 ```bash
 colcon test --packages-select gz_underwater_rendering
 ```
+
+`lamps_test`, rendered: at night, 20 m down, a plate lit by a lamp against
+its clear-water colour faded both ways (worst 1 step); the beam along the
+centre row against a single-scatter integration in the test (within 2 % of
+its peak in IB, 3C and 7C water); clear water carrying the beam farther and
+murky water keeping it nearer the lamp.
 
 `underwater_rendering_test`, rendered (needs a GPU): the same scene without
 and with the GPU path, in one process. The GPU image against the reference
