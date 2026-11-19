@@ -112,7 +112,10 @@ drawn sea, so look from an underwater camera or hide the water.
 The reach and the rays are sent when they change, not on a timer: a pinger
 switched off or a buoy dragged while the world is paused is redrawn at
 once, and a circle that stays is not sent again. The rings are sent every
-50 ms of simulation time, and no more often than that in wall time.
+50 ms of simulation time, the heavier 3D shells every 100 ms, and no more
+often than that in wall time. While the world runs, a pinger that moves or
+a plane that follows a receiver is caught up by those frames; while it is
+paused, a drag is redrawn at once.
 
 Colours run with frequency from orange at 25 kHz to violet at 40 kHz.
 Configuration: `<reach>`, `<pings>`, `<readings>` (all false by default),

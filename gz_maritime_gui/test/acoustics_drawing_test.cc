@@ -604,7 +604,7 @@ TEST(AcousticsGui, DropoutMarkers)
                                                  true)},
       {0.5, 1.0, 0.8, 0.5, 0.0}, 0.0, "ns");
   ASSERT_EQ(2u, markers.size());
-  EXPECT_EQ(1001u, markers[0].id());
+  EXPECT_EQ(kDropoutFirstId, markers[0].id());
   std::set<long> radii;
   for (const auto &m : markers)
   {

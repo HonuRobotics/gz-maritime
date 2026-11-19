@@ -64,6 +64,9 @@ namespace
   /// send more frames.
   constexpr std::chrono::milliseconds kRingPeriod{50};
 
+  /// \brief The same for the 3D shells, which weigh several times the
+  /// rings: half as many frames.
+  constexpr std::chrono::milliseconds kShellPeriod{100};
 
   /// \brief Period of wall time between two refreshes of the lists.
   constexpr std::chrono::milliseconds kListPeriod{250};
@@ -641,9 +644,11 @@ void AcousticsPanel::Update(const UpdateInfo &_info,
 
   // The rings move with simulation time: a frame every so often of it,
   // and at once when a pinger or a setting changed. The rings follow their
-  // pinger, but its position is in the key only while the world is paused:
-  // running, the frames every so often follow it, and a pinger on anything
-  // that moves would otherwise send a frame at every update.
+  // pinger and the plane they lie on, but the pinger's position and the
+  // plane's height are in the key only while the world is paused: running,
+  // the frames every so often follow them, and a pinger on anything that
+  // moves, or a plane following a receiver that does, would otherwise send
+  // a frame at every update.
   auto tracked = pingers;
   d.changes.Track(tracked, now, d.waterLevel);
   std::ostringstream key;
@@ -657,11 +662,15 @@ void AcousticsPanel::Update(const UpdateInfo &_info,
     key << ';';
   }
   // The plane the rings lie on, which a receiver's depth moves.
-  key << static_cast<int>(d.plane) << ' ' << d.planeZ;
+  key << static_cast<int>(d.plane);
+  if (_info.paused)
+    key << ' ' << d.planeZ;
   const bool changed = d.dirty || key.str() != d.ringsKey;
+  const auto period = d.plane == Plane::k3D ?
+      std::chrono::steady_clock::duration(kShellPeriod) :
+      std::chrono::steady_clock::duration(kRingPeriod);
   const bool ringsDue = changed || !d.lastRings || now < *d.lastRings ||
-      (now - *d.lastRings >= kRingPeriod &&
-       wall - d.lastRingsWall >= kRingPeriod);
+      (now - *d.lastRings >= period && wall - d.lastRingsWall >= period);
   if (ringsDue)
   {
     if (d.showPings && d.plane == Plane::k3D)

@@ -309,7 +309,8 @@ std::vector<msgs::Marker> ReachMarkers(const std::vector<PingerView> &_pingers,
   return out;
 }
 
-//////////////////////////////////////////////////
+namespace
+{
 /// \brief The pings of one pinger whose sound is on its way, as the radii
 /// of their spheres: the one rule for the rings and for the 3D shells. Only
 /// pings that were sent (the pinger on, under the water, since its schedule
@@ -322,17 +323,20 @@ std::vector<msgs::Marker> ReachMarkers(const std::vector<PingerView> &_pingers,
 /// \param[in] _speed m/s the sound is drawn spreading at, positive.
 /// \param[in] _maxRadius m, the cap for a pinger with no reach.
 /// \param[out] _limit m, how far this pinger's pings are drawn.
-/// \return The radii, largest first.
-static std::vector<double> SpreadingPings(const PingerView &_p,
-    double _waterLevel, const std::chrono::steady_clock::duration &_now,
-    double _speed, double _maxRadius, double &_limit)
+/// \param[out] _radii The radii, largest first.
+/// \return False if the pinger sends nothing to draw: off, out of the
+/// water, or with no reach, cap or period. Such a pinger takes no marker
+/// ids either.
+bool SpreadingPings(const PingerView &_p, double _waterLevel,
+    const std::chrono::steady_clock::duration &_now, double _speed,
+    double _maxRadius, double &_limit, std::vector<double> &_radii)
 {
-  std::vector<double> out;
+  _radii.clear();
   _limit = _p.data.reach > 0.0 ? _p.data.reach : _maxRadius;
   if (!_p.data.active || !(_p.position.Z() < _waterLevel) ||
       !(_limit > 0.0) || !(_p.data.period > 0.0))
   {
-    return out;
+    return false;
   }
   const auto window = std::chrono::duration_cast<
       std::chrono::steady_clock::duration>(
@@ -351,10 +355,11 @@ static std::vector<double> SpreadingPings(const PingerView &_p,
     const double sphere =
         _speed * std::chrono::duration<double>(_now - t).count();
     if (sphere > 0.0 && sphere <= _limit)
-      out.push_back(sphere);
+      _radii.push_back(sphere);
   }
-  return out;
+  return true;
 }
+}  // namespace
 
 //////////////////////////////////////////////////
 std::vector<msgs::Marker> PingMarkers(const std::vector<PingerView> &_pingers,
@@ -368,15 +373,13 @@ std::vector<msgs::Marker> PingMarkers(const std::vector<PingerView> &_pingers,
   std::uint64_t id = kFirstId;
   for (const auto &p : _pingers)
   {
-    // A pinger that is off, or out of the water, sends nothing: no ids
-    // for it either, as before.
-    if (!p.data.active || !(p.position.Z() < _waterLevel))
-      continue;
     double limit{0.0};
-    const auto spheres =
-        SpreadingPings(p, _waterLevel, _now, _speed, _maxRadius, limit);
-    if (!(limit > 0.0) || !(p.data.period > 0.0))
+    std::vector<double> spheres;
+    if (!SpreadingPings(p, _waterLevel, _now, _speed, _maxRadius, limit,
+                        spheres))
+    {
       continue;
+    }
     const double depth = _planeZ - p.position.Z();
     const math::Vector3d centre(p.position.X(), p.position.Y(), _planeZ);
     const math::Color colour = FrequencyColor(p.data.frequency);
@@ -512,13 +515,13 @@ std::vector<msgs::Marker> PingSpheres(const std::vector<PingerView> &_pingers,
   {
     // The same pings as the rings: only those sent, out to the reach, and
     // a bounded number of them.
-    if (!p.data.active || !(p.position.Z() < _waterLevel))
-      continue;
     double limit{0.0};
-    const auto spheres =
-        SpreadingPings(p, _waterLevel, _now, _speed, _maxRadius, limit);
-    if (!(limit > 0.0) || !(p.data.period > 0.0))
+    std::vector<double> spheres;
+    if (!SpreadingPings(p, _waterLevel, _now, _speed, _maxRadius, limit,
+                        spheres))
+    {
       continue;
+    }
     const math::Color colour = FrequencyColor(p.data.frequency);
 
     std::vector<std::vector<math::Vector3d>> shades(kShades);
@@ -526,8 +529,10 @@ std::vector<msgs::Marker> PingSpheres(const std::vector<PingerView> &_pingers,
     {
       const int shade = std::min(kShades - 1,
           static_cast<int>(kShades * r / limit));
-      // Sparser than the reach: a few shells drawn at once stay readable.
-      auto shell = SphereSegments(p.position, r, _waterLevel, 6, 3, 32);
+      // Sparser than the reach: a few shells drawn at once stay readable,
+      // and each is sent again as it spreads, so it is kept light: about
+      // 6 kB a shell.
+      auto shell = SphereSegments(p.position, r, _waterLevel, 4, 2, 24);
       auto &dst = shades[static_cast<std::size_t>(shade)];
       dst.insert(dst.end(), shell.begin(), shell.end());
     }
