@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<!--
+  The lens drops system without rendering: no sensors system, so nothing
+  draws and the render pass is never added, but the drops are stepped and
+  the topics work.
+
+  * dry: a camera with the system and no rain, for the set topic.
+  * wet: a camera in heavy rain (200 mm/h, ten drops a second) whose drops
+    never dry, seeded, for a run that repeats.
+  * wrong: the system on an IMU, which it refuses.
+-->
+<sdf version="1.9">
+  <world name="lens_drops_test">
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+
+    <model name="dry">
+      <static>true</static>
+      <link name="link">
+        <sensor name="camera" type="camera">
+          <topic>/lens_drops_test/dry</topic>
+          <camera>
+            <horizontal_fov>1.2</horizontal_fov>
+            <image><width>160</width><height>120</height></image>
+          </camera>
+          <plugin filename="gz-maritime-lens-drops-system"
+                  name="gz::sim::maritime::LensDrops">
+            <seed>3</seed>
+          </plugin>
+        </sensor>
+      </link>
+    </model>
+
+    <model name="wet">
+      <static>true</static>
+      <pose>0 2 0 0 0 0</pose>
+      <link name="link">
+        <sensor name="camera" type="camera">
+          <topic>/lens_drops_test/wet</topic>
+          <camera>
+            <horizontal_fov>1.2</horizontal_fov>
+            <image><width>160</width><height>120</height></image>
+          </camera>
+          <plugin filename="gz-maritime-lens-drops-system"
+                  name="gz::sim::maritime::LensDrops">
+            <rain_rate>200</rain_rate>
+            <dry_time>3600</dry_time>
+            <seed>5</seed>
+          </plugin>
+        </sensor>
+      </link>
+    </model>
+
+    <model name="wrong">
+      <static>true</static>
+      <pose>0 4 0 0 0 0</pose>
+      <link name="link">
+        <sensor name="imu" type="imu">
+          <plugin filename="gz-maritime-lens-drops-system"
+                  name="gz::sim::maritime::LensDrops"/>
+        </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>
