@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <!--
-  The same, on still water (no wave height): the box rests at the draft the flat buoyancy gives.
+  Still water (a wave field of no height): bodies that float as the flat
+  buoyancy floats them, with the moments and the air it counts.
 -->
 <sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
   <world name="flat">
@@ -38,6 +39,7 @@
       <pose>0 0 0.005 0 0 0</pose>
       <link name="link">
         <inertial>
+          <pose>0 0 0 0 0 0</pose>
           <mass>200</mass>
           <inertia>
             <ixx>19.3</ixx><iyy>19.3</iyy><izz>33.3</izz>
@@ -45,24 +47,66 @@
           </inertia>
         </inertial>
         <collision name="hull" gz:buoyancy="true">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><box><size>1 1 0.4</size></box></geometry>
           <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
         </collision>
       </link>
     </model>
-    <!-- A neutral sphere 3 m down, wholly under the water at every wave. -->
-    <model name="sinker">
-      <pose>10 0 -3 0 0 0</pose>
+    <!-- The same box with its centre of mass 3 cm forward of its centre: it
+         trims bow down, about 5 degrees, for its 0.33 m metacentric height. -->
+    <model name="trimmed">
+      <pose>0 5 0.005 0 0 0</pose>
       <link name="link">
         <inertial>
-          <mass>34.348</mass>
+          <pose>0.03 0 0 0 0 0</pose>
+          <mass>200</mass>
           <inertia>
-            <ixx>0.55</ixx><iyy>0.55</iyy><izz>0.55</izz>
+            <ixx>19.3</ixx><iyy>19.3</iyy><izz>33.3</izz>
             <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
           </inertia>
         </inertial>
         <collision name="hull" gz:buoyancy="true">
-          <geometry><sphere><radius>0.2</radius></sphere></geometry>
+          <pose>0 0 0 0 0 0</pose>
+          <geometry><box><size>1 1 0.4</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+    <!-- The same box, its shape and its centre of mass both 1 m forward and
+         0.5 m to port of the link origin: it floats level, like the first. -->
+    <model name="offset">
+      <pose>0 10 0.005 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <pose>1 0.5 0 0 0 0</pose>
+          <mass>200</mass>
+          <inertia>
+            <ixx>19.3</ixx><iyy>19.3</iyy><izz>33.3</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="hull" gz:buoyancy="true">
+          <pose>1 0.5 0 0 0 0</pose>
+          <geometry><box><size>1 1 0.4</size></box></geometry>
+          <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
+        </collision>
+      </link>
+    </model>
+    <!-- A 0.5 m sphere 5 m up, as heavy as the air it displaces: the air
+         holds it there. -->
+    <model name="balloon">
+      <pose>0 15 5 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>0.5235988</mass>
+          <inertia>
+            <ixx>0.05236</ixx><iyy>0.05236</iyy><izz>0.05236</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="hull" gz:buoyancy="true">
+          <geometry><sphere><radius>0.5</radius></sphere></geometry>
           <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
         </collision>
       </link>

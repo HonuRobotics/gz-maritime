@@ -26,13 +26,15 @@ namespace gz::sim
 inline namespace GZ_SIM_VERSION_NAMESPACE {
 namespace components
 {
-  /// \brief On the world entity of a world whose physics follows the waves,
-  /// the world z of its still water: the surface the wave field's elevation
-  /// is measured from. Written by the wave buoyancy system
-  /// (gz_waves_buoyancy); a system that damps against the water can add
-  /// the waves' water velocity when it is there.
+  /// \brief A tag on the world entity of a world whose physics follows the
+  /// waves: the wave buoyancy (gz_waves_buoyancy) floats its vehicles on the
+  /// wave field. A system that damps against the water, such as
+  /// gz_hydrodynamics, adds the waves' water velocity only where it is.
   /// Without it, vehicles float on flat water and the waves are drawn only.
-  using WaveCoupling = Component<double, class WaveCouplingTag>;
+  ///
+  /// A tag and nothing else: the still water level stays where the world
+  /// already keeps it, in its ocean current recipe.
+  using WaveCoupling = Component<NoData, class WaveCouplingTag>;
 
   GZ_SIM_REGISTER_COMPONENT("gz_maritime_components.WaveCoupling",
                             WaveCoupling)

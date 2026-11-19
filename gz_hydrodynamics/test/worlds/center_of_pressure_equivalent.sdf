@@ -1,0 +1,94 @@
+<?xml version="1.0"?>
+<!--
+  Three bodies that are the same piece of metal, tilted, with added mass,
+  Coriolis and damping in a current, pushed by a "gravity" from rest.
+  "tag" writes its hydrodynamics at 0.10 -0.03 -0.20 of its link through
+  <center_of_pressure>. "moved" has its link frame at that point and no tag,
+  so its inertial pose is shifted back: the same model without the feature.
+  "plain" leaves the model at the link origin of "tag", a different model.
+-->
+<sdf version="1.9">
+  <world name="center_of_pressure_equivalent">
+    <gravity>1.0 0.5 -2.0</gravity>
+    <physics name="1ms" type="dart">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <model name="tag">
+      <pose>0 0 0 0.3 -0.2 0.5</pose>
+      <link name="link">
+        <inertial>
+          <pose>0.05 0.02 -0.10 0 0 0</pose>
+          <mass>10</mass>
+          <inertia>
+            <ixx>0.15</ixx><iyy>0.2</iyy><izz>0.25</izz>
+            <ixy>0.01</ixy><ixz>-0.02</ixz><iyz>0.005</iyz>
+          </inertia>
+        </inertial>
+      </link>
+      <plugin filename="gz-maritime-hydrodynamics-system"
+              name="gz::sim::maritime::Hydrodynamics">
+        <link_name>link</link_name>
+        <center_of_pressure>0.10 -0.03 -0.20</center_of_pressure>
+        <xDotU>-1</xDotU><yDotV>-2</yDotV><zDotW>-3</zDotW>
+        <kDotP>-0.01</kDotP><mDotQ>-0.02</mDotQ><nDotR>-0.015</nDotR>
+        <xU>-4</xU><yV>-6</yV><zW>-5</zW>
+        <kP>-0.3</kP><mQ>-0.4</mQ><nR>-0.2</nR>
+        <xUabsU>-30</xUabsU><yVabsV>-80</yVabsV><zWabsW>-60</zWabsW>
+        <kPabsP>-1.5</kPabsP><mQabsQ>-2</mQabsQ><nRabsR>-1</nRabsR>
+        <default_current>0.2 -0.1 0.05</default_current>
+      </plugin>
+    </model>
+    <model name="moved">
+      <pose>0 10 0 0.3 -0.2 0.5</pose>
+      <link name="link">
+        <pose>0.10 -0.03 -0.20 0 0 0</pose>
+        <inertial>
+          <pose>-0.05 0.05 0.10 0 0 0</pose>
+          <mass>10</mass>
+          <inertia>
+            <ixx>0.15</ixx><iyy>0.2</iyy><izz>0.25</izz>
+            <ixy>0.01</ixy><ixz>-0.02</ixz><iyz>0.005</iyz>
+          </inertia>
+        </inertial>
+      </link>
+      <plugin filename="gz-maritime-hydrodynamics-system"
+              name="gz::sim::maritime::Hydrodynamics">
+        <link_name>link</link_name>
+        <xDotU>-1</xDotU><yDotV>-2</yDotV><zDotW>-3</zDotW>
+        <kDotP>-0.01</kDotP><mDotQ>-0.02</mDotQ><nDotR>-0.015</nDotR>
+        <xU>-4</xU><yV>-6</yV><zW>-5</zW>
+        <kP>-0.3</kP><mQ>-0.4</mQ><nR>-0.2</nR>
+        <xUabsU>-30</xUabsU><yVabsV>-80</yVabsV><zWabsW>-60</zWabsW>
+        <kPabsP>-1.5</kPabsP><mQabsQ>-2</mQabsQ><nRabsR>-1</nRabsR>
+        <default_current>0.2 -0.1 0.05</default_current>
+      </plugin>
+    </model>
+    <model name="plain">
+      <pose>0 20 0 0.3 -0.2 0.5</pose>
+      <link name="link">
+        <inertial>
+          <pose>0.05 0.02 -0.10 0 0 0</pose>
+          <mass>10</mass>
+          <inertia>
+            <ixx>0.15</ixx><iyy>0.2</iyy><izz>0.25</izz>
+            <ixy>0.01</ixy><ixz>-0.02</ixz><iyz>0.005</iyz>
+          </inertia>
+        </inertial>
+      </link>
+      <plugin filename="gz-maritime-hydrodynamics-system"
+              name="gz::sim::maritime::Hydrodynamics">
+        <link_name>link</link_name>
+        <xDotU>-1</xDotU><yDotV>-2</yDotV><zDotW>-3</zDotW>
+        <kDotP>-0.01</kDotP><mDotQ>-0.02</mDotQ><nDotR>-0.015</nDotR>
+        <xU>-4</xU><yV>-6</yV><zW>-5</zW>
+        <kP>-0.3</kP><mQ>-0.4</mQ><nR>-0.2</nR>
+        <xUabsU>-30</xUabsU><yVabsV>-80</yVabsV><zWabsW>-60</zWabsW>
+        <kPabsP>-1.5</kPabsP><mQabsQ>-2</mQabsQ><nRabsR>-1</nRabsR>
+        <default_current>0.2 -0.1 0.05</default_current>
+      </plugin>
+    </model>
+  </world>
+</sdf>

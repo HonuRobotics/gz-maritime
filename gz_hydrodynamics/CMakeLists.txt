@@ -32,6 +32,7 @@ find_package(gz_msgs_vendor REQUIRED)
 find_package(gz-msgs REQUIRED)
 find_package(gz_ocean_current REQUIRED)
 find_package(gz_waves REQUIRED)
+find_package(gz_waves_buoyancy REQUIRED)
 
 # --------------------------------------------------------------------------
 # The hydrodynamics system (gz-maritime-hydrodynamics-system). Upstream builds
@@ -50,6 +51,7 @@ target_link_libraries(gz-maritime-hydrodynamics-system
   PRIVATE
     gz_ocean_current::gz_ocean_current
     gz_waves::gz_waves
+    gz_waves_buoyancy::gz_waves_buoyancy
     gz-sim::core
     gz-plugin::register
     gz-math::gz-math
@@ -72,30 +74,38 @@ if(BUILD_TESTING)
   set(ament_cmake_uncrustify_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 
-  # The system in running worlds: the world's current reaches a vehicle
-  # loaded with the world and one spawned later, and a world without one
-  # keeps upstream's behaviour.
+  # The system in running worlds. The plugin library is loaded by name from
+  # the build tree so the tests run before install. The ocean current system
+  # is installed next to gz_ocean_current's library, whose exported target
+  # gives the folder in a merged or an isolated install alike. A partition
+  # for each test keeps its topics apart from the other tests, which colcon
+  # runs in parallel.
   find_package(ament_cmake_gtest REQUIRED)
-  ament_add_gtest(hydrodynamics_current_test
-    test/hydrodynamics_current_test.cc)
-  if(TARGET hydrodynamics_current_test)
-    target_compile_definitions(hydrodynamics_current_test PRIVATE
-      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
-    target_link_libraries(hydrodynamics_current_test
-      gz-sim::core
-      gz-common::gz-common
-      gz-transport::gz-transport
-      gz-msgs::gz-msgs)
-    # The plugin library is loaded by name from the build tree so the test
-    # runs before install. The ocean current system is installed next to
-    # gz_ocean_current's library, whose exported target gives the folder in
-    # a merged or an isolated install alike. A partition of its own keeps
-    # its topics apart from other packages' tests, which colcon runs in
-    # parallel.
-    set_tests_properties(hydrodynamics_current_test PROPERTIES
-      ENVIRONMENT
-      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$<TARGET_FILE_DIR:gz_ocean_current::gz_ocean_current>;GZ_PARTITION=gz_hydrodynamics_test")
-  endif()
+  function(gz_hydrodynamics_gtest _name)
+    ament_add_gtest(${_name} test/${_name}.cc)
+    if(TARGET ${_name})
+      target_compile_definitions(${_name} PRIVATE
+        "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+      target_link_libraries(${_name}
+        gz-sim::core
+        gz-common::gz-common
+        gz-transport::gz-transport
+        gz-msgs::gz-msgs)
+      set_tests_properties(${_name} PROPERTIES
+        ENVIRONMENT
+        "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$<TARGET_FILE_DIR:gz_ocean_current::gz_ocean_current>;GZ_PARTITION=gz_${_name}")
+    endif()
+  endfunction()
+
+  # The world's current reaches a vehicle loaded with the world and one
+  # spawned later, and a world without one keeps upstream's behaviour.
+  gz_hydrodynamics_gtest(hydrodynamics_current_test)
+
+  # The plugin's added mass against theory and the physics engine's own.
+  gz_hydrodynamics_gtest(hydrodynamics_added_mass_test)
+
+  # The centre of pressure: a change of reference point for the whole model.
+  gz_hydrodynamics_gtest(hydrodynamics_center_of_pressure_test)
 
   # The waves' water velocity: a body is carried by them in a world whose
   # physics follows the waves, and not in one whose waves are drawn only.

@@ -243,6 +243,12 @@ touching `IWaveField`, so the engine type stays opaque (N3):
 - `Advance(WavefieldData&, double _t)` — drives `Update` if an engine is present.
 - `SurfaceElevation`, `ParticleVelocity`, `Normal`, `Jacobian`,
   `FoamMask(..., _threshold = 0.6)` — each takes `(const WavefieldData&, _x, _y, _t)`.
+- `SurfaceHeight(const WavefieldData&, _x, _y, _t)` — the height of the
+  surface *as drawn* over a world point: `SurfaceElevation` at the point whose
+  horizontal displacement (the render grid's `dx`/`dy`, `IWaveField::Field`)
+  carries it onto (x, y), found by a fixed-point iteration. Equals
+  `SurfaceElevation` for an engine with no grid or no chop. Physics that must
+  sit on the visible surface (buoyancy) uses this one.
 
 When `simulation` is null they return **still-water** defaults (elevation 0,
 velocity 0, normal +Z, Jacobian 1, foam 0), so a consumer that runs before the
@@ -721,9 +727,12 @@ ros2 launch kai_bringup simulation.launch.xml
   the engine's folding (Jacobian) metric; the analytic Gerstner engine's
   Jacobian barely leaves 1.0, so it carries no usable folding signal and the
   shader's foam pass is skipped for it.
-- `gz_waves_buoyancy` ships the `WaveBuoyancy` consumer: buoyancy on the
-  local, sloping surface above each marked shape, opt-in per world instead
-  of the flat buoyancy, and the `WaveCoupling` world component that marks
-  such a world. There `gz_hydrodynamics` damps against the waves' water
-  velocity too (`waves::WaterVelocity`, faded with depth). No
-  `kai_gazebo` world runs it yet.
+- `gz_waves_buoyancy` ships the `WaveBuoyancy` consumer: hydrostatic
+  buoyancy under a plane fitted through the drawn surface around each marked
+  shape (`Eval`'s `SurfaceHeight`, which undoes the horizontal displacement
+  of the engine's render grid), opt-in per world instead of the flat
+  buoyancy. It reads the field at the source system's `<update_rate>` and
+  never advances it. It tags the world with its `WaveCoupling` component,
+  and there `gz_hydrodynamics` damps against the waves' water velocity too
+  (`waves::WaterVelocity`, faded with depth). No `kai_gazebo` world runs it
+  yet.

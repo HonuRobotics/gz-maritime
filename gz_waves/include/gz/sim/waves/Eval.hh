@@ -42,6 +42,23 @@ void Advance(WavefieldData &_wf, double _t);
 double SurfaceElevation(const WavefieldData &_wf,
                         double _x, double _y, double _t);
 
+/// \brief Height [m] above the still water level of the surface as drawn,
+/// over the world point (x, y). A choppy sea also moves the surface
+/// sideways: the water that `SurfaceElevation` gives at (x0, y0) is drawn
+/// at (x0, y0) plus the field's horizontal displacement there. This finds
+/// the (x0, y0) drawn over (x, y), by a few fixed-point steps on the
+/// displacement of the engine's render grid (`IWaveField::Field`), and
+/// returns the elevation there. Without horizontal displacement it equals
+/// `SurfaceElevation`.
+/// \param[in] _wf Wave-field state to query.
+/// \param[in] _x  World-frame x coordinate [m].
+/// \param[in] _y  World-frame y coordinate [m].
+/// \param[in] _t  Simulation time [s].
+/// \return Height of the drawn surface above the still water level [m]; 0
+/// if `_wf` holds no engine.
+double SurfaceHeight(const WavefieldData &_wf,
+                     double _x, double _y, double _t);
+
 /// \brief Water particle velocity at the surface point (x, y) [m/s].
 /// \param[in] _wf Wave-field state to query.
 /// \param[in] _x  World-frame x coordinate [m].

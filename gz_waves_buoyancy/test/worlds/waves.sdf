@@ -1,6 +1,8 @@
 <?xml version="1.0"?>
 <!--
-  A floating box and a sunken sphere on one long wave, 0.3 m high: the box rides it, the sphere, wholly under the water, does not feel it.
+  A floating box and a sunken sphere on one long wave, 0.3 m high: the box rides
+  and pitches with it, the sphere, wholly under the water, is held by the still
+  water model.
 -->
 <sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
   <world name="waves">
@@ -38,6 +40,7 @@
       <pose>0 0 0.005 0 0 0</pose>
       <link name="link">
         <inertial>
+          <pose>0 0 0 0 0 0</pose>
           <mass>200</mass>
           <inertia>
             <ixx>19.3</ixx><iyy>19.3</iyy><izz>33.3</izz>
@@ -45,6 +48,7 @@
           </inertia>
         </inertial>
         <collision name="hull" gz:buoyancy="true">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><box><size>1 1 0.4</size></box></geometry>
           <surface><contact><collide_bitmask>0x00</collide_bitmask></contact></surface>
         </collision>

@@ -26,20 +26,20 @@ find_package(gz-common REQUIRED)
 find_package(sdformat_vendor REQUIRED)
 find_package(sdformat REQUIRED)
 find_package(gz_waves REQUIRED)
+find_package(gz_marked_shapes REQUIRED)
 
 # --------------------------------------------------------------------------
-# Core library: how much of a shape is under a sloping water surface.
+# How much of a shape is under a sloping water surface: internal, built into
+# the system and its test.
 # --------------------------------------------------------------------------
-add_library(${PROJECT_NAME} SHARED
-  src/Displacement.cc
-)
-target_include_directories(${PROJECT_NAME}
+add_library(wave_displacement STATIC src/Displacement.cc)
+set_target_properties(wave_displacement PROPERTIES
+  POSITION_INDEPENDENT_CODE ON)
+target_include_directories(wave_displacement PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(wave_displacement
   PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
-target_link_libraries(${PROJECT_NAME}
-  PUBLIC
+    gz_marked_shapes::gz_marked_shapes
     gz-math::gz-math
     sdformat::sdformat
 )
@@ -47,24 +47,30 @@ target_link_libraries(${PROJECT_NAME}
 # --------------------------------------------------------------------------
 # The world system: buoyancy on the wave field.
 # --------------------------------------------------------------------------
+# The WaveCoupling tag, a header only component: the wave buoyancy writes
+# it, and a system that damps against the water reads it.
+add_library(${PROJECT_NAME} INTERFACE)
+target_include_directories(${PROJECT_NAME}
+  INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(${PROJECT_NAME} INTERFACE gz-sim::core)
+install(DIRECTORY include/ DESTINATION include)
+install(TARGETS ${PROJECT_NAME} EXPORT export_${PROJECT_NAME})
+
 add_library(gz-maritime-wave-buoyancy-system SHARED
   src/systems/WaveBuoyancy.cc
 )
 target_link_libraries(gz-maritime-wave-buoyancy-system
   PRIVATE
     ${PROJECT_NAME}
+    wave_displacement
     gz_waves::gz_waves
     gz-sim::core
     gz-plugin::register
     gz-common::gz-common)
 
-install(DIRECTORY include/ DESTINATION include)
-install(
-  TARGETS ${PROJECT_NAME}
-  EXPORT export_${PROJECT_NAME}
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin)
 install(TARGETS gz-maritime-wave-buoyancy-system
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
@@ -81,7 +87,7 @@ if(BUILD_TESTING)
   # The volume under a sloping surface, without a world.
   ament_add_gtest(displacement_test test/displacement_test.cc)
   if(TARGET displacement_test)
-    target_link_libraries(displacement_test ${PROJECT_NAME})
+    target_link_libraries(displacement_test wave_displacement)
   endif()
 
   # The system on waves.
@@ -100,8 +106,8 @@ endif()
 ament_environment_hooks("hooks/hook.dsv.in")
 ament_environment_hooks("hooks/hook.sh.in")
 
-ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
+ament_export_targets(export_${PROJECT_NAME})
 ament_export_include_directories(include)
-ament_export_dependencies(gz_math_vendor sdformat_vendor)
+ament_export_dependencies(gz_sim_vendor)
 
 ament_package()

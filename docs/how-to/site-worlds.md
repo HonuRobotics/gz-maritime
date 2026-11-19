@@ -238,9 +238,10 @@ seawalls and bridges, more than 5000 buildings and 7000 trees from
 OpenStreetMap, and the landmarks modelled on their own, Marina Bay Sands
 and its SkyPark, the ArtScience Museum, the Esplanade's domes, the Singapore
 Flyer (its wheel turns, once every 105 s), the Helix Bridge and the
-Supertree Grove. The pontoon and the courses
-are placed from the organisers' site plan; the course elements themselves
-are not in the world, so add your own.
+Supertree Grove. The quays stand 3 m above the water, as measured at the
+Promontory. The courses are placed from the organisers' site plan; the
+event's pontoon and course elements are not in this world, so add your own,
+or launch `robotx_2026.sdf` below, which has them.
 
 The world's origin is the middle of the courses. The water is the Marina
 Reservoir, fresh water behind the Marina Barrage, so buoyancy uses
@@ -279,6 +280,37 @@ ros2 launch kai_bringup simulation.launch.xml world:=marina_bay_lite.sdf
 ```
 
 Its site model is a separate download, about 8 MB.
+
+### RobotX 2026
+
+```{figure} images/robotx-2026.jpg
+:alt: The RobotX 2026 courses from above the Marina Boulevard seawall: buoy fields, delivery platforms and docks in front of the pontoon, its banners, canopies and flags, and the overcast bay behind
+
+The RobotX 2026 world at its opening view, over courses A and B.
+```
+
+`robotx_2026.sdf` is Marina Bay set up as at the Maritime RobotX Challenge
+2026, after the venue's photos and video. Each of the four courses, 30 m
+wide and 36 m apart from 5 m off the Marina Boulevard seawall to 5 m off the
+pontoon, has its boundary buoys (lettered A to D), the Task 1 buoy field,
+the Task 2 buoys over the pipeline with a pinger under each, two delivery
+platforms with a red, a green and a blue tin on each, and the docking bays.
+The pontoon runs behind all four courses, from a few metres off the
+Promontory to a gangway up to the promenade at the D end, with a dragon boat
+berth on its bay side. Each course has its launch area there: the UAV launch
+and landing platform and two USV launch fingers. Banners, canopies and flags
+dress the pontoon, and the COURSE A to D tents stand on the promenade. The
+day is overcast, as it was.
+
+The elements are static, except the tins, which a UAV can pick up. They
+come from the RobotX_2026 collection on Fuel, about 30 MB on first use.
+
+| | |
+|---|---|
+| Launch | `ros2 launch kai_bringup simulation.launch.xml world:=robotx_2026.sdf` |
+| Start points | course A `x:=-53 y:=0`, B `x:=-23 y:=-20`, C `x:=7 y:=-40`, D `x:=37 y:=-60`, each `yaw:=0.98` |
+| Water | The Marina Reservoir, fresh, overcast |
+| Sea states | 0 to 2 |
 
 ## What to know
 
