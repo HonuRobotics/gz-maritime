@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<!--
+  Two boxes pushed along +x at their centre of mass, which is 0.1 m below
+  the link origin. No gravity, no buoyancy and no current. "at_point" writes
+  its hydrodynamics at the centre of mass, so thrust and drag share a line
+  and it stays level. "at_origin" leaves the model at the link origin, as
+  upstream: the drag acts 0.1 m above the thrust and the couple pitches it.
+-->
+<sdf version="1.9">
+  <world name="center_of_pressure">
+    <gravity>0 0 0</gravity>
+    <physics name="1ms" type="dart">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <model name="at_point">
+      <pose>0 0 0 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <pose>0 0 -0.1 0 0 0</pose>
+          <mass>10</mass>
+          <inertia>
+            <ixx>0.1</ixx><iyy>0.1</iyy><izz>0.1</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+      </link>
+      <plugin filename="gz-maritime-hydrodynamics-system"
+              name="gz::sim::maritime::Hydrodynamics">
+        <link_name>link</link_name>
+        <center_of_pressure>0 0 -0.1</center_of_pressure>
+        <xUabsU>-40</xUabsU><yVabsV>-40</yVabsV><zWabsW>-40</zWabsW>
+        <kP>-1</kP><mQ>-1</mQ><nR>-1</nR>
+      </plugin>
+    </model>
+    <model name="at_origin">
+      <pose>0 5 0 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <pose>0 0 -0.1 0 0 0</pose>
+          <mass>10</mass>
+          <inertia>
+            <ixx>0.1</ixx><iyy>0.1</iyy><izz>0.1</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+      </link>
+      <plugin filename="gz-maritime-hydrodynamics-system"
+              name="gz::sim::maritime::Hydrodynamics">
+        <link_name>link</link_name>
+        <xUabsU>-40</xUabsU><yVabsV>-40</yVabsV><zWabsW>-40</zWabsW>
+        <kP>-1</kP><mQ>-1</mQ><nR>-1</nR>
+      </plugin>
+    </model>
+  </world>
+</sdf>
