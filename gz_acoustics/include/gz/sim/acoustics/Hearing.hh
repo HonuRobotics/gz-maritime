@@ -130,6 +130,19 @@ bool Overlap(const Duration &_a, const Duration &_aPulse,
 /// \param[in] _angle rad.
 /// \return rad.
 double WrapAngle(double _angle);
+
+/// \brief Whether amplitude noise hides the range: some spread, or a bias
+/// the receiver cannot read. A fixed `<bias_mean>` does not count, since
+/// it is in the SDF. A dynamic bias counts only when it moves, with a
+/// correlation time, as gz-sensors applies it.
+/// \param[in] _stddev `<stddev>`.
+/// \param[in] _biasStdDev `<bias_stddev>`.
+/// \param[in] _dynamicBiasStdDev `<dynamic_bias_stddev>`.
+/// \param[in] _dynamicBiasCorrelationTime `<dynamic_bias_correlation_time>`.
+/// \return True if the amplitude no longer gives the range exactly.
+bool HidesRange(double _stddev, double _biasStdDev,
+                double _dynamicBiasStdDev,
+                double _dynamicBiasCorrelationTime);
 }  // namespace gz::sim::acoustics
 
 #endif  // GZ_SIM_ACOUSTICS_HEARING_HH_

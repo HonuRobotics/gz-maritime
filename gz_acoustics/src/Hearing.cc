@@ -136,4 +136,13 @@ double WrapAngle(double _angle)
     a += 2.0 * GZ_PI;
   return a;
 }
+
+//////////////////////////////////////////////////
+bool HidesRange(double _stddev, double _biasStdDev,
+                double _dynamicBiasStdDev,
+                double _dynamicBiasCorrelationTime)
+{
+  return _stddev > 0.0 || _biasStdDev > 0.0 ||
+      (_dynamicBiasStdDev > 0.0 && _dynamicBiasCorrelationTime > 0.0);
+}
 }  // namespace gz::sim::acoustics

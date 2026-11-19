@@ -626,6 +626,46 @@ TEST(Acoustics, SeededRunsRepeat)
 }
 
 //////////////////////////////////////////////////
+/// A dynamic bias steps with the time since the receiver's last reading:
+/// with no spread and no fixed bias, the amplitude less the true one is the
+/// bias, which starts at zero, then moves between two readings 0.25 s
+/// apart by gz-sensors' sigma * sqrt(-tau / 2 * expm1(-2 * dt / tau)),
+/// 0.3 * sqrt(50 * 0.005) = 0.15 dB. A step taken with the physics step
+/// instead, 4 ms, would move it by 0.019 dB, and none by nothing.
+TEST(Acoustics, DynamicBiasDriftsBetweenReadings)
+{
+  Readings drifting("/drifting");
+  {
+    AcousticWorld world("drifting.sdf", 5);
+    ASSERT_TRUE(world.Run(10.0));
+  }
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+  const auto readings = drifting.All();
+  ASSERT_GT(readings.size(), 30u);
+
+  const double truth = -20.0 * std::log10(100.0);
+  std::vector<double> bias;
+  for (const auto &r : readings)
+    bias.push_back(Get(r, "amplitude") - truth);
+
+  // The first reading has no time step, so no bias yet.
+  EXPECT_NEAR(0.0, bias.front(), 1e-9);
+
+  // Every later one has moved, by small steps.
+  double sumSquares{0.0};
+  for (std::size_t i = 1; i < bias.size(); ++i)
+  {
+    EXPECT_NE(0.0, bias[i]) << "reading " << i;
+    const double step = bias[i] - bias[i - 1];
+    EXPECT_LT(std::abs(step), 0.75) << "reading " << i;
+    sumSquares += step * step;
+  }
+  const double rms = std::sqrt(sumSquares / (bias.size() - 1));
+  EXPECT_GT(rms, 0.1);
+  EXPECT_LT(rms, 0.2);
+}
+
+//////////////////////////////////////////////////
 /// A world reset starts the pings again from time zero and drops the pings
 /// still on their way: none sent before the reset arrives after it.
 TEST(Acoustics, ResetDropsPingsOnTheirWay)

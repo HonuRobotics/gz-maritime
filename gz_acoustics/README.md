@@ -115,9 +115,11 @@ give the distance away:
   is the range to about 7 %. What hides the range is a bias, which stands
   for the source level the receiver does not know: give a receiver that
   must not know its range an `<amplitude_noise>` with a `<bias_stddev>`
-  and some `<stddev>`. A receiver with `<range>` off and neither spread
-  nor bias on its amplitude says so in a warning when it loads; one with no
-  `<gz:acoustic_receiver>` block at all loads quietly.
+  and some `<stddev>`. A receiver with `<range>` off and no spread, no
+  `<bias_stddev>` and no dynamic bias on its amplitude says so in a warning
+  when it loads; a fixed `<bias_mean>` does not count, since it can be read
+  in the SDF. One with no `<gz:acoustic_receiver>` block at all loads
+  quietly.
 - **The stamp.** It is the exact arrival, and a pinger fires at
   `offset + k * period`. With a known schedule the stamp gives the range:
   in `test/worlds/pingers.sdf` the listener's stamps are whole seconds plus
@@ -130,7 +132,9 @@ noise model does the work:
 - the types `gaussian` and `gaussian_quantized`, with `mean`, `stddev`,
   `bias_mean`, `bias_stddev` and `precision`;
 - the dynamic bias (`dynamic_bias_stddev`, `dynamic_bias_correlation_time`),
-  which steps with the time between two readings.
+  which steps with the time between two readings. As on gz-sensors' IMU,
+  `dynamic_bias_stddev` is a density: the bias wanders to about
+  `dynamic_bias_stddev * sqrt(dynamic_bias_correlation_time / 2)`.
 
 ## Who hears what
 
