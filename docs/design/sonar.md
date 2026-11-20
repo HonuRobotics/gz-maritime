@@ -126,7 +126,7 @@ Configured as one beam per side, narrow along track and wide in elevation, point
 
 ### Acoustic properties of the scene
 
-Each surface needs the two backscatter terms above: the Lambert strength μ and, for smooth objects, the specular strength S and width w. Materials of a part live in its `.glb`, and an SDF `<visual>` must not declare a `<material>`, so acoustic properties cannot come from SDF materials. They are set with `gz:` custom elements, the way the project already marks collisions for buoyancy and wind. Strengths are in dB (10 log₁₀ μ and 10 log₁₀ S), the form backscatter is quoted in the literature, and the width is in radians, as SDF gives every angle. Ground truth labels come from the same pass: each ray knows which entity it hit.
+Each surface needs the two backscatter terms above: the Lambert strength μ and, for smooth objects, the specular strength S and width w. Materials of a part live in its `.glb`, and an SDF `<visual>` must not declare a `<material>`, so acoustic properties cannot come from SDF materials. They are set with `gz:` custom elements, the way the project already marks collisions for buoyancy and wind. Strengths are in dB (10 log₁₀ μ and 10 log₁₀ S), the form backscatter is quoted in the literature, and the width is in radians, as SDF gives every angle. Ground truth labels come from the same pass: each ray knows which entity it hit. Labels are the segmentation camera's 8 bits, one id per model and property set for the whole world, so a world can tell 254 surfaces apart; past that, the rest share one id with the default properties, and labeling per ping by range is the way beyond it.
 
 Nothing has to be marked for the sonar to see it. Every surface gets values from the first of these that sets them:
 
@@ -221,17 +221,17 @@ Parameters shared by the three types. The defaults come from each type's exempla
 | `beams` | Beams across the fan | 256 | 20 (most soundings per ping) | 1 | 1 to about 1000 |
 | `beam_width` | Two-way −3 dB width of one beam across the fan, rad | 0.026 (1.5°) | 0.017 (1°, chosen) | the horizontal FOV | 0.25° to 3° |
 | `sidelobe_level` | First sidelobe relative to the main lobe, dB | −13 (chosen) | −13 (chosen) | −13 (chosen) | −13 (unshaded array) to −40 (heavily shaded) |
-| `range/min`, `range/max` | Range window, m | 0.2, 30 | 2.5, 50 | 1 (chosen), 50 | min 0.1 to 5; max 5 to 300 |
+| `range/min`, `range/max` (or `range_min`, `range_max`) | Range window, m | 0.2, 30 | 2.5, 50 | 1 (chosen), 50 | min 0.1 to 5; max 5 to 300 |
 | `samples` | Range samples per beam per ping | 1024 (chosen) | 400 | 600 | 200 to 4000 |
 | `pulse_length` | Transmit pulse, s; sets range resolution cτ/2 | 1e-5 (8 mm) | chosen to give one range step | 1e-4 (chosen) | 10 to 200 µs |
 | `sound_speed` | Speed the device assumes when it converts time to range, m/s. The world's `<sound_speed>` is the truth; a difference between them biases every range, as a mis-set sonar does | the world's value | the world's value, reported in the message only, since soundings are travel times | 1500 | 1400 to 1550 |
-| `gain` | Receiver gain before readout: `auto`, or a fixed value in dB | auto | auto | auto | auto, or 0 to 60 dB |
+| `gain` | Receiver gain before readout: `auto`, which puts the median echo 24 dB below full scale, or a fixed value in dB | auto | auto | auto | auto, or 0 to 60 dB |
 | `gain_time_constant` | How quickly automatic gain follows the scene, s; 0 sets it from each ping alone | 0 | 0 | 1 | 0 to 5 |
 | `tvg` | Time-varied gain: `none`, `spreading` or `spreading_absorption` | spreading_absorption | none | spreading_absorption | one of the three |
 | `noise_floor` | Additive noise relative to the readout's full scale, dB; higher is harder | −50 | −50 | −50 | −80 (quiet) to −20 (noisy) |
 | `speckle` | Multiply each sample by the speckle factor | true | true | true | true or false |
 | `multipath` | Add the surface-bounce return | false | false | false | true or false; worth turning on for sidescan in shallow water |
-| `labels` | Publish the ground-truth labels topic | false | false | false | true or false |
+| `labels` | Publish the ground-truth labels topic, `<topic>/labels` | false | false | false | true or false |
 
 Readout parameters that only one type uses:
 
@@ -245,7 +245,7 @@ Readout parameters that only one type uses:
 
 The imaging sonar's readout is fixed: 8-bit beam by sample, as the ECHO delivers it.
 
-A world system (the counterpart of the wind system) owns the engine, the water properties and the scene's acoustic defaults described above, and drives every sonar sensor in the world, including those on vehicles spawned at run time.
+A world system, `gz::sim::maritime::Sonar` in `gz-maritime-sonar-system` (the counterpart of the wind system), owns the water properties and the scene's acoustic defaults described above, and drives every sonar sensor in the world, including those on vehicles spawned at run time. It draws each sonar's cameras on the rendering thread of gz-sim's Sensors system, which the world must load, and joins that thread's render events only once the world has a sonar: a connected render event makes the rendering thread run every physics step, so a world without a sonar pays nothing. Pings are scheduled in nanoseconds of sim time and stamped with the time of the scene they saw, and a slow ping holds the simulation back rather than being dropped, so the output stays a function of the seed and the scene. A vehicle described by a parts config, as the BlueROV2 is, passes a `sonar:` dict on the part's entry into this block, one element per key.
 
 ### Messages
 
@@ -255,11 +255,11 @@ A world system (the counterpart of the wind system) owns the engine, the water p
 | Profiling | `marine_acoustic_msgs/SonarDetections` | Per sounding: two-way travel time, across-track angle (`rx_angles`), along-track angle (`tx_angles`), intensity and a flag (OK, or rejected by the sonar or by a filter). The arrays can change length from ping to ping, so a variable number of soundings fits. This mirrors the Surveyor's own angle and time-of-flight packet, and leaves the conversion from travel time to range to the team, as on the real sensor |
 | Profiling water column (optional) | `marine_acoustic_msgs/ProjectedSonarImage` | The thin-fan intensity before bottom detection, on a separate topic |
 | Sidescan | `marine_acoustic_msgs/ProjectedSonarImage`, one beam per message | Each side is its own sensor, as each Omniscan unit is, and each ping is one beam: its direction, the range of each sample, and the samples as float32 in dB, with time-varied gain for spreading and absorption applied by default. The gain law is documented, so a consumer can remove it exactly using the range of each sample. `marine_acoustic_msgs` has no sidescan message; using the imaging sonar's message means one consumer path, one conversion and one visualization for both. Nothing in the message marks the values as dB, so that is a documented convention |
-| Ground truth (optional) | Per-sample entity labels on a separate topic | Never on the sensor topic; an imaging sonar cannot resolve elevation, so 3D points from it would be information the real sensor never gives |
+| Ground truth (optional) | Per-sample label ids and the name of each, on `<topic>/labels` (gz-transport only for now) | Never on the sensor topic; an imaging sonar cannot resolve elevation, so 3D points from it would be information the real sensor never gives |
 
-No sensor publishes a point cloud; the profiler's soundings are the nearest thing, and they become points only with the vehicle's pose. Topics follow the one-name-per-instance rule (`<vehicle>/sonar/forward`, `<vehicle>/sonar/down`, `<vehicle>/sonar/port`). Each message's frame is the sensor's link. `marine_acoustic_msgs` puts Z along the acoustic axis and X up, to match profilers that report in north-east-down, while the SDF sensor and ROS put x along it, so the sensor publishes in a frame rotated from its link by that fixed rotation and names it in the header.
+No sensor publishes a point cloud; the profiler's soundings are the nearest thing, and they become points only with the vehicle's pose. Topics follow the vehicle's part rule, `/<vehicle>/<part name>/image` (for example `/bluerov2/sonar_forward/image`), which keeps one name per instance. Each message's frame is the sensor's link. `marine_acoustic_msgs` puts Z along the acoustic axis and X up, to match profilers that report in north-east-down, while the SDF sensor and ROS put x along it, so the sensor publishes in a frame rotated from its link by that fixed rotation and names it in the header.
 
-Inside Gazebo the sensors publish gz-transport messages of gz-maritime's own, generated with gz-msgs. `ros_gz_bridge` converts only the DVL message from `marine_acoustic_msgs`, so `kai_sonar_bridge` converts these to `ProjectedSonarImage` and `SonarDetections`. That keeps ROS out of the Gazebo plugins, unlike POSIM, which publishes ROS 2 from inside the sensor; contributing the conversions to `ros_gz_bridge` later would let the bridge node go.
+Inside Gazebo the sensors publish gz-transport messages of gz-maritime's own, `gz.maritime.sonar.SonarImage` and `SonarLabels`, generated with gz-msgs. `ros_gz_bridge` converts only the DVL message from `marine_acoustic_msgs`, so `kai_sonar_bridge` converts these to `ProjectedSonarImage` and `SonarDetections`. That keeps ROS out of the Gazebo plugins, unlike POSIM, which publishes ROS 2 from inside the sensor; contributing the conversions to `ros_gz_bridge` later would let the bridge node go.
 
 ## Implementation plan
 
@@ -269,7 +269,7 @@ Everything is built in gz-maritime, from components it already uses: gz-sim, gz-
 
 | Package | Contents |
 |---|---|
-| `gz_sonar` | The engine as a library with no Gazebo dependency (geometry samples in, beam × sample intensity out: the sonar equation, Francois–Garrison absorption, backscatter, binning, speckle and noise, the three readouts), so it can be tested on its own; the custom sensors and the world system; the sonar messages, generated with gz-msgs' message generation |
+| `gz_sonar` | The engine as a library with no Gazebo dependency (geometry samples in, beam × sample intensity out: the sonar equation, Francois–Garrison absorption, backscatter, binning, speckle and noise, the three readouts, and the camera sampler that turns depth and label images into ray hits), so it can be tested on its own; the custom sensors and the world system; the sonar messages, generated with gz-msgs' message generation; the sonar target models and the walkthroughs' demo worlds |
 | `kai_sonar_bridge` | A ROS 2 node that converts the gz-transport messages to `marine_acoustic_msgs`, launched by `kai_bringup` for each vehicle that carries a sonar |
 
 The names follow the repo's split between `gz_*` (Gazebo) and `kai_*` (ROS) packages.

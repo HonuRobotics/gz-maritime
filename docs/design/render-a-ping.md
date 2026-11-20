@@ -1,6 +1,24 @@
 # Render a ping without Gazebo
 
-For contributors. The sonar engine in `gz_sonar` runs on its own, with a small scene of analytic shapes standing in for Gazebo's renderer, so each stage of the model can be seen and tested without a simulation. This page renders an imaging ping, a sidescan pass and a profiling pass and draws them. When an image looks wrong later, in Gazebo, this is the place to reproduce it. The model itself is described in the [sonar simulation design](sonar.md#theory-of-operation).
+For people working on the sonar engine itself. To use a sonar on a vehicle, start with [First look: imaging sonar from the ROV](../how-to/sonar-first-look.md).
+
+The sonar engine in `gz_sonar` runs on its own, with a small scene of analytic shapes standing in for Gazebo's renderer, so each stage of the model can be seen and tested without a simulation. This page renders an imaging ping, a sidescan pass and a profiling pass and draws them. The model itself is described in the [sonar simulation design](sonar.md#theory-of-operation).
+
+## Why it is here
+
+In Gazebo, a sonar image is the product of two things: the scene geometry that gz-rendering's cameras sample, and the acoustic model that turns that geometry into echoes. When an image looks wrong, the first question is which of the two is at fault. Here the geometry is exact: the synthetic scene intersects each ray with its spheres, planes and boxes analytically, so the range, incidence angle and surface of every hit are known, and whatever the image shows is the acoustic model's doing. That makes this the place to reproduce a suspicious image, to try a change to the model before it meets a renderer, and to compare against other sonar simulators on the same scenes.
+
+## What it tests
+
+Each stage of the model, against what physics and geometry predict:
+
+- Geometry: a target appears at the range and bearing it is placed at, and the seabed's first return at the altitude the sonar is at.
+- The sonar equation: echoes fall with range as spreading and absorption predict, scale with a surface's backscatter (Lambert's law and the specular glint) and with the area the beam covers, and vanish behind an object (shadows).
+- The beams: a small target spreads across neighboring beams as the beam pattern says, sidelobes included, and targets at the same range but different elevations land in the same place (the imaging sonar's elevation ambiguity).
+- Speckle and noise: their statistics, and a fixed seed giving the same ping every time, on any number of threads.
+- The readouts: the imaging sonar's 8-bit frame, the sidescan's line in dB with time-varied gain a consumer can take out again, and the profiling sonar's soundings.
+
+The gtests check these numerically; the pictures below let a person see them.
 
 Run everything inside drydock, from `~/maritime_ws`.
 

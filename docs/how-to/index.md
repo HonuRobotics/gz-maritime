@@ -17,6 +17,16 @@ from its files.
    driving.
 5. [Add sensors](sensors.md): IMU, GPS, magnetometer and cameras.
 
+## Sonar
+
+Imaging sonars for underwater vehicles, from a first look to labeled training data.
+
+1. [First look: imaging sonar from the ROV](sonar-first-look.md)
+2. [Add a sonar to your vehicle](sonar-add.md)
+3. [Make objects visible to the sonar](sonar-visible.md)
+4. [Set the difficulty](sonar-difficulty.md)
+5. [Generate labeled training data](sonar-labels.md)
+
 ## More
 
 - [Several vehicles on one ocean](several-vehicles.md)
@@ -40,5 +50,10 @@ site-worlds
 aquatic-centre
 own-world
 wind-and-current
+sonar-first-look
+sonar-add
+sonar-visible
+sonar-difficulty
+sonar-labels
 faq
 ```
