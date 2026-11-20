@@ -83,6 +83,8 @@ colcon test --packages-select gz_acoustics
 # the GUI: the core gtests, the four plugins in an offscreen GUI, and a
 # camera that must not see the panels' markers (needs a GPU, skips without)
 colcon test --packages-select gz_maritime_gui
+# On a GPU machine, as CI runs it (a skip becomes a failure):
+GZ_MARITIME_REQUIRE_RENDERING=1 colcon test --packages-select gz_maritime_gui --ctest-args -L gpu
 # docs, strict (needs network for the requirements):
 pip install -r docs/requirements.txt && sphinx-build -W docs docs/_build/html
 ```
