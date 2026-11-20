@@ -287,7 +287,7 @@ We write our own code, and take ideas, structure and test cases from the open im
 
 ### Phases
 
-Four phases, each ending at a checkpoint: a short list of tests and demonstrations that the author runs locally, in drydock, and checks by eye where a person has to. At each checkpoint we review what was learned and adjust the phases that follow before starting the next. Each phase gets an issue and a pull request, and delivers the walkthroughs that show off what it added; running them as written is part of its checkpoint.
+Four phases of development, each ending at a checkpoint: a short list of tests and demonstrations that the author runs locally, in drydock, and checks by eye where a person has to. At each checkpoint we review what was learned and adjust the phases that follow before starting the next. Each phase delivers the walkthroughs that show off what it added, and running them as written is part of its checkpoint. All four phases are commits on one feature branch; a fifth phase integrates the work and submits it for review as a single pull request.
 
 The VRX 2027 competition is over the horizon and is not a phase of its own. The design keeps what it will need in view as it goes: seeded, repeatable output, difficulty that a few parameters control, and ground truth to score against.
 
@@ -345,7 +345,7 @@ Realign on: what mapping needs from the two sonars before the survey phase.
 
 #### Phase 4. Mapping a shipwreck
 
-A shipwreck model, with its geometry kept as ground truth, on the seabed of a demo world. The profiler in the BlueROV2's downward slot, on the base of the ROV. Example scripts that build a georeferenced sidescan mosaic, build a georeferenced point cloud from the soundings, and compare the point cloud with the wreck's ground truth.
+A shipwreck model, built as part of this phase and modeled with sonar in mind (hull openings, a mast, debris, surfaces that cast shadows), with its geometry kept as ground truth, on the seabed of a demo world. The profiler in the BlueROV2's downward slot, on the base of the ROV. Example scripts that build a georeferenced sidescan mosaic, build a georeferenced point cloud from the soundings, and compare the point cloud with the wreck's ground truth.
 
 Walkthroughs:
 
@@ -358,7 +358,19 @@ Checkpoint:
 2. With noisy positioning, the mosaic blurs and the reported point-cloud error grows with the positioning error.
 3. Three vehicles carrying sonars in one world hold their rates on a GPU.
 
-Realign on: what comes next, among a comparison with real recordings, more target models and exemplars, and what the VRX 2027 tasks will need.
+Realign on: anything the integration phase has to settle before review.
+
+#### Phase 5. Integrate and submit
+
+Bring the four phases together as one change that a reviewer can read from start to finish. Make the three sonars consistent with each other (parameter names, defaults, messages, topics and frames); bring this design up to date with what was built, with the design history kept in the branch's commits; add the walkthroughs to the how-to index; record the origin of any adapted code in `PROVENANCE.md`; and, if sphinx-honu v0.2.1 has been released by then, bump the docs pin and remove the `myst_fence_as_directive` line from `docs/conf.py`. The BlueBoat and BlueROV2 mounts live in `bluerobotics_models`, so they go up as a companion pull request there, linked from this one, and the two merge together.
+
+Checkpoint:
+
+1. From a clean workspace in drydock: `colcon build --merge-install` and `colcon test` pass for every package, and the docs build with warnings as errors.
+2. Every walkthrough runs as written, from the first look at the imaging sonar to the shipwreck map.
+3. The pull request description is reviewed before it is posted: what was built, how to try it (the first-look walkthroughs), what was tested, and what is left for later.
+
+Then: one pull request to gz-maritime, with its companion in `bluerobotics_models`, opened for review. Review comments are answered on the branch, and the next round of work (a comparison with real recordings, more target models and exemplars, what the VRX 2027 tasks will need) is planned from what the review raises.
 
 ## Testing plan
 
