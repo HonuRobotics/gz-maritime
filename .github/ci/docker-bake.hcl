@@ -15,7 +15,8 @@
 # The CI image. CI adds the caches and the output with --set; a local build
 # is: docker buildx bake -f .github/ci/docker-bake.hcl ci --load
 
-variable "IMAGE" {
+# Not IMAGE: the image job's IMAGE (repository and tag) would override it.
+variable "IMAGE_REPO" {
   default = "ghcr.io/honurobotics/gz-maritime-ci"
 }
 
@@ -45,7 +46,7 @@ target "ci" {
     DEPS_EPOCH = DEPS_EPOCH
     BUILD_JOBS = BUILD_JOBS
   }
-  tags = compact(["${IMAGE}:${TAG}", EXTRA_TAG == "" ? "" : "${IMAGE}:${EXTRA_TAG}"])
+  tags = compact(["${IMAGE_REPO}:${TAG}", EXTRA_TAG == "" ? "" : "${IMAGE_REPO}:${EXTRA_TAG}"])
   # One manifest per tag, so the cleanup job never deletes a child manifest
   # that a tagged index still points to.
   attest = ["type=provenance,disabled=true", "type=sbom,disabled=true"]

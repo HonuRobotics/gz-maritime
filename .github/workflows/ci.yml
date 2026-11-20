@@ -32,6 +32,9 @@ jobs:
       packages: write
     env:
       IMAGE: ghcr.io/honurobotics/gz-maritime-ci:sha-${{ github.sha }}
+      # Bake's tags, which check_image_tags.sh holds to IMAGE.
+      TAG: sha-${{ github.sha }}
+      EXTRA_TAG: ${{ github.event_name == 'push' && 'lyrical' || '' }}
       SAME_REPO: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     outputs:
       image: ${{ env.IMAGE }}
@@ -107,11 +110,14 @@ jobs:
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
+      # Bake reads this job's environment, so a variable that shares a name
+      # with one of bake's would change the tags.
+      - name: Check the image tags
+        run: bash .github/ci/check_image_tags.sh
+
       - name: Build the image
         uses: docker/bake-action@v7.5.0
         env:
-          TAG: sha-${{ github.sha }}
-          EXTRA_TAG: ${{ github.event_name == 'push' && 'lyrical' || '' }}
           DEPS_EPOCH: ${{ steps.epoch.outputs.deps_epoch }}
         with:
           source: .
