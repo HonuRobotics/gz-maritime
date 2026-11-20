@@ -232,7 +232,16 @@ jobs:
       - name: Run the GPU tests
         run: |
           mkdir -p "$RUNNER_TEMP/results"
-          docker run --rm --gpus all -e NVIDIA_DRIVER_CAPABILITIES=all -v "$RUNNER_TEMP/results:/results" "$IMAGE" /ws/src/gz-maritime/.github/ci/run_tests.sh gpu
+          docker run --rm --name gz-tests --gpus all -e NVIDIA_DRIVER_CAPABILITIES=all -v "$RUNNER_TEMP/results:/results" "$IMAGE" /ws/src/gz-maritime/.github/ci/run_tests.sh gpu
+
+      # A cancel or a timeout stops the step's shell, not the container. TERM
+      # makes run_tests.sh copy what the tests left before the upload.
+      - name: Stop the tests
+        if: always()
+        run: |
+          if docker kill --signal TERM gz-tests > /dev/null 2>&1; then
+            timeout 120 docker wait gz-tests > /dev/null || true
+          fi
 
       - name: Upload the GPU test results
         if: always()
