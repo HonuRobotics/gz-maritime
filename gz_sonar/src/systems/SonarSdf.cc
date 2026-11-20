@@ -102,6 +102,12 @@ std::optional<sonar::SonarConfig> LoadSonarConfig(const std::string &_type,
     if (auto v = Child<double>(range, "max"))
       c.rangeMax = *v;
   }
+  // Flat spellings too, for configs that cannot nest (a vehicle's parts
+  // list passes its sonar settings as one level of key: value).
+  if (auto v = Child<double>(_block, "range_min"))
+    c.rangeMin = *v;
+  if (auto v = Child<double>(_block, "range_max"))
+    c.rangeMax = *v;
   if (auto v = Child<double>(_block, "pulse_length"))
     c.pulseLength = *v;
   if (auto v = Child<double>(_block, "sound_speed"))

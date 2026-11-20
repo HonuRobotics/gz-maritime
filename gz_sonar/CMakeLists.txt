@@ -111,6 +111,10 @@ install(TARGETS gz-maritime-sonar-system
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 
+# Sonar target models and the demo worlds of the walkthroughs; the models
+# are found through GZ_SIM_RESOURCE_PATH (hooks).
+install(DIRECTORY models worlds DESTINATION share/${PROJECT_NAME})
+
 install(DIRECTORY include/ DESTINATION include)
 install(
   TARGETS ${PROJECT_NAME}

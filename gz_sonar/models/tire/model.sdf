@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<sdf version="1.12" xmlns:gz="http://gazebosim.org/schema">
+  <model name="tire">
+    <static>true</static>
+    <link name="link">
+      <visual name="rubber">
+        <geometry><cylinder><radius>0.35</radius><length>0.25</length></cylinder></geometry>
+        <material><diffuse>0.08 0.08 0.08 1</diffuse><ambient>0.08 0.08 0.08 1</ambient></material>
+        <gz:acoustic_lambert>-25</gz:acoustic_lambert>
+      </visual>
+      <collision name="rubber">
+        <geometry><cylinder><radius>0.35</radius><length>0.25</length></cylinder></geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

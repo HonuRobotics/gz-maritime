@@ -40,7 +40,8 @@ struct Levels
   /// \brief The time-varied gain applied at each sample, dB.
   std::vector<double> tvgDb;
 
-  /// \brief The gain applied, dB: fixed, or chosen so the brightest echoes
+  /// \brief The gain applied, dB: fixed, or chosen so the median echo
+  /// sits 24 dB below full scale
   /// sit at full scale.
   double gainDb{0.0};
 
@@ -58,7 +59,7 @@ double TimeVariedGain(const SonarConfig &_config, double _alpha,
 class GainTracker
 {
   /// \brief Take one ping's gain and return the gain to apply.
-  /// \param[in] _pingGain The gain that would put this ping's brightest
+  /// \param[in] _pingGain The gain that would put this ping's median
   /// echoes at full scale, dB.
   /// \param[in] _dt Time since the previous ping, s.
   /// \param[in] _timeConstant Time constant, s; 0 follows each ping.

@@ -29,9 +29,12 @@ namespace
 constexpr std::uint64_t kNoiseStream = 2;
 constexpr std::uint64_t kDetectionStream = 3;
 
-/// \brief Automatic gain puts this fraction of the lit cells below full
-/// scale.
-constexpr double kAutoGainQuantile = 0.995;
+/// \brief Automatic gain puts the median echo this far below full scale,
+/// dB: the seabed sits mid-gray, stronger targets stand out above it, and
+/// only the strongest glints reach full scale. (Anchored to the brightest
+/// echoes instead, speckle peaks off a seabed set the scale and clip every
+/// target that is no brighter than they are.)
+constexpr double kAutoGainMedianDb = -24.0;
 }  // namespace
 
 double TimeVariedGain(const SonarConfig &_config, double _alpha,
@@ -92,11 +95,10 @@ Levels ReadLevels(const BeamIntensity &_intensity, const SonarConfig &_config,
   }
   else if (!lit.empty())
   {
-    const auto n = static_cast<std::size_t>(
-      kAutoGainQuantile * static_cast<double>(lit.size() - 1));
+    const auto n = (lit.size() - 1) / 2;
     std::nth_element(lit.begin(), lit.begin() + static_cast<long>(n),
       lit.end());
-    out.gainDb = -lit[n];
+    out.gainDb = kAutoGainMedianDb - lit[n];
     if (_tracker)
       out.gainDb = _tracker->Update(out.gainDb, _dt, _config.gainTimeConstant);
   }
