@@ -92,7 +92,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Every run reads the layer cache; only non-PR runs write it, so pull
-      # requests never evict the shared layers. Same-repo images are pushed.
+      # requests never evict the shared layers. A failed cache write only
+      # warns: the image is still pushed. Same-repo images are pushed.
       - name: Bake settings
         id: bake
         run: |
@@ -100,7 +101,7 @@ jobs:
             echo 'set<<EOF'
             echo 'ci.cache-from=type=gha,scope=gz-maritime-ci'
             if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
-              echo 'ci.cache-to=type=gha,scope=gz-maritime-ci,mode=max'
+              echo 'ci.cache-to=type=gha,scope=gz-maritime-ci,mode=max,ignore-error=true'
             fi
             if [ "$SAME_REPO" = true ]; then
               echo 'ci.output=type=image,push=true,compression=zstd,compression-level=3,force-compression=true,oci-mediatypes=true'
