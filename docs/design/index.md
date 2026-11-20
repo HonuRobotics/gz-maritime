@@ -117,7 +117,7 @@ field. The main points it has to handle:
 
 ## Sonar
 
-Imaging, profiling and sidescan sonar share one engine, an incoherent beam model on geometry sampled with gz-rendering, configured by the shape of each sonar's fan. The use cases, the theory of operation, the interface, and the implementation, testing and tutorial plans are in [Sonar simulation design](sonar.md).
+Imaging, profiling and sidescan sonar share one engine, an incoherent beam model on geometry sampled with gz-rendering, configured by the shape of each sonar's fan. The use cases, the theory of operation, the interface, and the implementation, testing and tutorial plans are in [Sonar simulation design](sonar.md). Contributors can run the engine on its own with [Render a ping without Gazebo](render-a-ping.md).
 
 ## Related
 
@@ -130,4 +130,5 @@ and how they keep their floating volume on a link of its own.
 :maxdepth: 1
 
 sonar
+render-a-ping
 ```

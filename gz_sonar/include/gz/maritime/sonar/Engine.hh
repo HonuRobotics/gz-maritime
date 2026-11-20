@@ -1,0 +1,109 @@
+/*
+ * Copyright (C) 2026 Honu Robotics
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+#ifndef GZ_MARITIME_SONAR_ENGINE_HH_
+#define GZ_MARITIME_SONAR_ENGINE_HH_
+
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
+#include "gz/maritime/sonar/Config.hh"
+#include "gz/maritime/sonar/Rays.hh"
+#include "gz/maritime/sonar/Water.hh"
+
+namespace gz::maritime::sonar
+{
+/// \brief The echo intensity of one ping in every beam and range sample,
+/// before readout: linear, relative to the echo of a 1 m^2 scatterer at
+/// 1 m on the beam's axis.
+struct BeamIntensity
+{
+  std::size_t beams{0};
+  std::size_t samples{0};
+
+  /// \brief Beam-major: data[beam * samples + sample].
+  std::vector<double> data;
+
+  /// \brief For each cell, the label of the surface that sent it the most
+  /// energy; 0 where nothing did. Ground truth, never sensor output.
+  std::vector<std::uint32_t> labels;
+
+  /// \brief Center range of each sample, m, as the sonar reports it (with
+  /// its assumed sound speed).
+  std::vector<double> ranges;
+
+  /// \brief Azimuth of each beam, rad.
+  std::vector<double> azimuths;
+
+  double &At(std::size_t _beam, std::size_t _sample)
+  {
+    return this->data[_beam * this->samples + _sample];
+  }
+
+  double At(std::size_t _beam, std::size_t _sample) const
+  {
+    return this->data[_beam * this->samples + _sample];
+  }
+};
+
+/// \brief Intensity weight of a beam at an angle from its axis: a sinc^2
+/// main lobe whose -3 dB width is the beam width, with its sidelobes set to
+/// the configured level.
+double HorizontalPattern(const SonarConfig &_config, double _offset);
+
+/// \brief Intensity weight of the vertical beam at an elevation: Gaussian,
+/// -3 dB at half the vertical field of view.
+double VerticalPattern(const SonarConfig &_config, double _elevation);
+
+/// \brief The incoherent beam model: turns the ray hits of one ping into
+/// echo intensity per beam and range sample.
+///
+/// Each hit at range R and incidence theta sends back
+///   b_h b_v sigma(theta) dOmega / (R^2 cos theta) 10^(-2 alpha R / 10),
+/// the sonar equation for a patch of area R^2 dOmega / cos theta. The energy
+/// is added (not averaged) into every beam the horizontal pattern reaches,
+/// spread over the range samples that the patch's footprint and the pulse
+/// cover, at the range the sonar computes with its assumed sound speed.
+/// Speckle multiplies each cell by an exponential draw with mean 1.
+class Engine
+{
+  /// \brief An engine for one sonar in a body of water.
+  public: Engine(const SonarConfig &_config, const Water &_water);
+
+  /// \brief One ping.
+  /// \param[in] _hits What each ray of the fan found.
+  /// \param[in] _ping The ping number, which with the seed fixes the
+  /// random draws.
+  public: BeamIntensity Ping(const std::vector<RayHit> &_hits,
+              std::uint64_t _ping) const;
+
+  /// \brief The configuration.
+  public: const SonarConfig &Config() const;
+
+  /// \brief The water.
+  public: const Water &WaterProperties() const;
+
+  /// \brief Absorption at the sonar's frequency, dB per meter.
+  public: double Absorption() const;
+
+  private: SonarConfig config;
+  private: Water water;
+  private: double alpha{0.0};
+};
+}  // namespace gz::maritime::sonar
+
+#endif  // GZ_MARITIME_SONAR_ENGINE_HH_
