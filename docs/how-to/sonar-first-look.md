@@ -31,17 +31,17 @@ The fan, forward up: nothing until the beam meets the seabed, then the targets a
 ## Turn the ROV
 
 ```bash
-ros2 topic pub /bluerov2/thruster_1/cmd std_msgs/msg/Float64 "data: -0.05" -1 &
-ros2 topic pub /bluerov2/thruster_2/cmd std_msgs/msg/Float64 "data: 0.05" -1 &
-ros2 topic pub /bluerov2/thruster_3/cmd std_msgs/msg/Float64 "data: 0.05" -1 &
-ros2 topic pub /bluerov2/thruster_4/cmd std_msgs/msg/Float64 "data: -0.05" -1 &
+ros2 topic pub /bluerov2/thruster_1/cmd std_msgs/msg/Float64 "data: -0.15" -1 &
+ros2 topic pub /bluerov2/thruster_2/cmd std_msgs/msg/Float64 "data: 0.15" -1 &
+ros2 topic pub /bluerov2/thruster_3/cmd std_msgs/msg/Float64 "data: 0.15" -1 &
+ros2 topic pub /bluerov2/thruster_4/cmd std_msgs/msg/Float64 "data: -0.15" -1 &
 ```
 
 A slow turn to port, so the targets slide across the fan; publish `data: 0.0` to the same four to stop.
 
 ## Check
 
-The targets and their shadows sit in the fan at the ranges and bearings the world places them, about 6.5 to 9.5 m ahead, and move across it as the ROV turns. To read one ping's numbers:
+The targets and their shadows sit in the fan at the ranges and bearings the world places them, about 6.5 to 9.5 m ahead, and slide across the fan and out of it as the ROV turns. To read one ping's numbers:
 
 ```bash
 ros2 topic echo --once /bluerov2/sonar_forward/image --field ping_info
