@@ -1,0 +1,177 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [lyrical]
+  schedule:
+    # Mondays 03:00 UTC: the week's first run rebuilds the dependency layer
+    # (DEPS_EPOCH), so the week's pull requests start warm.
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      cold:
+        description: Build with no cache at all, to measure a cold build
+        type: boolean
+        default: false
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions: {}
+
+jobs:
+  # Builds the CI image. Same-repo runs push it to GHCR for the test jobs;
+  # a fork's image stays on the runner, and its CPU tests run here.
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/honurobotics/gz-maritime-ci:sha-${{ github.sha }}
+      SAME_REPO: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    outputs:
+      image: ${{ env.IMAGE }}
+      same_repo: ${{ env.SAME_REPO }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Unit test for the test script
+        run: bash .github/ci/test_run_tests.sh
+
+      - name: Free disk before the build
+        run: df -h /
+
+      - uses: docker/setup-buildx-action@v4
+        id: buildx
+
+      - name: Dependency epoch
+        id: epoch
+        run: echo "deps_epoch=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
+      # Pull requests only read the ccache; pushes, the weekly run and manual
+      # runs also save it, after the cache dance has taken it out of BuildKit.
+      - name: Restore the ccache
+        if: github.event_name == 'pull_request' && !inputs.cold
+        uses: actions/cache/restore@v6
+        with:
+          path: ccache
+          key: ccache-${{ steps.epoch.outputs.deps_epoch }}-${{ hashFiles('.github/ci/Dockerfile', '*/package.xml') }}-${{ github.run_id }}
+          restore-keys: ccache-${{ steps.epoch.outputs.deps_epoch }}-${{ hashFiles('.github/ci/Dockerfile', '*/package.xml') }}-
+
+      - name: Restore and save the ccache
+        if: github.event_name != 'pull_request' && !inputs.cold
+        uses: actions/cache@v6
+        with:
+          path: ccache
+          key: ccache-${{ steps.epoch.outputs.deps_epoch }}-${{ hashFiles('.github/ci/Dockerfile', '*/package.xml') }}-${{ github.run_id }}
+          restore-keys: ccache-${{ steps.epoch.outputs.deps_epoch }}-${{ hashFiles('.github/ci/Dockerfile', '*/package.xml') }}-
+
+      - name: Move the ccache in and out of BuildKit
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          cache-map: |
+            {
+              "ccache": {"target": "/ccache", "id": "ccache"}
+            }
+          skip-extraction: ${{ github.event_name == 'pull_request' }}
+
+      - name: Log in to GHCR
+        if: env.SAME_REPO == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Every run reads the layer cache; only non-PR runs write it, so pull
+      # requests never evict the shared layers. Same-repo images are pushed.
+      - name: Bake settings
+        id: bake
+        run: |
+          {
+            echo 'set<<EOF'
+            echo 'ci.cache-from=type=gha,scope=gz-maritime-ci'
+            if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+              echo 'ci.cache-to=type=gha,scope=gz-maritime-ci,mode=max'
+            fi
+            if [ "$SAME_REPO" = true ]; then
+              echo 'ci.output=type=image,push=true,compression=zstd,compression-level=3,force-compression=true,oci-mediatypes=true'
+            else
+              echo 'ci.output=type=docker'
+            fi
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build the image
+        uses: docker/bake-action@v7.5.0
+        env:
+          TAG: sha-${{ github.sha }}
+          EXTRA_TAG: ${{ github.event_name == 'push' && 'lyrical' || '' }}
+          DEPS_EPOCH: ${{ steps.epoch.outputs.deps_epoch }}
+        with:
+          source: .
+          files: .github/ci/docker-bake.hcl
+          targets: ci
+          no-cache: ${{ inputs.cold == true }}
+          set: ${{ steps.bake.outputs.set }}
+
+      - name: Image size
+        if: env.SAME_REPO == 'true'
+        run: |
+          manifest=$(docker buildx imagetools inspect --raw "$IMAGE")
+          jq -r '.layers[] | "\(.size)\t\(.digest)"' <<< "$manifest"
+          echo "IMAGE_SIZE compressed_bytes=$(jq '[.layers[].size] | add' <<< "$manifest") layers=$(jq '.layers | length' <<< "$manifest")"
+
+      - name: Free disk after the build
+        run: df -h /
+
+      - name: Run the CPU tests
+        if: env.SAME_REPO != 'true'
+        run: |
+          mkdir -p results
+          docker run --rm -v "$PWD/results:/results" "$IMAGE" /ws/src/gz-maritime/.github/ci/run_tests.sh cpu
+
+      - name: Upload the CPU test results
+        if: always() && env.SAME_REPO != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-cpu
+          path: results
+
+  test-cpu:
+    needs: image
+    if: needs.image.outputs.same_repo == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: read
+    env:
+      IMAGE: ${{ needs.image.outputs.image }}
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull the image
+        run: docker pull "$IMAGE"
+
+      - name: Run the CPU tests
+        run: |
+          mkdir -p "$RUNNER_TEMP/results"
+          docker run --rm -v "$RUNNER_TEMP/results:/results" "$IMAGE" /ws/src/gz-maritime/.github/ci/run_tests.sh cpu
+
+      - name: Upload the CPU test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-cpu
+          path: ${{ runner.temp }}/results
