@@ -95,9 +95,9 @@ flowchart LR
   S --> R["Readout<br/><i>TVG, gain, dB, quantize; or detect range</i>"]
 ```
 
-1. Sample the geometry. For each ping, a fan of rays covers the sonar's field of view at finer resolution than the beams, in azimuth and in elevation. Each ray returns the range to the first surface it hits, the incidence angle there, and the acoustic properties of that surface. Taking only the first hit along each ray produces acoustic shadows without any extra step.
+1. Sample the geometry. For each ping, a fan of rays covers the sonar's field of view at finer resolution than the beams, in azimuth and in elevation. Each ray returns the range to the first surface it hits, the incidence angle there, and the acoustic properties of that surface. Taking only the first hit along each ray produces acoustic shadows without any extra step. In Gazebo the rays come from gz-rendering: a depth camera gives the range, read at each ray's exact direction by interpolating 1/z between pixels, which is exact on a plane; a segmentation camera gives the entity hit; and normals come from neighboring hits on the ray grid. Phase 1 measured this at 0.02 mm median range error on a box on a seabed; gz-rendering's ray sensor (GpuRays) was rejected for an error floor of about 8 mm and no normals. Depth cameras report depth along their optical axis, which the sampler converts to range along the ray.
 2. Compute the echo level of each ray from the sonar equation, in linear units: the contribution of a ray hitting a surface at range R and incidence θ is proportional to b²(φ, ψ) · σ(θ) · A / R⁴ · 10^(−2αR/10), where b is the one-way beam pattern at the ray's azimuth φ and elevation ψ, A = R² ΔΩ / cos θ is the area the ray's solid angle ΔΩ covers on the surface, and α is the absorption in dB per meter. The backscatter is σ(θ) = μ cos²θ + S exp(−θ²/2w²): Lambert's law for rough, diffuse scattering, with μ a property of the surface, plus an optional specular lobe of strength S and angular width w for smooth objects, which return strongly only near normal incidence. Absorption comes from the Francois–Garrison equations at the configured frequency, temperature, salinity and depth, not from a fixed constant.
-3. Bin into beams and range. Each ray's contribution is added (not averaged) into the range sample at 2R/c, spread over the pulse length, and into the beams according to the beam pattern, so sidelobes appear around bright targets. Summing over the elevation of a beam reproduces the imaging sonar's elevation ambiguity; for the narrow beams of the profiler and the narrow along-track width of the sidescan it collapses to almost nothing.
+3. Bin into beams and range. Each ray's contribution is added (not averaged) into the range sample at 2R/c, spread uniformly over the wider of the pulse length and the range interval the ray's footprint covers on a slanted surface (capped at 8 samples, so a ray grazing the edge of a target does not smear it far in range), and into the beams according to the beam pattern, so sidelobes appear around bright targets. Summing over the elevation of a beam reproduces the imaging sonar's elevation ambiguity; for the narrow beams of the profiler and the narrow along-track width of the sidescan it collapses to almost nothing.
 4. Speckle and noise. Each sample's intensity is multiplied by an exponentially distributed random factor, the statistics of fully developed speckle from many unresolved scatterers, and an additive noise floor is applied. Every random draw comes from a generator seeded from the world's seed, the sensor's name and the ping number, so a run is reproducible.
 5. Readout, which differs by sonar (below).
 
@@ -122,7 +122,7 @@ The bathymetric work that a large-ocean multibeam needs (sound-speed ray tracing
 
 ### Sidescan
 
-Configured as one beam per side, narrow along track and wide in elevation, pointing to the side with a configurable depression angle. One ping produces one line; the line-by-line waterfall and any mosaic are built by the consumer from the vehicle's motion, as with the real sensor, so the vessel's roll, pitch and yaw in waves enter the data without special handling. Readout: each sample in dB as float32, with time-varied gain for spreading and absorption applied by default, as sidescan viewers expect. Since the message carries the range of every sample, the gain is an exact, documented term in dB that a consumer can remove; `tvg` set to `none` publishes the received level instead. The Omniscan scales its dB values into uint16 for its link, which the simulation has no need to copy. The Omniscan defaults: 450 kHz, 0.5° by 50°, no tilt, 600 samples, far field beyond 9 m. The nadir gap, the first bottom return, and the grazing-angle dependence of the seabed return all follow from the geometry and the backscatter law.
+Configured as one beam per side, narrow along track and wide in elevation, pointing to the side with a configurable depression angle. One ping produces one line; the line-by-line waterfall and any mosaic are built by the consumer from the vehicle's motion, as with the real sensor, so the vessel's roll, pitch and yaw in waves enter the data without special handling. Readout: each sample in dB as float32, with time-varied gain for spreading and absorption applied by default, as sidescan viewers expect. Since the message carries the range of every sample, the gain is an exact, documented term in dB that a consumer can remove; `tvg` set to `none` publishes the received level instead. Automatic gain is smoothed across pings with a time constant of about a second, as real sidescans do: set ping by ping, it darkens every line that holds a bright target and stripes the waterfall, as Phase 1 showed. The Omniscan scales its dB values into uint16 for its link, which the simulation has no need to copy. The Omniscan defaults: 450 kHz, 0.5° by 50°, no tilt, 600 samples, far field beyond 9 m. The nadir gap, the first bottom return, and the grazing-angle dependence of the seabed return all follow from the geometry and the backscatter law.
 
 ### Acoustic properties of the scene
 
@@ -226,6 +226,7 @@ Parameters shared by the three types. The defaults come from each type's exempla
 | `pulse_length` | Transmit pulse, s; sets range resolution cτ/2 | 1e-5 (8 mm) | chosen to give one range step | 1e-4 (chosen) | 10 to 200 µs |
 | `sound_speed` | Speed the device assumes when it converts time to range, m/s. The world's `<sound_speed>` is the truth; a difference between them biases every range, as a mis-set sonar does | the world's value | the world's value, reported in the message only, since soundings are travel times | 1500 | 1400 to 1550 |
 | `gain` | Receiver gain before readout: `auto`, or a fixed value in dB | auto | auto | auto | auto, or 0 to 60 dB |
+| `gain_time_constant` | How quickly automatic gain follows the scene, s; 0 sets it from each ping alone | 0 | 0 | 1 | 0 to 5 |
 | `tvg` | Time-varied gain: `none`, `spreading` or `spreading_absorption` | spreading_absorption | none | spreading_absorption | one of the three |
 | `noise_floor` | Additive noise relative to the readout's full scale, dB; higher is harder | −50 | −50 | −50 | −80 (quiet) to −20 (noisy) |
 | `speckle` | Multiply each sample by the speckle factor | true | true | true | true or false |
@@ -238,7 +239,7 @@ Readout parameters that only one type uses:
 |---|---|---|---|---|
 | Profiling | `readout` | How angles are found: `beamformed` (one sounding per beam) or `angle_of_arrival` (the strongest echoes, any angle) | angle_of_arrival | either |
 | Profiling | `detection_threshold` | Echo level above the noise floor that counts as a sounding, dB | 10 (chosen) | 3 to 20 |
-| Profiling | `range_noise` | Standard deviation of range at high signal-to-noise ratio, m; grows as the ratio falls | one range step | 0.005 to 0.1 |
+| Profiling | `range_noise` | Standard deviation of range at high signal-to-noise ratio, m; grows as the ratio falls | half a range step (chosen; the Surveyor's precision is not published) | 0.005 to 0.1 |
 | Profiling | `angle_noise` | Standard deviation of a sounding's angle, rad | 0.009 (0.5°, chosen) | 0.1° to 2° |
 | Profiling | `water_column` | Also publish the thin-fan intensity before detection | false | true or false |
 
@@ -262,7 +263,7 @@ Inside Gazebo the sensors publish gz-transport messages of gz-maritime's own, ge
 
 ## Implementation plan
 
-Everything is built in gz-maritime, from components it already uses: gz-sim, gz-sensors (as `gz_wind` does), gz-rendering (as `gz_waves_rendering` does), gz-transport, gz-msgs, gz-math, and on the ROS side `marine_acoustic_msgs`, which is already installed because `ros_gz_bridge` depends on it. No new external dependency, and in particular no CUDA, WGPU or other GPU toolkit: the GPU is reached only through gz-rendering, which also runs on a CPU-only renderer (Mesa llvmpipe), so one code path serves both. The rate is a requirement only on the scoring hardware, which has a GPU: every sonar holds its configured rate there alongside three vehicles. Without a GPU the sonar is best effort: the same output for the same seed, at a rate measured in Phase 1 and published in the documentation.
+Everything is built in gz-maritime, from components it already uses: gz-sim, gz-sensors (as `gz_wind` does), gz-rendering (as `gz_waves_rendering` does), gz-transport, gz-msgs, gz-math, and on the ROS side `marine_acoustic_msgs`, which is already installed because `ros_gz_bridge` depends on it. No new external dependency, and in particular no CUDA, WGPU or other GPU toolkit: the GPU is reached only through gz-rendering, which also runs on a CPU-only renderer (Mesa llvmpipe), so one code path serves both. The rate is a requirement only on the scoring hardware, which has a GPU: every sonar holds its configured rate there alongside three vehicles. Without a GPU the sonar is best effort: the same output for the same seed, at a published rate. Phase 1 measured the sampler at about 92 Hz on a GPU and 4 to 8 Hz on llvmpipe for the imaging fan in a 2.1-million-triangle scene, so the CPU-only imaging rate is about 4 to 8 Hz. On llvmpipe the cost follows the triangle count in view, and labels double it, being a second render. With a GPU the engine becomes the slower stage, so Phase 2 runs it on several threads.
 
 ### Packages
 
@@ -307,9 +308,20 @@ Checkpoint:
 
 Realign on: the sampling approach, the GPU and CPU-only rates, and anything the pictures show the model getting wrong.
 
+Outcome (2026-11-20). Done: the gtests pass, and next to POSIM the engine agrees on every scene's geometry. Decided at the checkpoint:
+
+1. The sampler is a depth camera and a segmentation camera, with 1/z interpolation and normals from neighboring hits (see the theory of operation).
+2. Sidescan automatic gain is smoothed across pings.
+3. A ray's footprint spreads over at most 8 range samples.
+4. The default sidelobe level stays at −13 dB, an unshaded array, until recordings from a real ECHO say otherwise.
+5. The noise floor stays relative to full scale.
+6. The profiler's default range noise drops to half a range step; seabed soundings scattered about ±0.25 m at 3 m altitude.
+7. The engine runs on several threads from Phase 2; the CPU-only imaging rate is published as about 4 to 8 Hz.
+8. GPU and CPU-only output agree to millimeters, not bit for bit, which the testing plan's tolerance already allows.
+
 #### Phase 2. Imaging sonar in Gazebo
 
-The custom sensor, the world system, the gz-rendering sampler, the gz-transport message and `kai_sonar_bridge` publishing `ProjectedSonarImage`, with the fan drawn as an image for viewing; ECHO defaults; seeded noise. Acoustic properties: the Lambert, specular and transparent elements, the defaults and their precedence, the seabed, ground-truth labels, and the first target models (glass float, cylinder, box, tire).
+First, the engine changes from the Phase 1 checkpoint: smoothed sidescan gain, the 8-sample footprint cap, the profiler's range noise, and running the engine on several threads. Then the custom sensor, the world system, the gz-rendering sampler (depth and segmentation cameras), the gz-transport message and `kai_sonar_bridge` publishing `ProjectedSonarImage`, with the fan drawn as an image for viewing; ECHO defaults; seeded noise. Acoustic properties: the Lambert, specular and transparent elements, the defaults and their precedence, the seabed, ground-truth labels, and the first target models (glass float, cylinder, box, tire).
 
 Walkthroughs:
 
@@ -389,7 +401,7 @@ Tests run headless in drydock, as gtests for the engine and pytests for whole wo
 | Profiling | A seabed with a known slope and step | Recovered ranges match the geometry within the configured noise; dropouts appear past the configured grazing limit |
 | Map product |urvey of the wreck with the profiling sonar, georeferenced from the simulation's true poses, then from noisy positioning | With true poses, the point cloud lies on the true seabed and wreck surfaces within the configured range and angle noise; with noisy positioning, the error grows as the positioning error does |
 | Determinism | The same world, seed and motion twice | Byte-identical messages |
-| GPU and CPU-only | The same ping rendered on a GPU and on llvmpipe | The same output within a stated tolerance, since the acoustics run on the CPU either way and only the rasterization differs |
+| GPU and CPU-only | The same ping rendered on a GPU and on llvmpipe | The same surfaces hit, and ranges within a few millimeters (Phase 1 measured up to 4 mm), since the acoustics run on the CPU either way and only the rasterization differs |
 | Readout | The imaging and sidescan output of a scene with known echo levels | The imaging sonar's 8-bit values follow the documented time-varied gain and dB-to-8-bit mapping; removing the documented time-varied gain from the sidescan's dB values recovers the received level |
 | Interface | Each message type | Beam directions, range per sample, frame and stamp are present and consistent with the sensor's configuration; topics follow the instance name |
 | Performance | Three vehicles with all sonars in `marina_bay`, headless | Each sonar holds its configured rate on the scoring hardware (GPU); without a GPU the measured rate is recorded and published, with no pass threshold |
