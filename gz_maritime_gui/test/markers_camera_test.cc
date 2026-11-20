@@ -161,6 +161,19 @@ msgs::Marker Square(msgs::Marker::Visibility _visibility)
   m.set_visibility(_visibility);
   return m;
 }
+
+/// \brief Whether this machine must render, as on CI's GPU runners:
+/// GZ_MARITIME_REQUIRE_RENDERING is set to anything but empty or 0.
+/// \return True when a missing camera image fails the test instead of
+/// skipping it.
+bool RenderingRequired()
+{
+  const char *value = std::getenv("GZ_MARITIME_REQUIRE_RENDERING");
+  if (value == nullptr)
+    return false;
+  const std::string required(value);
+  return !required.empty() && required != "0";
+}
 }
 
 //////////////////////////////////////////////////
@@ -175,7 +188,14 @@ TEST(MarkersCamera, PanelMarkersStayOutOfCameras)
 
   const auto before = images.Next(std::chrono::seconds(20));
   if (!before)
+  {
+    if (RenderingRequired())
+    {
+      FAIL() << "no camera image, and GZ_MARITIME_REQUIRE_RENDERING is set: "
+                "this machine must render";
+    }
     GTEST_SKIP() << "no camera image: this machine cannot render";
+  }
 
   // The panels' drawings: the acoustics panel's reach and a solid square,
   // both built as every panel builds its markers.

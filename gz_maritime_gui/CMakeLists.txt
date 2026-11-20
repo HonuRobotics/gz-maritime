@@ -145,7 +145,8 @@ if(BUILD_TESTING)
       ENVIRONMENT "GZ_PARTITION=gz_maritime_gui_acoustics_drawing_test")
   endif()
 
-  # A camera never sees the panels' markers. Needs a GPU; skips without one.
+  # A camera never sees the panels' markers. Needs a GPU (ctest label gpu);
+  # skips without one unless GZ_MARITIME_REQUIRE_RENDERING is set.
   ament_add_gtest(markers_camera_test test/markers_camera_test.cc TIMEOUT 120)
   if(TARGET markers_camera_test)
     target_compile_definitions(markers_camera_test PRIVATE
@@ -154,6 +155,7 @@ if(BUILD_TESTING)
       gz-transport::core)
     set_tests_properties(markers_camera_test PROPERTIES
       ENVIRONMENT "GZ_PARTITION=gz_maritime_gui_markers_camera_test")
+    set_property(TEST markers_camera_test APPEND PROPERTY LABELS gpu)
   endif()
 
   # Stands for MarkerManager in the offscreen GUI test, and prints what it
