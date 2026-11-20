@@ -20,7 +20,8 @@
 // Gazebo". Writes .npy arrays and a .json of axes to an output directory;
 // draw_ping.py turns them into pictures.
 //
-//   gz_sonar_render_ping imaging A|B|C <out_dir>
+//   gz_sonar_render_ping imaging A|B|C <out_dir> [sidelobe=dB]
+//                        [dynamic_range=dB] [name=suffix]
 //   gz_sonar_render_ping sidescan <out_dir>
 //   gz_sonar_render_ping profiling <out_dir>
 
@@ -135,11 +136,33 @@ sonar::SyntheticScene PassScene()
   return s;
 }
 
-int Imaging(const std::string &_scene, const std::string &_out)
+int Imaging(const std::string &_scene, const std::string &_out,
+  const std::vector<std::string> &_options)
 {
   sonar::SonarConfig c = sonar::EchoImaging();
   c.rangeMax = 10.0;
   c.samples = 512;
+  // Optional key=value settings, to see what one parameter does:
+  // sidelobe=<dB> (first sidelobe of the beam pattern), dynamic_range=<dB>
+  // (the levels the 8-bit frame spans) and name=<suffix> (for the files).
+  std::string suffix;
+  for (const auto &o : _options)
+  {
+    const auto eq = o.find('=');
+    const std::string key = o.substr(0, eq);
+    const std::string value = eq == std::string::npos ? "" : o.substr(eq + 1);
+    if (key == "sidelobe")
+      c.sidelobeLevelDb = std::stod(value);
+    else if (key == "dynamic_range")
+      c.dynamicRangeDb = std::stod(value);
+    else if (key == "name")
+      suffix = "_" + value;
+    else
+    {
+      std::cerr << "unknown setting [" << o << "]\n";
+      return 1;
+    }
+  }
   Pose3d pose;
   const auto scene = Scene(_scene, pose);
   sonar::Engine engine(c, HarborWater());
@@ -149,7 +172,7 @@ int Imaging(const std::string &_scene, const std::string &_out)
   const auto frame = sonar::ReadImaging(
     sonar::ReadLevels(b, c, engine.Absorption(), 0), c);
 
-  const std::string stem = _out + "/gz_sonar_" + _scene;
+  const std::string stem = _out + "/gz_sonar_" + _scene + suffix;
   std::vector<float> lin(b.data.begin(), b.data.end());
   WriteNpy(stem + ".npy", lin, b.beams, b.samples, "<f4");
   WriteNpy(stem + "_u8.npy", frame.data, frame.beams, frame.samples, "|u1");
@@ -246,7 +269,8 @@ int Profiling(const std::string &_out)
 int main(int _argc, char **_argv)
 {
   const std::string usage =
-    "usage: gz_sonar_render_ping imaging A|B|C <out_dir>\n"
+    "usage: gz_sonar_render_ping imaging A|B|C <out_dir> [sidelobe=dB] "
+    "[dynamic_range=dB] [name=suffix]\n"
     "       gz_sonar_render_ping sidescan <out_dir>\n"
     "       gz_sonar_render_ping profiling <out_dir>\n";
   if (_argc < 3)
@@ -255,8 +279,9 @@ int main(int _argc, char **_argv)
     return 1;
   }
   const std::string kind = _argv[1];
-  if (kind == "imaging" && _argc == 4)
-    return Imaging(_argv[2], _argv[3]);
+  if (kind == "imaging" && _argc >= 4)
+    return Imaging(_argv[2], _argv[3],
+      std::vector<std::string>(_argv + 4, _argv + _argc));
   if (kind == "sidescan")
     return Sidescan(_argv[2]);
   if (kind == "profiling")

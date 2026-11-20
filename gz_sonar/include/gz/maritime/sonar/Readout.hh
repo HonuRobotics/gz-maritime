@@ -41,7 +41,8 @@ struct Levels
   std::vector<double> tvgDb;
 
   /// \brief The gain applied, dB: fixed, or chosen so the median echo
-  /// sits 24 dB below full scale
+  /// sits 24 dB below full scale, unless that would clip more than the
+  /// brightest 0.1 % of echoes
   /// sit at full scale.
   double gainDb{0.0};
 

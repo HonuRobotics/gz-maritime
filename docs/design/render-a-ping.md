@@ -54,16 +54,64 @@ ros2 run gz_sonar draw_ping.py /tmp/sonar
 
 ## What to look for
 
+Each case below shows the scene as a line drawing, with the geometry that predicts what the sonar should see, and then what the engine rendered.
+
+### Scene A: a sphere in open water
+
+```{figure} images/render_ping_A.svg
+:alt: Side view of scene A: a level imaging sonar, its 20° beam out to a 10 m window, a sphere 5 m ahead on the axis, and the seabed 7 m below
+
+Scene A, side view. The sphere sits on the beam's axis, and the seabed, 7 m down, stays below the beam within the 10 m window, so the sphere is the only target.
+```
+
+```{figure} images/gz_sonar_A_shaded.png
+:alt: Imaging sonar fan of scene A with a shaded array: a bright spot at 4.75 m on the axis and a faint arc close to it at the same range
+
+Scene A, rendered with a shaded array (`sidelobe=-25`). The sphere's near face, at 4.75 m on the axis, with a faint arc at the same range on either side of it.
+```
+
+The arc is expected. A sonar forms each beam from an array of transducers, and every beam also hears a little from directions outside its main lobe, through its sidelobes. A strong, isolated target is therefore heard by every beam at its own range, and shows as an arc across the fan, brightest next to the target and fading away from it; real imaging sonars show the same arcs around strong targets in open water. How far the arc reaches depends on the array: an unshaded line array, the default here (`sidelobe=-13`), has sidelobes that fall off slowly and carry the arc across the whole fan, while a shaded array lowers them and keeps it close to the target. To see the unshaded case:
+
+```bash
+ros2 run gz_sonar gz_sonar_render_ping imaging A /tmp/sonar
+ros2 run gz_sonar gz_sonar_render_ping imaging A /tmp/sonar sidelobe=-25 name=shaded
+ros2 run gz_sonar draw_ping.py /tmp/sonar
+```
+
+### Scene B: a box on a flat seabed
+
+```{figure} images/render_ping_B.svg
+:alt: Side view of scene B: the imaging sonar 2 m up, pitched down 15°, its beam meeting the seabed at 4.7 m slant range, a box at 4.5 to 5.5 m and its shadow out to 7.3 m
+
+Scene B, side view. The lower edge of the beam, 25° down, meets the seabed at 4.7 m slant range; the box's far top edge shadows the seabed out to 7.3 m.
+```
+
 ```{figure} images/gz_sonar_B.png
 :alt: Imaging sonar fan of scene B: bright seabed from about 4.7 m, the box as a bright patch near 5 m with a dark shadow behind it
 
 Scene B. The seabed starts where the lowest edge of the 20° beam meets it, the box returns brightly from its near face and top, and the seabed behind it is in shadow. The dimmer band closer in is seabed seen by the vertical beam's taper, below its −3 dB edge.
 ```
 
-```{figure} images/gz_sonar_A.png
-:alt: Imaging sonar fan of scene A: a bright spot at 4.75 m on the axis and a faint arc at the same range across the fan
+### Scene C: a seabed rising to starboard
 
-Scene A. The sphere's near face, at 4.75 m on the axis. The faint arc at the same range across the fan is the beam pattern's sidelobes: every beam hears a little of a strong target.
+```{figure} images/render_ping_C.svg
+:alt: Scene C: (a) looking forward, the seabed rising 10° to starboard under a sonar 2 m up; (b) plan view of the fan, where the seabed enters the beam, flat versus sloped
+
+Scene C. (a) Looking forward: the seabed rises 10° to starboard through the point under the sonar. (b) Where the seabed enters the beam: on the axis it is the same as scene B's flat seabed, closer to starboard, and on the port side it falls away beyond the 10 m window.
+```
+
+```{figure} images/gz_sonar_C.png
+:alt: Imaging sonar fan of scene C: the seabed's first return closer on the starboard side than on the port side
+
+Scene C. The seabed's first return comes closer on the starboard side, where the slope rises toward the sonar, and farther on the port side, where it falls away.
+```
+
+### The pass: sidescan and profiling
+
+```{figure} images/render_ping_pass.svg
+:alt: The pass: (a) a section through the box with the sidescan beam to port from y = 0 and the profiler's fan from y = 4; (b) plan view of both passes, the swaths, the box and the glass float
+
+The pass. (a) A section through the box: the sidescan at y = 0 looks to port, 20° down, leaving a 3 m nadir gap; the profiler at y = 4 runs over the box. (b) The two passes in plan, with the swaths each one covers and the shadows the box and the float cast to the sidescan.
 ```
 
 ```{figure} images/gz_sonar_sidescan.png

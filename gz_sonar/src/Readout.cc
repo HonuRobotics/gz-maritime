@@ -35,6 +35,13 @@ constexpr std::uint64_t kDetectionStream = 3;
 /// echoes instead, speckle peaks off a seabed set the scale and clip every
 /// target that is no brighter than they are.)
 constexpr double kAutoGainMedianDb = -24.0;
+
+/// \brief ...but never so much gain that more than this fraction of the
+/// lit cells clips. In a sparse scene, a lone target in open water, the lit
+/// cells are mostly the target's sidelobes, and the median rule alone would
+/// lift them to mid-gray and bury the target in saturation; the cap keeps
+/// the target at full scale and its sidelobes at their true level.
+constexpr double kAutoGainPeakQuantile = 0.999;
 }  // namespace
 
 double TimeVariedGain(const SonarConfig &_config, double _alpha,
@@ -98,7 +105,12 @@ Levels ReadLevels(const BeamIntensity &_intensity, const SonarConfig &_config,
     const auto n = (lit.size() - 1) / 2;
     std::nth_element(lit.begin(), lit.begin() + static_cast<long>(n),
       lit.end());
-    out.gainDb = kAutoGainMedianDb - lit[n];
+    const double median = lit[n];
+    const auto top = static_cast<std::size_t>(
+      kAutoGainPeakQuantile * static_cast<double>(lit.size() - 1));
+    std::nth_element(lit.begin(), lit.begin() + static_cast<long>(top),
+      lit.end());
+    out.gainDb = std::min(kAutoGainMedianDb - median, -lit[top]);
     if (_tracker)
       out.gainDb = _tracker->Update(out.gainDb, _dt, _config.gainTimeConstant);
   }
