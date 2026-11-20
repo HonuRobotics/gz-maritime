@@ -1,0 +1,2 @@
+prepend-non-duplicate;GZ_SIM_SYSTEM_PLUGIN_PATH;@CMAKE_INSTALL_PREFIX@/lib
+prepend-non-duplicate;PYTHONPATH;@CMAKE_INSTALL_PREFIX@/lib/python

@@ -265,6 +265,10 @@ bool WaterVisual::Implementation::ResolveVisual()
   if (!this->visual)
     return false;
 
+  // Marked as water, with its tiles below, so sensors that must not see the
+  // surface (gz_sonar, from underneath) can find and hide it.
+  this->visual->SetUserData("gz-maritime-water", true);
+
   if (!this->material)
   {
     // Defer material creation until the wavefield component has been
@@ -345,6 +349,7 @@ bool WaterVisual::Implementation::ResolveVisual()
           }
           tile->AddGeometry(mesh);
           tile->SetMaterial(this->material, false);  // share, don't clone
+          tile->SetUserData("gz-maritime-water", true);
           tile->SetWorldPosition(
               basePos.X() + i * this->tileMeshSize,
               basePos.Y() + j * this->tileMeshSize,

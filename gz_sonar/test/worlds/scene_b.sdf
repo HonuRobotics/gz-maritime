@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<!-- Scene B of the Phase 1 comparison: a 1 x 1 x 0.5 m box on a flat
+     seabed, 5 m ahead of an imaging sonar 2 m up, pitched down 15 degrees.
+     The sonar's own hull sits in front of it and must not be seen. -->
+<sdf version="1.12" xmlns:gz="http://gazebosim.org/schema">
+  <world name="scene_b">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-maritime-sonar-system" name="gz::sim::maritime::Sonar">
+      <temperature>29</temperature>
+      <salinity>30</salinity>
+      <sound_speed>1500</sound_speed>
+      <seabed>
+        <model>seabed</model>
+        <lambert>-27</lambert>
+      </seabed>
+    </plugin>
+    <light type="directional" name="sun">
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <model name="seabed">
+      <static>true</static>
+      <link name="link">
+        <visual name="floor">
+          <geometry><plane><normal>0 0 1</normal><size>200 200</size></plane></geometry>
+        </visual>
+      </link>
+    </model>
+
+    <model name="box">
+      <static>true</static>
+      <pose>5 0 0.25 0 0 0</pose>
+      <link name="link">
+        <visual name="body">
+          <geometry><box><size>1 1 0.5</size></box></geometry>
+          <gz:acoustic_lambert>-15</gz:acoustic_lambert>
+        </visual>
+      </link>
+    </model>
+
+    <model name="rov">
+      <static>true</static>
+      <pose>0 0 2 0 0 0</pose>
+      <link name="base_link">
+        <visual name="hull">
+          <pose>0.3 0 0 0 0 0</pose>
+          <geometry><box><size>0.05 0.6 0.6</size></box></geometry>
+        </visual>
+        <sensor name="sonar_forward" type="custom" gz:type="imaging_sonar">
+          <pose>0 0 0 0 0.2618 0</pose>
+          <update_rate>10</update_rate>
+          <topic>rov/sonar_forward/image</topic>
+          <gz:sonar>
+            <range><min>0.2</min><max>10</max></range>
+            <samples>512</samples>
+            <labels>true</labels>
+          </gz:sonar>
+        </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>
