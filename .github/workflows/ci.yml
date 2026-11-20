@@ -201,6 +201,58 @@ jobs:
           name: test-results-cpu
           path: ${{ runner.temp }}/results
 
+  # The GPU tests, on a GPU runner in Honu's cloud account. Off unless the
+  # repository variable CLOUD_GPU is on, which is also the kill switch.
+  test-gpu:
+    needs: image
+    if: needs.image.outputs.same_repo == 'true' && vars.CLOUD_GPU == 'on'
+    runs-on: runs-on=${{ github.run_id }}/family=g4dn.xlarge/image=ubuntu24-gpu-x64
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    env:
+      IMAGE: ${{ needs.image.outputs.image }}
+    steps:
+      - name: GPU
+        run: nvidia-smi
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull the image
+        run: docker pull "$IMAGE"
+
+      # run_tests.sh gpu requires rendering on NVIDIA's EGL, and fails on a
+      # skip, on Mesa, or when no gpu-labelled test ran.
+      - name: Run the GPU tests
+        run: |
+          mkdir -p "$RUNNER_TEMP/results"
+          docker run --rm --gpus all -e NVIDIA_DRIVER_CAPABILITIES=all -v "$RUNNER_TEMP/results:/results" "$IMAGE" /ws/src/gz-maritime/.github/ci/run_tests.sh gpu
+
+      - name: Upload the GPU test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-gpu
+          path: ${{ runner.temp }}/results
+
+      # What the cloud provider bills: the instance's whole life, boot
+      # included, at the spot or the on-demand price. Never fails the job.
+      - name: Instance usage
+        if: always()
+        run: |
+          token=$(curl -sf -m 5 -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' || true)
+          meta() { curl -sf -m 5 -H "X-aws-ec2-metadata-token: $token" "http://169.254.169.254/latest/meta-data/$1" || echo unknown; }
+          lifecycle=$(meta instance-life-cycle)
+          type=$(meta instance-type)
+          up=$(cut -d' ' -f1 /proc/uptime)
+          echo "INSTANCE_USAGE uptime_s=${up%.*} lifecycle=$lifecycle instance_type=$type"
+
   # Deletes the CI images nothing needs any more; see the script.
   cleanup:
     if: github.event_name == 'schedule'
