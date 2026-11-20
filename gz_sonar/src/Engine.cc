@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <thread>
 
 #include "gz/maritime/sonar/Random.hh"
 
@@ -38,8 +39,9 @@ constexpr double kPatternFloor = 1e-5;
 /// grazing.
 constexpr double kMinCos = 1e-3;
 
-/// \brief A footprint spreads over at most this many samples.
-constexpr double kMaxFootprintSamples = 64.0;
+/// \brief A footprint spreads over at most this many samples: more smears
+/// a target's edge, where rays graze it, far in range.
+constexpr double kMaxFootprintSamples = 8.0;
 
 double Sinc2(double _x)
 {
@@ -47,6 +49,31 @@ double Sinc2(double _x)
     return 1.0;
   const double s = std::sin(M_PI * _x) / (M_PI * _x);
   return s * s;
+}
+
+/// \brief Run _fn(i) for i in [0, _n) on up to _threads threads, each
+/// taking a contiguous block. _fn must only touch what belongs to i.
+template<typename Fn>
+void ParallelFor(std::size_t _n, std::size_t _threads, Fn _fn)
+{
+  const std::size_t t = std::min(_threads, _n);
+  if (t <= 1)
+  {
+    for (std::size_t i = 0; i < _n; ++i)
+      _fn(i);
+    return;
+  }
+  std::vector<std::thread> pool;
+  pool.reserve(t);
+  for (std::size_t w = 0; w < t; ++w)
+  {
+    pool.emplace_back([&, w]() {
+      for (std::size_t i = w * _n / t; i < (w + 1) * _n / t; ++i)
+        _fn(i);
+    });
+  }
+  for (auto &th : pool)
+    th.join();
 }
 
 /// \brief Stream numbers for the random draws of a ping.
@@ -131,7 +158,8 @@ BeamIntensity Engine::Ping(const std::vector<RayHit> &_hits,
 
   // Rays that share an azimuth share their beam weights, so the energy is
   // first summed into fine azimuth columns (the ray fan's spacing) and each
-  // column is then spread into the beams once. Same sums, far fewer of them.
+  // beam then gathers from the columns its pattern reaches. Same sums, far
+  // fewer of them.
   const double colStep = std::min(beamSpacing, c.beamWidth) /
     static_cast<double>(std::max<std::size_t>(c.raysPerBeam, 1));
   const double azHalf = 0.5 * c.horizontalFov + 2.0 * c.beamWidth;
@@ -142,85 +170,122 @@ BeamIntensity Engine::Ping(const std::vector<RayHit> &_hits,
   std::vector<long> colLo(cols, static_cast<long>(c.samples));
   std::vector<long> colHi(cols, -1);
 
-  for (const RayHit &h : _hits)
+  // Sort the hits into their columns, keeping their order within each, so
+  // every thread owns whole columns and then whole beams. Nothing is shared
+  // between threads, and the sums run in the same order for any number of
+  // threads: the result is the same bits whatever the machine.
+  std::vector<std::size_t> start(cols + 1, 0);
+  std::vector<std::size_t> colOf(_hits.size(), cols);
+  for (std::size_t i = 0; i < _hits.size(); ++i)
   {
-    if (!h.hit || h.range <= 0.0)
+    const RayHit &h = _hits[i];
+    if (!h.hit || h.range <= 0.0 || std::abs(h.ray.azimuth) >= azHalf)
       continue;
-    const double r = h.range;
-    const double apparent = r * rangeScale;
-    if (apparent < c.rangeMin || apparent >= c.rangeMax)
-      continue;
-    if (std::abs(h.ray.azimuth) >= azHalf)
-      continue;
-
-    const double vertical = VerticalPattern(c, h.ray.elevation);
-    if (vertical < kPatternFloor)
-      continue;
-
-    // Sonar equation for the patch this ray stands for.
-    const double cosInc = std::max(std::cos(h.incidence), kMinCos);
-    const double level = vertical * Backscatter(h.properties, h.incidence) *
-      h.ray.solidAngle / (r * r * cosInc) *
-      std::pow(10.0, -2.0 * this->alpha * r / 10.0);
-    if (level <= 0.0)
-      continue;
-
-    // The patch's footprint on a slanted surface spans a range interval,
-    // and the pulse smears it further; spread the energy uniformly over the
-    // wider of the two (at least one sample).
-    const double tanInc = std::min(std::tan(h.incidence), 50.0);
-    const double footprint = std::min(apparent * h.ray.spacing * tanInc,
-      kMaxFootprintSamples * dr);
-    const double width = std::max({footprint, pulseRange, dr});
-    const double lo = apparent - 0.5 * width;
-    const double hi = apparent + 0.5 * width;
-    const long k0 = std::max<long>(0,
-      static_cast<long>(std::floor((lo - c.rangeMin) / dr)));
-    const long k1 = std::min<long>(static_cast<long>(c.samples) - 1,
-      static_cast<long>(std::floor((hi - c.rangeMin) / dr)));
-
-    const auto col = std::min(cols - 1, static_cast<std::size_t>(
-      (h.ray.azimuth + azHalf) / colStep));
-    colLo[col] = std::min(colLo[col], k0);
-    colHi[col] = std::max(colHi[col], k1);
-    for (long k = k0; k <= k1; ++k)
+    colOf[i] = std::min(cols - 1,
+      static_cast<std::size_t>((h.ray.azimuth + azHalf) / colStep));
+    ++start[colOf[i] + 1];
+  }
+  for (std::size_t col = 0; col < cols; ++col)
+    start[col + 1] += start[col];
+  std::vector<std::size_t> order(start[cols]);
+  {
+    std::vector<std::size_t> next(start.begin(), start.end() - 1);
+    for (std::size_t i = 0; i < _hits.size(); ++i)
     {
-      const double cellLo = c.rangeMin + static_cast<double>(k) * dr;
-      const double overlap = std::min(hi, cellLo + dr) - std::max(lo, cellLo);
-      if (overlap <= 0.0)
-        continue;
-      const double add = level * overlap / width;
-      const std::size_t idx = col * c.samples + static_cast<std::size_t>(k);
-      colData[idx] += add;
-      if (add > colBest[idx])
-      {
-        colBest[idx] = add;
-        colLabel[idx] = h.label;
-      }
+      if (colOf[i] < cols)
+        order[next[colOf[i]]++] = i;
     }
   }
 
-  for (std::size_t col = 0; col < cols; ++col)
-  {
-    if (colHi[col] < colLo[col])
-      continue;
-    const double az = -azHalf + (static_cast<double>(col) + 0.5) * colStep;
-    const double jCenter = (az + 0.5 * c.horizontalFov) / beamSpacing - 0.5;
-    const long j0 = std::max<long>(0,
-      static_cast<long>(std::floor(jCenter)) - beamReach);
-    const long j1 = std::min<long>(static_cast<long>(c.beams) - 1,
-      static_cast<long>(std::ceil(jCenter)) + beamReach);
-    for (long j = j0; j <= j1; ++j)
+  const std::size_t threads = c.threads > 0 ? c.threads :
+    std::max(1u, std::thread::hardware_concurrency());
+
+  // Each column: the sonar equation for every hit in it, spread over the
+  // range samples its footprint and the pulse cover.
+  ParallelFor(cols, threads, [&](std::size_t _col) {
+    for (std::size_t n = start[_col]; n < start[_col + 1]; ++n)
     {
-      const double w = HorizontalPattern(c,
-        az - out.azimuths[static_cast<std::size_t>(j)]);
+      const RayHit &h = _hits[order[n]];
+      const double r = h.range;
+      const double apparent = r * rangeScale;
+      if (apparent < c.rangeMin || apparent >= c.rangeMax)
+        continue;
+
+      const double vertical = VerticalPattern(c, h.ray.elevation);
+      if (vertical < kPatternFloor)
+        continue;
+
+      // Sonar equation for the patch this ray stands for.
+      const double cosInc = std::max(std::cos(h.incidence), kMinCos);
+      const double level = vertical * Backscatter(h.properties, h.incidence) *
+        h.ray.solidAngle / (r * r * cosInc) *
+        std::pow(10.0, -2.0 * this->alpha * r / 10.0);
+      if (level <= 0.0)
+        continue;
+
+      // The patch's footprint on a slanted surface spans a range interval,
+      // and the pulse smears it further; spread the energy uniformly over
+      // the wider of the two (at least one sample, at most a few).
+      // From the sampler, which knows the neighbors; otherwise estimated
+      // from the incidence, and capped since a lone ray cannot tell a
+      // slanted plane from the edge of a target.
+      double footprint = h.footprint * rangeScale;
+      if (footprint <= 0.0)
+      {
+        const double tanInc = std::min(std::tan(h.incidence), 50.0);
+        footprint = std::min(apparent * h.ray.spacing * tanInc,
+          kMaxFootprintSamples * dr);
+      }
+      const double width = std::max({footprint, pulseRange, dr});
+      const double lo = apparent - 0.5 * width;
+      const double hi = apparent + 0.5 * width;
+      const long k0 = std::max<long>(0,
+        static_cast<long>(std::floor((lo - c.rangeMin) / dr)));
+      const long k1 = std::min<long>(static_cast<long>(c.samples) - 1,
+        static_cast<long>(std::floor((hi - c.rangeMin) / dr)));
+
+      colLo[_col] = std::min(colLo[_col], k0);
+      colHi[_col] = std::max(colHi[_col], k1);
+      for (long k = k0; k <= k1; ++k)
+      {
+        const double cellLo = c.rangeMin + static_cast<double>(k) * dr;
+        const double overlap = std::min(hi, cellLo + dr) -
+          std::max(lo, cellLo);
+        if (overlap <= 0.0)
+          continue;
+        const double add = level * overlap / width;
+        const std::size_t idx = _col * c.samples + static_cast<std::size_t>(k);
+        colData[idx] += add;
+        if (add > colBest[idx])
+        {
+          colBest[idx] = add;
+          colLabel[idx] = h.label;
+        }
+      }
+    }
+  });
+
+  // Each beam gathers from the columns its pattern reaches, in column order.
+  ParallelFor(c.beams, threads, [&](std::size_t _j) {
+    const double beamAz = out.azimuths[_j];
+    const double reachAz = static_cast<double>(beamReach + 1) * beamSpacing;
+    const long first = std::max<long>(0, static_cast<long>(
+      std::floor((beamAz - reachAz + azHalf) / colStep)));
+    const long last = std::min<long>(static_cast<long>(cols) - 1,
+      static_cast<long>(std::ceil((beamAz + reachAz + azHalf) / colStep)));
+    for (long col = first; col <= last; ++col)
+    {
+      const auto ucol = static_cast<std::size_t>(col);
+      if (colHi[ucol] < colLo[ucol])
+        continue;
+      const double az = -azHalf + (static_cast<double>(col) + 0.5) * colStep;
+      const double w = HorizontalPattern(c, az - beamAz);
       if (w < kPatternFloor)
         continue;
-      for (long k = colLo[col]; k <= colHi[col]; ++k)
+      for (long k = colLo[ucol]; k <= colHi[ucol]; ++k)
       {
-        const std::size_t from = col * c.samples + static_cast<std::size_t>(k);
-        const std::size_t idx =
-          static_cast<std::size_t>(j) * c.samples + static_cast<std::size_t>(k);
+        const std::size_t from = ucol * c.samples + static_cast<std::size_t>(k);
+        const std::size_t idx = _j * c.samples + static_cast<std::size_t>(k);
         out.data[idx] += w * colData[from];
         if (w * colBest[from] > best[idx])
         {
@@ -229,7 +294,7 @@ BeamIntensity Engine::Ping(const std::vector<RayHit> &_hits,
         }
       }
     }
-  }
+  });
 
   if (c.speckle)
   {

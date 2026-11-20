@@ -17,6 +17,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(gz_math_vendor REQUIRED)
 find_package(gz-math REQUIRED)
+find_package(Threads REQUIRED)
 
 # --------------------------------------------------------------------------
 # The sonar engine: ray hits in, echo intensity per beam and range sample
@@ -38,7 +39,9 @@ target_include_directories(${PROJECT_NAME}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(${PROJECT_NAME} PUBLIC gz-math::gz-math)
+target_link_libraries(${PROJECT_NAME}
+  PUBLIC gz-math::gz-math
+  PRIVATE Threads::Threads)
 
 # Renders one ping of a synthetic scene to files, for the contributor
 # walkthrough "Render a ping without Gazebo".

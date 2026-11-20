@@ -51,7 +51,7 @@ Scene A. The sphere's near face, at 4.75 m on the axis. The faint arc at the sam
 ```{figure} images/gz_sonar_sidescan.png
 :alt: Sidescan waterfall: no returns before about 3 m, then seabed; the box as a bright band with a black shadow, the float as a small shadow
 
-Sidescan. Nothing returns before the seabed (the nadir gap, 3 m at this altitude); the box returns brightly and casts a shadow; the float casts a small one.
+Sidescan. Nothing returns before the seabed (the nadir gap, 3 m at this altitude); the box returns brightly and casts a shadow; the float casts a small one. Automatic gain is smoothed across pings, so the box dims the lines around it only a little.
 ```
 
 ```{figure} images/gz_sonar_profiling.png

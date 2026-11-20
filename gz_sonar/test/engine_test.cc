@@ -74,7 +74,8 @@ sonar::BeamIntensity Ping(const sonar::SonarConfig &_config,
 {
   sonar::Engine engine(_config, HarborWater());
   const auto rays = sonar::RayFan(_config);
-  const auto hits = _scene.Cast(_pose, rays, 1.5 * _config.rangeMax);
+  auto hits = _scene.Cast(_pose, rays, 1.5 * _config.rangeMax);
+  sonar::AssignFootprints(hits, sonar::RayFanElevationCount(_config));
   return engine.Ping(hits, _ping);
 }
 
@@ -430,4 +431,37 @@ TEST(Readout, ProfilingFlatSeabed)
       EXPECT_NEAR(s.travelTime, 2.0 * s.range / 1500.0, 1e-12);
     }
   }
+}
+
+/////////////////////////////////////////////////
+// Threads change how fast, never what: the same bits for 1 or 8 threads.
+TEST(Engine, SameResultForAnyThreadCount)
+{
+  sonar::SonarConfig c = CleanEcho();
+  c.speckle = true;
+  sonar::SyntheticScene scene;
+  scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), 1);
+  scene.AddBox({4.5, -0.5, 0}, {5.5, 0.5, 0.5}, Lambert(-15.0), 2);
+  const Pose3d pose(0, 0, 2, 0, 15.0 * kDeg, 0);
+  c.threads = 1;
+  const auto one = Ping(c, scene, pose, 3);
+  c.threads = 8;
+  const auto eight = Ping(c, scene, pose, 3);
+  EXPECT_EQ(one.data, eight.data);
+  EXPECT_EQ(one.labels, eight.labels);
+}
+
+/////////////////////////////////////////////////
+// Smoothed automatic gain: a sudden change moves the gain by 1 - e^(-dt/tau)
+// of the way per ping, and a zero time constant follows each ping.
+TEST(Readout, GainTrackerSmooths)
+{
+  sonar::GainTracker t;
+  EXPECT_DOUBLE_EQ(t.Update(-40.0, 0.1, 1.0), -40.0);
+  const double step = 1.0 - std::exp(-0.1);
+  EXPECT_NEAR(t.Update(-60.0, 0.1, 1.0), -40.0 - 20.0 * step, 1e-9);
+
+  sonar::GainTracker follow;
+  follow.Update(-40.0, 0.1, 0.0);
+  EXPECT_DOUBLE_EQ(follow.Update(-60.0, 0.1, 0.0), -60.0);
 }

@@ -68,6 +68,11 @@ struct RayHit
 
   /// \brief Which entity was hit, for ground truth; 0 for none.
   std::uint32_t label{0};
+
+  /// \brief The range interval this ray's patch covers, m: half the
+  /// spread of the ranges its neighbors on the ray grid hit on the same
+  /// surface. 0 when unknown, and the engine estimates it.
+  double footprint{0.0};
 };
 
 /// \brief The fan of rays that samples a sonar's field of view: finer than
@@ -76,6 +81,17 @@ struct RayHit
 /// view, and two beam widths beyond each edge of the fan, so the beam
 /// pattern's tapers and near sidelobes see the scene too.
 std::vector<Ray> RayFan(const SonarConfig &_config);
+
+/// \brief Number of elevation rays in each azimuth column of RayFan's grid.
+std::size_t RayFanElevationCount(const SonarConfig &_config);
+
+/// \brief Set each hit's footprint from its neighbors on the ray grid:
+/// RayFan's order, azimuth columns of _elevationCount rays each. Only
+/// neighbors that hit the same surface (the same label) count, so a ray at
+/// the edge of a target does not take the jump to the background behind it.
+/// \param[in,out] _hits Hits in RayFan order.
+/// \param[in] _elevationCount Rays per azimuth column.
+void AssignFootprints(std::vector<RayHit> &_hits, std::size_t _elevationCount);
 }  // namespace gz::maritime::sonar
 
 #endif  // GZ_MARITIME_SONAR_RAYS_HH_

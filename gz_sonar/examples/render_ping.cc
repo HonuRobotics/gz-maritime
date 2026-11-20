@@ -143,7 +143,8 @@ int Imaging(const std::string &_scene, const std::string &_out)
   Pose3d pose;
   const auto scene = Scene(_scene, pose);
   sonar::Engine engine(c, HarborWater());
-  const auto hits = scene.Cast(pose, sonar::RayFan(c), 1.5 * c.rangeMax);
+  auto hits = scene.Cast(pose, sonar::RayFan(c), 1.5 * c.rangeMax);
+  sonar::AssignFootprints(hits, sonar::RayFanElevationCount(c));
   const auto b = engine.Ping(hits, 0);
   const auto frame = sonar::ReadImaging(
     sonar::ReadLevels(b, c, engine.Absorption(), 0), c);
@@ -176,13 +177,18 @@ int Sidescan(const std::string &_out)
   std::vector<float> waterfall;
   std::vector<double> along;
   std::vector<double> tvg;
+  // At 1 m/s a ping every 0.1 m is a ping every 0.1 s; automatic gain is
+  // smoothed across them.
+  sonar::GainTracker gain;
   for (std::size_t i = 0; i < pings; ++i)
   {
     const double x = 0.1 * static_cast<double>(i);
     const Pose3d pose(x, 0, 3, 0, 20.0 * kDeg, 90.0 * kDeg);
-    const auto b = engine.Ping(scene.Cast(pose, rays, 1.5 * c.rangeMax), i);
+    auto hits = scene.Cast(pose, rays, 1.5 * c.rangeMax);
+    sonar::AssignFootprints(hits, sonar::RayFanElevationCount(c));
+    const auto b = engine.Ping(hits, i);
     const auto line = sonar::ReadSidescan(
-      sonar::ReadLevels(b, c, engine.Absorption(), i));
+      sonar::ReadLevels(b, c, engine.Absorption(), i, &gain, 0.1));
     waterfall.insert(waterfall.end(), line.db.begin(), line.db.end());
     along.push_back(x);
     tvg = line.tvgDb;
@@ -216,7 +222,9 @@ int Profiling(const std::string &_out)
   {
     const double x = 0.1 * static_cast<double>(i);
     const Pose3d pose(x, 4, 3, 0, 90.0 * kDeg, 0);
-    const auto b = engine.Ping(scene.Cast(pose, rays, 1.5 * c.rangeMax), i);
+    auto hits = scene.Cast(pose, rays, 1.5 * c.rangeMax);
+    sonar::AssignFootprints(hits, sonar::RayFanElevationCount(c));
+    const auto b = engine.Ping(hits, i);
     const auto soundings = sonar::ReadProfiling(
       sonar::ReadLevels(b, c, engine.Absorption(), i), c, 1500.0, i);
     for (const auto &s : soundings)

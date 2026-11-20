@@ -96,6 +96,7 @@ SonarConfig OmniscanSidescan()
   c.samples = 600;
   c.pulseLength = 1.0e-4;
   c.tvg = Tvg::kSpreadingAbsorption;
+  c.gainTimeConstant = 1.0;
   c.raysPerBeam = 8;
   c.elevationRays = 400;
   return c;

@@ -112,6 +112,11 @@ struct SonarConfig
   /// \brief Fixed gain in dB; empty for automatic gain.
   std::optional<double> gainDb;
 
+  /// \brief How quickly automatic gain follows the scene, s: it moves
+  /// toward each ping's own gain with this time constant. 0 takes each
+  /// ping's gain as it is.
+  double gainTimeConstant{0.0};
+
   /// \brief Time-varied gain.
   Tvg tvg{Tvg::kSpreadingAbsorption};
 
@@ -147,11 +152,15 @@ struct SonarConfig
   double detectionThresholdDb{10.0};
 
   /// \brief Profiling: range noise at high signal-to-noise ratio, m; empty
-  /// for one range sample.
+  /// for half a range sample.
   std::optional<double> rangeNoise;
 
   /// \brief Profiling: angle noise, rad.
   double angleNoise{0.009};
+
+  /// \brief Threads the engine may use; 0 for one per core. The result is
+  /// the same whatever the number.
+  std::size_t threads{0};
 
   /// \brief The assumed sound speed, falling back to the water's.
   double AssumedSoundSpeed(double _trueSoundSpeed) const;

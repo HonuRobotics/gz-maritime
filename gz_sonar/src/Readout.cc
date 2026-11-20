@@ -45,8 +45,21 @@ double TimeVariedGain(const SonarConfig &_config, double _alpha,
   return g;
 }
 
+double GainTracker::Update(double _pingGain, double _dt, double _timeConstant)
+{
+  if (!this->started || _timeConstant <= 0.0)
+  {
+    this->started = true;
+    this->gain = _pingGain;
+    return this->gain;
+  }
+  const double a = 1.0 - std::exp(-std::max(_dt, 0.0) / _timeConstant);
+  this->gain += a * (_pingGain - this->gain);
+  return this->gain;
+}
+
 Levels ReadLevels(const BeamIntensity &_intensity, const SonarConfig &_config,
-  double _alpha, std::uint64_t _ping)
+  double _alpha, std::uint64_t _ping, GainTracker *_tracker, double _dt)
 {
   Levels out;
   out.beams = _intensity.beams;
@@ -84,6 +97,8 @@ Levels ReadLevels(const BeamIntensity &_intensity, const SonarConfig &_config,
     std::nth_element(lit.begin(), lit.begin() + static_cast<long>(n),
       lit.end());
     out.gainDb = -lit[n];
+    if (_tracker)
+      out.gainDb = _tracker->Update(out.gainDb, _dt, _config.gainTimeConstant);
   }
 
   Random rng(_config.seed, _ping, kNoiseStream);
@@ -139,7 +154,8 @@ std::vector<Sounding> ReadProfiling(const Levels &_levels,
     _config.detectionThresholdDb;
   const double dr = _levels.ranges.size() > 1 ?
     _levels.ranges[1] - _levels.ranges[0] : 0.0;
-  const double rangeNoise = _config.rangeNoise ? *_config.rangeNoise : dr;
+  const double rangeNoise = _config.rangeNoise ? *_config.rangeNoise :
+    0.5 * dr;
   Random rng(_config.seed, _ping, kDetectionStream);
 
   // The strongest sample of each beam.

@@ -52,12 +52,30 @@ struct Levels
 double TimeVariedGain(const SonarConfig &_config, double _alpha,
   double _range);
 
+/// \brief Automatic gain smoothed across pings: it moves toward each
+/// ping's own gain with the configured time constant, so one bright target
+/// does not darken the whole line it appears in.
+class GainTracker
+{
+  /// \brief Take one ping's gain and return the gain to apply.
+  /// \param[in] _pingGain The gain that would put this ping's brightest
+  /// echoes at full scale, dB.
+  /// \param[in] _dt Time since the previous ping, s.
+  /// \param[in] _timeConstant Time constant, s; 0 follows each ping.
+  public: double Update(double _pingGain, double _dt, double _timeConstant);
+
+  private: bool started{false};
+  private: double gain{0.0};
+};
+
 /// \brief Turn echo intensity into levels: time-varied gain, gain, and the
 /// noise floor (an exponential draw per cell, so noise speckles too). Noise
 /// is added after gain, so it sits at the noise floor below full scale at
-/// every range.
+/// every range. With automatic gain and a tracker, the gain is smoothed
+/// across pings.
 Levels ReadLevels(const BeamIntensity &_intensity, const SonarConfig &_config,
-  double _alpha, std::uint64_t _ping);
+  double _alpha, std::uint64_t _ping, GainTracker *_tracker = nullptr,
+  double _dt = 0.0);
 
 /// \brief The imaging sonar's matrix: dynamicRangeDb below full scale maps
 /// to 1, full scale to 255, and anything below the window to 0. No
