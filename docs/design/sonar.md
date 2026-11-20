@@ -1,6 +1,6 @@
 # Sonar simulation design
 
-Status: first draft, 2026-11-20. The decisions taken during review are listed at the end.
+Status: draft, 2026-11-20.
 
 ## Use cases
 
@@ -13,7 +13,7 @@ The sonar simulation exists so that a team can develop underwater perception and
 
 The water is shallow: nominally 3 to 12 m, at most 30 m. 
 
-The simulation is used for scored competition runs as well as development, so it must be repeatable from a seed, run on the evaluation hardware alongside several vehicles, and expose difficulty through a small set of documented parameters.
+The simulation is used for scored competition runs as well as development, so it must be repeatable from a seed, run on the evaluation hardware alongside several vehicles, and expose difficulty through a small set of documented parameters. The scoring hardware has a GPU, and the sonar must hold its configured rate there; it must also run, more slowly, on any machine that can run Gazebo's cameras, so that no team needs a GPU to develop.
 
 ![Imaging, profiling and sidescan sonar: the same engine with different fan geometry](./images/sonar_types.png)
 
@@ -253,7 +253,7 @@ A world system (the counterpart of the wind system) owns the engine, the water p
 | Imaging | `marine_acoustic_msgs/ProjectedSonarImage` | Beam directions, the range of each sample, frequency, sound speed and beam widths, and the uint8 beam × sample data, in one message |
 | Profiling | `marine_acoustic_msgs/SonarDetections` | Per sounding: two-way travel time, across-track angle (`rx_angles`), along-track angle (`tx_angles`), intensity and a flag (OK, or rejected by the sonar or by a filter). The arrays can change length from ping to ping, so a variable number of soundings fits. This mirrors the Surveyor's own angle and time-of-flight packet, and leaves the conversion from travel time to range to the team, as on the real sensor |
 | Profiling water column (optional) | `marine_acoustic_msgs/ProjectedSonarImage` | The thin-fan intensity before bottom detection, on a separate topic |
-| Sidescan | `marine_acoustic_msgs/ProjectedSonarImage`, one beam per message | Each side is its own sensor, as each Omniscan unit is, and each ping is one beam: its direction, the range of each sample, and the samples as float32 in dB. `marine_acoustic_msgs` has no sidescan message; using the imaging sonar's message means one consumer path, one conversion and one visualization for both. Nothing in the message marks the values as dB, so that is a documented convention |
+| Sidescan | `marine_acoustic_msgs/ProjectedSonarImage`, one beam per message | Each side is its own sensor, as each Omniscan unit is, and each ping is one beam: its direction, the range of each sample, and the samples as float32 in dB, with time-varied gain for spreading and absorption applied by default. The gain law is documented, so a consumer can remove it exactly using the range of each sample. `marine_acoustic_msgs` has no sidescan message; using the imaging sonar's message means one consumer path, one conversion and one visualization for both. Nothing in the message marks the values as dB, so that is a documented convention |
 | Ground truth (optional) | Per-sample entity labels on a separate topic | Never on the sensor topic; an imaging sonar cannot resolve elevation, so 3D points from it would be information the real sensor never gives |
 
 No sensor publishes a point cloud; the profiler's soundings are the nearest thing, and they become points only with the vehicle's pose. Topics follow the one-name-per-instance rule (`<vehicle>/sonar/forward`, `<vehicle>/sonar/down`, `<vehicle>/sonar/port`). Each message's frame is the sensor's link. `marine_acoustic_msgs` puts Z along the acoustic axis and X up, to match profilers that report in north-east-down, while the SDF sensor and ROS put x along it, so the sensor publishes in a frame rotated from its link by that fixed rotation and names it in the header.
@@ -262,7 +262,7 @@ Inside Gazebo the sensors publish gz-transport messages of gz-maritime's own, ge
 
 ## Implementation plan
 
-Everything is built in gz-maritime, from components it already uses: gz-sim, gz-sensors (as `gz_wind` does), gz-rendering (as `gz_waves_rendering` does), gz-transport, gz-msgs, gz-math, and on the ROS side `marine_acoustic_msgs`, which is already installed because `ros_gz_bridge` depends on it. No new external dependency, and in particular no CUDA, WGPU or other GPU toolkit: the GPU is reached only through gz-rendering, which also runs on a CPU-only renderer (Mesa llvmpipe), so one code path serves both.
+Everything is built in gz-maritime, from components it already uses: gz-sim, gz-sensors (as `gz_wind` does), gz-rendering (as `gz_waves_rendering` does), gz-transport, gz-msgs, gz-math, and on the ROS side `marine_acoustic_msgs`, which is already installed because `ros_gz_bridge` depends on it. No new external dependency, and in particular no CUDA, WGPU or other GPU toolkit: the GPU is reached only through gz-rendering, which also runs on a CPU-only renderer (Mesa llvmpipe), so one code path serves both. The rate is a requirement only on the scoring hardware, which has a GPU: every sonar holds its configured rate there alongside three vehicles. Without a GPU the sonar is best effort: the same output for the same seed, at a rate measured in Phase 0 and published in the documentation.
 
 ### Packages
 
@@ -289,7 +289,7 @@ We write our own code, and take ideas, structure and test cases from the open im
 
 Each phase ends with something a user can run, and gets its own issue.
 
-0. Study and spike. Read the sonar code of POSIM and HoloOcean, and run POSIM in drydock as a reference, not a dependency: its images of a few test scenes become comparison data for later phases. Prototype the geometry sampler with gz-rendering (a depth, normal and entity-label pass over the fan) and measure it on a GPU and on llvmpipe, with three vehicles in `marina_bay`. The outcome fixes the sampling approach and the CPU rate we can promise.
+0. Study and spike. Read the sonar code of POSIM and HoloOcean, and run POSIM in drydock as a reference, not a dependency: its images of a few test scenes become comparison data for later phases. Prototype the geometry sampler with gz-rendering (a depth, normal and entity-label pass over the fan) and measure it on a GPU and on llvmpipe, with three vehicles in `marina_bay`. The outcome fixes the sampling approach, confirms the rate on the scoring hardware, and gives the CPU-only rate to publish.
 1. The engine library. The sonar equation, absorption, backscatter, binning, speckle, noise and the three readouts, with no Gazebo in the loop. Most of the testing plan runs here as gtests against analytic cases: a sphere at known range, a flat seabed, a box and its shadow.
 2. Imaging sonar in Gazebo. The custom sensor, the world system, the gz-rendering sampler, the message, and the ROS 2 bridge publishing `ProjectedSonarImage`; ECHO defaults; seeded noise. A demo world with a sphere, a cylinder and a box on a flat seabed in front of a BlueROV2, compared with POSIM's image of the same scene.
 3. Acoustic properties. The Lambert, specular and transparent elements, the defaults and their precedence, the seabed, and a small set of target models (glass float, cylinder, box, tire, crate) with documented values; ground-truth labels.
@@ -314,10 +314,11 @@ Tests run headless in drydock, as gtests for the engine and pytests for whole wo
 | Profiling | A seabed with a known slope and step | Recovered ranges match the geometry within the configured noise; dropouts appear past the configured grazing limit |
 | Map product |urvey of the wreck with the profiling sonar, georeferenced from the simulation's true poses, then from noisy positioning | With true poses, the point cloud lies on the true seabed and wreck surfaces within the configured range and angle noise; with noisy positioning, the error grows as the positioning error does |
 | Determinism | The same world, seed and motion twice | Byte-identical messages |
-| Back ends | The same ping on CPU and GPU | Agreement within a stated tolerance |
+| GPU and CPU-only | The same ping rendered on a GPU and on llvmpipe | The same output within a stated tolerance, since the acoustics run on the CPU either way and only the rasterization differs |
+| Readout | The imaging and sidescan output of a scene with known echo levels | The imaging sonar's 8-bit values follow the documented time-varied gain and dB-to-8-bit mapping; removing the documented time-varied gain from the sidescan's dB values recovers the received level |
 | Interface | Each message type | Beam directions, range per sample, frame and stamp are present and consistent with the sensor's configuration; topics follow the instance name |
-| Performance | Three vehicles with all sonars in `marina_bay`, headless | Each sonar holds its configured rate on the scoring hardware, on GPU, and a stated rate on CPU |
-| Real data (future work) | Recordings of a known target (a glass float, a tire) with a real ECHO, Omniscan and Surveyor; none are available yet | Target-to-background contrast, shadow length and speckle statistics within stated tolerances of the simulation of the same scene |
+| Performance | Three vehicles with all sonars in `marina_bay`, headless | Each sonar holds its configured rate on the scoring hardware (GPU); without a GPU the measured rate is recorded and published, with no pass threshold |
+| Real data (future work) | Recordings of a known target (a glass float, a tire) with a real ECHO, Omniscan and Surveyor; none are available yet. The ECHO recordings also settle how its own output is processed, which the imaging readout's mapping assumes for now | Target-to-background contrast, shadow length and speckle statistics within stated tolerances of the simulation of the same scene |
 
 The last row is the only one that checks the model against the world rather than against itself, and no surveyed simulator has done it quantitatively. It is future work, for when recordings can be obtained.
 
@@ -345,8 +346,3 @@ One per kind of sonar, each a short, ready-made scene that shows what the sensor
 | Generate labeled training data | 3 | 1 | Turns on the labels topic and records images with the identity of what each sample hit | Each target's samples carry its label |
 
 The first looks need a way to watch each sonar, and RViz has no display for the `marine_acoustic_msgs` types. `kai_sonar_bridge` therefore also publishes, optionally and for viewing only: the imaging sonar's data drawn as a fan, and each sidescan's lines stacked into a scrolling waterfall, both as `sensor_msgs/Image`; and the profiler's soundings as a `sensor_msgs/PointCloud2` in the vehicle's frame. These are display aids built from the sensor messages, not sensor outputs. The example scripts the walkthroughs use (mosaic, soundings to a georeferenced point cloud, comparison with ground truth) live in `kai_sonar_bridge` and are tested like the rest of the repo, so the tutorials cannot drift from the code.
-
-## Decisions
-
-1. CPU and GPU. The sonar runs on any machine that can run Gazebo's cameras: geometry comes from gz-rendering, which uses the GPU when there is one and Mesa llvmpipe when there is not, and the acoustics run on the CPU, so there is one code path and no GPU toolkit. The rate is a requirement only on the scoring hardware, which has a GPU: every sonar holds its configured rate there alongside three vehicles. Without a GPU the sonar is best effort: the same output for the same seed, at a rate measured in Phase 0 and published.
-2. How processed each output is. The imaging sonar applies time-varied gain and a fixed, documented mapping from dB to 8 bits, with no thresholding or color map; this is to be revisited when recordings from a real ECHO are available. The sidescan publishes float32 dB with time-varied gain applied by default, its law documented so a consumer can remove it, and `tvg` switchable to `none`. The profiling sonar publishes soundings, so the question does not arise.

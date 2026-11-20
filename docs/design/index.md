@@ -115,8 +115,19 @@ field. The main points it has to handle:
 - **Choppy seas.** The high-fidelity sea also moves the surface sideways;
   finding the true height at a point needs that displacement.
 
+## Sonar
+
+Imaging, profiling and sidescan sonar share one engine, an incoherent beam model on geometry sampled with gz-rendering, configured by the shape of each sonar's fan. The use cases, the theory of operation, the interface, and the implementation, testing and tutorial plans are in [Sonar simulation design](sonar.md).
+
 ## Related
 
 The [bluerobotics_models](https://github.com/HonuRobotics/bluerobotics_models)
 documentation explains how the BlueBoat and BlueROV2 are assembled from parts,
 and how they keep their floating volume on a link of its own.
+
+```{toctree}
+:hidden:
+:maxdepth: 1
+
+sonar
+```
