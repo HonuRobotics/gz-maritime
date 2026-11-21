@@ -19,11 +19,12 @@ from its files.
 
 ## Sonar
 
-Imaging sonars for underwater vehicles, from watching one to labeled training data.
+Imaging, sidescan and profiling sonars, from watching one to labeled training data.
 
 1. [Imaging (forward looking) sonar from the ROV](sonar-imaging.md)
-2. [Add a sonar to your vehicle](sonar-add.md)
-3. [Sonar features: acoustic properties and truth labels](sonar-features.md)
+2. [Profiling and sidescan sonar from the USV](sonar-survey.md)
+3. [Add a sonar to your vehicle](sonar-add.md)
+4. [Sonar features: acoustic properties and truth labels](sonar-features.md)
 
 ## More
 
@@ -49,6 +50,7 @@ aquatic-centre
 own-world
 wind-and-current
 sonar-imaging
+sonar-survey
 sonar-add
 sonar-features
 faq
