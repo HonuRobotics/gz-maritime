@@ -115,4 +115,6 @@ Look for `frame_id: custom_usv/imu_link` in the header. If the command
 waits forever, check the bridge entry and that the world runs the matching
 system.
 
+A sonar is a custom sensor driven by the world's sonar system rather than a stock gz-sim sensor: see [Add a sonar](sonar-add.md).
+
 Next: [Use your own world](own-world.md).

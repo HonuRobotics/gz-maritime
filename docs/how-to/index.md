@@ -25,6 +25,7 @@ Imaging, sidescan and profiling sonars, from watching one to labeled training da
 2. [Profiling and sidescan sonar from the USV](sonar-survey.md)
 3. [Add a sonar to your vehicle](sonar-add.md)
 4. [Sonar features: acoustic properties and truth labels](sonar-features.md)
+5. [Map a shipwreck](sonar-shipwreck.md)
 
 ## More
 
@@ -53,5 +54,6 @@ sonar-imaging
 sonar-survey
 sonar-add
 sonar-features
+sonar-shipwreck
 faq
 ```

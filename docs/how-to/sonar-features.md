@@ -1,9 +1,9 @@
 # Sonar features: acoustic properties and truth labels
 
-The simulated sonar offers the ability to change properties (from easy to difficult to impossible) and to extract truth (labels and positions) that is not available in field trials.  These can be valuable features exercising sonar perception for the purposes of developing (evaluating) perception algorithms that should be robust to changes in acoustic properties. Two things a simulated sonar offers that a real one cannot: 
+The simulated sonar offers two things that field trials cannot, both valuable for developing and evaluating perception algorithms that should be robust to changes in acoustic properties:
 
-1. you set how every surface echoes and how hard the image is to read, and 
-2. for every echo you can know which object it came from. 
+1. you set how every surface echoes and how hard the image is to read, from easy to difficult to impossible, and
+2. for every echo you can know which object it came from (truth labels).
 
 This page shows both on the [imaging sonar world](sonar-imaging.md): how each is set, then the example we ran. The parameters, with a sense of scale for each, are in the [design](../design/sonar.md#acoustic-properties-of-the-scene).
 
@@ -57,14 +57,13 @@ Terrain often comes from models you do not edit, so its values are set in the wo
 
 ## Tune the image
 
-A few of the sonar's own parameters make its image easier or harder to work with. They are keys in the `sonar:` entry of the sonar part in the vehicle config: a copy of `bluerov2_sonar.yaml` with the keys added, passed to the launch as `config_file`. For example:
+A few of the sonar's own parameters make its image easier or harder to work with. They are keys in the `sonar:` entry of the sonar part in the vehicle config ([Add a sonar](sonar-add.md#on-the-blue-robotics-vehicles)); for the example, a copy of `bluerov2_sonar.yaml` with these added, passed to the launch as `config_file`:
 
 ```yaml
-  - {type: sonoptix_echo_multibeam, name: sonar_forward, xyz: "0.25 0 0.12", rpy: "0 0.26 0",
      sonar: {range_max: 15, samples: 768, labels: true,
              noise_floor: -25,   # dB below full scale; -50 by default
              gain: auto,         # or a fixed gain in dB, such as 60
-             speckle: true}}     # false removes the grain
+             speckle: true}      # false removes the grain
 ```
 
 | Parameter | Effect | Easier | Harder |
@@ -107,5 +106,7 @@ With that set, the sensor publishes `<topic>/labels` beside its image; in a vehi
 ```{figure} images/sonar-labels.png
 :alt: Left, the sonar fan with the targets near the middle; right, the same fan with the seabed in gray and the glass float, cylinder, block and tire each in their own color, and no flag
 
-The example: one ping of the imaging sonar world, its image beside its labels. The seabed and the four marked targets each have a label, lined up with their bright returns; the flag, marked transparent, has none, because the sonar never sees it. A label marks where the echo energy came from, not only where the object is: with an unshaded array (`sidelobe_level` −13), a strong target's sidelobe arc spreads across the fan and carries that target's label.
+The example: one ping of the imaging sonar world, its image beside its labels. The seabed and the four marked targets each have a label, lined up with their bright returns; the flag, marked transparent, has none, because the sonar never sees it.
 ```
+
+A label marks where the echo energy came from, not only where the object is: with an unshaded array (`sidelobe_level` −13), a strong target's sidelobe arc spreads across the fan and carries that target's label.

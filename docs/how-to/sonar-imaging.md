@@ -35,9 +35,9 @@ ros2 run rqt_image_view rqt_image_view /bluerov2/sonar_forward/image/view
 `/view` is the sonar's frame drawn as the fan it covers, forward up, for looking at; the sonar data itself is `/bluerov2/sonar_forward/image`, a `marine_acoustic_msgs/ProjectedSonarImage`.
 
 ```{figure} images/sonar-imaging.png
-:alt: Sonar fan: seabed fading in from about 4 m and bright from about 5 m, with the targets as small highlights and shadows near the middle
+:alt: Sonar fan: seabed from about 4 m, with the targets as small highlights and shadows near the middle
 
-The fan, forward up: nothing close in, then the seabed, faint where only the edge of the vertical beam reaches it and full where the main beam does, and the four targets as bright returns, each with a shadow behind it.
+The fan, forward up: nothing close in, then the seabed from about 4 m, where the rays first reach it below the vertical beam's edge, and the four targets as bright returns, each with a shadow behind it. The time-varied gain lifts the near seabed, so the beam's edge shows little in the image.
 ```
 
 ## Turn the ROV

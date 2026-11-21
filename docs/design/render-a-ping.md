@@ -2,19 +2,17 @@
 
 For people working on the sonar engine itself. To use a sonar on a vehicle, start with [Imaging (forward looking) sonar from the ROV](../how-to/sonar-imaging.md).
 
-In Gazebo, a sonar image is the product of two things: 
+The sonar engine in `gz_sonar` runs on its own, so each stage of the model can be seen and tested without a simulation. This page renders an imaging ping, a sidescan pass and a profiling pass on synthetic scenes and draws them. The model itself is described in the [sonar simulation design](sonar.md#theory-of-operation).
 
-1. the scene geometry that gz-rendering's cameras sample, and 
-2. the acoustic model that turns that geometry into echoes. 
+In Gazebo, a sonar image is the product of two things:
 
-To avoid the confound, here the geometry is exact: the synthetic scene intersects each ray with its spheres, planes and boxes analytically, so the range, incidence angle and surface of every hit are known, and whatever the image shows is the acoustic model's doing. 
+1. the scene geometry that gz-rendering's cameras sample, and
+2. the acoustic model that turns that geometry into echoes.
 
-
-The sonar engine in `gz_sonar` runs on its own, with a small scene of analytic shapes standing in for Gazebo's renderer, so each stage of the model can be seen and tested without a simulation. This page renders an imaging ping, a sidescan pass and a profiling pass and draws them. The model itself is described in the [sonar simulation design](sonar.md#theory-of-operation).
+To avoid the confound, here the geometry is exact: the synthetic scene intersects each ray with its spheres, planes and boxes analytically, so the range, incidence angle and surface of every hit are known, and whatever the image shows is the acoustic model's doing.
 
 
 ## What this tests
-
 
 - Geometry: a target appears at the range and bearing it is placed at, and the seabed's first return at the altitude the sonar is at.
 - The sonar equation: echoes fall with range as spreading and absorption predict, scale with a surface's backscatter (Lambert's law and the specular glint) and with the area the beam covers, and vanish behind an object (shadows).
@@ -22,7 +20,7 @@ The sonar engine in `gz_sonar` runs on its own, with a small scene of analytic s
 - Speckle and noise: their statistics, and a fixed seed giving the same ping every time, on any number of threads.
 - The readouts: the imaging sonar's 8-bit frame, the sidescan's line in dB with time-varied gain a consumer can take out again, and the profiling sonar's soundings.
 
-The gtests check these numerically; the pictures allow for a visual check by a human.  Humans are notoriously better at looking at sonar images!
+The gtests check these numerically; the pictures are for a person to check by eye, which is still the best check of a sonar image.
 
 Run everything inside drydock, from `~/maritime_ws`.
 
@@ -74,7 +72,7 @@ Scene A, side view. The sphere sits on the beam's axis, and the seabed, 7 m down
 Scene A. The sphere's near face, at 4.75 m on the axis, with a faint arc at the same range on either side of it.
 ```
 
-The arc is expected. A sonar forms each beam from an array of transducers, and every beam also hears a little from directions outside its main lobe, through its sidelobes. A strong, isolated target is therefore heard by every beam at its own range, and shows as an arc across the fan, brightest next to the target and fading away from it; real imaging sonars show the same arcs around strong targets in open water. How far the arc reaches depends on the array. Imaging sonars usually shade their arrays, weighting the elements to lower the sidelobes, and the default here is a shaded array (`sidelobe=-25`), which keeps the arc close to the target. An unshaded array (`sidelobe=-13`) has sidelobes that fall off slowly and carry the arc across the whole fan:
+The arc is expected. A sonar forms each beam from an array of transducers, and every beam also hears a little from directions outside its main lobe, through its sidelobes. A strong, isolated target is therefore heard by every beam at its own range, and shows as an arc across the fan, brightest next to the target and fading away from it; real imaging sonars show the same arcs around strong targets in open water. How far the arc reaches depends on the array. Imaging sonars usually shade their arrays, weighting the elements to lower the sidelobes, and the default here is a shaded array (`sidelobe_level` −25 dB, `sidelobe=-25` on `gz_sonar_render_ping`'s command line), which keeps the arc close to the target. An unshaded array (`sidelobe=-13`) has sidelobes that fall off slowly and carry the arc across the whole fan:
 
 ```{figure} images/gz_sonar_A_unshaded.png
 :alt: Imaging sonar fan of scene A with an unshaded array: the bright spot at 4.75 m and a bright arc at the same range across the whole fan
@@ -139,6 +137,8 @@ Profiling. Soundings from the pass, georeferenced with the true poses: the seabe
 ```
 
 ## Where things live
+
+In the `gz_sonar` package:
 
 | File | What |
 |---|---|

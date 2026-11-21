@@ -14,6 +14,8 @@ The scene. (a) A section across the track: the sidescan's beam on each side, 15Â
 The same scene in Gazebo, from a camera under the water beside the track: the boat on the surface, the drum under its track, the block beyond it and the float nearer the camera.
 ```
 
+Waves do not move the boat yet: gz-maritime's waves are drawn but not coupled to buoyancy, so the boat runs on flat water.
+
 Run everything inside drydock, from `~/maritime_ws`, with the workspace sourced.
 
 ## Launch
@@ -45,11 +47,10 @@ For the soundings, add a PointCloud2 display of `/blueboat/profiler/detections/p
 ## Drive the pass
 
 ```bash
-ros2 topic pub -r 10 /blueboat/prop_port/cmd std_msgs/msg/Float64 "data: 0.3" &
-ros2 topic pub -r 10 /blueboat/prop_stbd/cmd std_msgs/msg/Float64 "data: 0.3" &
+ros2 run gz_sonar survey_lawnmower.py sonar_survey --x0 -15 --x1 40 --y0 0 --y1 0
 ```
 
-Both propellers at the same command drive the boat straight ahead at about 1.8 m/s; stop them (and publish `data: 0.0`) after about 30 s, past the float. Started a moment apart, they can leave the boat a few degrees off its heading; the targets then appear at slightly different ranges, but the picture is the same. For the example below we held the boat on the line with a small heading hold on the two propellers.
+`survey_lawnmower.py` drives the boat along survey lines on its two propellers, holding each line with a heading and cross-track controller; one line, from x = âˆ’15 to 40 along y = 0, is this pass, at about 1.8 m/s, and it stops the propellers at the end. Without it, both propellers at the same command (`ros2 topic pub` on `/blueboat/prop_port/cmd` and `/blueboat/prop_stbd/cmd`) also drive the boat straight ahead, but started a moment apart they can leave it a few degrees off its heading, and the targets then appear at slightly different ranges.
 
 ```{figure} images/sonar-survey-pass.webp
 :alt: Animation: above, the Gazebo view of the boat crossing the scene; below, the port waterfall on the left and the starboard waterfall on the right, growing as the boat moves, the block appearing on the port side
@@ -81,5 +82,4 @@ The profiler's soundings, placed in the world with the boat's pose. They follow 
 
 - Each sidescan target shows on its own side, at the range its position gives, with a shadow beyond it.
 - The soundings trace the seabed's swells and rise over the drum.
-- The sidescan's levels carry its time-varied gain, which the message's `tvg` field gives per sample: subtracting it, and the `gain`, gives back the received level that `tvg: none` publishes, to within 0.01 dB for echoes well above the noise.
-- Waves do not move the boat yet: gz-maritime's waves are drawn but not coupled to buoyancy, so the boat runs on flat water.
+- The sidescan's levels carry its time-varied gain and gain, which the gz-transport message (`/blueboat/sidescan/port/image` in Gazebo) carries per sample and per ping: subtracting both gives back the received level that `tvg: none` publishes, to within 0.01 dB for echoes well above the noise. The ROS message has no field for them; for received levels on the ROS side, set `tvg: none` and a fixed `gain`.
