@@ -124,8 +124,20 @@ each point:
   displaced: no pressure change with depth under the wave, no horizontal wave
   force.
 
+## Sonar
+
+Imaging, profiling and sidescan sonar share one engine, a sonar-equation model on geometry sampled with gz-rendering, configured by the shape of each sonar's fan. The use cases, the theory of operation, the interface, and the implementation, testing and tutorial plans are in [Sonar simulation design](sonar.md). Contributors can run the engine on its own with [Render a ping without Gazebo](render-a-ping.md).
+
 ## Related
 
 The [bluerobotics_models](https://github.com/HonuRobotics/bluerobotics_models)
 documentation explains how the BlueBoat and BlueROV2 are assembled from parts,
 and how they keep their floating volume on a link of its own.
+
+```{toctree}
+:hidden:
+:maxdepth: 1
+
+sonar
+render-a-ping
+```

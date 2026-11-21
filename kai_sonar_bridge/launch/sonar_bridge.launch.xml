@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<!-- One sonar bridge: gz_sonar's SonarImage topics to
+     marine_acoustic_msgs/ProjectedSonarImage, plus a /view image beside each.
+
+     ros2 launch kai_sonar_bridge sonar_bridge.launch.xml \
+       gz_topics:="[/rov/sonar_forward/image]" \
+       ros_topics:="[/rov/sonar_forward/image]" -->
+<launch>
+  <arg name="gz_topics" description="The sonars' gz-transport topics, as a list"/>
+  <arg name="ros_topics" description="The ROS 2 topics, one per gz topic"/>
+  <arg name="frame_ids" default="[]"
+       description="Frames to stamp; empty for each sensor's frame plus _acoustic"/>
+  <arg name="view" default="true" description="Also publish a /view image beside each ROS topic"/>
+  <arg name="name" default="sonar_bridge"/>
+  <node pkg="kai_sonar_bridge" exec="sonar_bridge" name="$(var name)" output="screen">
+    <param name="gz_topics" value="$(var gz_topics)"/>
+    <param name="ros_topics" value="$(var ros_topics)"/>
+    <param name="frame_ids" value="$(var frame_ids)" value-sep=","/>
+    <param name="view" value="$(var view)"/>
+  </node>
+</launch>

@@ -1,0 +1,138 @@
+<?xml version="1.0"?>
+<!--
+  An imaging sonar scene: a flat seabed 5 m down with sonar targets
+  on it, for a BlueROV2 carrying a forward imaging sonar (gz_sonar). The
+  vehicle is spawned at the origin, 2.5 m down; its sonar, pitched down 15
+  degrees, first meets the seabed about 6 m ahead, where the targets lie: a
+  glass float, a steel cylinder and a concrete block, with a tire and a
+  marker flag the sonar must not see a little further off.
+
+  Graded buoyancy, the ocean current and the sensor render path follow the
+  BlueROV2's own water world (bluerobotics_models, bluerov2_water.sdf), so
+  the vehicle floats and drives as it does there. The spawned model must be
+  named bluerov2, the name the buoyancy system enables.
+
+    ros2 launch bluerov2_gazebo sim.launch.xml \
+      world:=$(ros2 pkg prefix --share gz_sonar)/worlds/sonar_imaging.sdf \
+      config_file:=<a config with the forward sonar fitted>
+-->
+<sdf version="1.12" xmlns:gz="http://gazebosim.org/schema">
+  <world name="sonar_imaging">
+
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+    <!-- The rendering thread the sonar draws its cameras on. -->
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-buoyancy-system"
+            name="gz::sim::systems::Buoyancy">
+      <graded_buoyancy>
+        <default_density>1025</default_density>
+        <density_change>
+          <above_depth>0</above_depth>
+          <density>1</density>
+        </density_change>
+      </graded_buoyancy>
+      <enable>bluerov2::buoyancy_displacement</enable>
+    </plugin>
+    <plugin filename="gz-maritime-ocean-current-system"
+            name="gz::sim::maritime::OceanCurrent">
+      <speed>0</speed>
+      <direction>0</direction>
+    </plugin>
+
+    <!-- The sonars: warm harbor seawater, and a sandy seabed. Anything not
+         marked takes the default, a plain diffuse -20 dB. -->
+    <plugin filename="gz-maritime-sonar-system"
+            name="gz::sim::maritime::Sonar">
+      <temperature>29</temperature>
+      <salinity>30</salinity>
+      <sound_speed>1540</sound_speed>
+      <seabed>
+        <model>seabed</model>
+        <lambert>-27</lambert>
+      </seabed>
+      <default><lambert>-20</lambert></default>
+    </plugin>
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <model name="seabed">
+      <static>true</static>
+      <pose>0 0 -5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>100 100</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>100 100</size></plane></geometry>
+          <material>
+            <ambient>0.45 0.42 0.35 1</ambient>
+            <diffuse>0.45 0.42 0.35 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Drawn for the cameras only: the sonar does not see the surface. -->
+    <model name="water_surface">
+      <static>true</static>
+      <gz:acoustic_transparent/>
+      <link name="link">
+        <visual name="visual">
+          <transparency>0.4</transparency>
+          <geometry><plane><normal>0 0 1</normal><size>200 200</size></plane></geometry>
+          <material>
+            <ambient>0.10 0.30 0.50 1</ambient>
+            <diffuse>0.10 0.35 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- The targets, resting on the seabed (z = -5). -->
+    <include>
+      <name>glass_float</name>
+      <uri>model://glass_float</uri>
+      <pose>6.5 -1.5 -4.8 0 0 0</pose>
+    </include>
+    <include>
+      <name>cylinder</name>
+      <uri>model://sonar_cylinder</uri>
+      <pose>7.0 0 -4.85 0 0 0.5</pose>
+    </include>
+    <include>
+      <name>block</name>
+      <uri>model://sonar_box</uri>
+      <pose>7.5 1.5 -4.75 0 0 0.3</pose>
+    </include>
+    <include>
+      <name>tire</name>
+      <uri>model://tire</uri>
+      <pose>9.5 -1.0 -4.875 0 0 0</pose>
+    </include>
+    <include>
+      <name>flag</name>
+      <uri>model://marker_flag</uri>
+      <pose>9.0 1.0 -5 0 0 0</pose>
+    </include>
+
+  </world>
+</sdf>

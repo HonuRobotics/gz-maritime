@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<sdf version="1.12" xmlns:gz="http://gazebosim.org/schema">
+  <model name="glass_float">
+    <static>true</static>
+    <link name="link">
+      <visual name="glass">
+        <geometry><sphere><radius>0.2</radius></sphere></geometry>
+        <material><diffuse>0.3 0.6 0.5 1</diffuse><ambient>0.3 0.6 0.5 1</ambient></material>
+        <gz:acoustic_lambert>-30</gz:acoustic_lambert>
+        <gz:acoustic_specular>-3</gz:acoustic_specular>
+        <gz:acoustic_specular_width>0.07</gz:acoustic_specular_width>
+      </visual>
+      <collision name="glass">
+        <geometry><sphere><radius>0.2</radius></sphere></geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>
