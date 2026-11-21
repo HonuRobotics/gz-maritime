@@ -26,8 +26,9 @@ namespace gz::sim::maritime
 class SonarPrivate;
 
 /// \brief The world's sonars: the world system that drives every
-/// <sensor type="custom" gz:type="imaging_sonar"> (and sidescan_sonar) in
-/// the world, including those on models spawned while it runs.
+/// <sensor type="custom"> whose gz:type is imaging_sonar, sidescan_sonar or
+/// profiling_sonar in the world, including those on models spawned while it
+/// runs.
 ///
 /// It owns the water and the scene's acoustic defaults:
 ///

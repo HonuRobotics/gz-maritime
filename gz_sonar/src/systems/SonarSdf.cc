@@ -16,8 +16,12 @@
  */
 #include "SonarSdf.hh"
 
+#include <cmath>
 #include <cstddef>
+#include <set>
 #include <string>
+
+#include <gz/common/Console.hh>
 
 namespace gz::sim::maritime
 {
@@ -193,6 +197,59 @@ std::optional<sonar::SonarConfig> LoadSonarConfig(const std::string &_type,
     _error = "fields of view and beam width must be positive";
     return std::nullopt;
   }
+  // The rays reach elevationSpan half-widths of the vertical field of view,
+  // and the cameras that sample them cannot look past 90 degrees.
+  if (0.5 * c.verticalFov * c.elevationSpan >= 85.0 * M_PI / 180.0)
+  {
+    _error = "<vertical_fov> times <elevation_span> must stay under 170 degrees";
+    return std::nullopt;
+  }
+  if (c.elevationSpan <= 0.0)
+  {
+    _error = "<elevation_span> must be positive";
+    return std::nullopt;
+  }
+  struct Check { double value; bool ok; const char *message; };
+  const Check checks[] = {
+    {c.frequency, c.frequency > 0.0, "<frequency> must be positive"},
+    {c.pulseLength, c.pulseLength > 0.0, "<pulse_length> must be positive"},
+    {c.soundSpeed.value_or(1.0), c.soundSpeed.value_or(1.0) > 0.0,
+     "<sound_speed> must be positive"},
+    {c.dynamicRangeDb, c.dynamicRangeDb > 0.0, "<dynamic_range> must be positive"},
+    {c.gainTimeConstant, c.gainTimeConstant >= 0.0,
+     "<gain_time_constant> must not be negative"},
+    {c.tvgSpreading, c.tvgSpreading >= 0.0, "<tvg_spreading> must not be negative"},
+    {c.sidelobeLevelDb, c.sidelobeLevelDb < 0.0, "<sidelobe_level> must be negative"},
+    {c.rangeNoise.value_or(0.0), c.rangeNoise.value_or(0.0) >= 0.0,
+     "<range_noise> must not be negative"},
+    {c.angleNoise, c.angleNoise >= 0.0, "<angle_noise> must not be negative"},
+  };
+  for (const auto &k : checks)
+  {
+    if (!k.ok || !std::isfinite(k.value))
+    {
+      _error = k.message;
+      return std::nullopt;
+    }
+  }
+  // Unknown elements are most likely misspellings; say so rather than
+  // ignore them.
+  static const std::set<std::string> known = {
+    "angle_noise", "beam_width", "beams", "detection_threshold",
+    "dynamic_range", "elevation_rays", "elevation_span", "frequency", "gain",
+    "gain_time_constant", "horizontal_fov", "labels", "max_soundings",
+    "noise_floor", "pulse_length", "range", "range_max", "range_min",
+    "range_noise", "rays_per_beam", "readout", "samples", "sidelobe_level",
+    "sound_speed", "speckle", "tvg", "tvg_spreading", "vertical_fov",
+    "water_column"};
+  for (auto e = _block->GetFirstElement(); e; e = e->GetNextElement())
+  {
+    if (!known.count(e->GetName()))
+    {
+      gzwarn << "sonar: unknown element <" << e->GetName()
+             << "> in <gz:sonar>, ignored\n";
+    }
+  }
   return c;
 }
 
@@ -223,6 +280,13 @@ void ApplyMarks(sonar::AcousticProperties &_properties,
   if (_marks.specularDb)
     _properties.specularDb = *_marks.specularDb;
   if (_marks.specularWidth)
-    _properties.specularWidth = *_marks.specularWidth;
+  {
+    // A zero width would divide by zero in the specular lobe.
+    if (*_marks.specularWidth > 0.0)
+      _properties.specularWidth = *_marks.specularWidth;
+    else
+      gzwarn << "sonar: a specular width must be positive; ignoring "
+             << *_marks.specularWidth << "\n";
+  }
 }
 }  // namespace gz::sim::maritime

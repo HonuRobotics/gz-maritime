@@ -16,6 +16,7 @@
  */
 #include "Sonar.hh"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -49,6 +50,7 @@
 #include <gz/sim/components/ParentEntity.hh>
 #include <gz/sim/components/Pose.hh>
 #include <gz/sim/components/Visual.hh>
+#include <gz/sim/components/World.hh>
 #include <gz/sim/rendering/Events.hh>
 #include <sdf/Link.hh>
 #include <sdf/Model.hh>
@@ -125,6 +127,10 @@ struct VisualMark
   Entity topModel{kNullEntity};
   int label{0};
   bool transparent{false};
+  /// \brief The visual is gone: forget its mark.
+  bool removed{false};
+  /// \brief Sim time of the update that made it; see Stamped.
+  std::chrono::nanoseconds stamp{0};
 };
 
 /// \brief A sonar to give cameras to.
@@ -135,7 +141,36 @@ struct RigRequest
   Entity topModel{kNullEntity};
   math::Pose3d pose;
   std::shared_ptr<SonarSensor> sonar;
+  /// \brief Sim time of the update that made it; see Stamped.
+  std::chrono::nanoseconds stamp{0};
 };
+
+/// \brief A label table, or a sonar to drop, with the sim time of the
+/// update that made it.
+///
+/// Every change the simulation thread hands the rendering thread is
+/// stamped, and the rendering thread takes it up at the first frame whose
+/// time has reached the stamp. The Sensors system renders frame S while the
+/// simulation thread runs PreUpdate(S+1), so without the stamp a change made
+/// there would land in frame S or S+1 depending on thread timing, and two
+/// runs with the same seed would differ.
+struct StampedTable
+{
+  std::shared_ptr<const LabelTable> table;
+  std::chrono::nanoseconds stamp{0};
+};
+struct StampedRemoval
+{
+  Entity sensor{kNullEntity};
+  std::chrono::nanoseconds stamp{0};
+};
+
+/// \brief The first ping on a sonar's rate grid at or after _t.
+std::uint64_t FirstPingAt(nanoseconds _t, double _rate)
+{
+  const double k = std::chrono::duration<double>(_t).count() * _rate;
+  return static_cast<std::uint64_t>(std::ceil(k - 1e-6));
+}
 
 /// \brief The cameras of one sonar, on the rendering thread.
 struct Rig
@@ -171,6 +206,16 @@ class SonarPrivate
   /// \brief Build the cameras of one sonar under its link visual.
   public: bool BuildRig(const RigRequest &_request, Rig &_rig);
 
+  /// \brief Disconnect a rig and destroy its cameras, so a sonar that is
+  /// removed, reset or spawned again leaves nothing behind in the scene.
+  public: void DestroyRig(Rig &_rig);
+
+  /// \brief Destroy one rig's cameras and drop it.
+  public: void EraseRig(Entity _sensor);
+
+  /// \brief Destroy every rig's cameras and drop them all.
+  public: void ClearRigs();
+
   /// \brief Map of entity to rendering visual, rebuilt when the scene
   /// changes size.
   public: rendering::VisualPtr VisualOf(Entity _e);
@@ -191,17 +236,28 @@ class SonarPrivate
   public: std::vector<Entity> removedSensors;
   public: std::vector<Entity> newVisuals;
   public: std::map<Entity, std::shared_ptr<SonarSensor>> sonars;
-  public: std::map<std::tuple<Entity, double, double, double, bool>, int>
-    labelOf;
+  public: std::chrono::nanoseconds now{0};
+  public: std::vector<Entity> removedVisuals;
+  /// \brief Labels: one per model and property set, held while any of its
+  /// visuals exists and then free for the next one, so a world that spawns
+  /// and removes targets does not run out of the 254.
+  public: using LabelKey = std::tuple<Entity, double, double, double, bool>;
+  public: std::map<LabelKey, int> labelOf;
+  public: std::map<LabelKey, int> labelUsers;
+  public: std::map<Entity, LabelKey> keyOfVisual;
+  public: std::set<int> freeLabels;
   public: bool warnedLabels{false};
+  /// \brief The system is not attached to the world and does nothing.
+  public: bool disabled{false};
 
   // ---- shared, under mutex
   public: std::mutex mutex;
   public: std::vector<RigRequest> rigRequests;
-  public: std::vector<Entity> rigRemovals;
+  public: std::vector<StampedRemoval> rigRemovals;
   public: std::vector<VisualMark> markRequests;
+  public: std::vector<StampedTable> tableRequests;
+  /// \brief The latest table, on the simulation thread.
   public: std::shared_ptr<const LabelTable> table;
-  public: bool clearRigs{false};
   public: std::atomic<bool> haveSonars{false};
   public: std::atomic<bool> sceneSeen{false};
 
@@ -214,10 +270,20 @@ class SonarPrivate
   public: std::map<Entity, Rig> rigs;
   public: std::vector<RigRequest> waitingRigs;
   public: std::vector<VisualMark> waitingMarks;
+  public: std::vector<StampedRemoval> waitingRemovals;
+  public: std::vector<StampedTable> waitingTables;
+  /// \brief The table the frames use, and the last frame's time: time going
+  /// back means the world was reset.
+  public: std::shared_ptr<const LabelTable> renderTable;
+  public: nanoseconds lastFrame{-1};
   public: std::unordered_map<Entity, VisualMark> marks;
   public: std::unordered_map<Entity, rendering::VisualPtr> visualByEntity;
   public: std::vector<rendering::VisualPtr> waterVisuals;
-  public: std::size_t knownVisualCount{0};
+  public: std::vector<unsigned int> knownVisualIds;
+
+  /// \brief Cameras built so far, to give each a name never used before:
+  /// gz-rendering refuses a name that is taken.
+  public: std::uint64_t camerasBuilt{0};
 };
 
 //////////////////////////////////////////////////
@@ -226,14 +292,30 @@ Sonar::Sonar() : dataPtr(std::make_unique<SonarPrivate>())
 }
 
 //////////////////////////////////////////////////
-Sonar::~Sonar() = default;
+Sonar::~Sonar()
+{
+  // Leave the events before anything their callbacks use goes away.
+  this->dataPtr->renderConn.reset();
+  this->dataPtr->preRenderConn.reset();
+  this->dataPtr->sceneUpdateConn.reset();
+  this->dataPtr->teardownConn.reset();
+}
 
 //////////////////////////////////////////////////
-void Sonar::Configure(const Entity &,
+void Sonar::Configure(const Entity &_entity,
   const std::shared_ptr<const sdf::Element> &_sdf,
-  EntityComponentManager &, EventManager &_eventMgr)
+  EntityComponentManager &_ecm, EventManager &_eventMgr)
 {
   auto &d = *this->dataPtr;
+  // One per world: it drives every sonar there, so a second copy on a model
+  // would render each of them twice.
+  if (!_ecm.Component<components::World>(_entity))
+  {
+    gzerr << "Sonar: load gz-maritime-sonar-system in the <world>, not in a "
+          << "model; this copy does nothing\n";
+    d.disabled = true;
+    return;
+  }
   d.events = &_eventMgr;
   auto sdf = std::const_pointer_cast<sdf::Element>(_sdf);
   d.water.temperature = sdf->Get<double>("temperature", 10.0).first;
@@ -259,6 +341,7 @@ void Sonar::Configure(const Entity &,
   table->properties.push_back(d.defaults);
   table->names.emplace_back();
   d.table = table;
+  d.renderTable = table;
 
   // Only the scene update and teardown now. The render events make the
   // rendering thread run every step, so they are joined from the scene
@@ -270,9 +353,12 @@ void Sonar::Configure(const Entity &,
 }
 
 //////////////////////////////////////////////////
-void Sonar::PreUpdate(const UpdateInfo &, EntityComponentManager &_ecm)
+void Sonar::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
 {
   auto &d = *this->dataPtr;
+  if (d.disabled)
+    return;
+  d.now = std::chrono::duration_cast<nanoseconds>(_info.simTime);
   const bool all = d.rescan;
   d.rescan = false;
   d.FindSonars(_ecm, all);
@@ -288,6 +374,8 @@ void Sonar::PreUpdate(const UpdateInfo &, EntityComponentManager &_ecm)
 void Sonar::PostUpdate(const UpdateInfo &, const EntityComponentManager &_ecm)
 {
   auto &d = *this->dataPtr;
+  if (d.disabled)
+    return;
   // EachNew only sees an entity in the step it was made in; note it here,
   // after every PreUpdate, and resolve it at the next.
   _ecm.EachNew<components::CustomSensor>(
@@ -308,21 +396,33 @@ void Sonar::PostUpdate(const UpdateInfo &, const EntityComponentManager &_ecm)
       d.removedSensors.push_back(_e);
       return true;
     });
+  _ecm.EachRemoved<components::Visual>(
+    [&](const Entity &_e, const components::Visual *) -> bool
+    {
+      d.removedVisuals.push_back(_e);
+      return true;
+    });
 }
 
 //////////////////////////////////////////////////
 void Sonar::Reset(const UpdateInfo &, EntityComponentManager &)
 {
+  // Keep every sonar that still exists, with its cameras: building them
+  // again is slow and gz-rendering does not reliably survive destroying and
+  // recreating depth cameras in one frame. The rescan drops the sonars whose
+  // sensors are gone and adds any new ones; each kept sonar starts over on
+  // the rate grid again, which the rendering thread does when it sees sim
+  // time go back, so a run after a reset repeats the run from the start.
   auto &d = *this->dataPtr;
-  d.sonars.clear();
+  if (d.disabled)
+    return;
   d.newSensors.clear();
   d.newVisuals.clear();
   d.removedSensors.clear();
+  d.removedVisuals.clear();
   d.rescan = true;
-  std::lock_guard<std::mutex> lock(d.mutex);
-  d.rigRequests.clear();
-  d.markRequests.clear();
-  d.clearRigs = true;
+  for (auto &[entity, sonar] : d.sonars)
+    sonar->ResetState();
 }
 
 //////////////////////////////////////////////////
@@ -341,12 +441,22 @@ void SonarPrivate::FindSonars(EntityComponentManager &_ecm, bool _all)
       });
   }
 
+  if (_all)
+  {
+    // A rescan (after a reset) also drops the sonars that are gone.
+    const std::set<Entity> present(candidates.begin(), candidates.end());
+    for (const auto &[e, sonar] : this->sonars)
+    {
+      if (!present.count(e))
+        this->removedSensors.push_back(e);
+    }
+  }
   for (const Entity e : this->removedSensors)
   {
     if (this->sonars.erase(e))
     {
       std::lock_guard<std::mutex> lock(this->mutex);
-      this->rigRemovals.push_back(e);
+      this->rigRemovals.push_back({e, this->now});
     }
   }
   this->removedSensors.clear();
@@ -382,6 +492,7 @@ void SonarPrivate::FindSonars(EntityComponentManager &_ecm, bool _all)
     r.topModel = TopModel(_ecm, e);
     r.pose = pose->Data();
     r.sonar = sensor;
+    r.stamp = this->now;
     std::lock_guard<std::mutex> lock(this->mutex);
     this->rigRequests.push_back(r);
   }
@@ -393,10 +504,16 @@ void SonarPrivate::FindVisuals(const EntityComponentManager &_ecm, bool _all)
 {
   std::vector<Entity> candidates;
   candidates.swap(this->newVisuals);
+  std::vector<Entity> removed;
+  removed.swap(this->removedVisuals);
   if (_all)
   {
     candidates.clear();
+    removed.clear();
     this->labelOf.clear();
+    this->labelUsers.clear();
+    this->keyOfVisual.clear();
+    this->freeLabels.clear();
     _ecm.Each<components::Visual>(
       [&](const Entity &_e, const components::Visual *) -> bool
       {
@@ -404,7 +521,7 @@ void SonarPrivate::FindVisuals(const EntityComponentManager &_ecm, bool _all)
         return true;
       });
   }
-  if (candidates.empty())
+  if (candidates.empty() && removed.empty())
     return;
 
   auto table = std::make_shared<LabelTable>(*this->table);
@@ -414,6 +531,34 @@ void SonarPrivate::FindVisuals(const EntityComponentManager &_ecm, bool _all)
     table->names.resize(1);
   }
   std::vector<VisualMark> found;
+
+  // A label whose last visual is gone is free again.
+  for (const Entity v : removed)
+  {
+    const auto k = this->keyOfVisual.find(v);
+    if (k == this->keyOfVisual.end())
+      continue;
+    const LabelKey key = k->second;
+    this->keyOfVisual.erase(k);
+    VisualMark gone;
+    gone.visual = v;
+    gone.removed = true;
+    gone.stamp = this->now;
+    found.push_back(gone);
+    const auto u = this->labelUsers.find(key);
+    if (u == this->labelUsers.end() || --u->second > 0)
+      continue;
+    this->labelUsers.erase(u);
+    const auto l = this->labelOf.find(key);
+    if (l == this->labelOf.end())
+      continue;
+    const auto i = static_cast<std::size_t>(l->second);
+    table->properties[i] = this->defaults;
+    table->names[i].clear();
+    this->freeLabels.insert(l->second);
+    this->labelOf.erase(l);
+  }
+
   for (const Entity v : candidates)
   {
     const auto *name = _ecm.Component<components::Name>(v);
@@ -465,6 +610,17 @@ void SonarPrivate::FindVisuals(const EntityComponentManager &_ecm, bool _all)
     {
       label = it->second;
     }
+    else if (!this->freeLabels.empty())
+    {
+      // The lowest free id, so the same removals and spawns give the same
+      // ids in every run.
+      label = *this->freeLabels.begin();
+      this->freeLabels.erase(this->freeLabels.begin());
+      table->properties[static_cast<std::size_t>(label)] = props;
+      table->names[static_cast<std::size_t>(label)] =
+        scopedName(chain.front(), _ecm, "::", false);
+      this->labelOf[key] = label;
+    }
     else if (table->properties.size() < static_cast<std::size_t>(kOtherLabel))
     {
       label = static_cast<int>(table->properties.size());
@@ -474,12 +630,12 @@ void SonarPrivate::FindVisuals(const EntityComponentManager &_ecm, bool _all)
     }
     else
     {
-      // Past 254 surfaces, the rest share one id with the default
+      // Past 254 surfaces at once, the rest share one id with the default
       // properties; labeling per ping by range is the way past it.
       if (!this->warnedLabels)
       {
-        gzwarn << "Sonar: more than 254 acoustic surfaces; the rest share "
-               << "the default properties and one ground-truth label\n";
+        gzwarn << "Sonar: more than 254 acoustic surfaces at once; the rest "
+               << "share the default properties and one ground-truth label\n";
         this->warnedLabels = true;
       }
       if (table->properties.size() == static_cast<std::size_t>(kOtherLabel))
@@ -489,11 +645,27 @@ void SonarPrivate::FindVisuals(const EntityComponentManager &_ecm, bool _all)
       }
       label = kOtherLabel;
     }
-    found.push_back({v, chain.front(), label, transparent});
+    if (label != kOtherLabel)
+    {
+      this->keyOfVisual[v] = key;
+      ++this->labelUsers[key];
+    }
+    else
+    {
+      this->keyOfVisual.erase(v);
+    }
+    VisualMark mark;
+    mark.visual = v;
+    mark.topModel = chain.front();
+    mark.label = label;
+    mark.transparent = transparent;
+    mark.stamp = this->now;
+    found.push_back(mark);
   }
 
-  std::lock_guard<std::mutex> lock(this->mutex);
   this->table = table;
+  std::lock_guard<std::mutex> lock(this->mutex);
+  this->tableRequests.push_back({table, this->now});
   this->markRequests.insert(this->markRequests.end(), found.begin(),
     found.end());
 }
@@ -501,7 +673,20 @@ void SonarPrivate::FindVisuals(const EntityComponentManager &_ecm, bool _all)
 //////////////////////////////////////////////////
 void SonarPrivate::OnSceneUpdate()
 {
-  if (this->renderConn || !this->haveSonars)
+  if (this->renderConn)
+  {
+    // Leave the render events once the last sonar and its cameras are gone,
+    // so a world without a sonar stops rendering every step for nothing.
+    if (this->haveSonars || !this->rigs.empty() || !this->waitingRigs.empty())
+      return;
+    std::lock_guard<std::mutex> lock(this->mutex);
+    if (!this->rigRequests.empty() || !this->rigRemovals.empty())
+      return;
+    this->preRenderConn.reset();
+    this->renderConn.reset();
+    return;
+  }
+  if (!this->haveSonars)
     return;
   // Joined here, on the rendering thread, so the emits that run on this
   // thread never race the connection.
@@ -516,9 +701,15 @@ void SonarPrivate::RefreshVisuals()
 {
   std::vector<rendering::VisualPtr> all;
   CollectVisuals(this->scene->RootVisual(), all);
-  if (all.size() == this->knownVisualCount)
+  // Rebuilt whenever the set of visuals changes, not only their number: a
+  // model removed and another spawned in one step keeps the count.
+  std::vector<unsigned int> ids;
+  ids.reserve(all.size());
+  for (const auto &v : all)
+    ids.push_back(v->Id());
+  if (ids == this->knownVisualIds)
     return;
-  this->knownVisualCount = all.size();
+  this->knownVisualIds = std::move(ids);
   this->visualByEntity.clear();
   this->waterVisuals.clear();
   for (const auto &v : all)
@@ -541,6 +732,45 @@ rendering::VisualPtr SonarPrivate::VisualOf(Entity _e)
 }
 
 //////////////////////////////////////////////////
+void SonarPrivate::DestroyRig(Rig &_rig)
+{
+  // Disconnect first, so no frame lands in a buffer that is going away.
+  _rig.connections.clear();
+  auto destroy = [this](const rendering::SensorPtr &_camera) {
+    if (!_camera)
+      return;
+    if (auto parent = _camera->Parent())
+      parent->RemoveChild(_camera);
+    if (this->scene)
+      this->scene->DestroySensor(_camera);
+  };
+  for (const auto &c : _rig.depth)
+    destroy(c);
+  for (const auto &c : _rig.seg)
+    destroy(c);
+  _rig.depth.clear();
+  _rig.seg.clear();
+}
+
+//////////////////////////////////////////////////
+void SonarPrivate::EraseRig(Entity _sensor)
+{
+  auto it = this->rigs.find(_sensor);
+  if (it == this->rigs.end())
+    return;
+  this->DestroyRig(it->second);
+  this->rigs.erase(it);
+}
+
+//////////////////////////////////////////////////
+void SonarPrivate::ClearRigs()
+{
+  for (auto &[entity, rig] : this->rigs)
+    this->DestroyRig(rig);
+  this->rigs.clear();
+}
+
+//////////////////////////////////////////////////
 bool SonarPrivate::BuildRig(const RigRequest &_request, Rig &_rig)
 {
   const auto linkVisual = this->VisualOf(_request.link);
@@ -556,9 +786,21 @@ bool SonarPrivate::BuildRig(const RigRequest &_request, Rig &_rig)
   {
     const math::Pose3d local = _request.pose *
       math::Pose3d(0, 0, 0, 0, 0, layout.yaws[c]);
-    const std::string tag = base + "_sonar_" + std::to_string(c);
+    const std::string tag = base + "_sonar_" + std::to_string(c) + "_" +
+      std::to_string(this->camerasBuilt++);
 
     auto depth = this->scene->CreateDepthCamera(tag + "_depth");
+    auto seg = this->scene->CreateSegmentationCamera(tag + "_seg");
+    if (!depth || !seg)
+    {
+      gzerr << "Sonar [" << base << "]: cannot create its cameras\n";
+      if (depth)
+        this->scene->DestroySensor(depth);
+      if (seg)
+        this->scene->DestroySensor(seg);
+      this->DestroyRig(_rig);
+      return false;
+    }
     depth->SetImageWidth(layout.width);
     depth->SetImageHeight(layout.height);
     depth->SetImageFormat(rendering::PF_FLOAT32_R);
@@ -579,7 +821,6 @@ bool SonarPrivate::BuildRig(const RigRequest &_request, Rig &_rig)
       }));
     _rig.depth.push_back(depth);
 
-    auto seg = this->scene->CreateSegmentationCamera(tag + "_seg");
     seg->SetImageWidth(layout.width);
     seg->SetImageHeight(layout.height);
     seg->SetHFOV(math::Angle(layout.hfov));
@@ -614,8 +855,8 @@ void SonarPrivate::OnPreRender()
   if (!this->scene || !this->scene->IsInitialized())
     return;
   this->sceneSeen = true;
+  const auto t = std::chrono::duration_cast<nanoseconds>(this->scene->Time());
 
-  bool clear = false;
   {
     std::lock_guard<std::mutex> lock(this->mutex);
     this->waitingRigs.insert(this->waitingRigs.end(),
@@ -624,24 +865,73 @@ void SonarPrivate::OnPreRender()
     this->waitingMarks.insert(this->waitingMarks.end(),
       this->markRequests.begin(), this->markRequests.end());
     this->markRequests.clear();
-    for (const Entity e : this->rigRemovals)
-      this->rigs.erase(e);
+    this->waitingRemovals.insert(this->waitingRemovals.end(),
+      this->rigRemovals.begin(), this->rigRemovals.end());
     this->rigRemovals.clear();
-    std::swap(clear, this->clearRigs);
+    this->waitingTables.insert(this->waitingTables.end(),
+      this->tableRequests.begin(), this->tableRequests.end());
+    this->tableRequests.clear();
   }
-  if (clear)
+
+  // Time going back is a world reset: every sonar starts over on its rate
+  // grid, and whatever was queued before it is due now.
+  if (this->lastFrame.count() >= 0 && t < this->lastFrame)
   {
-    this->rigs.clear();
-    this->marks.clear();
+    for (auto &[entity, rig] : this->rigs)
+    {
+      rig.next = FirstPingAt(t, rig.request.sonar->Rate());
+      rig.lastStamp = nanoseconds(-1);
+    }
+    for (auto &r : this->waitingRigs)
+      r.stamp = std::min(r.stamp, t);
+    for (auto &m : this->waitingMarks)
+      m.stamp = std::min(m.stamp, t);
+    for (auto &r : this->waitingRemovals)
+      r.stamp = std::min(r.stamp, t);
+    for (auto &w : this->waitingTables)
+      w.stamp = std::min(w.stamp, t);
+  }
+  this->lastFrame = t;
+
+  for (auto it = this->waitingRemovals.begin();
+       it != this->waitingRemovals.end();)
+  {
+    if (it->stamp > t)
+    {
+      ++it;
+      continue;
+    }
+    this->EraseRig(it->sensor);
+    it = this->waitingRemovals.erase(it);
+  }
+  for (auto it = this->waitingTables.begin(); it != this->waitingTables.end();)
+  {
+    if (it->stamp > t)
+    {
+      ++it;
+      continue;
+    }
+    this->renderTable = it->table;
+    it = this->waitingTables.erase(it);
   }
 
   this->RefreshVisuals();
 
-  // Visuals and sonars whose rendering visual is not in the scene yet stay
-  // queued until it is.
+  // Marks, then sonars, that are due; one whose rendering visual is not in
+  // the scene yet stays queued until it is.
   for (auto it = this->waitingMarks.begin(); it != this->waitingMarks.end();)
   {
-    if (this->VisualOf(it->visual))
+    if (it->stamp > t)
+    {
+      ++it;
+      continue;
+    }
+    if (it->removed)
+    {
+      this->marks.erase(it->visual);
+      it = this->waitingMarks.erase(it);
+    }
+    else if (this->VisualOf(it->visual))
     {
       this->marks[it->visual] = *it;
       it = this->waitingMarks.erase(it);
@@ -653,16 +943,23 @@ void SonarPrivate::OnPreRender()
   // buffers: map nodes do not move.
   for (auto it = this->waitingRigs.begin(); it != this->waitingRigs.end();)
   {
+    if (it->stamp > t)
+    {
+      ++it;
+      continue;
+    }
     const Entity e = it->sensor;
-    this->rigs.erase(e);
+    this->EraseRig(e);
     Rig &rig = this->rigs[e];
     if (this->BuildRig(*it, rig))
     {
+      // The first ping on the rate grid from here, as every later one is.
+      rig.next = FirstPingAt(t, it->sonar->Rate());
       it = this->waitingRigs.erase(it);
     }
     else
     {
-      this->rigs.erase(e);
+      this->EraseRig(e);
       ++it;
     }
   }
@@ -675,11 +972,7 @@ void SonarPrivate::OnRender()
     return;
   const auto t = std::chrono::duration_cast<nanoseconds>(this->scene->Time());
 
-  std::shared_ptr<const LabelTable> table;
-  {
-    std::lock_guard<std::mutex> lock(this->mutex);
-    table = this->table;
-  }
+  const std::shared_ptr<const LabelTable> table = this->renderTable;
 
   for (auto &[entity, rig] : this->rigs)
   {
@@ -733,6 +1026,8 @@ void SonarPrivate::OnRender()
       rig.seg[c]->PostRender();
     }
 
+    // gz-rendering has no visibility getter, so whatever was hidden here is
+    // shown again; nothing else in these worlds hides a visual.
     for (auto &v : hidden)
       v->SetVisible(true);
     // Put back whatever was there; an empty datum reads as background, as
@@ -761,11 +1056,12 @@ void SonarPrivate::OnRender()
 //////////////////////////////////////////////////
 void SonarPrivate::OnTeardown()
 {
-  this->rigs.clear();
+  this->ClearRigs();
   this->marks.clear();
   this->visualByEntity.clear();
   this->waterVisuals.clear();
-  this->knownVisualCount = 0;
+  this->knownVisualIds.clear();
+  this->lastFrame = nanoseconds(-1);
   this->scene.reset();
 }
 }  // namespace gz::sim::maritime

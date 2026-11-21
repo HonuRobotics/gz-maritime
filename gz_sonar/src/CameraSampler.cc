@@ -24,6 +24,12 @@ namespace gz::maritime::sonar
 {
 namespace
 {
+/// \brief Incidence for a hit whose surface normal cannot be estimated.
+constexpr double kUnknownIncidence = M_PI / 4.0;
+}  // namespace
+
+namespace
+{
 /// \brief Neighboring depths within this fraction are one surface.
 constexpr double kContinuous = 0.02;
 
@@ -183,7 +189,9 @@ std::vector<RayHit> CameraSampler::Sample(
 
   // Normals from neighboring hits on the ray grid, in the sensor frame: for
   // each direction, the one-sided difference with the smaller range jump,
-  // so a silhouette does not tilt the surface toward the background.
+  // so a silhouette does not tilt the surface toward the background when
+  // one neighbor is on the surface. With neither (an object one ray wide)
+  // the normal is unknown and the hit keeps kUnknownIncidence.
   const std::size_t ne = this->elevationCount;
   const std::size_t cols = hits.size() / std::max<std::size_t>(ne, 1);
   std::vector<math::Vector3d> points(hits.size());
@@ -201,6 +209,11 @@ std::vector<RayHit> CameraSampler::Sample(
       const std::size_t n = i * ne + k;
       if (!hits[n].hit)
         continue;
+      // Without two neighbors on the same surface the normal is unknown (a
+      // rope, a pole end on, a target one ray wide). Head on would give it
+      // the strongest return and a full glint; 45 degrees gives a plain
+      // diffuse return and no glint, unless a normal is found below.
+      hits[n].incidence = kUnknownIncidence;
       auto pick = [&](long _di, long _dk, math::Vector3d &_out) {
         const long ia = static_cast<long>(i) + _di;
         const long ka = static_cast<long>(k) + _dk;

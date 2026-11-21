@@ -3,7 +3,7 @@
   <model name="steel_drum">
     <static>true</static>
     <link name="link">
-      <!-- A 200 litre drum, 0.58 m across and 0.88 m long, lying on its side
+      <!-- A 200 liter drum, 0.58 m across and 0.88 m long, lying on its side
            along x. Hard and smooth: a fair diffuse return and a glint along
            its length when the sonar looks square at it. -->
       <visual name="body">

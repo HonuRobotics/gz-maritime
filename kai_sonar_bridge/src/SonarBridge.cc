@@ -114,6 +114,14 @@ class SonarBridge : public rclcpp::Node
     {
       auto s = std::make_shared<Sonar>();
       s->frame = i < frameIds.size() ? frameIds[i] : "";
+      if (s->frame.empty() && !gzTopics[i].empty())
+      {
+        // The fallback is gz's scoped sensor name, which no TF publisher
+        // knows; a vehicle's generated parameters always give the frame.
+        RCLCPP_WARN(this->get_logger(),
+          "no frame_ids entry for %s: its messages are stamped with the gz "
+          "sensor name, which TF does not carry", gzTopics[i].c_str());
+      }
       if (i < kinds.size() && kinds[i] == "detections")
       {
         s->detPub = this->create_publisher<RosDetections>(rosTopics[i],
@@ -251,8 +259,10 @@ class SonarBridge : public rclcpp::Node
       static_cast<std::size_t>(rMax * 1000.0);
     if (key != _s.fanKey)
     {
-      const double halfWidth = rMax * std::sin(std::max(std::abs(aMin),
-        std::abs(aMax)));
+      // At least a degree either side, so a one-beam or narrow fan still
+      // has a width to scale by.
+      const double halfWidth = rMax * std::sin(std::max({std::abs(aMin),
+        std::abs(aMax), M_PI / 180.0}));
       _s.fanW = kFanWidth;
       const double scale = _s.fanW / (2.0 * halfWidth);
       _s.fanH = static_cast<int>(std::ceil(rMax * scale)) + 1;
@@ -358,7 +368,10 @@ class SonarBridge : public rclcpp::Node
       out.flags.push_back(f);
       out.two_way_travel_times.push_back(_m.travel_times(static_cast<int>(i)));
       out.tx_delays.push_back(0.0f);
-      out.intensities.push_back(_m.intensities(static_cast<int>(i)));
+      // An angle-of-arrival profiler reports no intensity (NaN in the gz
+      // message); ROS consumers get 0 there rather than a NaN.
+      const float level = _m.intensities(static_cast<int>(i));
+      out.intensities.push_back(std::isnan(level) ? 0.0f : level);
       out.tx_angles.push_back(0.0f);
       out.rx_angles.push_back(-_m.angles(static_cast<int>(i)));
     }

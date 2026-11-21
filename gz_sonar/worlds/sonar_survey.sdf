@@ -32,7 +32,8 @@
     <plugin filename="gz-sim-scene-broadcaster-system"
             name="gz::sim::systems::SceneBroadcaster"/>
 
-    <!-- Renders the echosounder (gpu_lidar) sensor; needs a GPU + ogre2. -->
+    <!-- Renders the vehicle's sensors, the sonars' cameras among them;
+         needs a GPU (or a software renderer) and ogre2. -->
     <plugin filename="gz-sim-sensors-system"
             name="gz::sim::systems::Sensors">
       <render_engine>ogre2</render_engine>

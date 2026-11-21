@@ -42,8 +42,7 @@ struct Levels
 
   /// \brief The gain applied, dB: fixed, or chosen so the median echo
   /// sits 24 dB below full scale, unless that would clip more than the
-  /// brightest 0.1 % of echoes
-  /// sit at full scale.
+  /// brightest 0.1 % of echoes.
   double gainDb{0.0};
 
   std::vector<double> ranges;
@@ -60,8 +59,8 @@ double TimeVariedGain(const SonarConfig &_config, double _alpha,
 class GainTracker
 {
   /// \brief Take one ping's gain and return the gain to apply.
-  /// \param[in] _pingGain The gain that would put this ping's median
-  /// echoes at full scale, dB.
+  /// \param[in] _pingGain The gain automatic gain would choose for this
+  /// ping alone (its median echo 24 dB below full scale), dB.
   /// \param[in] _dt Time since the previous ping, s.
   /// \param[in] _timeConstant Time constant, s; 0 follows each ping.
   public: double Update(double _pingGain, double _dt, double _timeConstant);

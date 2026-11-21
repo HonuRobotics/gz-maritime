@@ -17,6 +17,7 @@
 #ifndef GZ_MARITIME_SONAR_SYSTEMS_SONARSENSOR_HH_
 #define GZ_MARITIME_SONAR_SYSTEMS_SONARSENSOR_HH_
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -107,6 +108,10 @@ class SonarSensor : public sensors::Sensor
   /// \brief Whether the ground-truth labels topic is on.
   public: bool Labels() const;
 
+  /// \brief Start over after a world reset: the automatic gain forgets
+  /// the pings it has seen.
+  public: void ResetState();
+
   private: void Work();
   private: void Process(const PingFrame &_frame);
 
@@ -117,6 +122,9 @@ class SonarSensor : public sensors::Sensor
   private: std::unique_ptr<gz::maritime::sonar::Engine> engine;
   private: std::unique_ptr<gz::maritime::sonar::CameraSampler> sampler;
   private: gz::maritime::sonar::GainTracker gain;
+
+  /// \brief Set by ResetState, read by the worker before its next ping.
+  private: std::atomic<bool> resetGain{false};
 
   private: transport::Node node;
   private: transport::Node::Publisher imagePub;

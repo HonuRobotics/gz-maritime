@@ -16,6 +16,7 @@
  */
 #include "SonarSensor.hh"
 
+#include <algorithm>
 #include <cstring>
 #include <utility>
 
@@ -128,6 +129,13 @@ bool SonarSensor::Load(const sdf::Sensor &_sdf, const std::string &_type,
         << this->config.samples << " samples to " << this->config.rangeMax
         << " m, " << l.yaws.size() << " camera(s) of " << l.width << "x"
         << l.height << "\n";
+  if (this->UpdateRate() > this->Rate())
+  {
+    gzwarn << "Sonar [" << this->Name() << "]: <update_rate> "
+           << this->UpdateRate() << " Hz is faster than echoes from "
+           << this->config.rangeMax << " m can return; pinging at "
+           << this->Rate() << " Hz\n";
+  }
   return true;
 }
 
@@ -156,7 +164,10 @@ const sonar::CameraLayout &SonarSensor::Layout() const
 
 double SonarSensor::Rate() const
 {
-  return this->UpdateRate() > 0.0 ? this->UpdateRate() : 10.0;
+  const double asked = this->UpdateRate() > 0.0 ? this->UpdateRate() : 10.0;
+  // One ping's echoes must return before the next: no faster than c / 2R.
+  const double cap = this->water.soundSpeed / (2.0 * this->config.rangeMax);
+  return std::min(asked, cap);
 }
 
 const std::string &SonarSensor::Type() const
@@ -167,6 +178,12 @@ const std::string &SonarSensor::Type() const
 bool SonarSensor::Labels() const
 {
   return this->labels;
+}
+
+void SonarSensor::ResetState()
+{
+  // The worker owns the gain tracker; it starts over at its next ping.
+  this->resetGain = true;
 }
 
 void SonarSensor::Work()
@@ -196,6 +213,8 @@ void SonarSensor::Work()
 
 void SonarSensor::Process(const PingFrame &_frame)
 {
+  if (this->resetGain.exchange(false))
+    this->gain = gz::maritime::sonar::GainTracker();
   std::vector<const float *> depth;
   std::vector<const std::uint8_t *> labelImages;
   for (const auto &d : _frame.depth)

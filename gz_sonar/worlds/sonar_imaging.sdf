@@ -4,8 +4,8 @@
   on it, for a BlueROV2 carrying a forward imaging sonar (gz_sonar). The
   vehicle is spawned at the origin, 2.5 m down; its sonar, pitched down 15
   degrees, first meets the seabed about 6 m ahead, where the targets lie: a
-  glass float, a steel cylinder and a concrete block, with a tire and a
-  marker flag the sonar must not see a little further off.
+  glass float, a steel cylinder and a concrete block, with a tire a little
+  further off and a marker flag the sonar must not see.
 
   Graded buoyancy, the ocean current and the sensor render path follow the
   BlueROV2's own water world (bluerobotics_models, bluerov2_water.sdf), so
