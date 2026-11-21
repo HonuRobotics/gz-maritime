@@ -8,14 +8,17 @@
 <launch>
   <arg name="gz_topics" description="The sonars' gz-transport topics, as a list"/>
   <arg name="ros_topics" description="The ROS 2 topics, one per gz topic"/>
-  <arg name="frame_ids" default="[]"
-       description="Frames to stamp; empty for each sensor's frame plus _acoustic"/>
+  <arg name="frame_ids" default="['']"
+       description="Frames to stamp, as a list; an empty entry for the default"/>
+  <arg name="kinds" default="['']"
+       description="Per sonar, image (the default) or detections for a profiler"/>
   <arg name="view" default="true" description="Also publish a /view image beside each ROS topic"/>
   <arg name="name" default="sonar_bridge"/>
   <node pkg="kai_sonar_bridge" exec="sonar_bridge" name="$(var name)" output="screen">
     <param name="gz_topics" value="$(var gz_topics)"/>
     <param name="ros_topics" value="$(var ros_topics)"/>
-    <param name="frame_ids" value="$(var frame_ids)" value-sep=","/>
+    <param name="frame_ids" value="$(var frame_ids)"/>
+    <param name="kinds" value="$(var kinds)"/>
     <param name="view" value="$(var view)"/>
   </node>
 </launch>

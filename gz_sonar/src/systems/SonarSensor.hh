@@ -122,6 +122,12 @@ class SonarSensor : public sensors::Sensor
   private: transport::Node::Publisher imagePub;
   private: transport::Node::Publisher labelsPub;
 
+  /// \brief A profiler's intensity before detection, when published.
+  private: transport::Node::Publisher waterColumnPub;
+
+  /// \brief Publish a profiler's water column (<water_column>).
+  private: bool waterColumn{false};
+
   private: std::mutex mutex;
   private: std::condition_variable cv;
   private: std::deque<PingFrame> queue;

@@ -74,6 +74,7 @@ gz_msgs_generate_messages(
   MSGS_PROTOS
     ${CMAKE_CURRENT_SOURCE_DIR}/proto/gz/maritime/sonar/sonar_image.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/proto/gz/maritime/sonar/sonar_labels.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/proto/gz/maritime/sonar/sonar_detections.proto
   DEPENDENCIES gz-msgs::gz-msgs
 )
 # The function installs the Python modules under gz/msgs/, where the

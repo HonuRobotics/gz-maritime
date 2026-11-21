@@ -22,6 +22,7 @@
 #include <gz/common/Console.hh>
 
 #include "SonarSdf.hh"
+#include "gz/maritime/sonar/sonar_detections.pb.h"
 #include "gz/maritime/sonar/sonar_image.pb.h"
 #include "gz/maritime/sonar/sonar_labels.pb.h"
 
@@ -78,13 +79,6 @@ bool SonarSensor::Load(const sdf::Sensor &_sdf, const std::string &_type,
   this->type = _type;
   this->water = _water;
 
-  if (_type == kProfilingSonar)
-  {
-    gzerr << "Sonar [" << this->Name() << "]: profiling sonars arrive in "
-          << "Phase 3 of the sonar plan; not loading it\n";
-    return false;
-  }
-
   const auto elem = _sdf.Element();
   const sdf::ElementPtr block = elem && elem->HasElement("gz:sonar") ?
     elem->FindElement("gz:sonar") : nullptr;
@@ -100,8 +94,27 @@ bool SonarSensor::Load(const sdf::Sensor &_sdf, const std::string &_type,
 
   this->engine = std::make_unique<sonar::Engine>(this->config, this->water);
   this->sampler = std::make_unique<sonar::CameraSampler>(this->config);
-  this->imagePub = this->node.Advertise<gz::maritime::sonar::SonarImage>(
-    this->Topic());
+  if (this->type == kProfilingSonar)
+  {
+    // Soundings on the topic itself; the intensity before detection, as an
+    // image of levels in dB, only when asked for.
+    this->imagePub =
+      this->node.Advertise<gz::maritime::sonar::SonarDetections>(
+        this->Topic());
+    this->waterColumn = block && block->HasElement("water_column") &&
+      block->Get<bool>("water_column");
+    if (this->waterColumn)
+    {
+      this->waterColumnPub =
+        this->node.Advertise<gz::maritime::sonar::SonarImage>(
+          this->Topic() + "/water_column");
+    }
+  }
+  else
+  {
+    this->imagePub = this->node.Advertise<gz::maritime::sonar::SonarImage>(
+      this->Topic());
+  }
   if (this->labels)
   {
     this->labelsPub = this->node.Advertise<gz::maritime::sonar::SonarLabels>(
@@ -219,6 +232,37 @@ void SonarSensor::Process(const PingFrame &_frame)
     const auto frame = sonar::ReadImaging(levels, this->config);
     msg.set_data_type(gz::maritime::sonar::SonarImage::UINT8);
     msg.set_data(frame.data.data(), frame.data.size());
+    this->imagePub.Publish(msg);
+  }
+  else if (this->type == kProfilingSonar)
+  {
+    // Bottom detection: the soundings are what the device delivers.
+    const double c = this->config.AssumedSoundSpeed(this->water.soundSpeed);
+    const auto soundings = sonar::ReadProfiling(levels, this->config, c,
+      _frame.ping);
+    gz::maritime::sonar::SonarDetections dm;
+    Stamp(dm.mutable_header(), _frame.stamp, this->FrameId());
+    dm.set_ping(_frame.ping);
+    dm.set_frequency(this->config.frequency);
+    dm.set_sound_speed(c);
+    dm.set_beam_width_across(static_cast<float>(this->config.beamWidth));
+    dm.set_beam_width_along(static_cast<float>(this->config.verticalFov));
+    for (const auto &sd : soundings)
+    {
+      dm.add_angles(static_cast<float>(sd.angle));
+      dm.add_travel_times(static_cast<float>(sd.travelTime));
+      dm.add_intensities(static_cast<float>(sd.levelDb));
+      dm.add_flags(static_cast<std::uint32_t>(sd.flag));
+    }
+    this->imagePub.Publish(dm);
+
+    if (this->waterColumn)
+    {
+      std::vector<float> db(levels.db.begin(), levels.db.end());
+      msg.set_data_type(gz::maritime::sonar::SonarImage::FLOAT32);
+      msg.set_data(db.data(), db.size() * sizeof(float));
+      this->waterColumnPub.Publish(msg);
+    }
   }
   else
   {
@@ -226,8 +270,8 @@ void SonarSensor::Process(const PingFrame &_frame)
     std::vector<float> db(levels.db.begin(), levels.db.end());
     msg.set_data_type(gz::maritime::sonar::SonarImage::FLOAT32);
     msg.set_data(db.data(), db.size() * sizeof(float));
+    this->imagePub.Publish(msg);
   }
-  this->imagePub.Publish(msg);
 
   if (this->labels)
   {

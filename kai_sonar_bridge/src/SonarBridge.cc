@@ -23,11 +23,15 @@
 
 #include <gz/transport/Node.hh>
 #include <marine_acoustic_msgs/msg/projected_sonar_image.hpp>
+#include <marine_acoustic_msgs/msg/sonar_detections.hpp>
 #include <marine_acoustic_msgs/msg/sonar_image_data.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <sensor_msgs/point_cloud2_iterator.hpp>
 
+#include "gz/maritime/sonar/sonar_detections.pb.h"
 #include "gz/maritime/sonar/sonar_image.pb.h"
 
 namespace kai_sonar_bridge
@@ -36,6 +40,8 @@ namespace
 {
 using GzImage = gz::maritime::sonar::SonarImage;
 using RosImage = marine_acoustic_msgs::msg::ProjectedSonarImage;
+using GzDetections = gz::maritime::sonar::SonarDetections;
+using RosDetections = marine_acoustic_msgs::msg::SonarDetections;
 
 /// \brief The frame id a gz header carries.
 std::string FrameOf(const gz::msgs::Header &_h)
@@ -64,10 +70,19 @@ constexpr int kFanWidth = 600;
 ///   gz_topics   the sonar's gz-transport topic
 ///   ros_topics  the ROS 2 topic for marine_acoustic_msgs/ProjectedSonarImage
 ///   frame_ids   the frame to stamp (optional; default: the sensor's frame
-///               with "_acoustic" appended)
+///               with "_acoustic" appended for images, the sensor's frame
+///               itself for detections)
+///   kinds       "image" (the default) for imaging and sidescan sonars, or
+///               "detections" for a profiling sonar's soundings
 /// and
-///   view        also publish <ros_topic>/view, a sensor_msgs/Image to look
-///               at: an imaging sonar's fan, or a sidescan's waterfall.
+///   view        also publish a view: <ros_topic>/view, a sensor_msgs/Image
+///               of an imaging sonar's fan or a sidescan's waterfall, and
+///               <ros_topic>/points, a profiler's soundings as a
+///               sensor_msgs/PointCloud2 in the sensor's frame.
+///
+/// Soundings: marine_acoustic_msgs/SonarDetections counts rx_angles
+/// positive to starboard for a down-looking sonar, which is the sensor's
+/// -y; the sensor's angles are positive toward +y, so they are negated.
 ///
 /// The message's frame has Z along the fan's center and X up, so a beam at
 /// azimuth a (about the sensor's z axis, positive to the left) points along
@@ -85,6 +100,8 @@ class SonarBridge : public rclcpp::Node
       "ros_topics", std::vector<std::string>{});
     const auto frameIds = this->declare_parameter<std::vector<std::string>>(
       "frame_ids", std::vector<std::string>{});
+    const auto kinds = this->declare_parameter<std::vector<std::string>>(
+      "kinds", std::vector<std::string>{});
     this->view = this->declare_parameter<bool>("view", true);
 
     if (gzTopics.size() != rosTopics.size())
@@ -97,6 +114,28 @@ class SonarBridge : public rclcpp::Node
     {
       auto s = std::make_shared<Sonar>();
       s->frame = i < frameIds.size() ? frameIds[i] : "";
+      if (i < kinds.size() && kinds[i] == "detections")
+      {
+        s->detPub = this->create_publisher<RosDetections>(rosTopics[i],
+          rclcpp::SensorDataQoS());
+        if (this->view)
+        {
+          s->cloudPub = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+            rosTopics[i] + "/points", rclcpp::SensorDataQoS());
+        }
+        std::function<void(const GzDetections &)> dcb =
+          [this, s](const GzDetections &_msg) { this->OnSoundings(*s, _msg); };
+        if (!this->gzNode.Subscribe(gzTopics[i], dcb))
+        {
+          RCLCPP_ERROR(this->get_logger(), "cannot subscribe to [%s]",
+            gzTopics[i].c_str());
+          continue;
+        }
+        RCLCPP_INFO(this->get_logger(), "profiler [%s] -> [%s]",
+          gzTopics[i].c_str(), rosTopics[i].c_str());
+        this->sonars.push_back(s);
+        continue;
+      }
       s->pub = this->create_publisher<RosImage>(rosTopics[i],
         rclcpp::SensorDataQoS());
       if (this->view)
@@ -123,6 +162,8 @@ class SonarBridge : public rclcpp::Node
     std::string frame;
     rclcpp::Publisher<RosImage>::SharedPtr pub;
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr viewPub;
+    rclcpp::Publisher<RosDetections>::SharedPtr detPub;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloudPub;
     std::mutex mutex;
     /// \brief A fan's pixel to (beam, sample) lookup, -1 outside.
     std::vector<int> fanLut;
@@ -284,6 +325,83 @@ class SonarBridge : public rclcpp::Node
     for (const auto &l : _s.lines)
       view.data.insert(view.data.end(), l.begin(), l.end());
     _s.viewPub->publish(std::move(view));
+  }
+
+  /// \brief A profiler's soundings: the detections message, and the same
+  /// soundings as points in the sensor's frame (x along the acoustic axis,
+  /// the fan in its x-y plane).
+  private: void OnSoundings(Sonar &_s, const GzDetections &_m)
+  {
+    const auto n = static_cast<std::size_t>(_m.angles_size());
+    if (static_cast<std::size_t>(_m.travel_times_size()) != n ||
+        static_cast<std::size_t>(_m.intensities_size()) != n ||
+        static_cast<std::size_t>(_m.flags_size()) != n)
+    {
+      RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+        "malformed detections message");
+      return;
+    }
+    RosDetections out;
+    out.header.stamp.sec = static_cast<int32_t>(_m.header().stamp().sec());
+    out.header.stamp.nanosec =
+      static_cast<uint32_t>(_m.header().stamp().nsec());
+    out.header.frame_id = !_s.frame.empty() ? _s.frame :
+      FrameOf(_m.header());
+    out.ping_info.frequency = static_cast<float>(_m.frequency());
+    out.ping_info.sound_speed = static_cast<float>(_m.sound_speed());
+    out.ping_info.tx_beamwidths.push_back(_m.beam_width_along());
+    out.ping_info.rx_beamwidths.push_back(_m.beam_width_across());
+    for (std::size_t i = 0; i < n; ++i)
+    {
+      marine_acoustic_msgs::msg::DetectionFlag f;
+      f.flag = static_cast<uint8_t>(_m.flags(static_cast<int>(i)));
+      out.flags.push_back(f);
+      out.two_way_travel_times.push_back(_m.travel_times(static_cast<int>(i)));
+      out.tx_delays.push_back(0.0f);
+      out.intensities.push_back(_m.intensities(static_cast<int>(i)));
+      out.tx_angles.push_back(0.0f);
+      out.rx_angles.push_back(-_m.angles(static_cast<int>(i)));
+    }
+    if (_s.cloudPub)
+    {
+      sensor_msgs::msg::PointCloud2 cloud;
+      cloud.header = out.header;
+      sensor_msgs::PointCloud2Modifier mod(cloud);
+      mod.setPointCloud2Fields(4,
+        "x", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "y", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "z", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "intensity", 1, sensor_msgs::msg::PointField::FLOAT32);
+      std::size_t good = 0;
+      for (std::size_t i = 0; i < n; ++i)
+        good += _m.flags(static_cast<int>(i)) == 0 ? 1 : 0;
+      mod.resize(good);
+      // The iterators take the address of the first byte, so a ping with no
+      // good soundings (all flagged, or nothing in range) publishes an empty
+      // cloud without them.
+      if (good > 0)
+      {
+        sensor_msgs::PointCloud2Iterator<float> x(cloud, "x");
+        sensor_msgs::PointCloud2Iterator<float> y(cloud, "y");
+        sensor_msgs::PointCloud2Iterator<float> z(cloud, "z");
+        sensor_msgs::PointCloud2Iterator<float> in(cloud, "intensity");
+        for (std::size_t i = 0; i < n; ++i)
+        {
+          const int k = static_cast<int>(i);
+          if (_m.flags(k) != 0)
+            continue;
+          const double r = 0.5 * _m.sound_speed() * _m.travel_times(k);
+          const double a = _m.angles(k);
+          *x = static_cast<float>(r * std::cos(a));
+          *y = static_cast<float>(r * std::sin(a));
+          *z = 0.0f;
+          *in = std::isnan(_m.intensities(k)) ? 0.0f : _m.intensities(k);
+          ++x; ++y; ++z; ++in;
+        }
+      }
+      _s.cloudPub->publish(std::move(cloud));
+    }
+    _s.detPub->publish(std::move(out));
   }
 
   private: gz::transport::Node gzNode;

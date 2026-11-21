@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<sdf version="1.12" xmlns:gz="http://gazebosim.org/schema">
+  <model name="steel_drum">
+    <static>true</static>
+    <link name="link">
+      <!-- A 200 litre drum, 0.58 m across and 0.88 m long, lying on its side
+           along x. Hard and smooth: a fair diffuse return and a glint along
+           its length when the sonar looks square at it. -->
+      <visual name="body">
+        <pose>0 0 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.29</radius><length>0.88</length></cylinder></geometry>
+        <material><diffuse>0.35 0.38 0.42 1</diffuse><ambient>0.35 0.38 0.42 1</ambient></material>
+        <gz:acoustic_lambert>-15</gz:acoustic_lambert>
+        <gz:acoustic_specular>-3</gz:acoustic_specular>
+        <gz:acoustic_specular_width>0.05</gz:acoustic_specular_width>
+      </visual>
+      <collision name="body">
+        <pose>0 0 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.29</radius><length>0.88</length></cylinder></geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>
