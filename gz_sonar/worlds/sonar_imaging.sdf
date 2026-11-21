@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <!--
-  First look at an imaging sonar: a flat seabed 5 m down with sonar targets
+  An imaging sonar scene: a flat seabed 5 m down with sonar targets
   on it, for a BlueROV2 carrying a forward imaging sonar (gz_sonar). The
   vehicle is spawned at the origin, 2.5 m down; its sonar, pitched down 15
   degrees, first meets the seabed about 6 m ahead, where the targets lie: a
@@ -13,11 +13,11 @@
   named bluerov2, the name the buoyancy system enables.
 
     ros2 launch bluerov2_gazebo sim.launch.xml \
-      world:=$(ros2 pkg prefix --share gz_sonar)/worlds/sonar_first_look.sdf \
+      world:=$(ros2 pkg prefix --share gz_sonar)/worlds/sonar_imaging.sdf \
       config_file:=<a config with the forward sonar fitted>
 -->
 <sdf version="1.12" xmlns:gz="http://gazebosim.org/schema">
-  <world name="sonar_first_look">
+  <world name="sonar_imaging">
 
     <physics name="1ms" type="ignored">
       <max_step_size>0.001</max_step_size>

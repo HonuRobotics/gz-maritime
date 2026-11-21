@@ -338,7 +338,7 @@ We write our own code, and take ideas, structure and test cases from the open im
 
 ### Performance
 
-Measured once, on one machine, during Phase 2, with the imaging sonar's rays reaching two half-widths of the vertical beam; the default is now three, which adds about 50 % more hits and about 7 ms a ping on the worker (sampling 18 ms, engine 25 ms), with no measurable change to the real time factor; read these as a guide to where the time goes, not as specifications. The machine has 24 cores and an NVIDIA RTX 2070 SUPER; the scene is the first-look world (`sonar_first_look.sdf`) with the BlueROV2 and its one forward imaging sonar at the ECHO defaults (256 beams, 768 samples to 15 m, labels on), sampled by two 604 × 429 cameras; the world runs headless.
+Measured once, on one machine, during Phase 2, with the imaging sonar's rays reaching two half-widths of the vertical beam; the default is now three, which adds about 50 % more hits and about 7 ms a ping on the worker (sampling 18 ms, engine 25 ms), with no measurable change to the real time factor; read these as a guide to where the time goes, not as specifications. The machine has 24 cores and an NVIDIA RTX 2070 SUPER; the scene is the imaging sonar world (`sonar_imaging.sdf`) with the BlueROV2 and its one forward imaging sonar at the ECHO defaults (256 beams, 768 samples to 15 m, labels on), sampled by two 604 × 429 cameras; the world runs headless.
 
 A ping has two halves. On the rendering thread, each camera renders depth and then segmentation and reads both back to the CPU. gz-sim's simulation thread waits for rendering whenever a sensor is due, so this half is what slows the world. On the sonar's own worker thread, the camera images become hits, intensities and the readout; this runs alongside the simulation and costs it nothing as long as it keeps up.
 
@@ -403,17 +403,15 @@ First, the engine changes from the Phase 1 checkpoint: smoothed sidescan gain, f
 
 Walkthroughs:
 
-- "First look: imaging sonar from the ROV": a BlueROV2 with the imaging sonar in its forward slot, facing a sphere, a cylinder and a box.
+- "Imaging (forward looking) sonar from the ROV": a BlueROV2 with the imaging sonar in its forward slot, facing a sphere, a cylinder and a box.
 - "Add a sonar to your vehicle": the sensor block, pointing it into a slot, the bridge. Extends [Add sensors](../how-to/sensors.md).
-- "Make objects visible to the sonar": the acoustic properties on a glass float, a tire and a flag, and naming the seabed.
-- "Set the difficulty": noise floor, gain, speckle and multipath, and replaying a run from its seed.
-- "Generate labeled training data": recording images with the identity of what each sample hit.
+- "Sonar features: acoustic properties and truth labels": the acoustic properties on a glass float, a tire and a flag, and naming the seabed; noise floor, gain and speckle, and replaying a run from its seed; and recording images with the identity of what each sample hit.
 
 Checkpoint:
 
 1. The five walkthroughs run as written.
 2. The same seed gives byte-identical messages twice; the sonar holds its rate on a GPU and runs on llvmpipe.
-3. The first-look image side by side with POSIM's image of the same scene.
+3. The imaging sonar walkthrough's image side by side with POSIM's image of the same scene.
 
 Realign on: how the images look against expectation and against POSIM, the parameter set and its defaults, the message and the viewing aids, before the same engine is configured twice more.
 
@@ -423,7 +421,7 @@ The sidescan and profiling configurations and their readouts (time-varied gain i
 
 Walkthrough:
 
-- "First look: profiling and sidescan from the USV": a BlueBoat carrying both sonars makes one straight pass over gently undulating terrain with a few hard-return targets (a concrete block, a steel drum, a glass float), so the reader sees both sonars on the same scene.
+- "Profiling and sidescan sonar from the USV": a BlueBoat carrying both sonars makes one straight pass over gently undulating terrain with a few hard-return targets (a concrete block, a steel drum, a glass float), so the reader sees both sonars on the same scene.
 
 Checkpoint:
 
@@ -457,8 +455,8 @@ Bring the four phases together as one change that a reviewer can read from start
 Checkpoint:
 
 1. From a clean workspace in drydock: `colcon build --merge-install` and `colcon test` pass for every package, and the docs build with warnings as errors.
-2. Every walkthrough runs as written, from the first look at the imaging sonar to the shipwreck map.
-3. The pull request description is reviewed before it is posted: what was built, how to try it (the first-look walkthroughs), what was tested, and what is left for later.
+2. Every walkthrough runs as written, from the imaging sonar on the ROV to the shipwreck map.
+3. The pull request description is reviewed before it is posted: what was built, how to try it (the imaging sonar and USV sonar walkthroughs), what was tested, and what is left for later.
 
 Then: one pull request to gz-maritime, with its companion in `bluerobotics_models`, opened for review. Review comments are answered on the branch, and the next round of work (a comparison with real recordings, more target models and exemplars, what the VRX 2027 tasks will need) is planned from what the review raises.
 
@@ -494,13 +492,11 @@ The walkthroughs each phase delivers go in `docs/how-to/`, in the style of the e
 | Walkthrough | Phase | Use cases | What the reader does | Done when |
 |---|---|---|---|---|
 | Render a ping without Gazebo (contributors) | 1 | all | Runs the engine on synthetic scenes and draws an imaging ping, a sidescan line and a set of soundings | Each picture shows what the scene predicts: the sphere at its range, the box's shadow, the slope in the soundings |
-| First look: imaging sonar from the ROV | 2 | 1, 2, 3 | Launches a BlueROV2 with the imaging sonar in its forward slot, facing a sphere, a cylinder and a box on a flat seabed, and drives it toward them while watching the image | The three objects and their shadows show in the fan at the ranges and bearings the world places them, and move in the fan as the ROV turns |
+| Imaging (forward looking) sonar from the ROV | 2 | 1, 2, 3 | Launches a BlueROV2 with the imaging sonar in its forward slot, facing a sphere, a cylinder and a box on a flat seabed, and drives it toward them while watching the image | The three objects and their shadows show in the fan at the ranges and bearings the world places them, and move in the fan as the ROV turns |
 | Add a sonar to your vehicle | 2 | all | Adds a sonar sensor to a model, points it with `<pose>` into a forward or downward slot, sets a few parameters, and runs the bridge | The vehicle's sonar topic publishes under its instance name. Extends [Add sensors](../how-to/sensors.md) |
-| Make objects visible to the sonar | 2 | 1, 3 | Marks a glass float, a tire and a flag with acoustic properties, and names the seabed | The float glints only when seen head on, the tire returns a steady echo, the flag disappears |
-| Set the difficulty | 2 | 1, 3 | Changes noise floor, gain, speckle and multipath, and replays a run from its seed | A low-contrast target fades as the noise floor rises, and the same seed gives the same images |
-| Generate labeled training data | 2 | 1 | Turns on the labels topic and records images with the identity of what each sample hit | Each target's samples carry its label |
-| First look: profiling and sidescan from the USV | 3 | 4 | Launches a BlueBoat carrying the profiling sonar looking down and a sidescan transducer on each hull, over gently undulating terrain with a few hard-return targets, and drives one straight pass over them | The sidescan waterfalls show each target as a bright return with a shadow beyond it, on the side it lies; the profiler's soundings trace the terrain under the track and rise over the targets the boat passes above |
+| Sonar features: acoustic properties and truth labels | 2 | 1, 3 | Marks a glass float, a tire and a flag with acoustic properties and names the seabed; changes noise floor, gain and speckle and replays a run from its seed; turns on the labels topic and records labeled images | The float glints only when seen head on, the tire returns a steady echo, the flag disappears; a target fades as the noise floor rises, and the same seed gives the same images; each target's samples carry its label |
+| Profiling and sidescan sonar from the USV | 3 | 4 | Launches a BlueBoat carrying the profiling sonar looking down and a sidescan transducer on each hull, over gently undulating terrain with a few hard-return targets, and drives one straight pass over them | The sidescan waterfalls show each target as a bright return with a shadow beyond it, on the side it lies; the profiler's soundings trace the terrain under the track and rise over the targets the boat passes above |
 | Build a sidescan mosaic of a shipwreck | 4 | 4 | Surveys the wreck from the BlueBoat in a lawnmower pattern and builds a georeferenced mosaic with the example script | The wreck and its shadow show in the mosaic at the wreck's true position and heading |
 | Map a shipwreck with the profiling sonar | 4 | 4 | Surveys the wreck with the profiler from the BlueBoat and from the BlueROV2, builds a georeferenced point cloud, and compares it with the ground truth | The point cloud lies on the wreck within the configured noise, and the comparison script reports the error |
 
-The first looks need a way to watch each sonar, and RViz has no display for the `marine_acoustic_msgs` types. `kai_sonar_bridge` therefore also publishes, optionally and for viewing only: the imaging sonar's data drawn as a fan, and each sidescan's lines stacked into a scrolling waterfall, both as `sensor_msgs/Image`; and the profiler's soundings as a `sensor_msgs/PointCloud2` in the vehicle's frame. These are display aids built from the sensor messages, not sensor outputs. The example scripts the walkthroughs use (mosaic, soundings to a georeferenced point cloud, comparison with ground truth) live in `kai_sonar_bridge` and are tested like the rest of the repo, so the tutorials cannot drift from the code.
+These walkthroughs need a way to watch each sonar, and RViz has no display for the `marine_acoustic_msgs` types. `kai_sonar_bridge` therefore also publishes, optionally and for viewing only: the imaging sonar's data drawn as a fan, and each sidescan's lines stacked into a scrolling waterfall, both as `sensor_msgs/Image`; and the profiler's soundings as a `sensor_msgs/PointCloud2` in the vehicle's frame. These are display aids built from the sensor messages, not sensor outputs. The example scripts the walkthroughs use (mosaic, soundings to a georeferenced point cloud, comparison with ground truth) live in `kai_sonar_bridge` and are tested like the rest of the repo, so the tutorials cannot drift from the code.

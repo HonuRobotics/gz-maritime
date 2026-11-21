@@ -1,16 +1,20 @@
 # Render a ping without Gazebo
 
-For people working on the sonar engine itself. To use a sonar on a vehicle, start with [First look: imaging sonar from the ROV](../how-to/sonar-first-look.md).
+For people working on the sonar engine itself. To use a sonar on a vehicle, start with [Imaging (forward looking) sonar from the ROV](../how-to/sonar-imaging.md).
+
+In Gazebo, a sonar image is the product of two things: 
+
+1. the scene geometry that gz-rendering's cameras sample, and 
+2. the acoustic model that turns that geometry into echoes. 
+
+To avoid the confound, here the geometry is exact: the synthetic scene intersects each ray with its spheres, planes and boxes analytically, so the range, incidence angle and surface of every hit are known, and whatever the image shows is the acoustic model's doing. 
+
 
 The sonar engine in `gz_sonar` runs on its own, with a small scene of analytic shapes standing in for Gazebo's renderer, so each stage of the model can be seen and tested without a simulation. This page renders an imaging ping, a sidescan pass and a profiling pass and draws them. The model itself is described in the [sonar simulation design](sonar.md#theory-of-operation).
 
-## Why it is here
 
-In Gazebo, a sonar image is the product of two things: the scene geometry that gz-rendering's cameras sample, and the acoustic model that turns that geometry into echoes. When an image looks wrong, the first question is which of the two is at fault. Here the geometry is exact: the synthetic scene intersects each ray with its spheres, planes and boxes analytically, so the range, incidence angle and surface of every hit are known, and whatever the image shows is the acoustic model's doing. That makes this the place to reproduce a suspicious image, to try a change to the model before it meets a renderer, and to compare against other sonar simulators on the same scenes.
+## What this tests
 
-## What it tests
-
-Each stage of the model, against what physics and geometry predict:
 
 - Geometry: a target appears at the range and bearing it is placed at, and the seabed's first return at the altitude the sonar is at.
 - The sonar equation: echoes fall with range as spreading and absorption predict, scale with a surface's backscatter (Lambert's law and the specular glint) and with the area the beam covers, and vanish behind an object (shadows).
@@ -18,7 +22,7 @@ Each stage of the model, against what physics and geometry predict:
 - Speckle and noise: their statistics, and a fixed seed giving the same ping every time, on any number of threads.
 - The readouts: the imaging sonar's 8-bit frame, the sidescan's line in dB with time-varied gain a consumer can take out again, and the profiling sonar's soundings.
 
-The gtests check these numerically; the pictures below let a person see them.
+The gtests check these numerically; the pictures allow for a visual check by a human.  Humans are notoriously better at looking at sonar images!
 
 Run everything inside drydock, from `~/maritime_ws`.
 
@@ -64,17 +68,25 @@ Each case below shows the scene as a line drawing, with the geometry that predic
 Scene A, side view. The sphere sits on the beam's axis, and the seabed, 7 m down, stays below the beam within the 10 m window, so the sphere is the only target.
 ```
 
-```{figure} images/gz_sonar_A_shaded.png
-:alt: Imaging sonar fan of scene A with a shaded array: a bright spot at 4.75 m on the axis and a faint arc close to it at the same range
+```{figure} images/gz_sonar_A.png
+:alt: Imaging sonar fan of scene A: a bright spot at 4.75 m on the axis and a faint arc close to it at the same range
 
-Scene A, rendered with a shaded array (`sidelobe=-25`). The sphere's near face, at 4.75 m on the axis, with a faint arc at the same range on either side of it.
+Scene A. The sphere's near face, at 4.75 m on the axis, with a faint arc at the same range on either side of it.
 ```
 
-The arc is expected. A sonar forms each beam from an array of transducers, and every beam also hears a little from directions outside its main lobe, through its sidelobes. A strong, isolated target is therefore heard by every beam at its own range, and shows as an arc across the fan, brightest next to the target and fading away from it; real imaging sonars show the same arcs around strong targets in open water. How far the arc reaches depends on the array: an unshaded line array, the default here (`sidelobe=-13`), has sidelobes that fall off slowly and carry the arc across the whole fan, while a shaded array lowers them and keeps it close to the target. To see the unshaded case:
+The arc is expected. A sonar forms each beam from an array of transducers, and every beam also hears a little from directions outside its main lobe, through its sidelobes. A strong, isolated target is therefore heard by every beam at its own range, and shows as an arc across the fan, brightest next to the target and fading away from it; real imaging sonars show the same arcs around strong targets in open water. How far the arc reaches depends on the array. Imaging sonars usually shade their arrays, weighting the elements to lower the sidelobes, and the default here is a shaded array (`sidelobe=-25`), which keeps the arc close to the target. An unshaded array (`sidelobe=-13`) has sidelobes that fall off slowly and carry the arc across the whole fan:
+
+```{figure} images/gz_sonar_A_unshaded.png
+:alt: Imaging sonar fan of scene A with an unshaded array: the bright spot at 4.75 m and a bright arc at the same range across the whole fan
+
+Scene A with an unshaded array (`sidelobe=-13`): the same sphere, its arc now across the whole fan.
+```
+
+To render both:
 
 ```bash
 ros2 run gz_sonar gz_sonar_render_ping imaging A /tmp/sonar
-ros2 run gz_sonar gz_sonar_render_ping imaging A /tmp/sonar sidelobe=-25 name=shaded
+ros2 run gz_sonar gz_sonar_render_ping imaging A /tmp/sonar sidelobe=-13 name=unshaded
 ros2 run gz_sonar draw_ping.py /tmp/sonar
 ```
 
