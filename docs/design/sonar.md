@@ -78,7 +78,6 @@ For each beam and range sample the echo power from every surface patch the beam 
 This section describes, at a high level, the model component by component, with references for the details; places it among the alternative approaches; justifies why it suits the driving use cases; and then describes how the one model is adapted to the different sonar types: the multibeam sonars (imaging and profiling) and the sidescan.
 
 ### The model and its components
-
 All three sonars use this one engine, also called an incoherent intensity model: incoherent because it adds echo powers and never phases. It treats every surface the sonar sees as a patch made of many small, independent scatterers. For each ping it adds up the echo power that every patch inside each beam sends back, placed at the time the echo takes to return, with the sonar equation: the source, the loss to spreading and absorption on the way out and back, the surface's backscatter, and the beam pattern. The random interference between scatterers is not computed wave by wave; it is applied statistically, as speckle. The result is the echo intensity in every beam and range sample, which a readout then turns into what the real device delivers. Coiras and Groen, ["Simulation and 3D reconstruction of side-looking sonar images"](https://doi.org/10.5772/39406) (in *Advances in Sonar Technology*, 2009, open access), derive this model in "Sonar simulation": from the wave equation and point scattering down to the Lambertian, incoherent form used here. Sena and Santos Neto, ["SideScanSim: an open-source side-scan sonar simulator"](https://sol.sbc.org.br/index.php/erbase/article/download/46318/46077/) (2026, with an [open implementation](https://github.com/andreluissena/SideScanSim)), write out the same ingredients in a few lines each: the sonar equation with spreading and Francois–Garrison absorption, Lambert's law for the seabed, time-varied gain, and speckle as an exponentially distributed intensity. Short introduction to the ["SONAR equation"](https://dosits.org/science/advanced-topics/sonar-equation/).
 
 The engine follows the terms of the active sonar equation, received level = source level − 2 TL + BS + 10 log A, weighted by the beam pattern, in six components:
@@ -261,8 +260,7 @@ Parameters shared by the three types. The defaults come from each type's exempla
 | `vertical_fov` | Thickness of the fan about the sensor's y axis, rad | 0.349 (20°) | 0.070 (4°) | 0.873 (50°) | 1° to 50° |
 | `beams` | Beams across the fan | 256 | 20 (most soundings per ping) | 1 | 1 to about 1000 |
 | `beam_width` | Two-way −3 dB width of one beam across the fan, rad | 0.026 (1.5°) | 0.017 (1°, chosen) | the horizontal FOV | 0.25° to 3° |
-| `elevation_span` | How far the rays reach out of the fan, in half-widths of the vertical beam; wider shows more of the faint seabed below the beam, at more cost | 3 (chosen) | 2 (chosen) | 2 (chosen) | 2 to 3 |
-| `sidelobe_level` | First sidelobe relative to the main lobe, dB | −13 (chosen) | −13 (chosen) | −13 (chosen) | −13 (unshaded array) to −40 (heavily shaded) |
+| `sidelobe_level` | First sidelobe relative to the main lobe, dB | −25 (chosen, typical of a shaded array) | −13 (chosen) | −13 (chosen) | −13 (unshaded array) to −40 (heavily shaded) |
 | `range/min`, `range/max` (or `range_min`, `range_max`) | Range window, m | 0.2, 30 | 2.5, 50 | 1 (chosen), 50 | min 0.1 to 5; max 5 to 300 |
 | `samples` | Range samples per beam per ping | 1024 (chosen) | 400 | 600 | 200 to 4000 |
 | `pulse_length` | Transmit pulse, s; sets range resolution cτ/2 | 1e-5 (8 mm) | chosen to give one range step | 1e-4 (chosen) | 10 to 200 µs |
@@ -284,6 +282,14 @@ Readout parameters that only one type uses:
 | Profiling | `range_noise` | Standard deviation of range at high signal-to-noise ratio, m; grows as the ratio falls | half a range step (chosen; the Surveyor's precision is not published) | 0.005 to 0.1 |
 | Profiling | `angle_noise` | Standard deviation of a sounding's angle, rad | 0.009 (0.5°, chosen) | 0.1° to 2° |
 | Profiling | `water_column` | Also publish the thin-fan intensity before detection | false | true or false |
+
+Advanced: geometry sampling. These set how finely the engine samples the scene, not anything about the sonar, and the defaults are chosen for accuracy. Lowering them is the way to buy speed, at the cost of fidelity; see [Performance](#performance).
+
+| Parameter | Meaning | Imaging (ECHO) | Profiling (Surveyor 240-16) | Sidescan (Omniscan 450 SS) | Trade-off |
+|---|---|---|---|---|---|
+| `rays_per_beam` | Rays across one beam width | 4 | 4 | 8 | The largest lever: the cameras' width and the work per ping scale with it. Below 4, small targets and edges fall between rays and shadows lose detail; 2 is the practical minimum |
+| `elevation_rays` | Rays across the vertical field of view, counted at a span of 2 | 64 | 16 | 400 | Fewer rays leave gaps in range on surfaces seen at grazing angles, which the footprints from neighboring rays only partly fill |
+| `elevation_span` | How far the rays reach out of the fan, in half-widths of the vertical beam; the ray count scales with it | 3 | 2 | 2 | Wider shows more of the faint seabed below the beam; 3 costs about 50 % more rays than 2 |
 
 The imaging sonar's readout is fixed: 8-bit beam by sample, as the ECHO delivers it.
 
@@ -352,7 +358,7 @@ In every run the sonar kept its configured rate in sim time, with no ping missin
 - The world slows by roughly the ping rate times the render time: at 10 Hz, 10 × 15 ms is 15 % of each second on the rendering thread, and the real time factor drops from 0.96 to 0.81.
 - The worker takes about 47 ms a ping, so it keeps up to about 20 Hz; beyond that the queue fills and the rendering thread waits for it too.
 
-In this small scene llvmpipe is close to the GPU, because the render is dominated by fixed per-camera costs, not triangles. On llvmpipe the render cost grows with the triangles in view: in Phase 1's 2.1-million-triangle scene the sampler managed 4 to 8 Hz without a GPU. 10 Hz is a realistic imaging rate for a sonar at 15 m and is the default; pick a lower rate for large scenes without a GPU.
+To buy speed, lower the sampling, `rays_per_beam` first (see the advanced parameters under [SDF](#sdf)), at a cost in fidelity that should be checked on the scene at hand. In this small scene llvmpipe is close to the GPU, because the render is dominated by fixed per-camera costs, not triangles. On llvmpipe the render cost grows with the triangles in view: in Phase 1's 2.1-million-triangle scene the sampler managed 4 to 8 Hz without a GPU. 10 Hz is a realistic imaging rate for a sonar at 15 m and is the default; pick a lower rate for large scenes without a GPU.
 
 To force llvmpipe in drydock, `gz sim` needs `__GLX_VENDOR_LIBRARY_NAME=mesa LIBGL_ALWAYS_SOFTWARE=1` (it renders through GLX on the forwarded display); the EGL settings alone leave it on the GPU. Ogre's log, `~/.gz/rendering/ogre2.log`, names the renderer it used.
 

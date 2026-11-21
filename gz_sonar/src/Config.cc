@@ -75,6 +75,10 @@ SonarConfig EchoImaging()
   // shows faintly from inside the -3 dB edge, as it does on a real sonar.
   c.elevationSpan = 3.0;
   c.beams = 256;
+  // Sidelobes of a shaded array: Sonoptix does not publish the ECHO's
+  // shading, and commercial imaging sonars shade their beams, so a strong
+  // target's sidelobe arc stays near it and small shadows stay dark.
+  c.sidelobeLevelDb = -25.0;
   c.beamWidth = 1.5 * kDeg;
   c.rangeMin = 0.2;
   c.rangeMax = 30.0;
