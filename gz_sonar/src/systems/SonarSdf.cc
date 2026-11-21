@@ -90,6 +90,15 @@ std::optional<sonar::SonarConfig> LoadSonarConfig(const std::string &_type,
   {
     return std::nullopt;
   }
+  if (auto v = Child<double>(_block, "elevation_span"))
+  {
+    if (*v <= 0.0)
+    {
+      _error = "<elevation_span> must be positive";
+      return std::nullopt;
+    }
+    c.elevationSpan = *v;
+  }
   if (auto v = Child<double>(_block, "beam_width"))
     c.beamWidth = *v;
   if (auto v = Child<double>(_block, "sidelobe_level"))

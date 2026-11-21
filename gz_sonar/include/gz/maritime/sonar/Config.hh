@@ -142,6 +142,12 @@ struct SonarConfig
   std::size_t raysPerBeam{4};
   std::size_t elevationRays{64};
 
+  /// \brief How far the rays reach in elevation, in half-widths of the
+  /// vertical beam (2: out to twice the beam's -3 dB edge, where the
+  /// pattern is 12 dB down). elevationRays is the count at 2; it scales
+  /// with the span, so the angular step stays the same.
+  double elevationSpan{2.0};
+
   /// \brief Profiling: how angles are found.
   ProfilingReadout readout{ProfilingReadout::kAngleOfArrival};
 

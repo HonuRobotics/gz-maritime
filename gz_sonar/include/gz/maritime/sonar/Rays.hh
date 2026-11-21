@@ -77,8 +77,8 @@ struct RayHit
 
 /// \brief The fan of rays that samples a sonar's field of view: finer than
 /// the beams in azimuth (raysPerBeam per beam width or beam spacing,
-/// whichever is smaller), elevationRays across twice the vertical field of
-/// view, and two beam widths beyond each edge of the fan, so the beam
+/// whichever is smaller), elevationRays across elevationSpan half-widths
+/// of the vertical beam (by default twice the vertical field of view), and two beam widths beyond each edge of the fan, so the beam
 /// pattern's tapers and near sidelobes see the scene too.
 std::vector<Ray> RayFan(const SonarConfig &_config);
 

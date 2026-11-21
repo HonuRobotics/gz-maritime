@@ -71,6 +71,9 @@ SonarConfig EchoImaging()
   c.frequency = 700000.0;
   c.horizontalFov = 120.0 * kDeg;
   c.verticalFov = 20.0 * kDeg;
+  // Rays out to three half-widths (30 degrees, 27 dB down): the seabed
+  // shows faintly from inside the -3 dB edge, as it does on a real sonar.
+  c.elevationSpan = 3.0;
   c.beams = 256;
   c.beamWidth = 1.5 * kDeg;
   c.rangeMin = 0.2;

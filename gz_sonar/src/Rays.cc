@@ -38,8 +38,8 @@ std::vector<Ray> RayFan(const SonarConfig &_config)
   const auto azCount = static_cast<std::size_t>(
     std::ceil(2.0 * azHalf / azStep));
 
-  const double elHalf = _config.verticalFov;
-  const std::size_t elCount = std::max<std::size_t>(_config.elevationRays, 1);
+  const double elHalf = 0.5 * _config.verticalFov * _config.elevationSpan;
+  const std::size_t elCount = RayFanElevationCount(_config);
   const double elStep = 2.0 * elHalf / static_cast<double>(elCount);
 
   std::vector<Ray> rays;
@@ -62,7 +62,9 @@ std::vector<Ray> RayFan(const SonarConfig &_config)
 
 std::size_t RayFanElevationCount(const SonarConfig &_config)
 {
-  return std::max<std::size_t>(_config.elevationRays, 1);
+  const double n = static_cast<double>(_config.elevationRays) *
+    _config.elevationSpan / 2.0;
+  return std::max<std::size_t>(static_cast<std::size_t>(std::lround(n)), 1);
 }
 
 void AssignFootprints(std::vector<RayHit> &_hits, std::size_t _elevationCount)
