@@ -125,13 +125,22 @@ install(
   RUNTIME DESTINATION bin)
 install(TARGETS gz_sonar_render_ping DESTINATION lib/${PROJECT_NAME})
 install(PROGRAMS examples/draw_ping.py examples/capture_sonar.py
+  examples/survey_lawnmower.py examples/record_survey.py
+  examples/sidescan_mosaic.py examples/soundings_cloud.py examples/compare_wreck.py
   DESTINATION lib/${PROJECT_NAME})
+# The mapping examples' shared pose helper, beside them so they import it.
+install(FILES examples/survey_pose.py DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
   set(ament_cmake_uncrustify_FOUND TRUE)
+  # The shipwreck's build script runs in Blender's own Python and keeps the
+  # style it was written in; it regenerates the model, which is checked
+  # against the glTF profile by its build.sh, not by these linters.
+  list(APPEND AMENT_LINT_AUTO_FILE_EXCLUDE
+    ${CMAKE_CURRENT_SOURCE_DIR}/models/shipwreck/build_shipwreck.py)
   ament_lint_auto_find_test_dependencies()
 
   # The analytic cases of the testing plan, on synthetic scenes.
@@ -145,6 +154,13 @@ if(BUILD_TESTING)
   ament_add_gtest(sampler_test test/sampler_test.cc)
   if(TARGET sampler_test)
     target_link_libraries(sampler_test ${PROJECT_NAME})
+  endif()
+
+  # The <gz:sonar> parser and its validation.
+  ament_add_gtest(sdf_test test/sdf_test.cc src/systems/SonarSdf.cc)
+  if(TARGET sdf_test)
+    target_include_directories(sdf_test PRIVATE src/systems)
+    target_link_libraries(sdf_test ${PROJECT_NAME} gz-sim::gz-sim gz-common::gz-common)
   endif()
 endif()
 

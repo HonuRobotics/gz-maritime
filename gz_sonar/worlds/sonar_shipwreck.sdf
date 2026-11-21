@@ -1,0 +1,146 @@
+<?xml version="1.0"?>
+<!--
+  A shipwreck to map: the wreck (model://shipwreck, modeled on the
+  Monohansett, 48.8 m by 9.1 m) on a flat sandy seabed 8 m down, its
+  center about the origin and its bow turned 0.6 rad from +x, for surveys
+  with the BlueBoat's sidescan and profiler (gz_sonar) or the BlueROV2's
+  profiler.
+
+  Graded buoyancy, the ocean current and the sensor render path follow the
+  vehicles' own water worlds (bluerobotics_models), so either vehicle
+  floats and drives as it does there; buoyancy acts on the BlueBoat's
+  hull_displacement link and the BlueROV2's buoyancy_displacement link, so
+  the spawned model must be named "blueboat" or "bluerov2". Launch it from
+  that vehicle's sim.launch.xml with world:=<this file>:
+
+    ros2 launch blueboat_gazebo sim.launch.xml \
+      world:=$(ros2 pkg prefix --share gz_sonar)/worlds/sonar_shipwreck.sdf \
+      config_file:=$(ros2 pkg prefix --share blueboat_description)/config/blueboat_sonar.yaml \
+      x:=-40 y:=-30
+-->
+<sdf version="1.12" xmlns:gz="http://gazebosim.org/schema">
+  <world name="sonar_shipwreck">
+
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+
+    <!-- Renders the vehicle's sensors, the sonars' cameras among them;
+         needs a GPU (or a software renderer) and ogre2. -->
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <!-- Graded buoyancy: seawater (1025) below z=0, air above, acting on the
+         boat's dedicated hull_displacement link only (the box pontoons the
+         composed model declares); the parts' own collisions are contact
+         geometry and never displace. -->
+    <plugin filename="gz-sim-buoyancy-system"
+            name="gz::sim::systems::Buoyancy">
+      <graded_buoyancy>
+        <default_density>1025</default_density>
+        <density_change>
+          <above_depth>0</above_depth>
+          <density>1</density>
+        </density_change>
+      </graded_buoyancy>
+      <enable>blueboat::hull_displacement</enable>
+      <enable>bluerov2::buoyancy_displacement</enable>
+    </plugin>
+
+    <!-- gz-maritime's ocean current (gz_ocean_current): slack water here,
+         <speed> in m/s and the <direction> it sets towards, in degrees
+         clockwise from north, changed while running on the topic
+         /world/<world>/ocean_current/set. The vehicle's Hydrodynamics damps
+         against it, so the vehicle drifts with it. A world without it is
+         slack water, and the vehicle behaves as it always did. -->
+    <plugin filename="gz-maritime-ocean-current-system"
+            name="gz::sim::maritime::OceanCurrent">
+      <speed>0</speed>
+      <direction>0</direction>
+    </plugin>
+    <!-- Sonars (gz-maritime gz_sonar): drives every sonar a vehicle carries,
+         with the water's properties (open seawater). Idle, at no cost, until a
+         sonar is fitted. -->
+    <plugin filename="gz-maritime-sonar-system"
+            name="gz::sim::maritime::Sonar">
+      <temperature>10</temperature>
+      <salinity>35</salinity>
+      <sound_speed>1500</sound_speed>
+      <seabed>
+        <model>seabed</model>
+        <lambert>-27</lambert>
+      </seabed>
+    </plugin>
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <!-- The seabed: flat sand 8 m down (its values are named in the sonar
+         system above), and a floor for anything that sinks. -->
+    <model name="seabed">
+      <static>true</static>
+      <pose>0 0 -8 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane><normal>0 0 1</normal><size>300 300</size></plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane><normal>0 0 1</normal><size>300 300</size></plane>
+          </geometry>
+          <material>
+            <ambient>0.55 0.50 0.38 1</ambient>
+            <diffuse>0.62 0.56 0.42 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- The wreck: its datum (on the seabed, under the keel at the boiler's
+         forward face) at (0, 0) on the seabed, bow turned 0.6 rad from +x.
+         Its meshes are the ground truth; named features are in its
+         ground_truth/features.yaml, in the model frame. -->
+    <include>
+      <uri>model://shipwreck</uri>
+      <pose>0 0 -8 0 0 0.6</pose>
+    </include>
+
+    <!-- Visual only water surface at the z=0 graded buoyancy waterline. -->
+    <model name="water_surface">
+      <static>true</static>
+      <!-- Drawn for the cameras only: sonars do not see it (gz_sonar). -->
+      <gz:acoustic_transparent/>
+      <link name="link">
+        <visual name="visual">
+          <transparency>0.4</transparency>
+          <geometry>
+            <plane><normal>0 0 1</normal><size>200 200</size></plane>
+          </geometry>
+          <material>
+            <ambient>0.10 0.30 0.50 1</ambient>
+            <diffuse>0.10 0.35 0.55 1</diffuse>
+            <specular>0.20 0.30 0.40 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>

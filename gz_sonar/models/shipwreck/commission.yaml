@@ -1,0 +1,78 @@
+# Commission for the shipwreck model, modeled on the Monohansett.
+# Spec: tools/maritime-workspace/notes/sonar_design/shipwreck.md
+
+commission: shipwreck
+
+creator: Honu Robotics
+rights: "Copyright 2026 Honu Robotics. Licensed under the Apache License, Version 2.0."
+source: "authored in Blender by build_shipwreck.py, modeled on the Monohansett (1872 wooden steam barge, Thunder Bay NMS)"
+dimensionSource: "https://thunderbay.noaa.gov/shipwrecks/monohansett.html"
+
+toolchain:
+  blender: "5.3.0 (profile pins 5.2.2 LTS)"
+
+parts:
+
+  hull:
+    partRole: base
+    datumPoint: "on the seabed plane, on the keel centerline, at the boiler's forward face"
+    nominalDimension: "length overall 48.8 m"
+    dimensionTolerance: 0.05
+    forwardFeature: "the bow; in Blender the bow faces -Y, so the file faces +Z"
+    materials: "hull: non-metal, waterlogged gray-brown wood"
+
+  # Every component shares the wreck's datum as its origin, so the parts assemble
+  # with no per-part pose. Nominal dimensions are the authored figures.
+  mast:
+    partRole: component
+    datumPoint: "the wreck datum: on the seabed plane, on the keel centerline, at the boiler's forward face"
+    nominalDimension: "diameter 0.35 m"
+    dimensionTolerance: 0.03
+    materials: "non-metal, waterlogged wood"
+
+  boiler:
+    partRole: component
+    datumPoint: "the wreck datum: on the seabed plane, on the keel centerline, at the boiler's forward face"
+    nominalDimension: "length 4.0 m"
+    dimensionTolerance: 0.05
+    materials: "non-metal (fouled), rust-brown iron"
+
+  engine:
+    partRole: component
+    datumPoint: "the wreck datum: on the seabed plane, on the keel centerline, at the boiler's forward face"
+    nominalDimension: "height 2.9 m"
+    dimensionTolerance: 0.05
+    materials: "non-metal (fouled), rust-brown iron"
+
+  debris:
+    partRole: component
+    datumPoint: "the wreck datum: on the seabed plane, on the keel centerline, at the boiler's forward face"
+    materials: "non-metal (fouled), rust-brown iron"
+
+  propeller:
+    partRole: component
+    datumPoint: "the wreck datum: on the seabed plane, on the keel centerline, at the boiler's forward face"
+    nominalDimension: "diameter 2.4 m"
+    dimensionTolerance: 0.05
+    materials: "non-metal (fouled), green-brown bronze"
+
+  bell:
+    partRole: component
+    datumPoint: "the wreck datum: on the seabed plane, on the keel centerline, at the boiler's forward face"
+    nominalDimension: "diameter 0.5 m"
+    dimensionTolerance: 0.02
+    materials: "non-metal (fouled), green-brown bronze"
+
+  name_plate:
+    partRole: component
+    datumPoint: "the wreck datum: on the seabed plane, on the keel centerline, at the boiler's forward face"
+    nominalDimension: "length 2.0 m"
+    dimensionTolerance: 0.02
+    materials: "non-metal, weathered painted board"
+
+  coal:
+    partRole: component
+    datumPoint: "the wreck datum: on the seabed plane, on the keel centerline, at the boiler's forward face"
+    nominalDimension: "length 12.0 m"
+    dimensionTolerance: 0.05
+    materials: "non-metal, coal under sediment"
