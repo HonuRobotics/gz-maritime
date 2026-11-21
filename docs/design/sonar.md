@@ -28,7 +28,7 @@ Three types of sonar: the same engine, with different geometry.
 | Profiling sonar (downward multibeam) | UUV looking down, or USV | 4 | Cerulean Surveyor 240-16 (defaults): 240 kHz, angle of arrival, 4° along track by 80° across, 10 to 20 soundings per ping, up to 100 m, up to 20 Hz. Also, for example, a beamformed profiler such as the Teledyne Odom MB2: 200 to 460 kHz, 1.8° by 1.8° beams | Soundings: a range and an angle per detection, sometimes with water-column intensity |
 | Sidescan | USV, one bar under the hull with a transducer on each side | 4 | Cerulean Omniscan 450 SS: 450 kHz, 0.5° along track by 50° vertical, up to 150 m, up to 20 Hz | One line per ping: 200 to 1200 uint16 samples in dB, with range start, length, gain and sound speed |
 
-A UUV carries a sonar looking forward, one looking down, or both; the BlueROV2's chassis has no sonar slots yet, so sonars go on by free placement. A USV carries the sidescan, the profiling sonar, or both.
+A UUV carries a sonar looking forward, one looking down, or both; the BlueROV2's chassis has one sonar slot, for the Ping360, so these sonars go on by free placement. A USV carries the sidescan, the profiling sonar, or both.
 
 Out of scope: single-beam echosounders and altimeters, interferometric sidescan, synthetic aperture sonar, sub-bottom profilers, mechanically scanned sonars (imaging or profiling), 3D sonars with a two-dimensional receive array, acoustic positioning (USBL, LBL) and acoustic communication, which is a separate design.
 
@@ -108,7 +108,7 @@ For each ping, a fan of rays covers the sonar's field of view at finer resolutio
 
 #### Transmission loss
 
-Two-way spherical spreading, 1/R⁴ in intensity (40 log R in dB), and absorption over the two-way path. Absorption comes from the Francois–Garrison equations at the configured frequency, temperature, salinity and depth, not from a fixed constant. The shallow, near-isovelocity water lets the engine ignore refraction and propagation modeling: paths are straight, and sound speed is a single configured value. Multipath, the bounces off the surface and the seabed that matter for a sidescan in shallow water, is not modeled yet; the water surface is hidden from the sonar.
+Two-way spherical spreading, 1/R⁴ in intensity (40 log R in dB), and absorption over the two-way path. Absorption comes from the Francois–Garrison equations at the configured frequency, temperature and salinity, at the surface, not from a fixed constant. The shallow, near-isovelocity water lets the engine ignore refraction and propagation modeling: paths are straight, and sound speed is a single configured value. Multipath, the bounces off the surface and the seabed that matter for a sidescan in shallow water, is not modeled yet; the water surface is hidden from the sonar.
 
 #### Backscatter
 
@@ -222,7 +222,7 @@ A real profiling sonar works in three stages: it ensonifies a thin fan, forms th
 
 Devices differ in how they get the angle, and the readout covers both. A beamformed profiler reports one sounding per beam at fixed beam angles. An angle-of-arrival profiler, such as the Cerulean Surveyor 240-16, transmits one thin fan (4° by 80°), estimates the direction of the strongest echoes from a small receive array (16 elements), and reports a variable number of soundings per ping (10 to 20), each with its own angle; the device reports no intensity, and the simulation fills in the detected level. For the second kind, the readout keeps the strongest detection in each of N sectors across the fan, with angle noise. Neither kind needs phase in the simulation, because only the soundings leave the device.
 
-The bathymetric work that a large-ocean multibeam needs (sound-speed ray tracing, multi-sector timing) is unnecessary at 30 m or less. We use the Surveyor 240-16 for defaults: angle-of-arrival readout, 240 kHz, a 4° by 80° fan, up to 20 soundings per ping, 200 to 800 range steps, up to 100 m. The same sensor mounts under the BlueBoat or on the base of the BlueROV2, looking down.
+The bathymetric work that a large-ocean multibeam needs (sound-speed ray tracing, multi-sector timing) is unnecessary at 30 m or less. We use the Surveyor 240-16 for defaults: angle-of-arrival readout, 240 kHz, a 4° by 80° fan, up to 20 soundings per ping, 200 to 800 range steps; the simulation's default window reaches 50 m, the device up to 100 m. The same sensor mounts under the BlueBoat or on the base of the BlueROV2, looking down.
 
 ### Sidescan
 
@@ -235,10 +235,10 @@ Configured as one beam per side, narrow along track and wide in elevation, point
 Each sonar is a gz-sensors custom sensor, the pattern `gz_wind`'s anemometer already uses: `<sensor type="custom" gz:type="imaging_sonar">`, `gz:type="sidescan_sonar"` or `gz:type="profiling_sonar"`, with the standard `<update_rate>`, `<topic>` and `<pose>`, and a `<gz:sonar>` block. Every element in the block is optional, and an empty block gives the exemplar for that type:
 
 ```xml
-<sensor name="forward_sonar" type="custom" gz:type="imaging_sonar">
+<sensor name="sonar_forward" type="custom" gz:type="imaging_sonar">
   <pose>0.2 0 -0.1 0 0.26 0</pose>
   <update_rate>10</update_rate>
-  <topic>sonar/forward</topic>
+  <topic>bluerov2/sonar_forward/image</topic>
   <gz:sonar>
     <frequency>700000</frequency>
     <horizontal_fov>2.094</horizontal_fov>
@@ -308,7 +308,7 @@ A world system, `gz::sim::maritime::Sonar` in `gz-maritime-sonar-system` (the co
 | Imaging | `marine_acoustic_msgs/ProjectedSonarImage` | Beam directions, the range of each sample, frequency, sound speed and beam widths, and the uint8 beam × sample data, in one message |
 | Profiling | `marine_acoustic_msgs/SonarDetections` | Per sounding: two-way travel time, across-track angle (`rx_angles`), along-track angle (`tx_angles`), intensity and a flag (OK, or rejected by the sonar or by a filter). The arrays can change length from ping to ping, so a variable number of soundings fits. This mirrors the Surveyor's own angle and time-of-flight packet, and leaves the conversion from travel time to range to the team, as on the real sensor |
 | Profiling water column (optional) | On `<topic>/water_column`, gz-transport only for now | The thin-fan intensity before bottom detection, as levels in dB, when the sensor sets `<water_column>true</water_column>` |
-| Sidescan | `marine_acoustic_msgs/ProjectedSonarImage`, one beam per message | Each side is its own sensor, as each side of the Omniscan's bar is a transducer of its own, and each ping is one beam: its direction, the range of each sample, and the samples as float32 in dB, with time-varied gain for spreading and absorption applied by default. The gain law is documented, so a consumer can remove it exactly using the range of each sample. `marine_acoustic_msgs` has no sidescan message; using the imaging sonar's message means one consumer path, one conversion and one visualization for both. Nothing in the message marks the values as dB, so that is a documented convention |
+| Sidescan | `marine_acoustic_msgs/ProjectedSonarImage`, one beam per message | Each side is its own sensor, as each side of the Omniscan's bar is a transducer of its own, and each ping is one beam: its direction, the range of each sample, and the samples as float32 in dB, with time-varied gain for spreading and absorption applied by default, which the gz-transport message carries so it can be removed (see Sidescan sonar above). `marine_acoustic_msgs` has no sidescan message; using the imaging sonar's message means one consumer path, one conversion and one visualization for both. Nothing in the message marks the values as dB, so that is a documented convention |
 | Ground truth (optional) | Per-sample label ids and the name of each, on `<topic>/labels` (gz-transport only for now). One id per model and set of acoustic properties, up to 254 at once; a removed model's ids are reused, lowest first, so read the names with each ping | Never on the sensor topic; an imaging sonar cannot resolve elevation, so 3D points from it would be information the real sensor never gives |
 
 No sensor publishes a point cloud. RViz has no display for the `marine_acoustic_msgs` types, so `kai_sonar_bridge` also publishes, optionally and for viewing only: the imaging sonar's data drawn as a fan and each sidescan's lines stacked into a scrolling waterfall, both as `sensor_msgs/Image` on `<topic>/view`; and the profiler's soundings as a `sensor_msgs/PointCloud2` on `<topic>/points`, in the sensor's frame, which TF places with the vehicle's pose. These are display aids built from the sensor messages, not sensor outputs. The bridge publishes everything with the sensor-data QoS (best effort), so a subscriber that asks for reliable delivery receives nothing. Topics follow the vehicle's part rule, `/<vehicle>/<part name>/image` (for example `/bluerov2/sonar_forward/image`), which keeps one name per instance; the sidescan's two sides add a level, `/<vehicle>/<part>/port/image` and `/stbd/image`, and the profiler publishes `/<vehicle>/<part>/detections`. Images are stamped in a frame of the part's: `marine_acoustic_msgs` puts Z along the acoustic axis and X up, to match profilers that report in north-east-down, while the SDF sensor and ROS put x along it, so each image is stamped in an `_acoustic` frame rotated from the sensor's by that fixed rotation. Soundings carry angles and times rather than an image, and are stamped in the sensor's own frame; their across-track angles count positive to starboard, as `SonarDetections` defines them for a down-looking sonar.
@@ -382,7 +382,7 @@ Read the sonar code of POSIM and HoloOcean, and run POSIM in drydock as a refere
 
 Walkthrough, for contributors:
 
-- "Render a ping without Gazebo": run the engine on synthetic scenes (a sphere, a box on a flat seabed, a slope) and draw an imaging ping, a sidescan line and a set of soundings as pictures. It shows what each stage of the model does, and is the place to look when an image seems wrong later.
+- "Render a ping without Gazebo": run the engine on synthetic scenes (a sphere, a box on a flat seabed, a slope) and draw imaging pings and a sidescan and profiling pass as pictures. It shows what each stage of the model does, and is the place to look when an image seems wrong later.
 
 Checkpoint:
 
@@ -409,7 +409,7 @@ First, the engine changes from the Phase 1 checkpoint: smoothed sidescan gain, f
 
 Walkthroughs:
 
-- Imaging (forward looking) sonar from the ROV.
+- Imaging (forward-looking) sonar from the ROV.
 - Add a sonar to your vehicle.
 - Sonar features: acoustic properties and truth labels.
 
@@ -465,7 +465,7 @@ Checkpoint:
 
 Realign on: anything the integration phase has to settle before review.
 
-Outcome (2026-11-20). Checks 1 and 2 pass; check 3 is left to a dedicated machine, as planned. An eight-line survey (7,514 pings of each sonar) shows the wreck in the mosaic at its true position and heading, with the stern section's shadows. With true poses, 95 % of the soundings over the wreck lie within 0.095 m of the true surface (median 0.027 m); with 0.5 m and 2° of positioning noise the 95th percentile rises to 0.154 m, and with 1 m and 4° to 0.243 m, while the mosaic blurs. A few soundings (0.2 %) on the mast lie up to 2.5 m off: a thin pole and the seabed behind it at the same range, which an angle-of-arrival readout cannot separate. Decided at the checkpoint: the wreck model lives in `gz_sonar` with the other sonar targets; the mosaic takes the altitude from a smoothed, median-filtered bottom track, since a first return from one line alone often lands on a speckle peak in the water column.
+Outcome (2026-11-20). Checks 1 and 2 pass; check 3 is left to a dedicated machine, as planned. An eight-line survey (7,514 pings of each sonar) shows the wreck in the mosaic at its true position and heading, with the stern section's shadows. With true poses, 95 % of the soundings over the wreck lie within 0.095 m of the true surface (median 0.027 m); with 0.5 m and 2° of positioning noise the 95th percentile rises to 0.154 m, and with 1 m and 4° to 0.243 m, while the mosaic blurs. A few soundings (0.2 %) on the mast lie up to 2.5 m off: a thin pole and the seabed behind it at the same range, which an angle-of-arrival readout cannot separate. Decided at the checkpoint: the wreck model lives in `gz_sonar` with the other sonar targets; the mosaic takes the altitude from a smoothed, median-filtered bottom track, since a first return from one line alone often picks a speckle peak in the water column.
 
 #### Phase 5. Integrate and submit
 
@@ -510,8 +510,8 @@ The walkthroughs each phase delivers go in `docs/how-to/`, in the style of the e
 
 | Walkthrough | Phase | Use cases | What the reader does | Done when |
 |---|---|---|---|---|
-| [Render a ping without Gazebo](render-a-ping.md) (contributors) | 1 | all | Runs the engine on synthetic scenes and draws an imaging ping, a sidescan line and a set of soundings | Each picture shows what the scene predicts: the sphere at its range, the box's shadow, the slope in the soundings |
-| [Imaging (forward looking) sonar from the ROV](../how-to/sonar-imaging.md) | 2 | 1, 2, 3 | Launches a BlueROV2 with the imaging sonar looking forward, facing a glass float, a steel cylinder, a concrete block and a tire on a sandy seabed, and turns it while watching the image | The four targets and their shadows show in the fan at the ranges and bearings the world places them, and slide across and out of the fan as the ROV turns |
+| [Render a ping without Gazebo](render-a-ping.md) (contributors) | 1 | all | Runs the engine on synthetic scenes and draws imaging pings and a sidescan and profiling pass | Each picture shows what the scene predicts: the sphere at its range, the box's shadow, the slope's brighter side, the targets and their shadows in the pass |
+| [Imaging (forward-looking) sonar from the ROV](../how-to/sonar-imaging.md) | 2 | 1, 2, 3 | Launches a BlueROV2 with the imaging sonar looking forward, facing a glass float, a steel cylinder, a concrete block and a tire on a sandy seabed, and turns it while watching the image | The four targets and their shadows show in the fan at the ranges and bearings the world places them, and slide across and out of the fan as the ROV turns |
 | [Add a sonar to your vehicle](../how-to/sonar-add.md) | 2 | all | Adds a sonar sensor to a model, points it with `<pose>`, sets a few parameters, and runs the bridge | The vehicle's sonar topic publishes under its instance name. Extends [Add sensors](../how-to/sensors.md) |
 | [Sonar features: acoustic properties and truth labels](../how-to/sonar-features.md) | 2 | 1, 3 | Marks surfaces with acoustic properties and names the seabed; raises the noise floor; replays a run from its seed; turns on the labels topic and records labeled images | A raised noise floor fills the shadows and lowers the contrast; the same seed gives the same images; each target's samples carry its label, and the flag, marked transparent, has none |
 | [Profiling and sidescan sonar from the USV](../how-to/sonar-survey.md) | 3 | 4 | Launches a BlueBoat carrying the profiling sonar looking down and the sidescan with a beam to each side, over gently undulating terrain with a few hard-return targets, and drives one straight pass over them | The sidescan waterfalls show each target as a bright return with a shadow beyond it, on the side it lies; the profiler's soundings trace the terrain under the track and rise over the targets the boat passes above |

@@ -100,7 +100,7 @@ Bridge it as `sensor_msgs/msg/Image` to `gz.msgs.Image`, from Gazebo to ROS.
 `open_water.sdf` lights its scene with a cyan ambient light
 (`<scene><ambient>0.0 1.0 1.0</ambient>`) for its deep-ocean look. Camera
 sensors render with that light, so objects look green and blue in their
-images. The Gazebo GUI uses its own light and isn't affected. If colours
+images. The Gazebo GUI uses its own light and isn't affected. If colors
 matter to you, use a copy of the world with a neutral ambient light, such as
 `0.4 0.4 0.4` ([Use your own world](own-world.md)).
 ```

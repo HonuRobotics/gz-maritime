@@ -36,10 +36,11 @@ The sonar draws its view on the Sensors system's rendering thread, and the sonar
 ```bash
 ros2 launch kai_sonar_bridge sonar_bridge.launch.xml \
   gz_topics:="[/my_vehicle/sonar_forward/image]" \
-  ros_topics:="[/my_vehicle/sonar_forward/image]"
+  ros_topics:="[/my_vehicle/sonar_forward/image]" \
+  frame_ids:="[my_vehicle/sonar_forward_acoustic]"
 ```
 
-`ros_gz_bridge` cannot convert the sonar's message; this bridge publishes `marine_acoustic_msgs/ProjectedSonarImage`, and a `/view` image beside it.
+`ros_gz_bridge` cannot convert the sonar's message; this bridge publishes `marine_acoustic_msgs/ProjectedSonarImage`, and a `/view` image beside it. Each image is stamped with the frame in `frame_ids`, which TF must carry: `ProjectedSonarImage` puts Z along the beam and X up, so give the vehicle's URDF a fixed frame on the sonar, rotated from the sensor's by roll 180°, pitch −90° (`rpy="3.14159 -1.5708 0"`). Without `frame_ids` the bridge warns and stamps the gz sensor's name, which TF does not know.
 
 ## Sidescan and profiler
 
@@ -49,10 +50,11 @@ A sidescan is one sensor per side, `gz:type="sidescan_sonar"`, each posed to loo
 ros2 launch kai_sonar_bridge sonar_bridge.launch.xml \
   gz_topics:="[/my_boat/sidescan/port/image,/my_boat/sidescan/stbd/image,/my_boat/profiler/detections]" \
   ros_topics:="[/my_boat/sidescan/port/image,/my_boat/sidescan/stbd/image,/my_boat/profiler/detections]" \
-  kinds:="[image,image,detections]"
+  kinds:="[image,image,detections]" \
+  frame_ids:="[my_boat/sidescan_port_acoustic,my_boat/sidescan_stbd_acoustic,my_boat/profiler_beam]"
 ```
 
-The profiler's soundings arrive as `marine_acoustic_msgs/SonarDetections`, and as a point cloud on `/points` beside them for viewing.
+The profiler's soundings arrive as `marine_acoustic_msgs/SonarDetections`, and as a point cloud on `/points` beside them for viewing; they are stamped in the profiler's own frame, not an `_acoustic` one.
 
 ## On the Blue Robotics vehicles
 

@@ -1,4 +1,4 @@
-# Imaging (forward looking) sonar from the ROV
+# Imaging (forward-looking) sonar from the ROV
 
 A BlueROV2 with a forward imaging sonar (a Sonoptix ECHO) hovers 2.5 m above a sandy seabed, with a glass float, a steel cylinder, a concrete block and a tire ahead of it. This page shows what the sonar sees. The model behind it is in the [sonar simulation design](../design/sonar.md).
 

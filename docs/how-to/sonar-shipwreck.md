@@ -68,7 +68,7 @@ ros2 run gz_sonar sidescan_mosaic.py survey.npz mosaic.png
 The mosaic around the wreck, with true poses (left) and with 0.5 m of position noise and 2° of heading noise on every line (right).
 ```
 
-With true poses, the hull's outline, its hatches and the breaks between sections are sharp, and the stern section, which stands about 2 m proud, casts dark shadows away from each line that passed it. The mosaic assumes a flat seabed, as a real one does: anything standing proud is laid down at its slant range, a little toward the track. Over the stern, where a line's first return comes from the wreck rather than the seabed, the altitude changes from line to line and the lines are laid down unevenly. The faint bands across the map are the seams where neighboring lines overlap. With noisy poses, each line lands a little off, and the wreck blurs along the lines: the hull is still there, the hatches are not.
+With true poses, the hull's outline, its hatches and the breaks between sections are sharp, and the stern section, which stands about 2 m proud, casts dark shadows away from each line that passed it. The mosaic assumes a flat seabed, as a real one does: anything standing proud is laid down at its slant range, a little toward the track. Over the stern, where a line's first return comes from the wreck rather than the seabed, the altitude changes from line to line and the lines are laid down unevenly. The faint bands across the map are the seams where neighboring lines overlap. With noisy poses, each line is laid a little off, and the wreck blurs along the lines: the hull is still there, the hatches are not.
 
 ## The soundings as a point cloud
 

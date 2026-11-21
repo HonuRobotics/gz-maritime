@@ -1,6 +1,6 @@
 # Render a ping without Gazebo
 
-For people working on the sonar engine itself. To use a sonar on a vehicle, start with [Imaging (forward looking) sonar from the ROV](../how-to/sonar-imaging.md).
+For people working on the sonar engine itself. To use a sonar on a vehicle, start with [Imaging (forward-looking) sonar from the ROV](../how-to/sonar-imaging.md).
 
 The sonar engine in `gz_sonar` runs on its own, so each stage of the model can be seen and tested without a simulation. This page renders an imaging ping, a sidescan pass and a profiling pass on synthetic scenes and draws them. The model itself is described in the [sonar simulation design](sonar.md#theory-of-operation).
 
@@ -16,7 +16,7 @@ To avoid the confound, here the geometry is exact: the synthetic scene intersect
 
 - Geometry: a target appears at the range and bearing it is placed at, and the seabed's first return at the altitude the sonar is at.
 - The sonar equation: echoes fall with range as spreading and absorption predict, scale with a surface's backscatter (Lambert's law and the specular glint) and with the area the beam covers, and vanish behind an object (shadows).
-- The beams: a small target spreads across neighboring beams as the beam pattern says, sidelobes included, and targets at the same range but different elevations land in the same place (the imaging sonar's elevation ambiguity).
+- The beams: a small target spreads across neighboring beams as the beam pattern says, sidelobes included, and targets at the same range but different elevations fall in the same place (the imaging sonar's elevation ambiguity).
 - Speckle and noise: their statistics, and a fixed seed giving the same ping every time, on any number of threads.
 - The readouts: the imaging sonar's 8-bit frame, the sidescan's line in dB with time-varied gain a consumer can take out again, and the profiling sonar's soundings.
 
