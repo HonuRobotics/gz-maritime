@@ -133,7 +133,7 @@ Profiling. Soundings from the pass, georeferenced with the true poses: the seabe
 | `include/gz/maritime/sonar/Water.hh` | Francois–Garrison absorption |
 | `include/gz/maritime/sonar/Config.hh` | Parameters, backscatter, and the ECHO, Omniscan and Surveyor presets |
 | `include/gz/maritime/sonar/Rays.hh` | The fan of rays and what each ray hit |
-| `include/gz/maritime/sonar/Engine.hh` | The incoherent beam model: hits to intensity per beam and sample |
+| `include/gz/maritime/sonar/Engine.hh` | The sonar-equation model: hits to intensity per beam and sample |
 | `include/gz/maritime/sonar/Readout.hh` | Levels, the 8-bit imaging frame, sidescan lines and profiling soundings |
 | `include/gz/maritime/sonar/SyntheticScene.hh` | The analytic scene and its ray caster |
 | `examples/render_ping.cc`, `examples/draw_ping.py` | This page |

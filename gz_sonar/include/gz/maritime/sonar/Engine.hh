@@ -69,7 +69,7 @@ double HorizontalPattern(const SonarConfig &_config, double _offset);
 /// -3 dB at half the vertical field of view.
 double VerticalPattern(const SonarConfig &_config, double _elevation);
 
-/// \brief The incoherent beam model: turns the ray hits of one ping into
+/// \brief The sonar-equation model: turns the ray hits of one ping into
 /// echo intensity per beam and range sample.
 ///
 /// Each hit at range R and incidence theta sends back

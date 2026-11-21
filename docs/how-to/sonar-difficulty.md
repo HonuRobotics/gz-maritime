@@ -23,13 +23,13 @@ ros2 launch bluerov2_gazebo sim.launch.xml \
 ## Replay a run
 
 ```bash
-ros2 run gz_sonar capture_sonar.py /bluerov2/sonar_forward/image /tmp/run1 --name p --ping 600 --timeout 120
+ros2 run gz_sonar capture_sonar.py /bluerov2/sonar_forward/image /tmp/run1 --name p --ping 400 --timeout 120
 # stop the launch, launch it again the same way, then
-ros2 run gz_sonar capture_sonar.py /bluerov2/sonar_forward/image /tmp/run2 --name p --ping 600 --timeout 120
+ros2 run gz_sonar capture_sonar.py /bluerov2/sonar_forward/image /tmp/run2 --name p --ping 400 --timeout 120
 sha256sum /tmp/run1/gz_sonar_p_u8.npy /tmp/run2/gz_sonar_p_u8.npy
 ```
 
-Ping 600 (40 s in) of the same world, seed and motion is the same bytes in every run; the world's sonar system takes `<seed>` to make a different, equally repeatable, run.
+Ping 400 (40 s in) of the same world, seed and motion is the same bytes in every run; the world's sonar system takes `<seed>` to make a different, equally repeatable, run.
 
 ## Check
 

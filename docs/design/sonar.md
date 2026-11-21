@@ -60,10 +60,10 @@ A survey of the field in November 2026 found the following. Its full notes are i
 
 | Simulator | Sonar model | Fidelity | What we take from it |
 |---|---|---|---|
-| DAVE, now [IOES-Lab/POSIM](https://github.com/IOES-Lab/POSIM) (Gazebo Jetty, ROS 2 Lyrical, Apache-2.0) | Point scattering on depth-camera rays, complex Gaussian amplitudes, beam pattern, per-beam time series; CPU, CUDA and WGPU back ends; publishes `marine_acoustic_msgs/ProjectedSonarImage` | Coherent time series on rasterized geometry, the only open model at this level | The output contract, the depth-camera sampling, and the scattering formulation, as ideas and, where useful, adapted code. Its absorption constant suits about 100 kHz rather than the MHz heads it ships, its back ends disagree numerically, and it has not been validated quantitatively against real data |
-| [HoloOcean](https://github.com/byu-holoocean/HoloOcean) (Unreal) | Octree, ray-cast and GPU back ends; cosine and impedance shading, mean per bin, heuristic noise; imaging, profiling, sidescan, single beam | Geometric ray cast with partial intensity physics | That one engine can serve imaging, profiling and sidescan by configuration. Averaging per bin, instead of summing, removes the dependence on ensonified area |
-| [Stonefish](https://github.com/patrykcieslak/stonefish) (OpenGL, GPL-3.0) | Rasterize and bin per beam column; correct ping timing from 2R/c | Image emulation to geometric | Ping timing; the GPL rules out reusing code |
-| [OceanSim](https://github.com/umfieldrobotics/OceanSim) (Isaac Sim) | Camera point cloud, cosine and attenuation, normalized per range row | Image emulation | Normalizing per frame or row erases the absolute intensity that classification needs |
+| DAVE, now [IOES-Lab/POSIM](https://github.com/IOES-Lab/POSIM) (Gazebo Jetty, ROS 2 Lyrical, Apache-2.0) | Point scattering on depth-camera rays, complex Gaussian amplitudes, beam pattern, per-beam time series; CPU, CUDA and WGPU back ends; publishes `marine_acoustic_msgs/ProjectedSonarImage` | Coherent point scattering on rasterized geometry, the only open model at this level | The output contract, the depth-camera sampling, and the scattering formulation, as ideas and, where useful, adapted code. Its absorption constant suits about 100 kHz rather than the MHz heads it ships, its back ends disagree numerically, and it has not been validated quantitatively against real data |
+| [HoloOcean](https://github.com/byu-holoocean/HoloOcean) (Unreal) | Octree, ray-cast and GPU back ends; cosine and impedance shading, mean per bin, heuristic noise; imaging, profiling, sidescan, single beam | Geometric (octree projection; ray casting in HoloOcean 2.0) with partial intensity physics | That one engine can serve imaging, profiling and sidescan by configuration. Averaging per bin, instead of summing, removes the dependence on ensonified area |
+| [Stonefish](https://github.com/patrykcieslak/stonefish) (OpenGL, GPL-3.0) | Rasterize and bin per beam column; correct ping timing from 2R/c | Image-based to geometric | Ping timing; the GPL rules out reusing code |
+| [OceanSim](https://github.com/umfieldrobotics/OceanSim) (Isaac Sim) | GPU ray-traced point cloud, cosine and attenuation, normalized by range | Geometric | Normalizing per frame or row erases the absolute intensity that classification needs |
 | [MARUS](https://github.com/MARUSimulator) (Unity) | CPU ray casts, cosine-squared shading; labeled dataset export | Geometric | Per-return object labels for training data |
 | [SMaRC](https://github.com/smarc-project) (Unity, plus auvlib) | Cheap runtime sidescan with the real vehicle's message; differentiable renderers fitted to real surveys offline | Geometric at run time | A sidescan message modeled on the real sensor's packet, so the same consumer runs on both |
 
@@ -71,19 +71,27 @@ Three findings carry into this design. None of the perception simulators puts th
 
 ## Theory of operation
 
+The engine is a **sonar-equation model** with **Lambertian-plus-specular backscatter**. 
+
+For each beam and range sample the echo power from every surface patch the beam sees is summed, using the sonar equation: two-way spherical spreading, Francois–Garrison absorption, the patch's backscatter strength times the area the beam ensonifies, and the two-way beam pattern. Backscatter follows Lambert's law (μ cos² of the incidence angle) plus a Gaussian specular lobe near normal incidence. Phases are never computed, so the model is incoherent: the interference between scatterers is applied afterward as speckle, an exponentially distributed multiplier on intensity.
+
+This section describes, at a high level, the main principles of the sonar-equation model and Lambertian-plus-specular backscatter, with references for the details; places it among the alternative approaches; justifies why it suits the driving use cases; and then describes how the one model is adapted to the different sonar types: the multibeam sonars (imaging and profiling) and the sidescan.
+
 ### The shared engine
 
-All three sonars use one engine, an **incoherent beam model**. It treats every surface the sonar sees as a patch made of many small, independent scatterers. For each ping it adds up the echo power that every patch inside each beam sends back, placed at the time the echo takes to return, with the sonar equation: the source, the loss to spreading and absorption on the way out and back, the surface's backscatter, and the beam pattern. The random interference between scatterers is not computed wave by wave; it is applied statistically, as speckle. The result is the echo intensity in every beam and range sample, which a readout then turns into what the real device delivers. The sonar equation and seabed backscatter are covered in Lurton, [An Introduction to Underwater Acoustics](https://doi.org/10.1007/978-3-642-13835-5) (Springer, 2010), and Bell and Linnett, ["Simulation and analysis of synthetic sidescan sonar images"](https://doi.org/10.1049/ip-rsn:19971311) (1997), is an early simulator built on the same idea.
+All three sonars use one engine, a **sonar-equation model**, also called an incoherent intensity model: incoherent because it adds echo powers and never phases. It treats every surface the sonar sees as a patch made of many small, independent scatterers. For each ping it adds up the echo power that every patch inside each beam sends back, placed at the time the echo takes to return, with the sonar equation: the source, the loss to spreading and absorption on the way out and back, the surface's backscatter, and the beam pattern. The random interference between scatterers is not computed wave by wave; it is applied statistically, as speckle. The result is the echo intensity in every beam and range sample, which a readout then turns into what the real device delivers. Coiras and Groen, ["Simulation and 3D reconstruction of side-looking sonar images"](https://doi.org/10.5772/39406) (in *Advances in Sonar Technology*, 2009, open access), derive this model in "Sonar simulation": from the wave equation and point scattering down to the Lambertian, incoherent form used here. Sena and Santos Neto, ["SideScanSim: an open-source side-scan sonar simulator"](https://sol.sbc.org.br/index.php/erbase/article/download/46318/46077/) (2026, with an [open implementation](https://github.com/andreluissena/SideScanSim)), write out the same ingredients in a few lines each: the sonar equation with spreading and Francois–Garrison absorption, Lambert's law for the seabed, time-varied gain, and speckle as an exponentially distributed intensity. For the sonar equation itself, DOSITS has a short introduction, ["SONAR equation"](https://dosits.org/science/advanced-topics/sonar-equation/).
 
-The alternatives, from least to most physical:
+The alternatives, from least to most physical, and so from least to most computation. Neither acousticians nor roboticists share one set of names for them, and robotics papers call the second, third and fourth all "physics-based", so we name each by what it computes and list the other names a reader will meet.
 
-| Model | What it does | Examples | Why not here |
-|---|---|---|---|
-| Image emulation | Renders the scene with a camera and restyles the picture as a sonar fan | OceanSim ([Song et al. 2025](https://arxiv.org/abs/2503.01074)) | Intensities are not physical and often normalized away, and the output carries no geometry; classification cues are not trustworthy |
-| Geometric ray cast | Casts rays for range, bearing and shadows, and shades each hit with a cosine law | HoloOcean ([Potokar et al. 2022](https://publications.ri.cmu.edu/resolve/2022/10/Potokar22icra.pdf)), Stonefish, MARUS | Range, bearing and shadows are right, but brightness does not follow the area seen, absorption or the beam pattern, which is where the harder detection and classification levels live |
-| Incoherent beam model | As described above | This design | |
-| Coherent time series | Gives each scatterer a complex amplitude and sums the waves in each beam, so speckle and sidelobes emerge from interference | DAVE, now POSIM ([Choi et al. 2021](https://doi.org/10.3389/frobt.2021.706646)) | Heavier, usually needing a GPU toolkit, and the phase it computes is never seen by a team, which receives beamformed intensity |
-| Propagation-coupled | Adds sound-speed refraction, multipath and reverberation from ocean acoustic propagation models | Engineering tools such as APL-UW's Sonar Simulation Toolset | Built for sonar design, not for real-time robotics, and unnecessary in water no deeper than 30 m |
+| Model | Also called | What it does | Examples | Why not here |
+|---|---|---|---|---|
+| Image-based conversion | Depth-camera based, image processing | Renders the scene with a camera, as depth or normals, and converts the picture into a sonar fan | The depth-camera sonar of UUV Simulator and DAVE, UWSim, ACOUSIM ([Basha S and Nambiar 2026](https://arxiv.org/abs/2605.19712)) | Intensities are not physical and often normalized away, and the output carries no geometry; classification cues are not trustworthy |
+| Geometric model with Lambertian shading | Ray tracing or ray casting, rasterization, octree projection, tube tracing; geometry-driven ([Attia et al. 2026](https://arxiv.org/abs/2606.06130)) | Finds range, bearing and shadows from the geometry, by casting rays or rasterizing, and shades each hit with a cosine law | HoloOcean (octree projection in [Potokar et al. 2022](https://publications.ri.cmu.edu/resolve/2022/10/Potokar22icra.pdf), ray casting in HoloOcean 2.0), OceanSim (GPU ray tracing, [Song et al. 2025](https://arxiv.org/abs/2503.01074)), Stonefish, MARUS | Range, bearing and shadows are right, but brightness does not follow the area seen, absorption or the beam pattern, which is where the harder detection and classification levels live |
+| Sonar-equation model | Incoherent intensity model; energy based ([Guériot and Sintes 2011](https://doi.org/10.5772/18029)) | As described above | This design; SideScanSim | |
+| Coherent point-scattering model | Point-based scattering model ([Brown et al. 2017](https://doi.org/10.1121/1.4976584)), point scatterer approach, time-series model; for large targets, facets with the Kirchhoff approximation | Gives each scatterer a complex amplitude and sums the waves in each beam, so speckle and sidelobes emerge from interference | DAVE, now POSIM ([Choi et al. 2021](https://doi.org/10.3389/frobt.2021.706646)); Penn State's PoSSM | Heavier, usually needing a GPU toolkit, and the phase it computes is never seen by a team, which receives beamformed intensity |
+| Propagation-model driven | Acoustic propagation models (ray tracing such as Bellhop, normal modes, parabolic equation); the nearby established term, sonar performance model, predicts detection rather than images | Adds sound-speed refraction, multipath and reverberation from ocean acoustic propagation models | APL-UW's Sonar Simulation Toolset ([TR 0702](https://www.apl.washington.edu/research/downloads/publications/tr_0702.pdf)) | Built for sonar design, not for real-time robotics, and unnecessary in water no deeper than 30 m |
+
+The backscatter law is a separate choice from the model above: Lambert's law, the Kirchhoff approximation, small-roughness perturbation, or the APL-UW models, any of which the second to fourth models can use. We use Lambert's law, σ = μ cos²θ per unit area (μ times the square of the sine of the grazing angle), plus a Gaussian specular lobe near normal incidence. The square comes from the two legs of a monostatic sonar: a tilted patch both intercepts less of the beam and scatters less of it back. Because the engine multiplies σ by the area each ray covers, which grows as 1/cosθ, one ray's return falls as cosθ, the same curve as the optical cosine shading many simulators apply per hit. What the sonar equation adds is the scale: μ is a measured backscatter strength, so the seabed values in the literature apply directly, and summing over area makes a return follow the area the beam ensonifies. Lambert's law is the standard first-order law for diffuse seabed backscatter, with one parameter (Mackenzie measured μ ≈ −27 dB), and fits at intermediate grazing angles; near normal incidence the specular lobe takes over, and at very low grazing angles real seabeds depart from it. A richer law, such as the APL-UW models, would drop into the same place.
 
 In the driving use cases, perception consumes what a real sonar delivers after beamforming, and mapping consumes soundings. The simulation produces exactly those data artifacts: for the imaging sonar, a matrix of 8-bit intensities with one column per beam and one row per range sample, which a viewer draws as a fan-shaped image; for the sidescan, one line of intensities in dB per ping, which the consumer stacks into a waterfall and georeferences into a mosaic; and for the profiling sonar, soundings, a travel time and an angle per detection, which the consumer turns into a point cloud. This level matches the focus of the challenge, which is classification and shared autonomy, not beamforming and signal processing.
 
@@ -193,7 +201,7 @@ Each sonar is a gz-sensors custom sensor, the pattern `gz_wind`'s anemometer alr
 ```xml
 <sensor name="forward_sonar" type="custom" gz:type="imaging_sonar">
   <pose>0.2 0 -0.1 0 0.26 0</pose>
-  <update_rate>15</update_rate>
+  <update_rate>10</update_rate>
   <topic>sonar/forward</topic>
   <gz:sonar>
     <frequency>700000</frequency>
@@ -214,7 +222,7 @@ Parameters shared by the three types. The defaults come from each type's exempla
 
 | Parameter | Meaning | Imaging (ECHO) | Profiling (Surveyor 240-16) | Sidescan (Omniscan 450 SS) | Typical range |
 |---|---|---|---|---|---|
-| `<update_rate>` (sensor) | Pings per second; the engine also caps it at c/2R so one ping's echoes return before the next | 15 Hz (up to 25) | 10 Hz (up to 20) | 10 Hz (up to 20) | 1 to 25 Hz |
+| `<update_rate>` (sensor) | Pings per second; the engine also caps it at c/2R so one ping's echoes return before the next | 10 Hz (up to 25) | 10 Hz (up to 20) | 10 Hz (up to 20) | 1 to 25 Hz |
 | `frequency` | Center frequency in Hz; sets absorption | 700 000 | 240 000 | 450 000 | 200 kHz to 2.25 MHz |
 | `horizontal_fov` | Width of the fan about the sensor's z axis, rad | 2.094 (120°) | 1.396 (80°) | 0.0087 (0.5°) | 0.5° to 140° |
 | `vertical_fov` | Thickness of the fan about the sensor's y axis, rad | 0.349 (20°) | 0.070 (4°) | 0.873 (50°) | 1° to 50° |
@@ -263,7 +271,7 @@ Inside Gazebo the sensors publish gz-transport messages of gz-maritime's own, `g
 
 ## Implementation plan
 
-Everything is built in gz-maritime, from components it already uses: gz-sim, gz-sensors (as `gz_wind` does), gz-rendering (as `gz_waves_rendering` does), gz-transport, gz-msgs, gz-math, and on the ROS side `marine_acoustic_msgs`, which is already installed because `ros_gz_bridge` depends on it. No new external dependency, and in particular no CUDA, WGPU or other GPU toolkit: the GPU is reached only through gz-rendering, which also runs on a CPU-only renderer (Mesa llvmpipe), so one code path serves both. The rate is a requirement only on the scoring hardware, which has a GPU: every sonar holds its configured rate there alongside three vehicles. Without a GPU the sonar is best effort: the same output for the same seed, at a published rate. Phase 1 measured the sampler at about 92 Hz on a GPU and 4 to 8 Hz on llvmpipe for the imaging fan in a 2.1-million-triangle scene, so the CPU-only imaging rate is about 4 to 8 Hz. On llvmpipe the cost follows the triangle count in view, and labels double it, being a second render. With a GPU the engine becomes the slower stage, so Phase 2 runs it on several threads.
+Everything is built in gz-maritime, from components it already uses: gz-sim, gz-sensors (as `gz_wind` does), gz-rendering (as `gz_waves_rendering` does), gz-transport, gz-msgs, gz-math, and on the ROS side `marine_acoustic_msgs`, which is already installed because `ros_gz_bridge` depends on it. No new external dependency, and in particular no CUDA, WGPU or other GPU toolkit: the GPU is reached only through gz-rendering, which also runs on a CPU-only renderer (Mesa llvmpipe), so one code path serves both. The rate is a requirement only on the scoring hardware, which has a GPU: the sonar holds its configured rate there. Without a GPU the sonar is best effort: the same output for the same seed, at a published rate. Each scenario runs one active sonar: the imaging sonar on the ROV, or the sidescan or the profiler on the USV. All three at once should work, but belongs on a dedicated machine with plenty of compute, and is neither prototyped nor checked. Where the time goes, and what rates are reasonable, is under [Performance](#performance).
 
 ### Packages
 
@@ -285,6 +293,34 @@ We write our own code, and take ideas, structure and test cases from the open im
 | Stonefish | GPL-3.0, not compatible | Ideas only, no code: capping the ping rate at c/2R |
 | MARUS | Apache-2.0, compatible | Writing labeled datasets |
 | SMaRC | MIT, compatible | A sidescan output shaped like the real vehicle's |
+
+### Performance
+
+Measured once, on one machine, during Phase 2; read these as a guide to where the time goes, not as specifications. The machine has 24 cores and an NVIDIA RTX 2070 SUPER; the scene is the first-look world (`sonar_first_look.sdf`) with the BlueROV2 and its one forward imaging sonar at the ECHO defaults (256 beams, 768 samples to 15 m, labels on), sampled by two 604 × 429 cameras; the world runs headless.
+
+A ping has two halves. On the rendering thread, each camera renders depth and then segmentation and reads both back to the CPU. gz-sim's simulation thread waits for rendering whenever a sensor is due, so this half is what slows the world. On the sonar's own worker thread, the camera images become hits, intensities and the readout; this runs alongside the simulation and costs it nothing as long as it keeps up.
+
+| Stage, per ping | GPU | llvmpipe (no GPU) |
+|---|---|---|
+| Render and read back, 2 cameras × (depth + segmentation), rendering thread | 13 to 15 ms | 18 to 23 ms |
+| Sample the images into hits (68,864), worker | 12 ms | 12 ms |
+| Engine: beams and samples, 24 threads, worker | 24 ms | 24 ms |
+| Readout: levels, gain, the 8-bit frame, worker | 11 ms | 11 ms |
+
+| Real time factor | GPU | llvmpipe |
+|---|---|---|
+| No sonar | 0.96 | 0.95 |
+| One sonar at 10 Hz (the default) | 0.81 | 0.81 |
+| One sonar at 15 Hz | 0.75 | 0.67 |
+
+In every run the sonar kept its configured rate in sim time, with no ping missing, so the cost shows up as a slower world rather than dropped pings. Two rules of thumb follow:
+
+- The world slows by roughly the ping rate times the render time: at 10 Hz, 10 × 15 ms is 15 % of each second on the rendering thread, and the real time factor drops from 0.96 to 0.81.
+- The worker takes about 47 ms a ping, so it keeps up to about 20 Hz; beyond that the queue fills and the rendering thread waits for it too.
+
+In this small scene llvmpipe is close to the GPU, because the render is dominated by fixed per-camera costs, not triangles. On llvmpipe the render cost grows with the triangles in view: in Phase 1's 2.1-million-triangle scene the sampler managed 4 to 8 Hz without a GPU. 10 Hz is a realistic imaging rate for a sonar at 15 m and is the default; pick a lower rate for large scenes without a GPU.
+
+To force llvmpipe in drydock, `gz sim` needs `__GLX_VENDOR_LIBRARY_NAME=mesa LIBGL_ALWAYS_SOFTWARE=1` (it renders through GLX on the forwarded display); the EGL settings alone leave it on the GPU. Ogre's log, `~/.gz/rendering/ogre2.log`, names the renderer it used.
 
 ### Phases
 
@@ -404,7 +440,7 @@ Tests run headless in drydock, as gtests for the engine and pytests for whole wo
 | GPU and CPU-only | The same ping rendered on a GPU and on llvmpipe | The same surfaces hit, and ranges within a few millimeters (Phase 1 measured up to 4 mm), since the acoustics run on the CPU either way and only the rasterization differs |
 | Readout | The imaging and sidescan output of a scene with known echo levels | The imaging sonar's 8-bit values follow the documented time-varied gain and dB-to-8-bit mapping; removing the documented time-varied gain from the sidescan's dB values recovers the received level |
 | Interface | Each message type | Beam directions, range per sample, frame and stamp are present and consistent with the sensor's configuration; topics follow the instance name |
-| Performance | Three vehicles with all sonars in `marina_bay`, headless | Each sonar holds its configured rate on the scoring hardware (GPU); without a GPU the measured rate is recorded and published, with no pass threshold |
+| Performance | Each scenario's one active sonar, headless | The sonar holds its configured rate on the scoring hardware (GPU); without a GPU the measured rate is recorded and published, with no pass threshold. All three sonars at once is left to a dedicated machine and not checked |
 | Real data (future work) | Recordings of a known target (a glass float, a tire) with a real ECHO, Omniscan and Surveyor; none are available yet. The ECHO recordings also settle how its own output is processed, which the imaging readout's mapping assumes for now | Target-to-background contrast, shadow length and speckle statistics within stated tolerances of the simulation of the same scene |
 
 The last row is the only one that checks the model against the world rather than against itself, and no surveyed simulator has done it quantitatively. It is future work, for when recordings can be obtained.

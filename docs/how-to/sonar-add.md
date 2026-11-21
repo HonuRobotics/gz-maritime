@@ -7,7 +7,7 @@ A sonar is a sensor on one of your vehicle's links, driven by one world system a
 ```xml
 <sensor name="sonar_forward" type="custom" gz:type="imaging_sonar">
   <pose>0.25 0 0 0 0.26 0</pose>
-  <update_rate>15</update_rate>
+  <update_rate>10</update_rate>
   <topic>my_vehicle/sonar_forward/image</topic>
   <gz:sonar>
     <range_max>15</range_max>
