@@ -1,11 +1,16 @@
 # Profiling and sidescan sonar from the USV
 
-A BlueBoat carries a sidescan (a Cerulean Omniscan 450 SS) and a profiling sonar (a Cerulean Surveyor 240-16) on one straight pass over a gently undulating sandy seabed about 8 m down, past a steel drum under its track, a concrete block to port and a glass float to starboard. This page shows what each sonar sees on the same pass. The model behind them is in the [sonar simulation design](../design/sonar.md).
+The example demonstrates the Blueboat with both 
+
+* downward looking profiling multibeam sonar for bathymetric mapping - sensor parameters to match a Cerulean Surveyor 240-16
+* a sidescan sonar - sensor parameters to match a Cerulean Omniscan 450 SS
+
+In the demo, the USV moves  one straight pass over a gently undulating sandy seabed about 8 m down, past a steel drum under its track, a concrete block to port and a glass float to starboard. This page shows what each sonar sees on the same pass. The sonar sensor model is in the [sonar simulation design](../design/sonar.md).
 
 ```{figure} images/sonar-survey-scene.svg
 :alt: Section and plan views of the survey: a BlueBoat on 8 m of water with a sidescan beam to each side and a downward profiler fan, and a steel drum under the track, a concrete block 12 m to port and a glass float 10 m to starboard
 
-The scene. (a) A section across the track: the sidescan's beam on each side, 15° down, leaves a nadir gap under the boat, which the profiler's 80° fan covers; between the two, from about 6.7 to 9.5 m out, neither reaches the seabed within its −3 dB beam. (b) From above: the track, the sidescan swaths, the profiler's swath and the three targets.
+The scene. (a) A section across the track: the sidescan's beam on each side (shaded, its axis dotted 15° down, its lower edge dashed) leaves a nadir gap under the boat, which the profiler's 80° fan of soundings covers; between the two, from about 6.7 to 9.5 m out, neither reaches the seabed within its −3 dB beam. (b) From above: the track, the sidescan swaths, the profiler's swath and the three targets.
 ```
 
 ```{figure} images/sonar-survey-gazebo.png

@@ -16,7 +16,9 @@
 \renewcommand{\familydefault}{\sfdefault}
 \tikzset{
   lbl/.style={font=\sffamily\small},
-  beam/.style={fill=black!7,draw=black,thin},
+  beam/.style={fill=black!12,draw=none},
+  ssedge/.style={very thick,dash pattern=on 4pt off 2pt},
+  ssaxis/.style={thin,dotted},
   dim/.style={thin,{Latex[length=1.6mm]}-{Latex[length=1.6mm]}},
   lead/.style={thin,black!70},
   declare function={
@@ -39,6 +41,12 @@
     \draw[beam] (0,-0.08) -- (-0.45,0) -- (-30,0)
       -- plot[domain=0:\af,samples=12] ({-30*cos(\x)},{-0.08-30*sin(\x)})
       -- plot[domain=9.5:28.9,samples=30] ({\x-38.4},{zsb(\X,\x-38.4)}) -- cycle;
+    % the sidescan's own lines: each beam's 30 m arc, its lower -3 dB edge, and its axis 15 deg down
+    \foreach \s in {1,-1} {
+      \draw[thin] plot[domain=0:\af,samples=12] ({\s*30*cos(\x)},{-0.08-30*sin(\x)});
+      \draw[ssedge] (0,-0.08) -- ({\s*9.5},{zsb(\X,\s*9.5)});
+      \draw[ssaxis] (0,-0.08) -- ({\s*13.52},-3.7);
+    }
     % profiler fan, 80 deg across track
     \foreach \t in {-40,-30,...,40} {
       \pgfmathsetmacro{\yy}{8*tan(\t)}
@@ -59,12 +67,14 @@
     \node[lbl,anchor=south] at (28,0.2) {PORT};
     \node[lbl,anchor=south] at (-28,0.2) {STARBOARD};
     \draw[lead] (0,0.3) -- (-3,3) node[lbl,anchor=south west] {BlueBoat};
-    \node[lbl,align=center] at (-21,-2.4) {sidescan, 15$^\circ$ down,\\50$^\circ$ beam, 30 m};
+    \node[lbl,align=center] at (22,-1.6) {sidescan,\\port beam};
+    \node[lbl,align=center] at (-22,-1.6) {sidescan, starboard beam,\\15$^\circ$ down, 50$^\circ$ wide};
     \draw[dim] (-34.5,0) -- (-34.5,-8) node[lbl,midway,right] {8 m};
     \draw[dim] (9.5,-11.2) -- (-9.5,-11.2) node[lbl,midway,below] {nadir gap};
     \draw (9.5,-9) -- (9.5,-11.5) (-9.5,-9) -- (-9.5,-11.5);
-    \draw[lead] (-5,-6.2) -- (-11,-5.6) node[lbl,anchor=west] {profiler, 80$^\circ$ fan};
-    \draw[lead] (12,{zsb(\X,12)+0.5}) -- (15,-3.6) node[lbl,anchor=east] {block, 12 m to port};
+    \draw[lead] (-5,-6.2) -- (-11,-5.6) node[lbl,anchor=west] {profiler, 80$^\circ$ fan straight down};
+    \draw[lead] (-8.3,-7.1) -- (-12,-10.2) node[lbl,anchor=north west] {sidescan beams' lower edges};
+    \draw[lead] (12,{zsb(\X,12)+0.5}) -- (17,-10.2) node[lbl,anchor=north east] {block, 12 m to port};
     \node[lbl] at (0,-15.5) {(a) section across the track at $x$ = 20 m, looking forward};
   \end{scope}
 
