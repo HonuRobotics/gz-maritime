@@ -20,6 +20,11 @@
 <sdf version="1.12" xmlns:gz="http://gazebosim.org/schema">
   <world name="sonar_survey">
 
+    <!-- No ground grid in the GUI: it would float 8 m above the seabed. -->
+    <scene>
+      <grid>false</grid>
+    </scene>
+
     <physics name="1ms" type="ignored">
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1.0</real_time_factor>
