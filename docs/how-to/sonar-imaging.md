@@ -8,10 +8,10 @@ A BlueROV2 with a forward imaging sonar (a Sonoptix ECHO) hovers 2.5 m above a s
 The scene. (a) From the side: the sonar's 20° beam, pitched down 15°, meets the seabed from 6.2 m slant range, and the seabed shows faintly from 3.7 m, below the beam's edge. (b) From above: the 120° fan and the four targets in it; the flag is transparent to the sonar.
 ```
 
-```{figure} images/sonar-imaging-gazebo.png
-:alt: Gazebo view from behind and to the side of the ROV: the BlueROV2 on the left facing a concrete block, a steel cylinder, a tire and a glass float on the seabed, with a marker flag standing among them
+```{figure} images/sonar-imaging-gazebo2.png
+:alt: Gazebo view from behind and to the side of the ROV
 
-The same scene in Gazebo, from a camera behind the ROV and to its starboard side: the ROV on the left, facing the block, the cylinder, the tire and the glass float, with the flag among them.
+The same scene in Gazebo, from a camera behind the ROV.
 ```
 
 Run everything inside drydock, from `~/maritime_ws`, with the workspace sourced.

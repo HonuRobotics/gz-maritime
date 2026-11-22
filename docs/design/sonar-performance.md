@@ -63,14 +63,14 @@ Only the drawing uses the GPU; without a GPU, llvmpipe does it on the CPU, on th
 
 The segmentation image is always drawn: its label tells each hit which surface it struck, and so which acoustic properties to use. The `labels` option only decides whether those ids are also published as ground truth.
 
-So a ping has two halves.
+So a ping has two halves. % CLAUDE: Confusing with the four steps above vice two halves ?
 
 1. Render, on the rendering thread. The Sensors system brings the scene up to date, the plugin asks gz-rendering to draw the sonar's cameras, and the images are read back to the CPU. gz-sim waits for this whenever a sensor is due, so it slows the world in proportion to how often the sonar pings, whether or not the rest keeps up.
 2. Compute the sonar model, on the plugin's worker thread, on the CPU only. This runs alongside the simulation, so it costs the world nothing as long as each ping is finished before the next ones pile up. The plugin lets two rendered pings wait for the worker; if a third is ready before the worker has taken one, the rendering thread stops until it has, and the world waits with it.
 
 One imaging sonar, small scene, per ping:
 
-| Stage | With a GPU | llvmpipe |
+| Stage | With a GPU | llvmpipe | % CLAUDE: show this as a horizontal bar to show the time spans visually
 |---|---|---|
 | Draw and copy back, 2 cameras | 13 to 15 ms | 18 to 23 ms |
 | Images to hits, about 100,000 | 18 ms | 18 ms |
@@ -82,7 +82,7 @@ Two limits follow.
 - The world slows by roughly the ping rate times the render time. At 10 Hz, 10 × 15 ms is 15 % of every second on the rendering thread, which is the drop from 0.96 to 0.81.
 - The worker takes about 54 ms of CPU time a ping, so one sonar keeps up to about 18 Hz. The engine is the largest part of it and runs on every core: on a machine with fewer cores, expect the worker, and so the highest rate the sonar keeps up with, to scale down roughly in proportion.
 
-## With a GPU or without one
+## With a GPU or without one % CLAUDE: tldr this section.   summarize succinctly. 
 
 The GPU does only the rendering. The sampling, the engine and the readout run on the CPU either way and take the same time, so a faster GPU cannot speed them up, and more or faster CPU cores can. Without a GPU, the CPU also does the rendering, on the same thread that holds up the simulation.
 
@@ -110,27 +110,3 @@ To try llvmpipe in drydock, start `gz sim` with `__GLX_VENDOR_LIBRARY_NAME=mesa 
 - The range window and the number of samples set the engine's and the readout's work, and the message's size.
 - The rate multiplies everything.
 
-## A world without an active sonar
-
-The sonar system costs nothing until a sonar exists. Attaching to the rendering thread makes gz-sim render every physics step, so the system attaches only when the first sonar appears and lets go when the last one is removed. On a light scene with a camera at 30 Hz:
-
-| World | Real time factor |
-|---|---|
-| The camera, no sonar system | 4.15 |
-| The camera and the sonar system, no sonar | 4.11 |
-| The camera and one sonar at 10 Hz | 3.02 |
-
-Each sonar's first ping also takes 30 to 140 ms once, to create its textures and shaders.
-
-## Fitting sonars deliberately
-
-- Fit a sonar only where the scenario uses it. Every vehicle world loads the sonar system, which is free until a sonar is fitted, so the choice is in the vehicle's config: the BlueROV2's and BlueBoat's `*_sonar.yaml` configs carry sonars, their default configs do not.
-- Budget one active sonar per scenario; that is what the defaults assume. Several sonars on several vehicles in one world have not been measured.
-- Keep the default 10 Hz unless the task needs more. Without a GPU, or in a detailed scene, lower it.
-- If the world runs too slowly, lower `rays_per_beam` before the rate.
-
-## Not measured
-
-- Several vehicles with sonars in one world.
-- Large competition worlds, such as `robotx_2026` with its 159 models, with a sonar.
-- Machines with fewer cores, or a smaller GPU.

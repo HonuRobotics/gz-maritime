@@ -22,7 +22,7 @@ Run everything inside drydock, from `~/maritime_ws`, with the workspace sourced.
 The scene. (a) A section across the track: the sidescan's beam on each side (shaded, its axis dotted 15° down, its lower edge dashed) leaves a nadir gap under the boat, which the profiler's 80° fan of soundings covers; between the two, from about 6.7 to 9.5 m out, neither reaches the seabed within its −3 dB beam. (b) From above: the track, the sidescan swaths, the profiler's swath and the three targets.
 ```
 
-```{figure} images/sonar-survey-gazebo.png
+```{figure} images/sonar-survey-gazebo2.png
 :alt: Gazebo view from under the water beside the track: the BlueBoat on the surface at the left, and on the seabed the steel drum, the concrete block in the distance and the glass float on the right
 
 The same scene in Gazebo, from a camera under the water beside the track: the boat on the surface, the drum under its track, the block beyond it and the float nearer the camera.
@@ -99,10 +99,10 @@ In this second demo, the same BlueBoat, with both profiling multibeam and sidesc
 The survey, sketched (vertical scale ×2): on each line the profiler's fan sounds a strip under the boat, and the sidescan images a wider swath to each side, in which the wreck casts an acoustic shadow away from the track.
 ```
 
-```{figure} images/sonar-shipwreck-gazebo.png
-:alt: Gazebo view from under the water beside the wreck: the long low hull broken into sections on the seabed, the engine house standing up at the right, and the BlueBoat small on the surface above
+```{figure} images/sonar-shipwreck-gazebo2.png
+:alt: Gazebo view from under the water beside the wreck.
 
-The same scene in Gazebo, from a camera under the water off the wreck's port side, with the boat on the surface above it.
+The same scene in Gazebo.
 ```
 
 The wreck, `model://shipwreck` in `gz_sonar`, is a wooden steam barge modeled on the [Monohansett](https://thunderbay.noaa.gov/shipwrecks/monohansett.html) in NOAA's Thunder Bay National Marine Sanctuary in Lake Huron, at its true size (48.8 by 9.1 m) and broken in three sections. It is an authored approximation, not a survey of the real site. Its meshes are its exact ground truth, and `ground_truth/features.yaml` names its features (the boiler, the engine, the mast, the anchor and others) in the model's frame.
@@ -179,30 +179,3 @@ ros2 run gz_sonar soundings_cloud.py survey.npz cloud.ply
 The soundings around the wreck, colored by height: 150,240 points for the whole survey. The forward hull stands a little above the seabed, the stern section about 2 m, and the mast highest of all.
 ```
 
-### Score it against the wreck
-
-```bash
-ros2 run gz_sonar compare_wreck.py cloud.ply $(ros2 pkg prefix --share gz_sonar)/models/shipwreck
-```
-
-`compare_wreck.py` reads the wreck's meshes, places them with the wreck's pose in the world (the default is the world's), and measures each sounding's distance to the nearest true surface, the wreck or the flat seabed. It scores the soundings over the wreck apart from those on open seabed:
-
-| Positioning | Over the wreck: median, 95 % within | Open seabed: median, 95 % within |
-|---|---|---|
-| True poses | 0.027 m, 0.095 m | 0.027 m, 0.087 m |
-| 0.5 m and 2° of noise | 0.031 m, 0.154 m | 0.027 m, 0.087 m |
-| 1 m and 4° of noise | 0.033 m, 0.243 m | 0.027 m, 0.087 m |
-
-```{figure} images/sonar-shipwreck-error.png
-:alt: Histograms of the distance from each sounding over the wreck to the true surface, for true poses and two levels of positioning noise: most within 0.1 m in all three, with a longer tail as the noise grows
-
-The distance from each sounding over the wreck to the true surface, for each level of positioning noise.
-```
-
-With true poses, the soundings lie on the true surfaces within the profiler's range and angle noise. Positioning noise moves every sounding of a ping together, which on flat seabed changes nothing, so the open seabed scores the same in all three; over the wreck it puts soundings beside the edges they came from, and the tail grows with the noise. A few soundings, 31 of the 17,489 over the wreck with true poses, lie more than 0.5 m from any surface, all around the mast. A thin pole and the seabed behind it echo at the same range, and the angle measured is likely between the two, as it is on a real angle-of-arrival profiler.
-
-### Check
-
-- The mosaic shows the wreck's outline and the stern section's shadows; with pose noise, the same wreck blurs.
-- With true poses, 95 % of the soundings over the wreck lie within 0.1 m of the true surface.
-- With positioning noise, the error over the wreck grows with the noise, and on open seabed it does not change.
