@@ -49,7 +49,7 @@ The software involved:
 - gz-rendering (Ogre 2) draws the images, on the GPU if there is one.
 - `gz-maritime-sonar-system`, the sonar plugin, asks for each ping's render and gives every sonar sensor a worker thread of its own (the sidescan's two sides are two sensors, so two workers). On each ping the worker runs the `gz_sonar` model, and for the engine step it briefly starts one helper thread per CPU core. The worker runs alongside the simulation and slows it only if pings arrive faster than it finishes them.
 
-## Recommendation
+## Recommendations
 
 - All sonar sims are computational costsly, so only activate a sonar only where the scenario uses it. 
 - Imaging sonar (wide beam) sim is more costly than the profiling and side scan (narrow beam).  A single imaging sonar costs about a fifth of real time, a sidescan about a tenth, a profiler less.
