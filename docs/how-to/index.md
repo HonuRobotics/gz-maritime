@@ -22,10 +22,9 @@ from its files.
 Imaging, sidescan and profiling sonars, from watching one to labeled training data and a mapped shipwreck.
 
 1. [Imaging (forward-looking) sonar from the ROV](sonar-imaging.md)
-2. [Profiling and sidescan sonar from the USV](sonar-survey.md)
+2. [USV survey examples: profiling and sidescan sonar](sonar-survey.md): a pass over the seabed, and mapping a shipwreck
 3. [Add a sonar to your vehicle](sonar-add.md)
 4. [Sonar features: acoustic properties and truth labels](sonar-features.md)
-5. [Map a shipwreck](sonar-shipwreck.md)
 
 ## More
 
@@ -54,6 +53,5 @@ sonar-imaging
 sonar-survey
 sonar-add
 sonar-features
-sonar-shipwreck
 faq
 ```
