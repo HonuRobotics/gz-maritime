@@ -117,7 +117,7 @@ field. The main points it has to handle:
 
 ## Sonar
 
-Imaging, profiling and sidescan sonar share one engine, a sonar-equation model on geometry sampled with gz-rendering, configured by the shape of each sonar's fan. The use cases, the theory of operation, the interface, and the implementation, testing and tutorial plans are in [Sonar simulation design](sonar.md). Contributors can run the engine on its own with [Render a ping without Gazebo](render-a-ping.md). What a sonar costs, where the time goes, and how to keep it in budget are in [Sonar performance](sonar-performance.md).
+Imaging, profiling and sidescan sonar share one engine, a sonar-equation model on geometry sampled with gz-rendering, configured by the shape of each sonar's fan. The use cases, the theory of operation, the interface, and the implementation, testing and tutorial plans are in [Sonar simulation design](sonar.md). Contributors can run the engine on its own with [Render a ping without Gazebo](render-a-ping.md). How it is built, the pieces and the reasons for them, is in [Sonar implementation](sonar-implementation.md). What a sonar costs, where the time goes, and how to keep it in budget are in [Sonar performance](sonar-performance.md).
 
 ## Related
 
@@ -131,5 +131,6 @@ and how they keep their floating volume on a link of its own.
 
 sonar
 render-a-ping
+sonar-implementation
 sonar-performance
 ```
