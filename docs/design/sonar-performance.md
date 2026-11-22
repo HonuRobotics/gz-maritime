@@ -38,15 +38,28 @@ Scenes:
 
 ## Where the time goes
 
-A ping passes through four pieces of software, on three threads. Only the rendering uses the GPU.
+A ping passes through five pieces of software, on three threads. Only the rendering uses the GPU.
 
-| Piece | What it is | What it does for a ping | Thread | Runs on |
-|---|---|---|---|---|
-| gz-sim | The simulator | Steps physics and the world's systems; waits for the rendering thread whenever a sensor is due | simulation | CPU |
-| Sensors system | A gz-sim system the world loads | Owns the rendering thread: brings the scene up to date with the simulation, then signals the plugins that may render | rendering | CPU |
-| gz-rendering (Ogre 2) | The rendering engine | Draws each of the sonar's cameras, depth and then segmentation, and reads both images back from GPU memory into CPU memory | rendering | GPU if there is one, otherwise the CPU (llvmpipe) |
-| gz-maritime-sonar-system | The sonar plugin, a gz-sim system | Places the sonar's cameras, asks gz-rendering to draw them when a ping is due, and hands the images to the sonar's worker; then, on the worker, runs the sonar model | rendering, then the sonar's own worker | CPU |
-| gz_sonar engine | A library the plugin calls on the worker | Turns the images into hits, the hits into intensities per beam and sample, and the intensities into the published levels | worker | CPU: the engine step on all cores, the rest on one |
+- gz-sim, the simulator: steps physics and the world's systems.
+- The Sensors system, a gz-sim system the world loads: owns the rendering thread.
+- gz-rendering, the rendering engine (Ogre 2): draws images, on the GPU if there is one, otherwise on the CPU (llvmpipe).
+- `gz-maritime-sonar-system`, the sonar plugin, a gz-sim system: places each sonar's cameras, triggers their rendering, and runs each sonar's worker thread.
+- `gz_sonar`, the sonar model, a library the plugin calls on the worker.
+
+A ping, step by step:
+
+| Step | Software | Thread | Runs on |
+|---|---|---|---|
+| Step the world; wait for rendering when a sensor is due | gz-sim | simulation | CPU |
+| Bring the scene up to date | Sensors system | rendering | CPU |
+| Render the sonar's cameras when a ping is due | sonar plugin | rendering | CPU |
+| Draw depth and segmentation, copy them to CPU memory | gz-rendering | rendering | GPU, or CPU (llvmpipe) |
+| Hand the images to the worker; at most two wait | sonar plugin | rendering | CPU |
+| Turn the images into hits | gz_sonar | worker | CPU, 1 core |
+| Beams and samples: the engine | gz_sonar | worker | CPU, all cores |
+| Levels, gain, the published message | gz_sonar | worker | CPU, 1 core |
+
+Only the drawing uses the GPU; without a GPU, llvmpipe does it on the CPU, on the same rendering thread.
 
 The segmentation image is always drawn: its label tells each hit which surface it struck, and so which acoustic properties to use. The `labels` option only decides whether those ids are also published as ground truth.
 
@@ -57,12 +70,12 @@ So a ping has two halves.
 
 One imaging sonar, small scene, per ping:
 
-| Stage | Piece | Runs on | With a GPU | Without (llvmpipe) |
-|---|---|---|---|---|
-| Render 2 cameras × (depth + segmentation) and read back | gz-rendering, asked by the plugin | GPU (CPU with llvmpipe) | 13 to 15 ms | 18 to 23 ms |
-| Sample the images into hits (about 100,000) | gz_sonar, on the worker | CPU, one core | 18 ms | 18 ms |
-| Engine: beams and samples | gz_sonar, on the worker | CPU, all 24 cores | 25 ms | 25 ms |
-| Readout: levels, gain, the 8-bit frame | gz_sonar, on the worker | CPU, one core | 11 ms | 11 ms |
+| Stage | With a GPU | llvmpipe |
+|---|---|---|
+| Draw and copy back, 2 cameras | 13 to 15 ms | 18 to 23 ms |
+| Images to hits, about 100,000 | 18 ms | 18 ms |
+| Engine, 24 cores | 25 ms | 25 ms |
+| Levels and message | 11 ms | 11 ms |
 
 Two limits follow.
 
