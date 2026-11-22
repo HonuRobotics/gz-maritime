@@ -7,16 +7,14 @@ The example demonstrates the Blueboat with both
 
 The page has two parts:
 
-1. [A pass over the seabed](#part-1-a-pass-over-the-seabed): in the demo, the USV moves  one straight pass over a gently undulating sandy seabed about 8 m down, past a steel drum under its track, a concrete block to port and a glass float to starboard, and the page shows what each sonar sees on the same pass.
+1. [Single pass over the undulating seabed with discrete targets](#part-1-single-pass-over-the-undulating-seabed-with-discrete-targets): in the demo, the USV moves  one straight pass over a gently undulating sandy seabed about 8 m down, past a steel drum under its track, a concrete block to port and a glass float to starboard, and the page shows what each sonar sees on the same pass.
 2. [Map a shipwreck](#part-2-map-a-shipwreck): a lawnmower survey over a shipwreck, made into a sidescan mosaic and a point cloud of the soundings, scored against the wreck's true geometry.
 
 The sonar sensor model is in the [sonar simulation design](../design/sonar.md).
 
-Waves do not move the boat yet: gz-maritime's waves are drawn but not coupled to buoyancy, so the boat runs on flat water.
-
 Run everything inside drydock, from `~/maritime_ws`, with the workspace sourced.
 
-## Part 1: a pass over the seabed
+## Part 1: Single pass over the undulating seabed with discrete targets
 
 ```{figure} images/sonar-survey-scene.svg
 :alt: Section and plan views of the survey: a BlueBoat on 8 m of water with a sidescan beam to each side and a downward profiler fan, and a steel drum under the track, a concrete block 12 m to port and a glass float 10 m to starboard
@@ -91,9 +89,9 @@ Close-ups. The concrete block, 12 m to port, returns brightly from the face towa
 The profiler's soundings, placed in the world with the boat's pose. They follow the seabed to within 0.1 m (95 % of them), and rise by about 0.6 m, the drum's height, over the drum, the only target under the track.
 ```
 
-## Part 2: map a shipwreck
+## Part 2: Map a shipwreck
 
-The same BlueBoat runs a lawnmower survey over a shipwreck on a flat sandy seabed 8 m down. One survey gives two maps: a sidescan mosaic, which shows the wreck and its shadows, and the profiler's soundings as a point cloud, which gives its shape. Because the simulation knows the wreck's geometry exactly, the point cloud can be scored against it, and positioning noise can be added to see what it costs.
+In this second demo, the same BlueBoat, with both profiling multibeam and sidescan sonars, executes a lawnmower survey over a shallow shipwreck on a flat sandy seabed. One survey gives two maps: a sidescan mosaic (2D image), which shows the wreck and its shadows, and the profiler's soundings as a 3D point cloud, which gives its shape. Because the simulation knows the wreck's geometry exactly, the point cloud can be scored against it truth, and positioning noise can be added to demonstrate how positioning noise affects the maps.
 
 ```{figure} ../design/images/shipwreck_survey.svg
 :alt: Line drawing of a survey boat on a line beside a broken wreck on the seabed: below the boat a profiler fan reaching the seabed and the wreck, a shaded sidescan swath to the side, profiler soundings as dots, and the wreck's acoustic shadow on the seabed
@@ -107,7 +105,15 @@ The survey, sketched (vertical scale ×2): on each line the profiler's fan sound
 The same scene in Gazebo, from a camera under the water off the wreck's port side, with the boat on the surface above it.
 ```
 
-The wreck, `model://shipwreck` in `gz_sonar`, is a wooden steam barge modeled on the Monohansett in Thunder Bay National Marine Sanctuary, at its true size (48.8 by 9.1 m) and broken in three sections. It is an authored approximation, not a survey of the real site. Its meshes are its exact ground truth, and `ground_truth/features.yaml` names its features (the boiler, the engine, the mast, the anchor and others) in the model's frame.
+The wreck, `model://shipwreck` in `gz_sonar`, is a wooden steam barge modeled on the [Monohansett](https://thunderbay.noaa.gov/shipwrecks/monohansett.html) in NOAA's Thunder Bay National Marine Sanctuary in Lake Huron, at its true size (48.8 by 9.1 m) and broken in three sections. It is an authored approximation, not a survey of the real site. Its meshes are its exact ground truth, and `ground_truth/features.yaml` names its features (the boiler, the engine, the mast, the anchor and others) in the model's frame.
+
+The Monohansett was chosen because it is a well-studied shipwreck: it has been surveyed by sonar and by photogrammetry, and the data are public, so the simulated results can be compared with real ones. The model follows NOAA's description and site plan, and the photogrammetry served as a visual reference.
+
+- Real sidescan. The [AI4Shipwrecks](https://arxiv.org/abs/2401.14546) dataset (*Machine Learning for Shipwreck Segmentation from Side Scan Sonar Imagery: Dataset and Benchmark*; data at [Deep Blue](https://doi.org/10.7302/dmf4-x492)) includes the Monohansett: labeled sidescan waterfalls from an Iver3 AUV with an EdgeTech 2205 at about 520 kHz, beside 27 other Thunder Bay wrecks.
+- Photogrammetry. Ken Merryman's 3D model, from 1,475 photographs (2021), on [3DShipwrecks](https://3dshipwrecks.org/shipwreck-monohansett/) and [Sketchfab](https://sketchfab.com/3d-models/monohansett-c72d7879931541c4946b1a2b71102b26), gives the wreck's real shape.
+- Another simulator. [OceanSim](https://arxiv.org/abs/2503.01074) (*OceanSim: A GPU-Accelerated Underwater Robot Perception Simulation Framework*) uses a reconstruction of the Monohansett as one of its scenes.
+
+This page does not make that comparison yet. Two differences matter when it is made: the real wreck lies in about 5.5 m of water and this world puts it at 8 m, and the real sidescan runs at a higher frequency and from an AUV rather than a surface boat. The datasets are linked, not copied into this repository: their licenses permit use, but not all of them permit redistribution.
 
 ### Launch
 
