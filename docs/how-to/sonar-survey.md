@@ -8,7 +8,7 @@ The example demonstrates the Blueboat with both
 The page has two parts:
 
 1. [Single pass over the undulating seabed with discrete targets](#part-1-single-pass-over-the-undulating-seabed-with-discrete-targets): in the demo, the USV moves  one straight pass over a gently undulating sandy seabed about 8 m down, past a steel drum under its track, a concrete block to port and a glass float to starboard, and the page shows what each sonar sees on the same pass.
-2. [Map a shipwreck](#part-2-map-a-shipwreck): a lawnmower survey over a shipwreck, made into a sidescan mosaic and a point cloud of the soundings, scored against the wreck's true geometry.
+2. [Map a shipwreck](#part-2-map-a-shipwreck): a lawnmower survey over a shipwreck, made into a sidescan mosaic and a point cloud of the soundings, with and without positioning noise.
 
 The sonar sensor model is in the [sonar simulation design](../design/sonar.md).
 
@@ -91,7 +91,7 @@ The profiler's soundings, placed in the world with the boat's pose. They follow 
 
 ## Part 2: Map a shipwreck
 
-In this second demo, the same BlueBoat, with both profiling multibeam and sidescan sonars, executes a lawnmower survey over a shallow shipwreck on a flat sandy seabed. One survey gives two maps: a sidescan mosaic (2D image), which shows the wreck and its shadows, and the profiler's soundings as a 3D point cloud, which gives its shape. Because the simulation knows the wreck's geometry exactly, the point cloud can be scored against it truth, and positioning noise can be added to demonstrate how positioning noise affects the maps.
+In this second demo, the same BlueBoat, with both profiling multibeam and sidescan sonars, executes a lawnmower survey over a shallow shipwreck on a flat sandy seabed. One survey gives two maps: a sidescan mosaic (2D image), which shows the wreck and its shadows, and the profiler's soundings as a 3D point cloud, which gives its shape. Because the simulation knows the wreck's geometry exactly, the maps can be checked against that ground truth, and positioning noise can be added to show how it affects them.
 
 ```{figure} ../design/images/shipwreck_survey.svg
 :alt: Line drawing of a survey boat on a line beside a broken wreck on the seabed: below the boat a profiler fan reaching the seabed and the wreck, a shaded sidescan swath to the side, profiler soundings as dots, and the wreck's acoustic shadow on the seabed
