@@ -342,7 +342,7 @@ We write our own code, and take ideas, structure and test cases from the open im
 
 ### Performance
 
-The sonar is one of the more expensive sensors in a world, so sonars belong only in scenarios that use them. Measured on one machine during development: one imaging sonar at the default 10 Hz takes the imaging world from 0.96 to 0.81 of real time on a GPU, and about the same on llvmpipe in that small scene; each ping's render and readback (13 to 15 ms on the GPU) is what the world pays, while the engine, the slowest stage at about 25 ms, runs on its own worker and limits the rate to about 18 Hz. Without a GPU, a large scene brings an imaging sonar down to 4 to 8 pings a second. A world with no sonar pays nothing. The measurements, where the time goes, and how to configure a sonar no richer than the task needs are in [Sonar performance](sonar-performance.md).
+The sonar is one of the more expensive sensors in a world, so sonars belong only in scenarios that use them. Measured once, on one machine: one imaging sonar at the default 10 Hz takes the imaging world from 0.96 to 0.81 of real time on a GPU, and about the same on llvmpipe in that small scene; each ping's render and readback (13 to 15 ms on the GPU) is what the world pays, while the engine, the slowest stage at about 25 ms, runs on its own worker and limits the rate to about 18 Hz. Without a GPU, a large scene brings an imaging sonar down to 4 to 8 pings a second. A world with no sonar pays nothing. The measurements, where the time goes, and how to configure a sonar no richer than the task needs are in [Sonar performance](sonar-performance.md).
 
 ### Phases
 
