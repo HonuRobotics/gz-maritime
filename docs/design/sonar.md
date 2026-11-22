@@ -342,33 +342,7 @@ We write our own code, and take ideas, structure and test cases from the open im
 
 ### Performance
 
-Measured once, on one machine, during Phase 2, with the imaging sonar's rays reaching two half-widths of the vertical beam; the default is now three, which adds about 50 % more hits and about 7 ms a ping on the worker (sampling 18 ms, engine 25 ms), with no measurable change to the real time factor; read these as a guide to where the time goes, not as specifications. The machine has 24 cores and an NVIDIA RTX 2070 SUPER; the scene is the imaging sonar world (`sonar_imaging.sdf`) with the BlueROV2 and its one forward imaging sonar at the walkthrough's settings (the ECHO with 768 samples to 15 m, labels on), sampled by two 604 × 429 cameras; the world runs headless.
-
-A ping has two halves. On the rendering thread, each camera renders depth and then segmentation and reads both back to the CPU. gz-sim's simulation thread waits for rendering whenever a sensor is due, so this half is what slows the world. On the sonar's own worker thread, the camera images become hits, intensities and the readout; this runs alongside the simulation and costs it nothing as long as it keeps up.
-
-| Stage, per ping | GPU | llvmpipe (no GPU) |
-|---|---|---|
-| Render and read back, 2 cameras × (depth + segmentation), rendering thread | 13 to 15 ms | 18 to 23 ms |
-| Sample the images into hits (68,864), worker | 12 ms | 12 ms |
-| Engine: beams and samples, 24 threads, worker | 24 ms | 24 ms |
-| Readout: levels, gain, the 8-bit frame, worker | 11 ms | 11 ms |
-
-| Real time factor | GPU | llvmpipe |
-|---|---|---|
-| No sonar | 0.96 | 0.95 |
-| One sonar at 10 Hz (the default) | 0.81 | 0.81 |
-| One sonar at 15 Hz | 0.75 | 0.67 |
-
-In every run the sonar kept its configured rate in sim time, with no ping missing, so the cost shows up as a slower world rather than dropped pings. Two rules of thumb follow:
-
-- The world slows by roughly the ping rate times the render time: at 10 Hz, 10 × 15 ms is 15 % of each second on the rendering thread, and the real time factor drops from 0.96 to 0.81.
-- The worker takes about 47 ms a ping at a span of 2 and about 54 ms at the default of 3, so it keeps up to about 18 Hz; beyond that the queue fills and the rendering thread waits for it too.
-
-To buy speed, lower the sampling, `rays_per_beam` first (see the advanced parameters under [SDF](#sdf)), at a cost in fidelity that should be checked on the scene at hand. In this small scene llvmpipe is close to the GPU, because the render is dominated by fixed per-camera costs, not triangles. On llvmpipe the render cost grows with the triangles in view: in Phase 1's 2.1-million-triangle scene the sampler managed 4 to 8 Hz without a GPU. 10 Hz is a realistic imaging rate for a sonar at 15 m and is the default; pick a lower rate for large scenes without a GPU.
-
-The USV scenario, the BlueBoat in the survey world with the sidescan (two sensors) and the profiler, all at 10 Hz on the GPU, kept every rate in sim time and ran at about 0.84 of real time; measured once, from the rates on the ROS side.
-
-To force llvmpipe in drydock, `gz sim` needs `__GLX_VENDOR_LIBRARY_NAME=mesa LIBGL_ALWAYS_SOFTWARE=1` (it renders through GLX on the forwarded display); the EGL settings alone leave it on the GPU. Ogre's log, `~/.gz/rendering/ogre2.log`, names the renderer it used.
+The sonar is one of the more expensive sensors in a world, so sonars belong only in scenarios that use them. Measured on one machine during development: one imaging sonar at the default 10 Hz takes the imaging world from 0.96 to 0.81 of real time on a GPU, and about the same on llvmpipe in that small scene; each ping's render and readback (13 to 15 ms on the GPU) is what the world pays, while the engine, the slowest stage at about 25 ms, runs on its own worker and limits the rate to about 18 Hz. Without a GPU, a large scene brings an imaging sonar down to 4 to 8 pings a second. A world with no sonar pays nothing. The measurements, where the time goes, and how to configure a sonar no richer than the task needs are in [Sonar performance](sonar-performance.md).
 
 ### Phases
 
