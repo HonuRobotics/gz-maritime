@@ -42,6 +42,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Unit test for the test script
+        run: bash .github/ci/test_run_tests.sh
+
       - name: Free disk before the build
         run: df -h /
 
