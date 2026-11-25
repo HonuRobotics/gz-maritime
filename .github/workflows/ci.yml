@@ -5,13 +5,15 @@ on:
   push:
     branches: [lyrical]
   schedule:
-    # Mondays 03:00 UTC: the week's first run rebuilds the dependency layer
-    # (DEPS_EPOCH), so the week's pull requests start warm.
+    # Mondays 03:00 UTC. DEPS_EPOCH changes at Monday 00:00 UTC, and the
+    # week's first run that writes the caches (this one, unless a push to
+    # lyrical came first) rebuilds the dependency layer, so the week's later
+    # pull requests start warm. A pull request before it builds cold.
     - cron: '0 3 * * 1'
   workflow_dispatch:
     inputs:
       cold:
-        description: Build with no cache at all, to measure a cold build
+        description: Read no cache, to measure a cold build (the layer cache is still written)
         type: boolean
         default: false
 
@@ -53,6 +55,7 @@ jobs:
 
       # Pull requests only read the ccache; pushes, the weekly run and manual
       # runs also save it, after the cache dance has taken it out of BuildKit.
+      # A cold manual run neither reads nor saves it.
       - name: Restore the ccache
         if: github.event_name == 'pull_request' && !inputs.cold
         uses: actions/cache/restore@v6
@@ -87,9 +90,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Every run reads the layer cache; only non-PR runs write it, so pull
-      # requests never evict the shared layers. A failed cache write only
-      # warns: the image is still pushed. Same-repo images are pushed.
+      # Every run but a cold one reads the layer cache; only non-PR runs, cold
+      # ones included, write it, so pull requests never evict the shared
+      # layers. A failed cache write only warns: the image is still pushed.
+      # Same-repo images are pushed.
       - name: Bake settings
         id: bake
         run: |
