@@ -157,8 +157,79 @@ ScrollView {
       Layout.leftMargin: 8
       Layout.rightMargin: 8
       spacing: 0
+      RowLayout {
+        Label { text: "Reach and pings on" }
+        ComboBox {
+          id: planeBox
+          Layout.fillWidth: true
+          textRole: "label"
+          valueRole: "key"
+          model: [
+            { "key": "water", "label": "the water" },
+            { "key": "depth", "label": "a depth" },
+            { "key": "receiver", "label": "a receiver's depth" },
+            { "key": "3d", "label": "spheres, in 3D" }
+          ]
+          currentIndex: Math.max(0, indexOfValue(_AcousticsPanel.plane))
+          onActivated: _AcousticsPanel.SetPlane(currentValue)
+        }
+      }
+      RowLayout {
+        Layout.leftMargin: 28
+        visible: _AcousticsPanel.plane === "depth"
+        NumberField {
+          Layout.fillWidth: false
+          Layout.preferredWidth: 60
+          text: root.show(_AcousticsPanel.planeDepth)
+          onAccepted: {
+            if (_AcousticsPanel.SetPlaneDepth(text))
+              edited = false;
+          }
+        }
+        Label { text: "m under the water" }
+      }
+      ComboBox {
+        Layout.leftMargin: 28
+        Layout.fillWidth: true
+        visible: _AcousticsPanel.plane === "receiver"
+        textRole: "name"
+        valueRole: "topic"
+        id: receiverBox
+        model: _AcousticsPanel.receivers
+        // The index does not follow the model: a ComboBox goes back to its
+        // first row whenever the list is replaced, as it is when a receiver
+        // is retuned. So the row of the receiver followed is set again each
+        // time the list or the receiver changes, not bound once. No topic
+        // means the first listed; a topic not listed gets no row, and says
+        // so, rather than the first receiver's.
+        function follow() {
+          var topic = _AcousticsPanel.planeReceiver;
+          currentIndex = topic === "" ? 0 : indexOfValue(topic);
+        }
+        displayText: currentIndex < 0 ?
+            "not listed: " + _AcousticsPanel.planeReceiver : currentText
+        Component.onCompleted: follow()
+        onModelChanged: follow()
+        onCountChanged: follow()
+        Connections {
+          target: _AcousticsPanel
+          function onPlaneReceiverChanged() { receiverBox.follow(); }
+        }
+        onActivated: _AcousticsPanel.SetPlaneReceiver(currentValue)
+      }
+      Label {
+        Layout.leftMargin: 28
+        text: "Drawing " + _AcousticsPanel.planeText +
+            (_AcousticsPanel.plane === "water" ? "" :
+             ": under the drawn sea, seen from under the water" +
+             " or with the water hidden.")
+        font.pixelSize: 11
+        color: "grey"
+        wrapMode: Text.WordWrap
+        Layout.fillWidth: true
+      }
       CheckBox {
-        text: "Reach on the water"
+        text: "Reach"
         checked: _AcousticsPanel.showReach
         onToggled: _AcousticsPanel.showReach = checked
       }

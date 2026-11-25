@@ -138,6 +138,15 @@ class IWaveField
   /// \param[in] _simTime Simulation time [s] to advance the field to.
   public: virtual void Update(double /*_simTime*/) {}
 
+  /// \brief A hint that the next `Update` will be for this time, given by a
+  /// caller that knows its schedule (the source system). A backend whose
+  /// update is costly may start computing it in the background, off the
+  /// caller's thread. It changes no result: `Update` and every query give
+  /// exactly what they give without the hint, whether or not the hinted
+  /// time turns out to be the next one. The default does nothing.
+  /// \param[in] _nextSimTime Simulation time [s] of the next `Update`.
+  public: virtual void Prepare(double /*_nextSimTime*/) {}
+
   // ---- Backend identity / capabilities ------------------------------------
 
   /// \brief Short name identifying the backend (e.g. "gerstner", "fft"). Used

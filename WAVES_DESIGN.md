@@ -162,6 +162,7 @@ engine-agnostic (N1, N3).
 | `double Jacobian(double _x, double _y, double _t) const` | Horizontal-displacement Jacobian; low values ⇒ folding/whitecaps. |
 | `void SetParameters(const WaveParameters &_params)` | (Re)build all internal state from the recipe. |
 | `void Update(double _simTime)` | Advance time-dependent state (no-op default for stateless engines). |
+| `void Prepare(double _nextSimTime)` | A hint that the next `Update` is for this time, from a caller that knows its schedule; an engine whose update is costly may compute it ahead, off the caller's thread. Changes no result, hinted right or wrong; no-op default. |
 | `std::string_view Kind() const` | Engine token, e.g. `"gerstner"`, `"fft"`. |
 | `std::optional<TileSize> Bounds() const` | Periodic extent (grid engines); `nullopt` for unbounded analytic ones. |
 | `const WaveField2D *Field() const` | The renderable grid (see below); `nullptr` if the engine has none. |
@@ -284,9 +285,12 @@ builds the engine, writes the `Wavefield` component (with `generation = 1`), and
 advertises **`/world/<name>/wave/set_parameters`** (a `gz.msgs.Param` →
 `gz.msgs.Boolean` service). `PreUpdate` drains queued parameter updates
 (bumping `generation`), re-points the engine if an ECM deserialize cleared it,
-and throttles `Update()` to `updateRate`. The service applies on the ECM thread
-(updates are queued from the transport thread), so runtime reconfiguration (R5)
-is race-free.
+and throttles `Update()` to `updateRate`. After each update it hints the
+engine with the time of the next one (`Prepare`), found with the throttle's own
+arithmetic so the hint is exactly the time that update carries;
+`wave_core_test` checks the two agree at several rates and step sizes. The
+service applies on the ECM thread (updates are queued from the transport
+thread), so runtime reconfiguration (R5) is race-free.
 
 **One parameter table, four uses.** A single `GZ_WAVES_PARAM_TABLE` (in
 `Wavefield.hh`) lists every `WaveParameters` field once and drives all four
@@ -428,6 +432,13 @@ as little of the generation as it likes.
   output is calibrated so the RMS matches the Pierson–Moskowitz `Hs`. Periodic
   over `tileSize`; `Elevation` bilinearly samples the grid; `Field()` exposes
   height + x/y displacement + a folding (foam) metric.
+- **Prepared ahead.** `Prepare` propagates the hinted time on a worker
+  thread, in a TBB arena of at most four threads so the physics thread's core
+  is left alone, into a working set of its own. `Update` takes that result
+  only for exactly that time, waiting if it is not done, and computes as ever
+  for any other, so the field is bit for bit the synchronous one. The worker
+  starts on the first hint; `SetParameters` rebuilds the state and joins it.
+  The copy of the engine in the GUI is never hinted.
 - **Particle velocity** is computed by **time finite-difference**: Ehukai
   exposes no analytic velocity field, so a scratch state is propagated a small
   `dt` ahead and the displacement grids differenced (∂Dx/∂t, ∂Dy/∂t, ∂η/∂t).
@@ -446,8 +457,9 @@ as little of the generation as it likes.
   but not yet applied (Ehukai assumes wind along +X).
 - *Tests:* `fft_test.cc` covers finiteness/bounds, ramp-up, foam from the
   Jacobian, band-pass reshaping, spectrum selection, time evolution, `Field()`
-  views, determinism vs. seed, periodicity, unit normals, particle velocity, and
-  sea-state Hs.
+  views, determinism vs. seed, periodicity, unit normals, particle velocity,
+  sea-state Hs, and that a prepared update is the synchronous one, whether the
+  hint was right, wrong, repeated, replaced or overtaken by a reconfigure.
 
 ### 6.2 GUI registrar pattern (per engine)
 
@@ -580,9 +592,11 @@ Subclass `IWaveField` (`#include "gz/sim/waves/WaveSimulation.hh"`) and implemen
 (return your token), and — to be renderable — `Update` + `Field()`. To render,
 `SetParameters` should allocate column-major N×N buffers and bind them into a
 `WaveField2D field_`; `Update` fills them for the given time; `Field()` returns
-`&field_`. Read whatever subset of `WaveParameters` you need (apply
-`WithSeaState`/`StartupRamp` for consistent sea-state and ramp behavior). Export
-the factory:
+`&field_`. `Prepare` is optional: the source system hints the time of the
+next `Update` through it, and an engine that wants to compute that update ahead
+may; leave the no-op default otherwise. Read whatever subset of
+`WaveParameters` you need (apply `WithSeaState`/`StartupRamp` for consistent
+sea-state and ramp behavior). Export the factory:
 
 ```cpp
 std::shared_ptr<IWaveField> Make<Name>WaveField();   // default-constructed engine

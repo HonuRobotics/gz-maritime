@@ -198,6 +198,9 @@ def test_acoustics_from_the_gui_state(gui):
         ''.join(g.lines)
     assert g.wait_for('AcousticsPanel: receivers listed by the acoustics system: 1'), \
         ''.join(g.lines)
+    # On the receiver's plane, 1 m down, once it is found.
+    assert g.wait_for('AcousticsPanel: drawing at the depth of listener'), \
+        ''.join(g.lines)
     # Its QML loads clean and it keeps running.
     time.sleep(3.0)
     assert g.gui.poll() is None, ''.join(g.lines)
@@ -210,6 +213,55 @@ def test_acoustics_from_the_gui_state(gui):
 NS = 'gz_maritime_gui/acoustics'
 
 
+def config_with(tmp_path, extra):
+    """Return the GUI config with elements added to the acoustics panel's."""
+    text = CONFIG.read_text().replace('<plane>receiver</plane>',
+                                      '<plane>receiver</plane>' + extra)
+    path = tmp_path / 'gui.config'
+    path.write_text(text)
+    return path
+
+
+def test_acoustics_plane_follows_the_receiver_named(gui, tmp_path):
+    """
+    Follow the receiver <plane_receiver> names, and still after a retune.
+
+    The second receiver is named: the plane follows it, and still does after
+    a receiver is retuned, which replaces the receivers' list. The combo
+    box's row lives in QML, which no offscreen test reads; this covers the
+    panel's side of it.
+    """
+    g = gui('two_receivers.sdf', config_with(
+        tmp_path, '<plane_receiver>/diver/acoustic_receiver</plane_receiver>'))
+    assert g.wait_for('AcousticsPanel: receivers listed by the acoustics system: 2'), \
+        ''.join(g.lines)
+    assert g.wait_for('AcousticsPanel: drawing at the depth of diver'), \
+        ''.join(g.lines)
+    assert not g.has('drawing at the depth of listener'), ''.join(g.lines)
+    # Retune the first receiver: the list is replaced, the plane stays.
+    g.publish('/listener/acoustic_receiver/set', 'gz.msgs.Param',
+              'params {key: "frequency" value {type: DOUBLE double_value: 25000}}')
+    time.sleep(3.0)
+    assert g.gui.poll() is None, ''.join(g.lines)
+    assert not g.has('drawing at the depth of listener'), ''.join(g.lines)
+    assert not g.has('AcousticsPanel.qml:'), ''.join(g.lines)
+
+
+def test_acoustics_plane_receiver_not_listed(gui, tmp_path):
+    """A <plane_receiver> nobody lists is warned about once, and the water drawn on."""
+    g = gui('two_receivers.sdf', config_with(
+        tmp_path, '<plane_receiver>/nobody/acoustic_receiver</plane_receiver>'))
+    assert g.wait_for('AcousticsPanel: receivers listed by the acoustics system: 2'), \
+        ''.join(g.lines)
+    assert g.wait_for('<plane_receiver> /nobody/acoustic_receiver is not a receiver'), \
+        ''.join(g.lines)
+    time.sleep(2.0)
+    assert not g.has('drawing at the depth of'), ''.join(g.lines)
+    assert sum('is not a receiver the acoustics system lists' in line
+               for line in g.lines) == 1, 'warned once'
+    assert not g.has('AcousticsPanel.qml:'), ''.join(g.lines)
+
+
 def test_acoustics_draws_what_it_shows(gui):
     """
     The acoustics panel's markers, as MarkerManager would get them.
@@ -220,12 +272,18 @@ def test_acoustics_draws_what_it_shows(gui):
     g = gui('acoustics.sdf')
     assert g.wait_for('Loaded plugin [AcousticsPanel]'), ''.join(g.lines)
 
+    # The plane drawn on is the receiver's, 1 m down, once it is found;
+    # until then the water.
+    assert g.wait_for('AcousticsPanel: drawing at the depth of listener'), \
+        ''.join(g.lines)
+    time.sleep(1.0)
+
     # The reach: one circle about the origin, where a 100 m sphere from
-    # 1.5 m down cuts the plane the panel draws on, 0.08 m above the water.
+    # 1.5 m down cuts that plane, half a metre above the pinger.
     reach = g.wait_drawn(NS + '/reach')
     assert len(reach) == 1, g.markers
     points, min_x, max_x, min_y, max_y = reach[1]
-    radius = math.sqrt(100.0 ** 2 - 1.58 ** 2)
+    radius = math.sqrt(100.0 ** 2 - 0.5 ** 2)
     assert points == 2 * 96
     assert max_x == pytest.approx(radius, abs=0.01)
     assert min_x == pytest.approx(-radius, abs=0.01)
@@ -354,3 +412,23 @@ def test_acoustics_in_a_world_without_pingers(gui):
                    for line in g.lines), ''.join(g.lines)
     # Nothing to draw: nothing drawn.
     assert not any(line.startswith(f'marker {NS}/') for line in g.markers), g.markers
+
+
+def test_acoustics_in_3d(gui):
+    g = gui('acoustics.sdf', HERE / 'gui_3d.config')
+    assert g.wait_for("AcousticsPanel: pingers from the GUI's state: 1"), \
+        ''.join(g.lines)
+    # Drawing the spheres, it keeps running, and its QML loads clean.
+    time.sleep(3.0)
+    assert g.gui.poll() is None, ''.join(g.lines)
+    assert not g.has('AcousticsPanel.qml:'), ''.join(g.lines)
+    # The reach as a sphere and the pings as shells, cut at the water: both
+    # are drawn, and reach no further than the 100 m reach.
+    reach = g.wait_drawn(NS + '/reach')
+    assert reach, g.markers
+    shells = g.wait_drawn(NS + '/pings')
+    assert shells, g.markers
+    for points, min_x, max_x, min_y, max_y in list(reach.values()) + list(shells.values()):
+        assert points > 0
+        assert -100.01 <= min_x and max_x <= 100.01
+        assert -100.01 <= min_y and max_y <= 100.01
