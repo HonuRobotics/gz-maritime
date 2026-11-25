@@ -569,8 +569,10 @@ void FFTWaveSimulation::Prepare(double _nextSimTime)
   if (e.ready && e.readyTime == _nextSimTime)
     return;
   // The worker first, while nothing is pending: if it cannot start, the
-  // exception leaves no job behind for an Update to wait on, and the update
-  // is computed as ever. It blocks on the mutex until the job is posted.
+  // exception leaves no job posted that an Update could wait on forever.
+  // Nothing catches it, so a thread that cannot start ends the run rather
+  // than hanging it. Once started it blocks on the mutex until the job is
+  // posted.
   if (!e.worker.joinable())
   {
     e.worker = std::thread(&EhukaiState::Run, &e,
