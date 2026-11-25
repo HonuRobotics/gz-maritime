@@ -91,6 +91,11 @@ class StubWaveField : public gsw::IWaveField
     this->lastUpdate = _t;
     ++this->updateCount;
   }
+  /// \brief Record the hinted time.
+  public: void Prepare(double _t) override
+  {
+    this->prepared.push_back(_t);
+  }
   /// \brief Backend token.
   public: std::string_view Kind() const override { return "stub"; }
 
@@ -139,6 +144,8 @@ class StubWaveField : public gsw::IWaveField
   public: double lastUpdate{-1.0};
   /// \brief Number of Update() calls.
   public: int updateCount{0};
+  /// \brief Every time Prepare() was given.
+  public: std::vector<double> prepared;
   /// \brief Whether Field() returns the grid.
   public: bool withField{false};
   /// \brief The render grid view.
@@ -597,6 +604,63 @@ TEST_F(WavesSystemTest, PreUpdateAdvancesEngineWithThrottle)
   EXPECT_EQ(engine->updateCount, 2);
   sys.PreUpdate(this->Info(2.0, /*paused=*/true), this->ecm);  // paused -> skip
   EXPECT_EQ(engine->updateCount, 2);
+}
+
+//////////////////////////////////////////////////
+/// After each update the system tells the engine when the next one falls,
+/// and that is exactly the time the next update then carries: at steps that
+/// divide the update period and at steps that do not, and with the throttle
+/// off, where every step updates.
+TEST_F(WavesSystemTest, PreUpdateHintsTheNextUpdateTime)
+{
+  struct Case
+  {
+    public: std::string rate;
+    public: std::chrono::steady_clock::duration dt;
+  };
+  const Case cases[] = {
+    {"30", std::chrono::milliseconds(4)},
+    {"30", std::chrono::milliseconds(1)},
+    {"50", std::chrono::milliseconds(4)},
+    {"7", std::chrono::microseconds(2500)},
+    {"0", std::chrono::milliseconds(4)},
+  };
+  for (const auto &c : cases)
+  {
+    SCOPED_TRACE(c.rate + " Hz");
+    this->ecm.RemoveComponent<gz::sim::components::Wavefield>(this->world);
+    StubWavesSystem sys;
+    sys.Configure(this->world,
+      this->Plugin("<update_rate>" + c.rate + "</update_rate>"),
+      this->ecm, this->evm);
+    auto *engine = dynamic_cast<StubWaveField *>(
+      this->Comp()->Data().simulation.get());
+    ASSERT_NE(engine, nullptr);
+
+    gz::sim::UpdateInfo info;
+    info.dt = c.dt;
+    info.paused = false;
+    int updates = 0;
+    for (int i = 1; i <= 2000; ++i)
+    {
+      info.simTime = i * c.dt;
+      const int before = engine->updateCount;
+      sys.PreUpdate(info, this->ecm);
+      if (engine->updateCount == before)
+        continue;
+      // This update was the one hinted after the last.
+      if (updates > 0)
+      {
+        ASSERT_GE(engine->prepared.size(), 2u);
+        ASSERT_EQ(engine->prepared[engine->prepared.size() - 2],
+                  engine->lastUpdate) << "step " << i;
+      }
+      ++updates;
+      // And it hinted the next.
+      ASSERT_EQ(static_cast<int>(engine->prepared.size()), updates);
+    }
+    EXPECT_GT(updates, 10);
+  }
 }
 
 //////////////////////////////////////////////////

@@ -77,6 +77,12 @@ class FFTWaveSimulation final : public IWaveField
   public: double Jacobian(double _x, double _y, double _t) const override;
   // Documentation inherited
   public: void Update(double _simTime) override;
+  /// \brief Start computing the update for `_nextSimTime` on a worker
+  /// thread. `Update` takes it when called for that very time, waiting only
+  /// if it is not done, and computes as ever for any other time: the field
+  /// is the same with or without the hint.
+  /// \param[in] _nextSimTime Simulation time [s] of the next `Update`.
+  public: void Prepare(double _nextSimTime) override;
   // Documentation inherited
   public: std::string_view Kind() const override { return "fft"; }
   // Documentation inherited
@@ -111,6 +117,12 @@ class FFTWaveSimulation final : public IWaveField
   {
     return this->dispYGrid;
   }
+
+  /// \brief The scale from Ehukai's amplitude to ours at a time: the
+  /// startup ramp, the sea state calibration and the user gain.
+  /// \param[in] _simTime Simulation time [s].
+  /// \return The scale.
+  private: double AmplitudeScale(double _simTime) const;
 
   /// \brief Bilinear sample of `_grid` at the given world (x, y), wrapping
   /// queries outside the tile to its periodic image.
