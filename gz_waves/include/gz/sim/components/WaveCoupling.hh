@@ -28,12 +28,14 @@ namespace components
 {
   /// \brief A tag on the world entity of a world whose physics follows the
   /// waves: the wave buoyancy (gz_waves_buoyancy) floats its vehicles on the
-  /// wave field. A system that damps against the water, such as
-  /// gz_hydrodynamics, adds the waves' water velocity only where it is.
+  /// wave field, and sets it. A system that damps against the water, such
+  /// as gz_hydrodynamics, adds the waves' water velocity only where it is.
   /// Without it, vehicles float on flat water and the waves are drawn only.
   ///
   /// A tag and nothing else: the still water level stays where the world
-  /// already keeps it, in its ocean current recipe.
+  /// already keeps it, in its ocean current recipe. It lives in the core so
+  /// that a reader depends on the core alone; components.cc anchors its
+  /// registration in the core library, so the GUI process knows it too.
   using WaveCoupling = Component<NoData, class WaveCouplingTag>;
 
   GZ_SIM_REGISTER_COMPONENT("gz_maritime_components.WaveCoupling",

@@ -9,11 +9,12 @@
  */
 
 /// \file
-/// \brief Anchors the `GZ_SIM_REGISTER_COMPONENT` static initializer for
-/// `components::Wavefield` in the core `libwaves.so`. Every system plugin we
-/// build links against this library, so the registration runs as soon as any
-/// of the plugins is dlopen'd — including in the GUI process, where the
-/// component needs to be registered before SceneBroadcaster's serialized
-/// state arrives.
+/// \brief Anchors the `GZ_SIM_REGISTER_COMPONENT` static initializers for
+/// `components::Wavefield` and the `components::WaveCoupling` tag in the core
+/// `libwaves.so`. Every system plugin we build links against this library, so
+/// the registration runs as soon as any of the plugins is dlopen'd —
+/// including in the GUI process, where the components need to be registered
+/// before SceneBroadcaster's serialized state arrives.
 
+#include "gz/sim/components/WaveCoupling.hh"
 #include "gz/sim/components/Wavefield.hh"

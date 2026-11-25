@@ -26,15 +26,12 @@
   <depend>gz_transport_vendor</depend>
   <depend>gz_msgs_vendor</depend>
   <depend>gz_ocean_current</depend>
-  <!-- The waves' water velocity, in a world whose physics follows them. -->
+  <!-- The waves' water velocity, in a world tagged by the wave buoyancy
+       (the WaveCoupling tag lives in the core). Its test is in
+       gz_waves_buoyancy. -->
   <depend>gz_waves</depend>
-  <!-- The WaveCoupling tag, which the wave buoyancy writes. -->
-  <depend>gz_waves_buoyancy</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
-  <!-- The waves test: the wave engine and the flat buoyancy. -->
-  <test_depend>gz_waves_provider_gerstner</test_depend>
-  <test_depend>gz_buoyancy</test_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 

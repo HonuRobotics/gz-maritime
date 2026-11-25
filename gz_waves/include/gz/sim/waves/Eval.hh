@@ -75,7 +75,9 @@ gz::math::Vector3d ParticleVelocity(const WavefieldData &_wf,
 /// (`WithSeaState(params).period`), as linear wave theory gives for one
 /// wave. A sea of many wave lengths fades its short waves faster, so this
 /// overstates their reach at depth. At or above the surface: the surface
-/// velocity.
+/// velocity. It is the velocity of the particle at rest at (x, y), while the
+/// depth is from the surface drawn over (x, y): apart, in a choppy sea, by
+/// the horizontal displacement, an error of the order of the steepness.
 /// \param[in] _wf Wave-field state to query.
 /// \param[in] _waterLevel World z of the still water [m].
 /// \param[in] _x  World-frame x coordinate [m].

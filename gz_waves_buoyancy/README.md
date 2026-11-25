@@ -68,7 +68,10 @@ plane, straight up. Not modelled:
   not along the surface normal, so a hull heels more than the slope, by
   BM / GM (the test box, 1.3 times);
 - water moving with the waves, for a vehicle without `gz_hydrodynamics`:
-  only one with Fossen coefficients is damped against it (below).
+  only one with Fossen coefficients is damped against it (below). A hull
+  with ocean current marks (`gz:ocean_current="true"`) is lifted by the
+  waves but not pushed: `gz_ocean_current`'s drag is against the current
+  alone.
 
 One plane per shape is right while the shape is short against the
 wavelength; the plane averages a chop shorter than the shape. A long hull is
@@ -78,9 +81,9 @@ buoyancy floats none.
 
 ## Water that moves with the waves
 
-The system also tags the world with its `WaveCoupling` component
-(`include/gz/sim/components/WaveCoupling.hh`, a tag and nothing else).
-`gz_hydrodynamics` sees it and damps a vehicle against the current **plus**
+The system also tags the world with `gz_waves`' `WaveCoupling` component
+(`gz_waves/include/gz/sim/components/WaveCoupling.hh`, a tag and nothing
+else). `gz_hydrodynamics` sees it and damps a vehicle against the current **plus**
 the waves' water velocity at its centre of pressure: the surface particle
 velocity, faded with depth as e^(-k d), with k the deep-water wavenumber of
 the sea's peak period (`waves::WaterVelocity`). The depth is measured from
@@ -91,10 +94,15 @@ carried back and forth by the waves; one deep down hardly feels them. In a
 world without the wave buoyancy, where the waves are only drawn, nothing
 changes.
 
+It has a cost: with the FFT engine the water velocity is a second
+propagation of the field at each update, on the physics thread. One damped
+box on the FFT sea takes about 17 % more wall time and 75 % more CPU than
+without it (25 000 steps, 4.1 s against 3.5 s).
+
 ## Tests
 
 ```bash
-colcon test --packages-select gz_waves_buoyancy gz_hydrodynamics
+colcon test --packages-select gz_waves_buoyancy
 ```
 
 - `displacement_test`: the volume and centre under, and over, flat, raised,
@@ -113,9 +121,10 @@ colcon test --packages-select gz_waves_buoyancy gz_hydrodynamics
     hydrostatic model predicts; a neutral sphere 3 m down stays put (the
     limit above);
   - on the FFT engine's slight sea, the box follows the drawn surface.
-- `gz_hydrodynamics`' `hydrodynamics_waves_test`: two damped neutral spheres
-  under the same wave. The one 0.6 m down swings 0.37 m, the one 5 m down
-  0.12 m, as e^(-k d) predicts. With the waves only drawn, neither moves.
+- `hydrodynamics_waves_test`: two neutral spheres damped by
+  `gz_hydrodynamics` under the same wave. The one 0.6 m down swings 0.37 m,
+  the one 5 m down 0.12 m, as e^(-k d) predicts. With the waves only drawn,
+  neither moves.
 
 ## Not yet
 
@@ -128,11 +137,17 @@ colcon test --packages-select gz_waves_buoyancy gz_hydrodynamics
   overstated: at 30 m, 40 to 80 % more than linear theory at sea states 5
   to 9.
 - The waves' velocity is added to the current, so a vehicle is carried
-  through its damping alone. The force from the water's acceleration (the
-  Froude–Krylov force, and the added mass's share of it) is not there,
-  though for a body small against the wavelength it is usually the larger
-  one; added mass sees the waves' velocity but not their acceleration, and
-  vehicles here carry none.
+  through its damping alone. The Froude–Krylov force, the undisturbed wave's
+  pressure on the displaced volume, is not there, though for a body small
+  against the wavelength it is usually the larger one. The added mass's
+  share of the water's acceleration is: the plugin differentiates the
+  velocity relative to the water, so with the FFT engine, whose velocity
+  changes only at the source's `<update_rate>`, a vehicle with plugin added
+  mass gets it as spikes. The vehicles here carry none.
 - The velocity is sampled at one point, the centre of pressure. A hull
   longer than the chop gets the full velocity of the short waves, where the
   buoyancy averages them over its fitted plane.
+- The velocity is the one of the particle at rest at that point, while the
+  depth is measured from the surface drawn over it; in a choppy sea the two
+  are apart by the horizontal displacement, an error of the order of the
+  wave steepness.

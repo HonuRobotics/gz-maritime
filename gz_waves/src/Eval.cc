@@ -10,8 +10,6 @@
 
 #include "gz/sim/waves/Eval.hh"
 
-#include <cmath>
-
 #include <algorithm>
 #include <cmath>
 
@@ -107,9 +105,12 @@ gz::math::Vector3d WaterVelocity(const WavefieldData &_wf, double _waterLevel,
 {
   if (!_wf.simulation)
     return gz::math::Vector3d::Zero;
+  // The velocity of the particle at rest at (x, y), while the depth below
+  // is measured from the surface drawn over (x, y), the one the wave
+  // buoyancy floats on. In a choppy sea the two are apart by the horizontal
+  // displacement, an error of the order of the wave steepness.
   const gz::math::Vector3d surface =
       _wf.simulation->ParticleVelocity(_x, _y, _t);
-  // Depth below the drawn surface, the one the wave buoyancy floats on.
   const double depth = _waterLevel + SurfaceHeight(_wf, _x, _y, _t) - _z;
   if (depth <= 0.0)
     return surface;
