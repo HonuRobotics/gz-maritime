@@ -26,8 +26,9 @@
 
 namespace gz::maritime::sonar
 {
-/// \brief The levels a sonar reads out, in dB relative to full scale (0 dB
-/// is the top of the readout): level + time-varied gain + gain, with the
+/// \brief The levels a sonar publishes, in dB relative to full scale (0 dB
+/// is the top of the published range, 255 in the imaging sonar's 8-bit
+/// image): level + time-varied gain + gain, with the
 /// noise floor added.
 struct Levels
 {

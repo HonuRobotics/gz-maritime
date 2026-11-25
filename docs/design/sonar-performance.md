@@ -41,7 +41,7 @@ The shipwreck world's real time factor for each set of sonars, with a GPU and wi
 One ping. Only the shaded step uses the GPU; the simulation waits for the rendering thread, and the sonar's worker runs alongside it.
 ```
 
-A ping has four significant steps, and only the first, drawing the images, uses the GPU. The other three, turning the images into hits, the engine, and the readout, run on the CPU whatever the hardware, so a GPU speeds up only part of the work. Without one, llvmpipe draws on the CPU instead, at a cost that stays modest in a scene of this size.
+A ping has four significant steps, and only the first, drawing the images, uses the GPU. The other three, turning the images into hits, the engine, and making the published message, run on the CPU whatever the hardware, so a GPU speeds up only part of the work. Without one, llvmpipe draws on the CPU instead, at a cost that stays modest in a scene of this size.
 
 The software involved:
 

@@ -18,7 +18,7 @@ To avoid the confound, here the geometry is exact: the synthetic scene intersect
 - The sonar equation: echoes fall with range as spreading and absorption predict, scale with a surface's backscatter (Lambert's law and the specular glint) and with the area the beam covers, and vanish behind an object (shadows).
 - The beams: a small target spreads across neighboring beams as the beam pattern says, sidelobes included, and targets at the same range but different elevations fall in the same place (the imaging sonar's elevation ambiguity).
 - Speckle and noise: their statistics, and a fixed seed giving the same ping every time, on any number of threads.
-- The readouts: the imaging sonar's 8-bit frame, the sidescan's line in dB with time-varied gain a consumer can take out again, and the profiling sonar's soundings.
+- What each sonar publishes: the imaging sonar's 8-bit image, the sidescan's line in dB with time-varied gain a consumer can take out again, and the profiling sonar's soundings.
 
 The gtests check these numerically; the pictures are for a person to check by eye, which is still the best check of a sonar image.
 
@@ -32,7 +32,7 @@ colcon test --merge-install --packages-select gz_sonar
 colcon test-result --verbose
 ```
 
-The gtests are the analytic cases of the design's testing plan: a sphere at its range and bearing, 40 log R spreading plus absorption, Lambert's law and the dependence on area, a shadow behind a box, the beam pattern across beams, elevation ambiguity, speckle statistics, the same seed giving the same ping, and the three readouts.
+The gtests are the analytic cases of the design's testing plan: a sphere at its range and bearing, 40 log R spreading plus absorption, Lambert's law and the dependence on area, a shadow behind a box, the beam pattern across beams, elevation ambiguity, speckle statistics, the same seed giving the same ping, and what the three sonars publish.
 
 ## Render and draw
 

@@ -27,9 +27,16 @@
 
 namespace gz::maritime::sonar
 {
-/// \brief The echo intensity of one ping in every beam and range sample,
-/// before readout: linear, relative to the echo of a 1 m^2 scatterer at
-/// 1 m on the beam's axis.
+/// \brief The echo intensity of one ping in every beam and range sample, as
+/// the sonar receives it. Each value is a power ratio (not decibels): the
+/// echo intensity relative to that of a target of 1 m^2 backscattering
+/// cross section, 1 m away on the beam's axis, with no absorption. For each
+/// hit that is sigma(theta) A / R^4 times absorption and the beam pattern,
+/// A being the area the ray covers; 10 log10 of the value is the echo level
+/// in dB. Readout.hh then turns it into what the sonar plugin publishes:
+/// time-varied gain and gain, then an 8-bit image (imaging) or a line of dB
+/// levels (sidescan) in a SonarImage message, or bottom-detected soundings
+/// in a SonarDetections message (profiling).
 struct BeamIntensity
 {
   std::size_t beams{0};

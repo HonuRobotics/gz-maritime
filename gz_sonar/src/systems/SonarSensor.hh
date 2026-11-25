@@ -71,7 +71,8 @@ struct PingFrame
 /// pattern of gz_wind's anemometer. It owns the engine and the camera
 /// sampler for its configuration. The world system draws its cameras on the
 /// rendering thread and hands each capture to Push; a worker thread turns it
-/// into ray hits, a ping and a readout, and publishes it. The queue is two
+/// into ray hits, the ping's intensities and its message (a SonarImage or a
+/// SonarDetections), and publishes it. The queue is two
 /// deep and Push blocks when it is full, so a slow engine slows the
 /// simulation instead of dropping or reordering pings.
 class SonarSensor : public sensors::Sensor

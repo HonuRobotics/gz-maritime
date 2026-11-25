@@ -54,7 +54,7 @@ def draw_fan(stem):
     ax.set_facecolor('black')
     ax.set_xlabel('starboard (m)')
     ax.set_ylabel('forward (m)')
-    ax.set_title(f'{stem.name}: imaging sonar, 8-bit readout')
+    ax.set_title(f'{stem.name}: imaging sonar, published 8-bit image')
     fig.tight_layout()
     fig.savefig(str(stem) + '.png', dpi=120)
     plt.close(fig)

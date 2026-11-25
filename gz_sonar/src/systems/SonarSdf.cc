@@ -168,15 +168,15 @@ std::optional<sonar::SonarConfig> LoadSonarConfig(const std::string &_type,
     c.speckle = *v;
   if (auto v = Child<bool>(_block, "labels"))
     _labels = *v;
-  if (auto v = Child<std::string>(_block, "readout"))
+  if (auto v = Child<std::string>(_block, "detection"))
   {
     if (*v == "beamformed")
-      c.readout = sonar::ProfilingReadout::kBeamformed;
+      c.detection = sonar::ProfilingDetection::kBeamformed;
     else if (*v == "angle_of_arrival")
-      c.readout = sonar::ProfilingReadout::kAngleOfArrival;
+      c.detection = sonar::ProfilingDetection::kAngleOfArrival;
     else
     {
-      _error = "<readout> must be beamformed or angle_of_arrival";
+      _error = "<detection> must be beamformed or angle_of_arrival";
       return std::nullopt;
     }
   }
@@ -235,11 +235,11 @@ std::optional<sonar::SonarConfig> LoadSonarConfig(const std::string &_type,
   // Unknown elements are most likely misspellings; say so rather than
   // ignore them.
   static const std::set<std::string> known = {
-    "angle_noise", "beam_width", "beams", "detection_threshold",
+    "angle_noise", "beam_width", "beams", "detection", "detection_threshold",
     "dynamic_range", "elevation_rays", "elevation_span", "frequency", "gain",
     "gain_time_constant", "horizontal_fov", "labels", "max_soundings",
     "noise_floor", "pulse_length", "range", "range_max", "range_min",
-    "range_noise", "rays_per_beam", "readout", "samples", "sidelobe_level",
+    "range_noise", "rays_per_beam", "samples", "sidelobe_level",
     "sound_speed", "speckle", "tvg", "tvg_spreading", "vertical_fov",
     "water_column"};
   for (auto e = _block->GetFirstElement(); e; e = e->GetNextElement())

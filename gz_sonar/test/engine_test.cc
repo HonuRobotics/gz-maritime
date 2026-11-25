@@ -395,11 +395,11 @@ TEST(Readout, SidescanTvgIsRemovable)
 // A profiler over a flat seabed: every sounding lies on it.
 TEST(Readout, ProfilingFlatSeabed)
 {
-  for (auto mode : {sonar::ProfilingReadout::kBeamformed,
-                    sonar::ProfilingReadout::kAngleOfArrival})
+  for (auto mode : {sonar::ProfilingDetection::kBeamformed,
+                    sonar::ProfilingDetection::kAngleOfArrival})
   {
     sonar::SonarConfig c = sonar::SurveyorProfiling();
-    c.readout = mode;
+    c.detection = mode;
     c.rangeMax = 30.0;
     c.angleNoise = 0.0;
     sonar::SyntheticScene scene;
@@ -412,7 +412,7 @@ TEST(Readout, ProfilingFlatSeabed)
       sonar::ReadLevels(b, c, engine.Absorption(), 0), c, 1500.0, 0);
 
     ASSERT_FALSE(soundings.empty());
-    if (mode == sonar::ProfilingReadout::kAngleOfArrival)
+    if (mode == sonar::ProfilingDetection::kAngleOfArrival)
     {
       EXPECT_LE(soundings.size(), c.maxSoundings);
       EXPECT_GE(soundings.size(), 10u);

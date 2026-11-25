@@ -119,7 +119,7 @@ TEST(SonarSdf, BadValuesAreRefused)
     "<samples>0</samples>",
     "<gain>loud</gain>",
     "<tvg>sometimes</tvg>",
-    "<readout>guess</readout>",
+    "<detection>guess</detection>",
     "<pulse_length>0</pulse_length>",
     "<sound_speed>-1</sound_speed>",
     "<dynamic_range>0</dynamic_range>",

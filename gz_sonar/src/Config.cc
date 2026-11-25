@@ -63,10 +63,17 @@ double SonarConfig::BeamAzimuth(std::size_t _j) const
     (static_cast<double>(_j) + 0.5) * spacing;
 }
 
+// Three config presets: each sensor type's defaults, set to those of a standard
+// device of its kind, so an empty <gz:sonar/> behaves like that device out of
+// the box. They are starting values, not fixed ones: every parameter can be
+// overridden in SDF (<gz:sonar>) or a vehicle's `sonar:` config without
+// recompiling, which is also how a different device is simulated.
+
 SonarConfig EchoImaging()
 {
-  // Datasheet: 700 kHz to 30 m, 120 x 20 degrees, 256 beams, 1.5 degree
-  // angular resolution, range resolution under 8 mm.
+  // Sonoptix ECHO multibeam imaging sonar, datasheet: 700 kHz to 30 m, 120 x
+  // 20 degrees, 256 beams, 1.5 degree angular resolution, range resolution
+  // under 8 mm.
   SonarConfig c;
   c.frequency = 700000.0;
   c.horizontalFov = 120.0 * kDeg;
@@ -90,8 +97,9 @@ SonarConfig EchoImaging()
 
 SonarConfig OmniscanSidescan()
 {
-  // Datasheet: 450 kHz, 0.5 degree along track by 50 degrees, no tilt,
-  // 600 samples typical, up to 150 m; we default to a 50 m window.
+  // Cerulean Sonar Omniscan 450 SS sidescan sonar, datasheet: 450 kHz, 0.5
+  // degree along track by 50 degrees, no tilt, 600 samples typical, up to 150
+  // m; we default to a 50 m window.
   SonarConfig c;
   c.frequency = 450000.0;
   c.horizontalFov = 0.5 * kDeg;
@@ -111,9 +119,10 @@ SonarConfig OmniscanSidescan()
 
 SonarConfig SurveyorProfiling()
 {
-  // Datasheet: 240 kHz, 4 degrees along track by 80 degrees across, angle
-  // of arrival with under 1 degree resolution, 10 to 20 points per ping,
-  // 200 to 800 range steps; we default to 50 m, the typical detection range.
+  // Cerulean Sonar Surveyor 240-16 multibeam echosounder, datasheet: 240 kHz,
+  // 4 degrees along track by 80 degrees across, angle of arrival with under 1
+  // degree resolution, 10 to 20 points per ping, 200 to 800 range steps; we
+  // default to 50 m, the typical detection range.
   SonarConfig c;
   c.frequency = 240000.0;
   c.horizontalFov = 80.0 * kDeg;
@@ -125,7 +134,7 @@ SonarConfig SurveyorProfiling()
   c.samples = 400;
   c.pulseLength = 1.0e-4;
   c.tvg = Tvg::kNone;
-  c.readout = ProfilingReadout::kAngleOfArrival;
+  c.detection = ProfilingDetection::kAngleOfArrival;
   c.maxSoundings = 20;
   c.elevationRays = 16;
   return c;

@@ -18,7 +18,7 @@ package gz.maritime.sonar;
 import "gz/msgs/header.proto";
 
 /// Ground truth for one ping: for every beam and sample, which surface sent
-/// it the most energy. Never sensor output: a real sonar cannot know this.
+/// it the most energy. 
 message SonarLabels
 {
   gz.msgs.Header header = 1;

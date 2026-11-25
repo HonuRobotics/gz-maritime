@@ -209,7 +209,7 @@ std::vector<Sounding> ReadProfiling(const Levels &_levels,
   };
 
   std::vector<Sounding> out;
-  if (_config.readout == ProfilingReadout::kBeamformed)
+  if (_config.detection == ProfilingDetection::kBeamformed)
   {
     for (const Peak &p : peaks)
       out.push_back(makeSounding(p));
