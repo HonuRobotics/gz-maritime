@@ -42,6 +42,9 @@ jobs:
       SAME_REPO: ${{ github.repository == 'HonuRobotics/gz-maritime' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No later step needs git credentials; keep the token off disk.
+          persist-credentials: false
 
       - name: Free disk before the build
         run: df -h /
