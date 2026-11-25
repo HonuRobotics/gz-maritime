@@ -92,7 +92,7 @@ pip install -r docs/requirements.txt && sphinx-build -W docs docs/_build/html
 Render-path changes cannot be verified without a GPU — they need a real
 `gz sim -r`. State plainly when a change is build-only and GUI-unverified. One
 part is covered by a test: `gz_waves_rendering`'s `drawn_surface_test` compares
-the surface a depth camera sees with the wave field (it needs a GPU too).
+the surface a depth camera sees with the wave field (it has to render too).
 
 ## Code style (Gazebo house style)
 
