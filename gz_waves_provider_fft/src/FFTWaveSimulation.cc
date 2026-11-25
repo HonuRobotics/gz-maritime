@@ -529,8 +529,8 @@ void FFTWaveSimulation::Update(double _simTime)
 
   e.propagation->propagate(
       e.params, *e.initial, *e.state, static_cast<float>(_simTime));
-  ToGrids(*e.state, N, this->AmplitudeScale(_simTime),
-          this->AmplitudeScale(_simTime) * this->choppiness,
+  const double scale = this->AmplitudeScale(_simTime);
+  ToGrids(*e.state, N, scale, scale * this->choppiness,
           this->heightGrid, this->dispXGrid, this->dispYGrid, this->minEGrid);
 
   // The particle-velocity grids are NOT refreshed here: their finite
@@ -568,16 +568,19 @@ void FFTWaveSimulation::Prepare(double _nextSimTime)
   e.cv.wait(lock, [&e] { return !e.pending; });
   if (e.ready && e.readyTime == _nextSimTime)
     return;
-  e.ready = false;
-  e.jobTime = _nextSimTime;
-  e.jobScale = this->AmplitudeScale(_nextSimTime);
-  e.jobChopScale = e.jobScale * this->choppiness;
-  e.pending = true;
+  // The worker first, while nothing is pending: if it cannot start, the
+  // exception leaves no job behind for an Update to wait on, and the update
+  // is computed as ever. It blocks on the mutex until the job is posted.
   if (!e.worker.joinable())
   {
     e.worker = std::thread(&EhukaiState::Run, &e,
                            static_cast<int>(this->gridSize));
   }
+  e.ready = false;
+  e.jobTime = _nextSimTime;
+  e.jobScale = this->AmplitudeScale(_nextSimTime);
+  e.jobChopScale = e.jobScale * this->choppiness;
+  e.pending = true;
   lock.unlock();
   e.cv.notify_all();
 }
