@@ -221,9 +221,9 @@ jobs:
     if: needs.image.outputs.same_repo == 'true' && vars.CLOUD_GPU == 'on'
     runs-on: runs-on=${{ github.run_id }}/family=g4dn.xlarge/image=ubuntu24-gpu-x64
     timeout-minutes: 20
+    # No checkout: the tests and run_tests.sh are in the image.
     permissions:
-      contents: read
-      packages: read
+      packages: read # to pull the image from GHCR
     env:
       IMAGE: ${{ needs.image.outputs.image }}
     steps:
