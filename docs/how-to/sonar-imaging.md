@@ -40,6 +40,23 @@ ros2 run rqt_image_view rqt_image_view /bluerov2/sonar_forward/image/view
 The fan, forward up: nothing close in, then the seabed from about 4 m, where the rays first reach it below the vertical beam's edge, and the four targets as bright returns, each with a shadow behind it. The time-varied gain lifts the near seabed, so the beam's edge shows little in the image.
 ```
 
+## Read the sonar in ROS 2
+
+The sonar data is the `marine_acoustic_msgs/ProjectedSonarImage` on `/bluerov2/sonar_forward/image`, published by `kai_sonar_bridge` with the sensor-data QoS (best effort):
+
+```bash
+ros2 topic info /bluerov2/sonar_forward/image
+ros2 run kai_sonar_bridge read_sonar.py /bluerov2/sonar_forward/image
+```
+
+`read_sonar.py`, in `kai_sonar_bridge/examples`, is a short ROS 2 consumer to start from: it unpacks each ping and prints what it holds.
+
+```text
+frame bluerov2/sonar_forward_acoustic: 256 beams x 768 samples, 0.21 to 14.99 m, uint8; brightest 255.0 at 6.67 m, 12.0 deg to starboard
+```
+
+The image is stored range-major, all 256 beams at the first range, then the next, as uint8. Each beam's direction is given in the message's frame, `bluerov2/sonar_forward_acoustic`, which puts Z along the sonar's axis and X up, as `ProjectedSonarImage` expects, so a beam's bearing is atan2(−y, z), positive to port. The brightest echo is the glass float's glint, its near face about 6.7 m away at 13° to starboard. In RViz, a TF display shows that frame on the ROV's bow.
+
 ## Turn the ROV
 
 ```bash

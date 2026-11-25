@@ -55,6 +55,19 @@ ros2 run rqt_image_view rqt_image_view /blueboat/sidescan/port/image/view
 
 For the soundings, add a PointCloud2 display of `/blueboat/profiler/detections/points` in RViz with the fixed frame `blueboat/base_link`.
 
+To read the messages themselves, `read_sonar.py` ([Read the sonar in ROS 2](sonar-imaging.md#read-the-sonar-in-ros-2)) also takes a sidescan side or the profiler:
+
+```bash
+ros2 run kai_sonar_bridge read_sonar.py /blueboat/profiler/detections
+```
+
+```text
+frame blueboat/profiler_beam: 20 soundings, 20 good
+    36.1 deg (+ starboard): range 10.46 m, across   6.16 m, depth  8.45 m
+```
+
+A sounding is an across-track angle (`rx_angles`, positive to starboard) and a two-way travel time; its range is half the travel time times the sound speed in `ping_info`. A sidescan side's `ProjectedSonarImage` is one beam of float32 levels in dB.
+
 ### Drive the pass
 
 ```bash

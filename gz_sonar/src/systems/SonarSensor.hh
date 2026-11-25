@@ -66,15 +66,19 @@ struct PingFrame
   std::shared_ptr<const LabelTable> table;
 };
 
-/// \brief One sonar: a gz-sensors custom sensor,
-/// <sensor type="custom" gz:type="imaging_sonar"> (or sidescan_sonar), the
-/// pattern of gz_wind's anemometer. It owns the engine and the camera
-/// sampler for its configuration. The world system draws its cameras on the
-/// rendering thread and hands each capture to Push; a worker thread turns it
-/// into ray hits, the ping's intensities and its message (a SonarImage or a
-/// SonarDetections), and publishes it. The queue is two
-/// deep and Push blocks when it is full, so a slow engine slows the
-/// simulation instead of dropping or reordering pings.
+/// \brief One sonar sensor. The sonar plugin (the world system, Sonar.cc)
+/// creates one SonarSensor for each <sensor type="custom"> in the world
+/// whose gz:type is one of  {imaging_sonar, sidescan_sonar or profiling_sonar}.
+///
+/// Each SonarSensor owns the engine and the camera sampler for its sonar's
+/// configuration, and a worker thread of its own. The world system draws
+/// this sonar's cameras on the rendering thread and hands each rendered
+/// ping to Push. The worker thread turns the ping's images into ray hits,
+/// the hits into intensities, and the intensities into this sonar's message
+/// (a SonarImage, or a SonarDetections for a profiler), and publishes it.
+/// The queue between them is two pings deep and Push blocks when it is
+/// full, so a slow engine slows the simulation instead of dropping or
+/// reordering pings.
 class SonarSensor : public sensors::Sensor
 {
   public: ~SonarSensor() override;

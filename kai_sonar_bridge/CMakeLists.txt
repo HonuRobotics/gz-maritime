@@ -41,6 +41,9 @@ install(TARGETS ${PROJECT_NAME}
   RUNTIME DESTINATION bin)
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 
+# An example ROS 2 consumer of the sonar messages: ros2 run kai_sonar_bridge read_sonar.py
+install(PROGRAMS examples/read_sonar.py DESTINATION lib/${PROJECT_NAME})
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)

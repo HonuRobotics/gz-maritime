@@ -26,7 +26,11 @@
 
 namespace gz::sim::maritime
 {
-/// \brief The custom sensor types the sonar system drives.
+/// \brief The custom sensor types the sonar system drives. What each type
+/// of sonar is, and how this project uses the terms (imaging, profiling,
+/// sidescan, multibeam and their synonyms), is in the design's Glossary:
+/// docs/design/sonar.md, section "Sonars in scope", "Glossary".
+
 inline constexpr const char *kImagingSonar = "imaging_sonar";
 inline constexpr const char *kSidescanSonar = "sidescan_sonar";
 inline constexpr const char *kProfilingSonar = "profiling_sonar";

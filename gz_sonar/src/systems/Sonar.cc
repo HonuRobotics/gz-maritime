@@ -172,6 +172,37 @@ std::uint64_t FirstPingAt(nanoseconds _t, double _rate)
   return static_cast<std::uint64_t>(std::ceil(k - 1e-6));
 }
 
+/// \brief Undoes what a sonar's render changed in the scene: shows the
+/// visuals it hid and puts back the labels it set, once, on Now() or at the
+/// end of its scope.
+class RestoreVisuals
+{
+  public: RestoreVisuals(
+    std::vector<std::pair<rendering::VisualPtr, rendering::Variant>> &_saved,
+    std::vector<rendering::VisualPtr> &_hidden)
+    : saved(_saved), hidden(_hidden) {}
+
+  public: ~RestoreVisuals() { this->Now(); }
+
+  public: void Now()
+  {
+    // gz-rendering has no visibility getter, so whatever was hidden here is
+    // shown again; nothing else in these worlds hides a visual.
+    for (auto &v : this->hidden)
+      v->SetVisible(true);
+    this->hidden.clear();
+    // Put back whatever was there, in reverse; an empty datum reads as
+    // background, as it did before.
+    for (auto it = this->saved.rbegin(); it != this->saved.rend(); ++it)
+      it->first->SetUserData("label", it->second);
+    this->saved.clear();
+  }
+
+  private: std::vector<std::pair<rendering::VisualPtr, rendering::Variant>>
+    &saved;
+  private: std::vector<rendering::VisualPtr> &hidden;
+};
+
 /// \brief The cameras of one sonar, on the rendering thread.
 struct Rig
 {
@@ -981,12 +1012,21 @@ void SonarPrivate::OnRender()
       std::llround(static_cast<double>(rig.next) * 1e9 / rate)));
     if (t < due)
       continue;
+    // The vehicle was removed this step: gz-sim has destroyed its link visual,
+    // which leaves the cameras without a parent (drawing from the world
+    // origin) until the rig itself goes at the next frame. Skip it.
+    if (!this->VisualOf(rig.request.link))
+      continue;
     const std::uint64_t ping = rig.next;
 
     // Labels on, and hide what the sonar must not see: the water, the
     // transparent surfaces and its own vehicle.
     std::vector<std::pair<rendering::VisualPtr, rendering::Variant>> saved;
     std::vector<rendering::VisualPtr> hidden;
+    // Shows the hidden visuals again and puts their labels back when this
+    // ping's render is done, also if it ends early with an exception, so no
+    // visual stays hidden from the other sonars and cameras.
+    RestoreVisuals restore{saved, hidden};
     auto label = [&](const rendering::VisualPtr &_v, int _l) {
       saved.emplace_back(_v, _v->UserData("label"));
       _v->SetUserData("label", _l);
@@ -1026,14 +1066,7 @@ void SonarPrivate::OnRender()
       rig.seg[c]->PostRender();
     }
 
-    // gz-rendering has no visibility getter, so whatever was hidden here is
-    // shown again; nothing else in these worlds hides a visual.
-    for (auto &v : hidden)
-      v->SetVisible(true);
-    // Put back whatever was there; an empty datum reads as background, as
-    // it did before.
-    for (auto it = saved.rbegin(); it != saved.rend(); ++it)
-      it->first->SetUserData("label", it->second);
+    restore.Now();
 
     PingFrame frame;
     frame.ping = ping;
