@@ -30,8 +30,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
-      contents: read
-      packages: write
+      contents: read # to check out the repository
+      packages: write # to push the image to GHCR
     env:
       IMAGE: ghcr.io/honurobotics/gz-maritime-ci:sha-${{ github.sha }}
       # Bake's tags, which check_image_tags.sh holds to IMAGE.
