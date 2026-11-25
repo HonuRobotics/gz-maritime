@@ -22,8 +22,8 @@ concurrency:
 permissions: {}
 
 jobs:
-  # Builds the CI image. Same-repo runs push it to GHCR; a fork's image
-  # stays on the runner.
+  # Builds the CI image. Runs in this repository push it to GHCR; a fork's
+  # image stays on the runner, from a pull request here or a run in the fork.
   image:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -35,7 +35,9 @@ jobs:
       # Bake's tags, which check_image_tags.sh holds to IMAGE.
       TAG: sha-${{ github.sha }}
       EXTRA_TAG: ${{ github.event_name == 'push' && 'lyrical' || '' }}
-      SAME_REPO: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+      # Only this repository may push to IMAGE: a run in a fork (a push, a
+      # manual run, a pull request between its branches) would get a 403.
+      SAME_REPO: ${{ github.repository == 'HonuRobotics/gz-maritime' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     steps:
       - uses: actions/checkout@v7
 
