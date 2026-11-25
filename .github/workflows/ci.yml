@@ -41,12 +41,12 @@ jobs:
       # manual run, a pull request between its branches) would get a 403.
       SAME_REPO: ${{ github.repository == 'HonuRobotics/gz-maritime' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Free disk before the build
         run: df -h /
 
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         id: buildx
 
       - name: Dependency epoch
@@ -58,7 +58,7 @@ jobs:
       # A cold manual run neither reads nor saves it.
       - name: Restore the ccache
         if: github.event_name == 'pull_request' && !inputs.cold
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ccache
           key: ccache-${{ steps.epoch.outputs.deps_epoch }}-${{ hashFiles('.github/ci/Dockerfile', '*/package.xml') }}-${{ github.run_id }}
@@ -66,14 +66,14 @@ jobs:
 
       - name: Restore and save the ccache
         if: github.event_name != 'pull_request' && !inputs.cold
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ccache
           key: ccache-${{ steps.epoch.outputs.deps_epoch }}-${{ hashFiles('.github/ci/Dockerfile', '*/package.xml') }}-${{ github.run_id }}
           restore-keys: ccache-${{ steps.epoch.outputs.deps_epoch }}-${{ hashFiles('.github/ci/Dockerfile', '*/package.xml') }}-
 
       - name: Move the ccache in and out of BuildKit
-        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        uses: reproducible-containers/buildkit-cache-dance@5422eac04292c961a382e0f584ea0f03ad9da723 # v3.4.0
         with:
           builder: ${{ steps.buildx.outputs.name }}
           cache-map: |
@@ -81,10 +81,13 @@ jobs:
               "ccache": {"target": "/ccache", "id": "ccache"}
             }
           skip-extraction: ${{ github.event_name == 'pull_request' }}
+          # The action's default image, ghcr.io/containerd/busybox:latest on
+          # 2026-11-25, pinned like the actions: it writes the ccache.
+          utility-image: ghcr.io/containerd/busybox@sha256:52f73a0a43a16cf37cd0720c90887ce972fe60ee06a687ee71fb93a7ca601df7
 
       - name: Log in to GHCR
         if: env.SAME_REPO == 'true'
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -117,7 +120,7 @@ jobs:
         run: bash .github/ci/check_image_tags.sh
 
       - name: Build the image
-        uses: docker/bake-action@v7.5.0
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
         env:
           DEPS_EPOCH: ${{ steps.epoch.outputs.deps_epoch }}
         with:
