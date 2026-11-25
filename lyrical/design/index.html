@@ -567,6 +567,14 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/wind-and-current.html#in-your-own-world">In your own world</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/acoustic-pingers.html">Find an acoustic pinger</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/acoustic-pingers.html#run-the-demo">Run the demo</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/acoustic-pingers.html#see-them-in-the-gui">See them in the GUI</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/acoustic-pingers.html#put-a-pinger-in-a-world">Put a pinger in a world</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/acoustic-pingers.html#give-your-vehicle-a-receiver">Give your vehicle a receiver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/acoustic-pingers.html#coming-from-vrx">Coming from VRX</a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="../how-to/faq.html">Troubleshooting</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#my-vehicle-sinks">My vehicle sinks</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#my-vehicle-bumps-into-things-it-shouldn-t-or-sits-on-the-water-oddly">My vehicle bumps into things it shouldn’t, or sits on the water oddly</a></li>
@@ -634,6 +642,7 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l2"><a class="reference internal" href="#floating-vehicles-the-world-doesn-t-know">Floating vehicles the world doesn’t know</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#one-name-per-instance">One name per instance</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#one-thruster-interface">One thruster interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pingers-in-the-world-receivers-on-vehicles">Pingers in the world, receivers on vehicles</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#buoyancy-that-follows-the-waves">Buoyancy that follows the waves</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#related">Related</a></li>
 </ul>
@@ -776,6 +785,34 @@ onto the motor. With one interface, a controller written against the custom
 USV drives the BlueBoat unchanged, and an autopilot’s servo outputs map onto
 it directly. The mode is on its way upstream; when a Gazebo release carries
 it, vehicles switch the plugin’s filename and name and nothing else.</p>
+</section>
+<section id="pingers-in-the-world-receivers-on-vehicles">
+<h2>Pingers in the world, receivers on vehicles<a class="headerlink" href="#pingers-in-the-world-receivers-on-vehicles" title="Link to this heading"></a></h2>
+<p>VRX’s acoustic pinger plugin lived on the receiving boat and held the pinger
+as a position of its own: each boat had its own copy of the pinger, a
+scoring plugin kept the copies in step over a topic, and a pinger hung under
+a buoy did not move with it. <code class="docutils literal notranslate"><span class="pre">gz_acoustics</span></code> turns that round, the way the
+buoyancy and wind marks do:</p>
+<ul class="simple">
+<li><p><strong>A pinger is a thing in the world.</strong> A model plugin writes it as a
+component on a link, so it moves with whatever carries it, every vehicle
+hears the same one, and the world can list them all.</p></li>
+<li><p><strong>A receiver is a sensor.</strong> A gz-sensors custom sensor on any link, found
+by the world’s acoustics system on any model, spawned at any time; its
+reading is in its own frame.</p></li>
+<li><p><strong>Behaviour, not acoustics.</strong> A ping is an event on a schedule, carried at
+the speed of sound to each receiver, and heard or not by a few rules
+(water, reach, band, field of view, dropout, overlap), each of which can
+be switched off.
+Nothing models how sound bends, echoes or fades beyond spherical
+spreading; a team testing its own signal processing will need more than
+this, which is left for later (time differences per hydrophone).</p></li>
+<li><p><strong>The world owns the switch.</strong> A pinger changes on its own <code class="docutils literal notranslate"><span class="pre">set</span></code> topic;
+choosing which one pings in a task belongs to whoever runs the task, such
+as a competition server, which only has to send <code class="docutils literal notranslate"><span class="pre">set</span></code> messages.</p></li>
+</ul>
+<p>The plan, the survey of other simulators it draws on and what is left are
+in <a class="reference external" href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/ACOUSTIC_PINGER_PLAN.md">ACOUSTIC_PINGER_PLAN.md</a>.</p>
 </section>
 <section id="buoyancy-that-follows-the-waves">
 <h2>Buoyancy that follows the waves<a class="headerlink" href="#buoyancy-that-follows-the-waves" title="Link to this heading"></a></h2>
