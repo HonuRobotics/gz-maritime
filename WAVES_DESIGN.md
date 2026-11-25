@@ -166,6 +166,7 @@ engine-agnostic (N1, N3).
 | `std::string_view Kind() const` | Engine token, e.g. `"gerstner"`, `"fft"`. |
 | `std::optional<TileSize> Bounds() const` | Periodic extent (grid engines); `nullopt` for unbounded analytic ones. |
 | `const WaveField2D *Field() const` | The renderable grid (see below); `nullptr` if the engine has none. |
+| `const double *Foam() const` | The grid's folding metric for the renderer, computed on request by an engine that defers it; default `Field()->foam`. |
 
 **`WaveField2D` — the rendering contract.** A Plain Old Data (POD) view the
 renderer consumes without knowing the engine:
@@ -183,6 +184,10 @@ struct WaveField2D {
 
 Arrays are **column-major N×N**, periodic over `tile`, owned by the engine, and
 valid until the next `SetParameters`; `Update` refreshes their contents in place.
+`foam` may be null until `Foam()` was asked for: an engine that computes the
+folding metric only on request leaves it out of `Update`, so a consumer that
+reads the view for the heights (`Eval::SurfaceHeight`, on the server) never
+pays for it; the renderer asks `Foam()`.
 `TileSize` is `{double x, double y}` (a centred, periodic tile).
 
 ### 3.2 Engine registry — token → factory
@@ -439,6 +444,12 @@ as little of the generation as it likes.
   for any other, so the field is bit for bit the synchronous one. The worker
   starts on the first hint; `SetParameters` rebuilds the state and joins it.
   The copy of the engine in the GUI is never hinted.
+- **Foam on request.** The folding metric takes three of the six inverse
+  transforms, and only the renderer reads it. `Update`, synchronous or
+  prepared ahead, propagates without it (Ehukai's `propagate(..., false)`),
+  and the first `Jacobian()` or `Foam()` after an update runs
+  `propagateMinE` for that time, on the caller's thread, into the live grid;
+  `Field()->foam` is null until then. A server world never computes foam.
 - **Particle velocity** is computed by **time finite-difference**: Ehukai
   exposes no analytic velocity field, so a scratch state is propagated a small
   `dt` ahead and the displacement grids differenced (∂Dx/∂t, ∂Dy/∂t, ∂η/∂t).
@@ -458,8 +469,10 @@ as little of the generation as it likes.
 - *Tests:* `fft_test.cc` covers finiteness/bounds, ramp-up, foam from the
   Jacobian, band-pass reshaping, spectrum selection, time evolution, `Field()`
   views, determinism vs. seed, periodicity, unit normals, particle velocity,
-  sea-state Hs, and that a prepared update is the synchronous one, whether the
-  hint was right, wrong, repeated, replaced or overtaken by a reconfigure.
+  sea-state Hs, that a prepared update is the synchronous one, whether the
+  hint was right, wrong, repeated, replaced or overtaken by a reconfigure, and
+  that foam comes on request, once per update, the same through `Jacobian()`
+  and `Foam()`, after a prepared update and after a reconfigure.
 
 ### 6.2 GUI registrar pattern (per engine)
 

@@ -71,7 +71,7 @@ struct WaveField2D
   const double *dy{nullptr};
 
   /// \brief Folding metric: 1 = flat, < 1 → folding (whitecaps); null ⇒ the
-  /// backend has no foam.
+  /// backend has no foam, or has not computed it yet: ask `Foam()`.
   const double *foam{nullptr};
 };
 
@@ -171,6 +171,19 @@ class IWaveField
   /// `Update`; it stays valid until the next `SetParameters`.
   /// \return The renderable grid, or `nullptr` if the backend exposes none.
   public: virtual const WaveField2D *Field() const { return nullptr; }
+
+  /// \brief The folding metric of the grid `Field()` describes, column-major
+  /// N×N like its other arrays, for the renderer's foam. An engine that
+  /// computes foam only when asked computes it here, for the time of the
+  /// last `Update`, and leaves `Field()->foam` null until it has, so a
+  /// consumer that reads `Field()` for the heights never pays for foam. The
+  /// default returns `Field()->foam`.
+  /// \return The folding metric, or `nullptr` if the backend has none.
+  public: virtual const double *Foam() const
+  {
+    const WaveField2D *field = this->Field();
+    return field ? field->foam : nullptr;
+  }
 };
 
 /// \brief Builds a default-constructed wave-field engine for a token. The

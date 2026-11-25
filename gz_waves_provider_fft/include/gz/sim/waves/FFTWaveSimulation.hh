@@ -73,7 +73,9 @@ class FFTWaveSimulation final : public IWaveField
   // Documentation inherited
   public: gz::math::Vector3d Normal(
     double _x, double _y, double _t) const override;
-  // Documentation inherited
+  // Documentation inherited. The folding metric behind it is computed on
+  // the first query after an Update (three of the six transforms, which the
+  // renderer alone needs); a server that never asks never pays for them.
   public: double Jacobian(double _x, double _y, double _t) const override;
   // Documentation inherited
   public: void Update(double _simTime) override;
@@ -90,8 +92,14 @@ class FFTWaveSimulation final : public IWaveField
   {
     return TileSize{this->tileSize, this->tileSize};
   }
-  // Documentation inherited
+  // Documentation inherited. Its `foam` is null until Foam() or Jacobian()
+  // computed it for the last Update, so Eval::SurfaceHeight and the other
+  // readers of the heights never trigger it.
   public: const WaveField2D *Field() const override;
+
+  // Documentation inherited. Computes the metric for the last Update if it
+  // is not yet.
+  public: const double *Foam() const override;
 
   // ---- Accessors for unit tests + visual heightmap upload ----------------
 
@@ -123,6 +131,11 @@ class FFTWaveSimulation final : public IWaveField
   /// \param[in] _simTime Simulation time [s].
   /// \return The scale.
   private: double AmplitudeScale(double _simTime) const;
+
+  /// \brief Compute the folding metric for the last Update, if it is not
+  /// yet: Ehukai's three derivative transforms at that time, on the caller's
+  /// thread, the way ParticleVelocity fills its grids.
+  private: void EnsureFoam() const;
 
   /// \brief Bilinear sample of `_grid` at the given world (x, y), wrapping
   /// queries outside the tile to its periodic image.
@@ -159,8 +172,13 @@ class FFTWaveSimulation final : public IWaveField
   /// \brief Horizontal y-displacement grid Dy.
   private: Eigen::MatrixXd dispYGrid;
   /// \brief Folding/whitecap metric (Ehukai path): per-cell minimum eigenvalue
-  /// of the displacement Jacobian, 1 = flat. Sampled by Jacobian() → FoamMask().
-  private: Eigen::MatrixXd minEGrid;
+  /// of the displacement Jacobian, 1 = flat. Sampled by Jacobian() → FoamMask()
+  /// and read by the renderer through Foam(). Filled on request by
+  /// EnsureFoam(), not by Update(): mutable, like the velocity grids.
+  private: mutable Eigen::MatrixXd minEGrid;
+  /// \brief Sim time the folding metric was computed for; stale whenever it
+  /// differs from lastUpdateT.
+  private: mutable double foamTime{-1.0};
 
   /// \brief Water-particle velocity grids [m/s] — the Eulerian time derivative
   /// of the displacement field (∂Dx/∂t, ∂Dy/∂t, ∂η/∂t). Filled lazily by the

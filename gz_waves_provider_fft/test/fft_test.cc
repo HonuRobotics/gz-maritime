@@ -288,7 +288,11 @@ TEST(FFTWaveSimulation, FieldExposesGridViews)
   ASSERT_NE(f->dz, nullptr);
   ASSERT_NE(f->dx, nullptr);
   ASSERT_NE(f->dy, nullptr);
-  ASSERT_NE(f->foam, nullptr);
+  // Foam is computed on request: null in the view until asked for.
+  EXPECT_EQ(f->foam, nullptr);
+  const double *foam = sim.Foam();
+  ASSERT_NE(foam, nullptr);
+  EXPECT_EQ(sim.Field()->foam, foam) << "in the view once computed";
 
   const int N = static_cast<int>(f->n);
   const auto &eta = sim.HeightGrid();
@@ -301,7 +305,7 @@ TEST(FFTWaveSimulation, FieldExposesGridViews)
       EXPECT_DOUBLE_EQ(f->dz[i + j * N], eta(i, j)) << "i=" << i << " j=" << j;
       EXPECT_DOUBLE_EQ(f->dx[i + j * N], dxG(i, j));
       EXPECT_DOUBLE_EQ(f->dy[i + j * N], dyG(i, j));
-      EXPECT_TRUE(std::isfinite(f->foam[i + j * N]));
+      EXPECT_TRUE(std::isfinite(foam[i + j * N]));
     }
   }
 }
@@ -334,13 +338,60 @@ TEST(FFTWaveSimulation, PreparedUpdateIsTheSynchronousOne)
     EXPECT_EQ(plain.HeightGrid(), ahead.HeightGrid());
     EXPECT_EQ(plain.DispXGrid(), ahead.DispXGrid());
     EXPECT_EQ(plain.DispYGrid(), ahead.DispYGrid());
-    const gsw::WaveField2D *a = plain.Field();
-    const gsw::WaveField2D *b = ahead.Field();
-    for (std::size_t i = 0; i < a->n * a->n; ++i)
-      ASSERT_EQ(a->foam[i], b->foam[i]) << i;
+    const double *a = plain.Foam();
+    const double *b = ahead.Foam();
+    ASSERT_NE(a, nullptr);
+    ASSERT_NE(b, nullptr);
+    for (std::size_t i = 0; i < plain.GridSize() * plain.GridSize(); ++i)
+      ASSERT_EQ(a[i], b[i]) << i;
     EXPECT_EQ(plain.ParticleVelocity(12.0, 34.0, t),
               ahead.ParticleVelocity(12.0, 34.0, t));
   }
+}
+
+//////////////////////////////////////////////////
+/// Foam is computed on request and once per update: Update leaves it
+/// stale, Jacobian() or Foam() computes it, both see the same grid, a
+/// second request costs nothing, and a reconfigure starts afresh.
+TEST(FFTWaveSimulation, FoamOnRequest)
+{
+  auto sim = MakeSim(/*seed=*/3);
+  sim.Update(6.0);
+  EXPECT_EQ(sim.Field()->foam, nullptr) << "not computed by Update";
+
+  // Through Jacobian(): the grid behind it is the one Foam() hands out.
+  const double j = sim.Jacobian(10.0, 20.0, 6.0);
+  const double *foam = sim.Foam();
+  ASSERT_NE(foam, nullptr);
+  EXPECT_EQ(sim.Field()->foam, foam);
+  EXPECT_DOUBLE_EQ(j, sim.Jacobian(10.0, 20.0, 6.0));
+  EXPECT_EQ(sim.Foam(), foam) << "the same grid, not computed again";
+
+  // The next update makes it stale again; asked for, it is that update's.
+  auto other = MakeSim(/*seed=*/3);
+  other.Update(6.0);
+  other.Update(9.0);
+  sim.Update(9.0);
+  EXPECT_EQ(sim.Field()->foam, nullptr);
+  const double *now = sim.Foam();
+  const double *fresh = other.Foam();
+  for (std::size_t i = 0; i < sim.GridSize() * sim.GridSize(); ++i)
+    ASSERT_EQ(fresh[i], now[i]) << i;
+
+  // A reconfigure: the new recipe's foam, not the old.
+  gsw::WaveParameters p = DefaultParams();
+  p.period = 9.0;
+  p.tileSize = 100.0;
+  p.gridSize = 64;
+  p.seed = 3;
+  sim.SetParameters(p);
+  auto plain = gsw::FFTWaveSimulation(p, p.tileSize, p.gridSize, p.seed);
+  sim.Update(4.0);
+  plain.Update(4.0);
+  const double *a = sim.Foam();
+  const double *b = plain.Foam();
+  for (std::size_t i = 0; i < sim.GridSize() * sim.GridSize(); ++i)
+    ASSERT_EQ(b[i], a[i]) << i;
 }
 
 //////////////////////////////////////////////////
