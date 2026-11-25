@@ -41,7 +41,7 @@
   shoreline from OpenStreetMap, (c) OpenStreetMap contributors, ODbL 1.0;
   see kai_gazebo/NOTICE.
 -->
-<sdf version="1.12">
+<sdf version="1.12" xmlns:experimental="http://sdformat.org/schemas/experimental">
   <world name="default">
 
     <!-- Physics -->
@@ -207,6 +207,19 @@
       name="gz::sim::maritime::OceanCurrent">
       <speed>0</speed>
       <direction>0</direction>
+    </plugin>
+
+    <!-- Acoustics (gz_acoustics): pingers ping, receivers hear them, both
+         found on any model (a pinger is the gz-maritime-acoustic-pinger-system
+         plugin on a link, model://acoustic_pinger is one ready made; a
+         receiver is a custom sensor, gz:type="acoustic_receiver"). Silent
+         until a pinger shows up; the world names neither. Each ping travels
+         at the speed of sound and is heard below the water only. -->
+    <plugin
+      filename="gz-maritime-acoustics-system"
+      name="gz::sim::maritime::Acoustics">
+      <speed_of_sound>1500</speed_of_sound>
+      <water_level>0</water_level>
     </plugin>
 
     <!-- ==================================================================
@@ -486,6 +499,14 @@
           <property type="string" key="state">docked</property>
         </gz-gui>
       </plugin>
+
+      <!-- Acoustics (gz_maritime_gui): the pingers and the receivers, and what they hear; drawing off until turned on in the panel. -->
+      <plugin filename="AcousticsPanel" name="Acoustics">
+        <gz-gui>
+          <title>Acoustics</title>
+          <property type="string" key="state">docked</property>
+        </gz-gui>
+      </plugin>
     </gui>
 
     <!-- The site: the bay's seawalls and land, the city, its landmarks and
@@ -493,6 +514,47 @@
          collisions are boxes (the seawall, the land behind it, the
          buildings near the venue and the pontoon), so vehicles touch the
          quays and the pontoon and aerial vehicles the buildings. -->
+    <!-- ===================== Course B pingers =====================
+         The RobotX 2026 survey task: a pinger under each of two buoys, 30 kHz,
+         and only the one under the green buoy pings. About 35 m out from the
+         course B start point (-15 -8, facing 0.55 rad), 10 m apart across the
+         course, which keeps both clear of a vehicle spawned at the origin
+         heading +x: the nearer one, the red, is 6 m off that line. Switch
+         them on /world/default/acoustics/pinger_green/set and
+         /world/default/acoustics/pinger_red/set (key active). -->
+    <!-- Green: pinging. -->
+    <include>
+      <uri>model://acoustic_pinger</uri>
+      <name>pinger_green</name>
+      <pose>12.2 14.6 0 0 0 0</pose>
+      <experimental:params>
+          <visual element_id="link::body" action="modify">
+            <material><ambient>0.1 0.6 0.2 1</ambient><diffuse>0.1 0.6 0.2 1</diffuse></material>
+          </visual>
+          <visual element_id="link::top" action="modify">
+            <material><ambient>0.1 0.6 0.2 1</ambient><diffuse>0.1 0.6 0.2 1</diffuse></material>
+          </visual>
+      </experimental:params>
+    </include>
+
+    <!-- Red: silent until switched on. -->
+    <include>
+      <uri>model://acoustic_pinger</uri>
+      <name>pinger_red</name>
+      <pose>17.5 6.0 0 0 0 0</pose>
+      <experimental:params>
+          <plugin element_id="gz::sim::maritime::AcousticPinger" action="modify">
+            <active>false</active>
+          </plugin>
+          <visual element_id="link::body" action="modify">
+            <material><ambient>0.8 0.1 0.1 1</ambient><diffuse>0.8 0.1 0.1 1</diffuse></material>
+          </visual>
+          <visual element_id="link::top" action="modify">
+            <material><ambient>0.8 0.1 0.1 1</ambient><diffuse>0.8 0.1 0.1 1</diffuse></material>
+          </visual>
+      </experimental:params>
+    </include>
+
     <include>
       <uri>https://fuel.gazebosim.org/1.0/honuRobotics/models/marina_bay_lite</uri>
     </include>

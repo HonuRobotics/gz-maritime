@@ -1,11 +1,12 @@
 # gz_maritime_gui
 
-The Gazebo GUI for the maritime environment: three GUI plugins.
+The Gazebo GUI for the maritime environment: four GUI plugins.
 `OceanCurrentPanel` and `WindPanel` each steer their field by hand or set it
 exactly, draw it on the water as flow trails or arrows coloured by speed,
 and show the water and the wind each vehicle meets; the wind panel also
 flies wind socks. `ScenarioPanel` steers both fields to named conditions
-and runs a demo. Planned in
+and runs a demo. `AcousticsPanel` shows the acoustic pingers and what the
+receivers hear, and switches the pingers (see below). Planned in
 [MARITIME_GUI_PLAN.md](../MARITIME_GUI_PLAN.md); how to use them is in the
 docs, [Change and see the wind and the current](../docs/how-to/wind-and-current.md).
 
@@ -67,6 +68,70 @@ from north. The compass in each draws the flow.
 
 They need no ROS.
 
+## The acoustics panel
+
+`AcousticsPanel` shows `gz_acoustics` in the GUI. It lists the pingers,
+each with its frequency, period, offset and reach and a switch that sends
+`active` on its `set` topic. The pingers are those the acoustics system
+lists on `/world/<world>/acoustics/pingers`, each as its `AcousticPinger`
+component in the GUI's ECM has it when the GUI has one, which is newer. A
+panel loaded with the GUI has them all in the ECM. One added later from the
+plugin menu has only those that changed since, and the list fills in the
+rest, at the acoustics system's `<publish_rate>`. It never asks for the
+world's state: no pinger is the normal case, in every world but the demo. It lists the receivers, which the acoustics system publishes on
+`/world/<world>/acoustics/receivers` (the GUI's copy of a custom sensor
+loses its `gz:type`, so the panel cannot find them in the ECM), each with its
+last reading and a field to retune it. It draws, each switched on its own:
+
+- **Reach:** the circle where each pinger's reach meets the water, in its
+  frequency's colour, grey and dashed when the pinger is off, and inside it
+  a lighter dashed ring where pings start to drop, one per dropout start
+  the receivers use.
+- **Pings:** a ring per ping where its sound meets the water, spreading at
+  the speed of sound slowed down (`<slow_down>`, 50 by default, so a ring
+  crosses 300 m in 10 s), fading out at the reach. `<max_ring_radius>` ends
+  the rings of a pinger with no reach only. Only pings that were sent ring:
+  none from a pinger above the water, none from before a pinger was last
+  switched on or its schedule changed. At most six rings per pinger: slowed
+  down further, every second or third ping is drawn, so what is sent stays
+  about 15 kB per pinger and frame.
+- **Bearings heard:** a ray from each receiver along its last reading's
+  bearing and elevation, fading in three steps over 1.5 s of simulation
+  time; red when the reading was invalid. The ray keeps the pose the
+  receiver had when the reading came, so it stays on the pinger while the
+  boat turns.
+
+The reach and the pings are drawn on a horizontal plane, chosen in the
+panel: the water (default); a depth under it; or a receiver's depth,
+following it, the slice a vehicle under the water listens in. Or in 3D:
+the reach as a wireframe sphere around each pinger and each ping as a
+sparser one growing out of it, both cut at the water, where sound stops,
+with a ring where they meet it. Under the water any of them lies behind the
+drawn sea, so look from an underwater camera or hide the water.
+
+The reach and the rays are sent when they change, not on a timer: a pinger
+switched off or a buoy dragged while the world is paused is redrawn at
+once, and a circle that stays is not sent again. The rings are sent every
+50 ms of simulation time, the heavier 3D shells every 100 ms, and no more
+often than that in wall time. While the world runs, a pinger that moves or
+a plane that follows a receiver is caught up by those frames; while it is
+paused, a drag is redrawn at once.
+
+Colours run with frequency from orange at 25 kHz to violet at 40 kHz.
+Configuration: `<reach>`, `<pings>`, `<readings>` (all false by default),
+`<plane>` (`water`, `depth`, `receiver` or `3d`), `<plane_depth>` (m, default 5),
+`<plane_receiver>` (a receiver's topic, default the first listed; one not
+listed is said so, and the water is drawn on until it is),
+`<speed_of_sound>`, `<slow_down>`, `<max_ring_radius>`, `<ray_length>`,
+`<ray_lifetime>`, `<water_level>` and `<marker_service>`.
+
+No camera sensor sees what the panels draw, because they draw only through
+the GUI's marker service, `/marker`: the server's sensors take markers on
+their own, `/sensors/marker`. The `visibility: GUI` flag the markers carry
+does not do it on its own; `markers_camera_test` renders a camera and shows
+both (it needs a GPU and skips without one). Never point `<marker_service>`
+at `/sensors/marker`.
+
 ## How they reach the recipes
 
 Gazebo creates the GUI runner, loads the plugins in the world's `<gui>`
@@ -90,10 +155,12 @@ It never writes into the GUI's ECM.
 | `include/gz/sim/maritime_gui/FieldSpec.hh`, `src/FieldSpec.cc` | Each field defined once: its topic name, steering rates, colours, arrow scale and trails. |
 | `include/gz/sim/maritime_gui/FieldControl.hh`, `src/FieldControl.cc` | A panel's control of a field: the world's name, the field's topic, the state service, tracking, steering, the status line and number parsing. |
 | `include/gz/sim/maritime_gui/FieldDrawing.hh`, `src/FieldDrawing.cc` | A panel's drawing of a field: arrows or trails, and the vehicles and socks beside them. |
-| `src/OceanCurrentPanel.*`, `src/WindPanel.*`, `src/ScenarioPanel.*` | The three GUI systems and their QML panels. |
+| `include/gz/sim/maritime_gui/MarkerLayer.hh`, `src/MarkerLayer.cc` | One drawing on the scene: what is drawn, replaced and deleted through MarkerManager, for every panel, and the panels' default marker service. |
+| `include/gz/sim/maritime_gui/Acoustics.hh`, `src/Acoustics.cc` | The acoustics panel's logic: the pingers from the ECM and from the list, the listener, and the reach, rings and rays as markers. |
+| `src/OceanCurrentPanel.*`, `src/WindPanel.*`, `src/ScenarioPanel.*`, `src/AcousticsPanel.*` | The four GUI systems and their QML panels. |
 | `src/Compass.qml`, `src/Legend.qml`, `src/NumberField.qml` | The steering compass, the colour legend and the number field both panels use. |
 | `test/fields_test.cc` | gtests on the core. |
-| `test/test_gui_reads_recipes.py` | Both plugins in a running GUI on Qt's offscreen platform, reading the recipes from the GUI's state and, in a world without a wind, asking the state service. |
+| `test/test_gui_reads_recipes.py` | The plugins in a running GUI on Qt's offscreen platform, reading the recipes from the GUI's state and, in a world without a wind, asking the state service; the acoustics panel's drawings, as `test/marker_recorder.cc` receives them in MarkerManager's place, redrawn at once while the world is paused (a buoy dragged, a pinger switched off), the panel added late from the plugin menu (`test/MenuLoader.cc` does what the menu does), and a world without pingers. |
 
 The core (`gz_maritime_gui_core`, the first six rows) has no Qt. The
 plugins install to `lib/gz_maritime_gui`, a folder of their own, and the

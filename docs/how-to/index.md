@@ -33,6 +33,7 @@ Imaging, sidescan and profiling sonars, from watching one to labeled training da
 - [Dive in the aquatic centre](aquatic-centre.md)
 - [Use your own world](own-world.md)
 - [Change and see the wind and the current](wind-and-current.md)
+- [Find an acoustic pinger](acoustic-pingers.md)
 - [Troubleshooting](faq.md)
 
 ```{toctree}
@@ -53,5 +54,6 @@ sonar-imaging
 sonar-survey
 sonar-add
 sonar-features
+acoustic-pingers
 faq
 ```

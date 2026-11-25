@@ -44,8 +44,14 @@ VEHICLE_PACKAGES = ('blueboat_gazebo', 'bluerov2_gazebo', 'x500_gazebo')
 try:
     for package in VEHICLE_PACKAGES:
         get_package_share_directory(package)
+    MISSING = None
 except PackageNotFoundError as missing:
-    pytest.skip(f'the demo needs every vehicle package: {missing}', allow_module_level=True)
+    MISSING = str(missing)
+# A mark, not pytest.skip(): launch_testing's pytest plugin imports every test
+# module in this directory to collect any one of them, so a skip at import
+# would stop test_instantiate_vehicle.py from running too.
+pytestmark = pytest.mark.skipif(MISSING is not None,
+                                reason=f'the demo needs every vehicle package: {MISSING}')
 
 WORLD_NAME = 'default'
 VEHICLES = {
