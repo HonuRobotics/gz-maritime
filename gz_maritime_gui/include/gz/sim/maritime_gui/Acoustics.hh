@@ -128,6 +128,10 @@ struct ReceiverInfo
 
   /// \brief Hz, its band's full width.
   public: double bandwidth{0.0};
+
+  /// \brief Fraction of a pinger's reach where its pings start to drop; 1
+  /// is no dropout.
+  public: double dropoutStart{1.0};
 };
 
 /// \brief One reading, as a receiver published it.
@@ -187,6 +191,46 @@ std::vector<std::chrono::steady_clock::duration> RecentPings(
     const std::chrono::steady_clock::duration &_now,
     const std::chrono::steady_clock::duration &_window);
 
+/// \brief Which horizontal plane the reach and the pings are drawn on.
+enum class Plane
+{
+  /// \brief The water's surface: the view from above, and where a boat's
+  /// hydrophone listens, give or take its draft.
+  kWater,
+
+  /// \brief A depth under the water, set by hand.
+  kDepth,
+
+  /// \brief The depth of a receiver, following it: the slice a vehicle
+  /// under the water is listening in.
+  kReceiver,
+
+  /// \brief Not a plane: the reach and the pings as wireframe spheres, cut
+  /// at the water, where sound stops.
+  k3D
+};
+
+/// \brief A plane's name in a configuration: water, depth, receiver or 3d.
+/// \param[in] _name The name.
+/// \param[out] _plane The plane, when the name is one.
+/// \return True if the name is a plane.
+bool ParsePlane(const std::string &_name, Plane &_plane);
+
+/// \brief A plane's name.
+/// \param[in] _plane The plane.
+/// \return water, depth, receiver or 3d.
+std::string PlaneName(Plane _plane);
+
+/// \brief The world z to draw at.
+/// \param[in] _plane Which plane.
+/// \param[in] _waterLevel World z of the water.
+/// \param[in] _depth m under the water, for kDepth; not negative.
+/// \param[in] _receiverZ The receiver's world z, for kReceiver, when known.
+/// \return The z. On the water, a little above it, so the drawn sea does
+/// not hide the drawing; a receiver not known yet falls back to the water.
+double PlaneZ(Plane _plane, double _waterLevel, double _depth,
+              const std::optional<double> &_receiverZ);
+
 /// \brief The reach of each pinger on a horizontal plane: the circle where
 /// its reach sphere cuts the plane, solid in its frequency's colour when it
 /// pings, grey and dashed when it is off. A pinger with no reach limit, or
@@ -226,6 +270,66 @@ std::vector<msgs::Marker> PingMarkers(const std::vector<PingerView> &_pingers,
     const std::chrono::steady_clock::duration &_now,
     double _speed, double _maxRadius, const std::string &_ns);
 
+/// \brief A wireframe sphere as LINE_LIST segments, cut at a height: its
+/// meridians and its parallels, and the circle where it meets the cut.
+/// \param[in] _centre Its centre.
+/// \param[in] _radius m.
+/// \param[in] _ceiling World z above which nothing is drawn.
+/// \param[in] _meridians Half great circles through the poles, at least 2.
+/// \param[in] _parallels Circles of latitude between the poles, at least 1.
+/// \param[in] _segments Segments around a circle, at least 8.
+/// \return Pairs of points, none above the ceiling.
+std::vector<math::Vector3d> SphereSegments(const math::Vector3d &_centre,
+    double _radius, double _ceiling, int _meridians, int _parallels,
+    int _segments = 48);
+
+/// \brief The reach of each pinger as a wireframe sphere, cut at the water,
+/// solid in its frequency's colour when it pings, grey when it is off. A
+/// pinger with no reach limit draws none.
+/// \param[in] _pingers The pingers.
+/// \param[in] _waterLevel World z of the water.
+/// \param[in] _ns Marker namespace.
+/// \return One LINE_LIST marker per pinger with a reach, ids from 1.
+std::vector<msgs::Marker> ReachSpheres(const std::vector<PingerView> &_pingers,
+                                       double _waterLevel,
+                                       const std::string &_ns);
+
+/// \brief The pings spreading from each active pinger under the water as
+/// wireframe spheres, sparser than the reach, cut at the water, fading as
+/// they grow: the same pings as PingMarkers draws as rings, so only those
+/// sent, out to the reach (`_maxRadius` for a pinger with none), and at
+/// most kMaxRings of them.
+/// \param[in] _pingers The pingers.
+/// \param[in] _waterLevel World z of the water.
+/// \param[in] _now Simulation time.
+/// \param[in] _speed m/s the spheres grow at.
+/// \param[in] _maxRadius m, the largest drawn.
+/// \param[in] _ns Marker namespace.
+/// \return LINE_LIST markers, a few per pinger, one per shade.
+std::vector<msgs::Marker> PingSpheres(const std::vector<PingerView> &_pingers,
+    double _waterLevel, const std::chrono::steady_clock::duration &_now,
+    double _speed, double _maxRadius, const std::string &_ns);
+
+/// \brief The first id of the dropout rings, which share the reach's
+/// layer: far after the reach's own ids, which count up from 1, one per
+/// pinger.
+constexpr std::uint64_t kDropoutFirstId{1001};
+
+/// \brief Where pings start to drop around each pinger with a reach: a
+/// dashed ring, lighter than the reach, for each dropout start the
+/// receivers use, where the sphere of that radius cuts a horizontal plane.
+/// \param[in] _pingers The pingers.
+/// \param[in] _starts Fractions of the reach; those not in (0, 1) and
+/// repeats are skipped.
+/// \param[in] _planeZ World z of the plane.
+/// \param[in] _ns Marker namespace.
+/// \param[in] _firstId The first marker's id, after the reach's.
+/// \return One LINE_LIST marker per pinger and start that meets the plane.
+std::vector<msgs::Marker> DropoutMarkers(
+    const std::vector<PingerView> &_pingers, std::vector<double> _starts,
+    double _planeZ, const std::string &_ns,
+    std::uint64_t _firstId = kDropoutFirstId);
+
 /// \brief A bearing a receiver reported, to draw.
 struct BearingRay
 {
@@ -236,6 +340,10 @@ struct BearingRay
 
   /// \brief The reading.
   public: HeardPing ping;
+
+  /// \brief How far through its life the ray is, 0 new to 1 gone: it
+  /// fades towards white.
+  public: double fade{0.0};
 };
 
 /// \brief Keep, for each receiver, its last reading with the pose the
@@ -262,7 +370,7 @@ std::vector<BearingRay> LiveRays(
 
 /// \brief A ray from each receiver along the bearing and elevation of its
 /// last reading, in its frequency's colour, red when the reading was
-/// invalid.
+/// invalid, fading in three steps as it ages.
 /// \param[in] _rays The rays.
 /// \param[in] _length m.
 /// \param[in] _ns Marker namespace.

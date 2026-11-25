@@ -44,15 +44,22 @@ namespace gz::sim::maritime_gui
   /// It draws, each drawing switched on its own, in a colour per frequency
   /// (25 kHz orange to 40 kHz violet), through MarkerManager:
   ///
-  /// * the reach: the circle where each pinger's reach meets the water,
-  ///   grey and dashed when it is off;
-  /// * the pings: a ring per ping, where its sound meets the water,
+  /// * the reach: the circle where each pinger's reach meets the plane drawn
+  ///   on, grey and dashed when it is off;
+  /// * the pings: a ring per ping, where its sound meets that plane,
   ///   spreading at the speed of sound slowed down so the eye can follow it,
   ///   fading out at the reach; only pings that were sent, and at most a
   ///   few rings per pinger;
   /// * the readings: a ray from each receiver along the bearing and
   ///   elevation of its last reading, from the pose it had when the reading
   ///   came, a while after it came; red when the reading was invalid.
+  ///
+  /// The reach and the pings are drawn on a horizontal plane: the water, as
+  /// a boat sees them; a depth under it; or the depth of a receiver,
+  /// following it, the slice a vehicle under the water listens in; or in 3D,
+  /// the reach and each ping as wireframe spheres cut at the water. Under the
+  /// water they are behind the drawn sea, seen from an underwater camera or
+  /// with the water hidden.
   ///
   /// The reach and the rays are sent when they change, paused or not.
   ///
@@ -71,6 +78,13 @@ namespace gz::sim::maritime_gui
   /// * `<ray_length>`: m, default 30.
   /// * `<ray_lifetime>`: s of simulation time a reading's ray stays,
   ///   default 1.5.
+  /// * `<plane>`: what the reach and the pings are drawn on, `water`
+  ///   (default), `depth` or `receiver`; or `3d`, as wireframe spheres cut
+  ///   at the water.
+  /// * `<plane_depth>`: m under the water, for `depth`, default 5.
+  /// * `<plane_receiver>`: the topic of the receiver whose depth `receiver`
+  ///   follows; default the first receiver listed. One the acoustics system
+  ///   does not list is said so, and the water is drawn on until it is.
   /// * `<water_level>`: world z of the water, default 0.
   /// * `<marker_service>`: MarkerManager's service, default `/marker`.
   class AcousticsPanel : public gz::sim::GuiSystem
@@ -106,6 +120,23 @@ namespace gz::sim::maritime_gui
     /// check box ticked.
     Q_PROPERTY(double slowDown READ SlowDown NOTIFY SlowDownChanged)
 
+    /// \brief What the reach and the pings are drawn on: water, depth,
+    /// receiver or 3d.
+    Q_PROPERTY(QString plane READ CurrentPlane NOTIFY PlaneChanged)
+
+    /// \brief m under the water, for the depth plane.
+    /// A signal of its own, as each drawing property has: one shared with
+    /// the plane would put the old depth back in the field while a new one
+    /// is typed and another option changed.
+    Q_PROPERTY(double planeDepth READ PlaneDepth NOTIFY PlaneDepthChanged)
+
+    /// \brief The topic of the receiver the receiver plane follows.
+    Q_PROPERTY(QString planeReceiver READ PlaneReceiver
+               NOTIFY PlaneReceiverChanged)
+
+    /// \brief The world z drawn at now, as text.
+    Q_PROPERTY(QString planeText READ PlaneText NOTIFY StatusChanged)
+
     /// \brief A short sentence on what is happening.
     Q_PROPERTY(QString status READ Status NOTIFY StatusChanged)
 
@@ -139,6 +170,35 @@ namespace gz::sim::maritime_gui
     /// \param[in] _text A number of at least 1, as typed.
     /// \return False if it is not one.
     public: Q_INVOKABLE bool SetSlowDown(const QString &_text);
+
+    /// \brief Draw the reach and the pings on another plane.
+    /// \param[in] _plane water, depth, receiver or 3d.
+    public: Q_INVOKABLE void SetPlane(const QString &_plane);
+
+    /// \brief Set the depth of the depth plane.
+    /// \param[in] _text m under the water, not negative, as typed.
+    /// \return False if it is not one.
+    public: Q_INVOKABLE bool SetPlaneDepth(const QString &_text);
+
+    /// \brief Follow another receiver's depth.
+    /// \param[in] _topic The receiver's topic.
+    public: Q_INVOKABLE void SetPlaneReceiver(const QString &_topic);
+
+    /// \brief What the reach and the pings are drawn on.
+    /// \return water, depth, receiver or 3d.
+    public: QString CurrentPlane() const;
+
+    /// \brief The depth of the depth plane.
+    /// \return m under the water.
+    public: double PlaneDepth() const;
+
+    /// \brief The receiver the receiver plane follows.
+    /// \return Its topic, empty for the first listed.
+    public: QString PlaneReceiver() const;
+
+    /// \brief Where the plane is now.
+    /// \return A short text.
+    public: QString PlaneText() const;
 
     /// \brief The pingers.
     /// \return The list.
@@ -204,6 +264,15 @@ namespace gz::sim::maritime_gui
 
     /// \brief The rings spread at another speed.
     signals: void SlowDownChanged();
+
+    /// \brief The reach and the pings are drawn on another plane, or in 3D.
+    signals: void PlaneChanged();
+
+    /// \brief The depth of the depth plane changed.
+    signals: void PlaneDepthChanged();
+
+    /// \brief The receiver plane follows another receiver.
+    signals: void PlaneReceiverChanged();
 
     /// \brief The status changed.
     signals: void StatusChanged();

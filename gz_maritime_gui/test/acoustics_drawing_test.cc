@@ -249,6 +249,118 @@ TEST(AcousticsGui, ReachMarkers)
 }
 
 //////////////////////////////////////////////////
+/// The planes: just above the water, a depth under it, or a receiver's
+/// depth, the water until the receiver is known.
+TEST(AcousticsGui, Planes)
+{
+  Plane plane{Plane::kWater};
+  EXPECT_TRUE(ParsePlane("receiver", plane));
+  EXPECT_EQ(Plane::kReceiver, plane);
+  EXPECT_TRUE(ParsePlane("3d", plane));
+  EXPECT_EQ(Plane::k3D, plane);
+  EXPECT_EQ("3d", PlaneName(Plane::k3D));
+  EXPECT_FALSE(ParsePlane("sky", plane));
+  EXPECT_EQ("depth", PlaneName(Plane::kDepth));
+
+  EXPECT_NEAR(0.08, PlaneZ(Plane::kWater, 0.0, 5.0, -3.0), 1e-12);
+  EXPECT_DOUBLE_EQ(-5.0, PlaneZ(Plane::kDepth, 0.0, 5.0, std::nullopt));
+  EXPECT_DOUBLE_EQ(0.0, PlaneZ(Plane::kDepth, 0.0, -2.0, std::nullopt));
+  EXPECT_DOUBLE_EQ(-3.0, PlaneZ(Plane::kReceiver, 0.0, 5.0, -3.0));
+  EXPECT_NEAR(0.08, PlaneZ(Plane::kReceiver, 0.0, 5.0, std::nullopt), 1e-12);
+}
+
+//////////////////////////////////////////////////
+/// The reach on a plane at the pinger's depth is the reach itself; on the
+/// water it is less, and on a plane the reach does not get to, nothing.
+TEST(AcousticsGui, ReachOnAPlaneUnderTheWater)
+{
+  const math::Vector3d at(0, 0, -10);
+  const std::vector<PingerView> pingers{Pinger("p", at, 30000, 20, true)};
+
+  const auto atDepth = ReachMarkers(pingers, -10.0, "ns");
+  ASSERT_EQ(1u, atDepth.size());
+  for (const auto r : Radii(atDepth[0], at))
+    EXPECT_NEAR(20.0, r, 1e-9);
+  EXPECT_DOUBLE_EQ(-10.0, atDepth[0].point(0).z());
+
+  const auto onWater = ReachMarkers(pingers, 0.0, "ns");
+  ASSERT_EQ(1u, onWater.size());
+  for (const auto r : Radii(onWater[0], at))
+    EXPECT_NEAR(std::sqrt(300.0), r, 1e-9);
+
+  EXPECT_TRUE(ReachMarkers(pingers, -35.0, "ns").empty());
+}
+
+//////////////////////////////////////////////////
+/// A wireframe sphere: every point on it, nothing above the cut, and the
+/// cut itself closed by a ring.
+TEST(AcousticsGui, SphereSegments)
+{
+  const math::Vector3d c(5, -3, -10);
+  const auto whole = SphereSegments(c, 4.0, 0.0, 6, 3, 32);
+  ASSERT_FALSE(whole.empty());
+  EXPECT_EQ(0u, whole.size() % 2);
+  for (const auto &p : whole)
+    EXPECT_NEAR(4.0, p.Distance(c), 1e-9);
+
+  // Cut 6 m up a 10 m sphere: the top is gone, the cut ring is 8 m across.
+  const auto cut = SphereSegments(c, 10.0, -4.0, 6, 3, 32);
+  int onCut{0};
+  for (const auto &p : cut)
+  {
+    EXPECT_LE(p.Z(), -4.0 + 1e-9);
+    if (std::abs(p.Z() + 4.0) < 1e-9)
+    {
+      ++onCut;
+      EXPECT_NEAR(8.0, std::hypot(p.X() - c.X(), p.Y() - c.Y()), 1e-9);
+    }
+    else
+    {
+      EXPECT_NEAR(10.0, p.Distance(c), 1e-9);
+    }
+  }
+  EXPECT_GE(onCut, 64);
+
+  // Wholly above the cut: nothing.
+  EXPECT_TRUE(SphereSegments(c, 4.0, -20.0, 6, 3).empty());
+}
+
+//////////////////////////////////////////////////
+/// The reach and the pings as spheres, cut at the water: grey when off,
+/// one shell per ping still spreading.
+TEST(AcousticsGui, Spheres)
+{
+  const math::Vector3d at(0, 0, -3);
+  const auto reach = ReachSpheres(
+      {Pinger("on", at, 30000, 20, true), Pinger("off", at, 30000, 20, false),
+       Pinger("unlimited", at, 30000, 0, true)}, 0.0, "ns");
+  ASSERT_EQ(2u, reach.size());
+  for (const auto &m : reach)
+  {
+    for (const auto &p : m.point())
+      EXPECT_LE(p.z(), 1e-9);
+  }
+  EXPECT_NE(reach[0].material().diffuse().r(),
+            reach[1].material().diffuse().r());
+
+  // At 10 m/s, at 2.5 s: shells of 15 and 5 m; the 25 m one is past the
+  // reach.
+  const auto pings = PingSpheres({Pinger("on", at, 30000, 20, true)}, 0.0,
+                                 2500ms, 10.0, 200.0, "ns");
+  std::set<long> radii;
+  for (const auto &m : pings)
+  {
+    for (const auto &p : m.point())
+    {
+      if (p.z() < -1e-6)
+        radii.insert(std::lround(math::Vector3d(p.x(), p.y(), p.z())
+                                 .Distance(at) * 100));
+    }
+  }
+  EXPECT_EQ((std::set<long>{500, 1500}), radii);
+}
+
+//////////////////////////////////////////////////
 /// A ring per ping where its sound meets the water, out to the reach; an
 /// inactive pinger draws none.
 TEST(AcousticsGui, PingMarkers)
@@ -479,6 +591,44 @@ TEST(AcousticsGui, ListenerHearsThePingers)
   }
   ASSERT_EQ(1u, listener.Pingers().size());
   EXPECT_EQ("only", listener.Pingers()[0].data.name);
+}
+
+//////////////////////////////////////////////////
+/// Where pings start to drop: a dashed ring at that fraction of the reach,
+/// one per start the receivers use, none for no dropout or a repeat.
+TEST(AcousticsGui, DropoutMarkers)
+{
+  const math::Vector3d at(0, 0, -3);
+  const auto markers = DropoutMarkers(
+      {Pinger("on", at, 30000, 10, true), Pinger("unlimited", at, 30000, 0,
+                                                 true)},
+      {0.5, 1.0, 0.8, 0.5, 0.0}, 0.0, "ns");
+  ASSERT_EQ(2u, markers.size());
+  EXPECT_EQ(kDropoutFirstId, markers[0].id());
+  std::set<long> radii;
+  for (const auto &m : markers)
+  {
+    for (const auto r : Radii(m, at))
+      radii.insert(std::lround(r * 100));
+  }
+  // 5 m and 8 m spheres around a pinger 3 m down meet the water at 4 m and
+  // about 7.42 m.
+  EXPECT_EQ((std::set<long>{400, 742}), radii);
+}
+
+//////////////////////////////////////////////////
+/// A ray fades in three steps as it ages.
+TEST(AcousticsGui, RaysFade)
+{
+  BearingRay fresh;
+  fresh.ping.frequency = 30000;
+  BearingRay old = fresh;
+  old.fade = 0.9;
+  const auto markers = RayMarkers({fresh, old}, 10.0, "ns");
+  ASSERT_EQ(2u, markers.size());
+  // 30 kHz is green; fading towards white raises its red.
+  EXPECT_LT(markers[0].material().diffuse().r(),
+            markers[1].material().diffuse().r());
 }
 
 //////////////////////////////////////////////////
