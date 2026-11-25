@@ -199,10 +199,15 @@ ScrollView {
         // The index does not follow the model: a ComboBox goes back to its
         // first row whenever the list is replaced, as it is when a receiver
         // is retuned. So the row of the receiver followed is set again each
-        // time the list or the receiver changes, not bound once.
+        // time the list or the receiver changes, not bound once. No topic
+        // means the first listed; a topic not listed gets no row, and says
+        // so, rather than the first receiver's.
         function follow() {
-          currentIndex = Math.max(0, indexOfValue(_AcousticsPanel.planeReceiver));
+          var topic = _AcousticsPanel.planeReceiver;
+          currentIndex = topic === "" ? 0 : indexOfValue(topic);
         }
+        displayText: currentIndex < 0 ?
+            "not listed: " + _AcousticsPanel.planeReceiver : currentText
         Component.onCompleted: follow()
         onModelChanged: follow()
         onCountChanged: follow()

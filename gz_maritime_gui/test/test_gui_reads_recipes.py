@@ -213,6 +213,55 @@ def test_acoustics_from_the_gui_state(gui):
 NS = 'gz_maritime_gui/acoustics'
 
 
+def config_with(tmp_path, extra):
+    """Return the GUI config with elements added to the acoustics panel's."""
+    text = CONFIG.read_text().replace('<plane>receiver</plane>',
+                                      '<plane>receiver</plane>' + extra)
+    path = tmp_path / 'gui.config'
+    path.write_text(text)
+    return path
+
+
+def test_acoustics_plane_follows_the_receiver_named(gui, tmp_path):
+    """
+    Follow the receiver <plane_receiver> names, and still after a retune.
+
+    The second receiver is named: the plane follows it, and still does after
+    a receiver is retuned, which replaces the receivers' list. The combo
+    box's row lives in QML, which no offscreen test reads; this covers the
+    panel's side of it.
+    """
+    g = gui('two_receivers.sdf', config_with(
+        tmp_path, '<plane_receiver>/diver/acoustic_receiver</plane_receiver>'))
+    assert g.wait_for('AcousticsPanel: receivers listed by the acoustics system: 2'), \
+        ''.join(g.lines)
+    assert g.wait_for('AcousticsPanel: drawing at the depth of diver'), \
+        ''.join(g.lines)
+    assert not g.has('drawing at the depth of listener'), ''.join(g.lines)
+    # Retune the first receiver: the list is replaced, the plane stays.
+    g.publish('/listener/acoustic_receiver/set', 'gz.msgs.Param',
+              'params {key: "frequency" value {type: DOUBLE double_value: 25000}}')
+    time.sleep(3.0)
+    assert g.gui.poll() is None, ''.join(g.lines)
+    assert not g.has('drawing at the depth of listener'), ''.join(g.lines)
+    assert not g.has('AcousticsPanel.qml:'), ''.join(g.lines)
+
+
+def test_acoustics_plane_receiver_not_listed(gui, tmp_path):
+    """A <plane_receiver> nobody lists is warned about once, and the water drawn on."""
+    g = gui('two_receivers.sdf', config_with(
+        tmp_path, '<plane_receiver>/nobody/acoustic_receiver</plane_receiver>'))
+    assert g.wait_for('AcousticsPanel: receivers listed by the acoustics system: 2'), \
+        ''.join(g.lines)
+    assert g.wait_for('<plane_receiver> /nobody/acoustic_receiver is not a receiver'), \
+        ''.join(g.lines)
+    time.sleep(2.0)
+    assert not g.has('drawing at the depth of'), ''.join(g.lines)
+    assert sum('is not a receiver the acoustics system lists' in line
+               for line in g.lines) == 1, 'warned once'
+    assert not g.has('AcousticsPanel.qml:'), ''.join(g.lines)
+
+
 def test_acoustics_draws_what_it_shows(gui):
     """
     The acoustics panel's markers, as MarkerManager would get them.

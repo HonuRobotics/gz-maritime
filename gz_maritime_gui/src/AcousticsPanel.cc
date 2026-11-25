@@ -19,7 +19,6 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <cstdio>
 #include <map>
 #include <optional>
 #include <sstream>
@@ -29,6 +28,8 @@
 #include <vector>
 
 #include <tinyxml2.h>
+
+#include <QColor>
 
 #include <gz/common/Console.hh>
 #include <gz/math/Helpers.hh>
@@ -71,17 +72,12 @@ namespace
   /// \brief Period of wall time between two refreshes of the lists.
   constexpr std::chrono::milliseconds kListPeriod{250};
 
-  /// \brief A colour as #rrggbb, for QML.
+  /// \brief A colour as #rrggbb, for QML, as the field panels make theirs.
   /// \param[in] _c The colour.
   /// \return The text.
   QString Hex(const math::Color &_c)
   {
-    char buf[8];
-    std::snprintf(buf, sizeof(buf), "#%02x%02x%02x",
-        static_cast<int>(std::lround(_c.R() * 255.0f)),
-        static_cast<int>(std::lround(_c.G() * 255.0f)),
-        static_cast<int>(std::lround(_c.B() * 255.0f)));
-    return QString(buf);
+    return QColor::fromRgbF(_c.R(), _c.G(), _c.B()).name();
   }
 
   /// \brief A receiver's scoped name, short: without the world, model and
@@ -256,6 +252,10 @@ class gz::sim::maritime_gui::AcousticsPanelPrivate
 
   /// \brief The receiver whose depth was last logged as drawn at.
   public: std::string loggedPlane;
+
+  /// \brief Whether a <plane_receiver> not among the receivers listed was
+  /// warned about, until it is listed.
+  public: bool warnedPlaneReceiver{false};
   public: int updates{0};
 
   /// \brief Receivers' sensor entities, by scoped name.
@@ -521,11 +521,13 @@ void AcousticsPanel::Update(const UpdateInfo &_info,
         const auto &h = it->second;
         const double age = std::chrono::duration<double>(now - h.stamp)
             .count();
-        char buf[96];
-        std::snprintf(buf, sizeof(buf), "%+.0f° %.1f kHz %.0f dB%s, %.0f s ago",
-            GZ_RTOD(h.bearing), h.frequency / 1000.0, h.amplitude,
-            h.valid ? "" : " invalid", std::max(age, 0.0));
-        text = buf;
+        text = QString("%1%2° %3 kHz %4 dB%5, %6 s ago")
+            .arg(std::signbit(GZ_RTOD(h.bearing)) ? "" : "+")
+            .arg(GZ_RTOD(h.bearing), 0, 'f', 0)
+            .arg(h.frequency / 1000.0, 0, 'f', 1)
+            .arg(h.amplitude, 0, 'f', 0)
+            .arg(h.valid ? "" : " invalid")
+            .arg(std::max(age, 0.0), 0, 'f', 0).toStdString();
       }
       lkey << r.topic << '=' << text << ';';
       rmap[QString::fromStdString(r.topic)] = QString::fromStdString(text);
@@ -558,12 +560,17 @@ void AcousticsPanel::Update(const UpdateInfo &_info,
   // it.
   std::optional<double> receiverZ;
   std::string followed;
+  // Whether the receiver named is among those listed: one that is not,
+  // named in <plane_receiver> or spawned later, is said so rather than
+  // quietly swapped for the first.
+  bool listed{d.planeReceiver.empty()};
   if (d.plane == Plane::kReceiver)
   {
     for (const auto &r : receivers)
     {
       if (!d.planeReceiver.empty() && r.topic != d.planeReceiver)
         continue;
+      listed = true;
       const auto pose = poses.find(r.topic);
       if (pose != poses.end())
       {
@@ -575,19 +582,36 @@ void AcousticsPanel::Update(const UpdateInfo &_info,
   }
   d.planeZ = PlaneZ(d.plane, d.waterLevel, d.planeDepth, receiverZ);
   {
-    char buf[128];
+    QString text;
     if (d.plane == Plane::kWater)
-      std::snprintf(buf, sizeof(buf), "on the water");
+      text = "on the water";
     else if (d.plane == Plane::k3D)
-      std::snprintf(buf, sizeof(buf), "in 3D, under the water");
+      text = "in 3D, under the water";
     else if (d.plane == Plane::kDepth)
-      std::snprintf(buf, sizeof(buf), "%.1f m under the water", d.planeDepth);
+      text = QString("%1 m under the water").arg(d.planeDepth, 0, 'f', 1);
     else if (receiverZ)
-      std::snprintf(buf, sizeof(buf), "at %s's depth, %.1f m",
-                    followed.c_str(), d.waterLevel - *receiverZ);
+      text = QString("at %1's depth, %2 m")
+          .arg(QString::fromStdString(followed))
+          .arg(d.waterLevel - *receiverZ, 0, 'f', 1);
+    else if (!listed && !receivers.empty())
+      text = QString("on the water: %1 is not among the receivers")
+          .arg(QString::fromStdString(d.planeReceiver));
     else
-      std::snprintf(buf, sizeof(buf), "on the water: no receiver found yet");
-    const QString text(buf);
+      text = "on the water: no receiver found yet";
+    if (d.plane == Plane::kReceiver && !listed && !receivers.empty())
+    {
+      if (!d.warnedPlaneReceiver)
+      {
+        gzwarn << kLog << ": <plane_receiver> " << d.planeReceiver
+               << " is not a receiver the acoustics system lists; drawing "
+               << "on the water until it is\n";
+        d.warnedPlaneReceiver = true;
+      }
+    }
+    else
+    {
+      d.warnedPlaneReceiver = false;
+    }
     if (receiverZ && followed != d.loggedPlane)
     {
       gzdbg << kLog << ": drawing at the depth of " << followed << "\n";

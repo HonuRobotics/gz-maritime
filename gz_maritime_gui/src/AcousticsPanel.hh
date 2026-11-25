@@ -83,7 +83,8 @@ namespace gz::sim::maritime_gui
   ///   at the water.
   /// * `<plane_depth>`: m under the water, for `depth`, default 5.
   /// * `<plane_receiver>`: the topic of the receiver whose depth `receiver`
-  ///   follows; default the first receiver listed.
+  ///   follows; default the first receiver listed. One the acoustics system
+  ///   does not list is said so, and the water is drawn on until it is.
   /// * `<water_level>`: world z of the water, default 0.
   /// * `<marker_service>`: MarkerManager's service, default `/marker`.
   class AcousticsPanel : public gz::sim::GuiSystem
