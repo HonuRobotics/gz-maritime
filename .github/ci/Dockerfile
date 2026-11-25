@@ -37,9 +37,11 @@ FROM base AS deps
 # cache key.
 ARG DEPS_EPOCH
 # The upgrade brings the ROS packages of the base image to the same sync as
-# the ones rosdep adds.
+# the ones rosdep adds. --with-new-pkgs installs the new dependencies of a
+# newer version, as apt upgrade does; apt-get upgrade alone keeps such a
+# package back. A package whose upgrade removes another is still kept back.
 RUN --mount=type=bind,from=manifests,source=/ws/src,target=/ws/src \
-    apt-get update && apt-get upgrade -y && \
+    apt-get update && apt-get upgrade -y --with-new-pkgs && \
     rosdep update --rosdistro "$ROS_DISTRO" && \
     rosdep install -y --from-paths /ws/src --ignore-src && \
     apt-get install -y --no-install-recommends ccache libegl1 && \
