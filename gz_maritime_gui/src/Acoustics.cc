@@ -564,7 +564,8 @@ std::vector<msgs::Marker> DropoutMarkers(
     {
       if (!(start > 0.0 && start < 1.0))
         continue;
-      const double r = CutRadius(p.data.reach * start, _planeZ - p.position.Z());
+      const double r = CutRadius(p.data.reach * start,
+                                 _planeZ - p.position.Z());
       if (!(r > 0.0))
         continue;
       out.push_back(SolidMarker(_ns, id++, msgs::Marker::LINE_LIST, colour,

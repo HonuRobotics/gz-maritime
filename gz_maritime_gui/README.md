@@ -120,7 +120,8 @@ paused, a drag is redrawn at once.
 Colours run with frequency from orange at 25 kHz to violet at 40 kHz.
 Configuration: `<reach>`, `<pings>`, `<readings>` (all false by default),
 `<plane>` (`water`, `depth`, `receiver` or `3d`), `<plane_depth>` (m, default 5),
-`<plane_receiver>` (a receiver's topic, default the first listed),
+`<plane_receiver>` (a receiver's topic, default the first listed; one not
+listed is said so, and the water is drawn on until it is),
 `<speed_of_sound>`, `<slow_down>`, `<max_ring_radius>`, `<ray_length>`,
 `<ray_lifetime>`, `<water_level>` and `<marker_service>`.
 
