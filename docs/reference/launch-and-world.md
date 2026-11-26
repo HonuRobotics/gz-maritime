@@ -272,8 +272,8 @@ What a world says to the water optics system,
 
 | Markup | Meaning |
 |---|---|
-| `<jerlov>` | The Jerlov water type, below. Default `II`. |
-| `<visibility>` | Horizontal visibility of a black target, m: scales the type's absorption, scattering and diffuse attenuation by the same factor so that 4.8 / c in the green comes out at this distance (Zaneveld and Pegau 2003). The water keeps its colour. |
+| `<jerlov>` | The Jerlov water type, below. Default `1C`. |
+| `<visibility>` | Horizontal visibility of a black target, m: scales what the type's absorption, scattering and diffuse attenuation have above pure water's (type `I`) by the same factor, so that 4.8 / c in the green comes out at this distance (Zaneveld and Pegau 2003). Clearer water turns bluer; beyond about 100 m, clearer than pure water, and for type `I`, it is an error. |
 | `<attenuation>` | β^D, how fast an object's light fades with range, 1/m, as `r g b`. Replaces c = a + b. |
 | `<backscatter>` | β^B, how fast the veil builds with range, 1/m, as `r g b`. Replaces c. |
 | `<veil>` | B∞, the veil just below the surface as a fraction of the daylight there, as `r g b`. Replaces b / c. |
@@ -303,7 +303,11 @@ The Jerlov types, from Solonenko and Mobley (2015), at red 625 nm, green
 | `7C` | Turbid coastal | 2.26, 2.77, 3.84 | 0.84, 0.92, 0.86 | 0.6, 0.47, 0.924 | 1.73 |
 | `9C` | Most turbid coastal | 2.95, 3.81, 5.33 | 0.85, 0.89, 0.82 | 0.763, 0.826, 1.56 | 1.26 |
 
-Each triple is red, green, blue. The optics are kept on the world entity as
+Each triple is red, green, blue. The values come from a transcription of the
+paper's tables and are not yet checked against the printed ones. Two rows
+look off: `II` and `III` scatter about as much as `1C` and `3C`, so open
+ocean `III` comes out as murky as a harbour. Until they are checked, prefer
+the `C` types for coastal water; `1C` is the default. The optics are kept on the world entity as
 the `WaterOptics` component; a system that sees through water keeps a
 `gz::sim::water_optics::WaterOpticsSampler`, from the `gz_water_optics`
 library.

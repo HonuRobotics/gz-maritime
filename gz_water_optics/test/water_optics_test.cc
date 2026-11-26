@@ -163,7 +163,8 @@ TEST(WaterOpticsSystem, SetTopicAndGroundTruth)
   EXPECT_NEAR(run.optics.Visibility(), 5.0, 1e-9);
   EXPECT_EQ(run.optics.jerlov, "3C");
   EXPECT_GT(run.optics.generation, before.generation);
-  EXPECT_EQ(run.optics.veil, before.veil) << "visibility changed the colour";
+  // Clearer than 3C's own 3.9 m: closer to pure water, which scatters less
+  EXPECT_LT(run.optics.veil.Y(), before.veil.Y());
 
   // The ground truth reports it.
   for (int i = 0; i < 50; ++i)
