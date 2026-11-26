@@ -6,13 +6,13 @@ Authored in Blender's own convention: bow toward -Y, up +Z, so the exported
 glTF faces +Z with +Y up (profile Axes section). One object per part, one
 part per .glb, named for the part (profile Scenes and nodes section).
 
-Model frame, shared by every part (the datum, from the spec in
-tools/maritime-workspace/notes/sonar_design/shipwreck.md):
+Model frame, shared by every part (the wreck's datum; the model and its sources are
+described in docs/how-to/sonar-survey.md, "Part 2: Map a shipwreck"):
     origin  on the seabed plane, under the keel, at the boiler's forward face
     z = 0   the seabed plane; anything below it is buried
     -Y      forward, toward the bow
 
-Parts, one .glb each, split by acoustic class and by scored feature (spec decision 7):
+Parts, one .glb each, split by acoustic class and by scored feature:
     hull (wood)  mast (wood)  boiler, engine, debris (iron)  propeller, bell (bronze)
     name_plate (painted board)  coal
 
@@ -358,7 +358,8 @@ def export(ob):
     return path
 
 
-# --- Acoustic classes, from the spec's Acoustic properties table ------------
+# --- Acoustic classes: illustrative values on the scale given in ------------
+# --- docs/design/sonar.md, "Acoustic properties of the scene" ---------------
 ACOUSTIC = {   # lambert dB, specular dB or None, specular width rad
     "wood":   (-25, None, None),
     "iron":   (-15, -5, 0.10),
@@ -426,7 +427,7 @@ def write_sdf(parts):
   centerline, at the boiler's forward face, +X toward the bow. Place the model
   with z at the seabed; a negative offset buries it. Every part's .glb shares
   the model frame, so each visual carries only the profile's glTF-to-Gazebo
-  rotation. Acoustic values are illustrative (spec, Acoustic properties).
+  rotation. Acoustic values are illustrative (docs/design/sonar.md, Acoustic properties of the scene).
   The meshes are the exact ground truth geometry; named features are in
   ground_truth/features.yaml, in this same frame.
 -->

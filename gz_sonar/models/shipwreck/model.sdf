@@ -7,7 +7,7 @@
   centerline, at the boiler's forward face, +X toward the bow. Place the model
   with z at the seabed; a negative offset buries it. Every part's .glb shares
   the model frame, so each visual carries only the profile's glTF-to-Gazebo
-  rotation. Acoustic values are illustrative (spec, Acoustic properties).
+  rotation. Acoustic values are illustrative (docs/design/sonar.md, Acoustic properties of the scene).
   The meshes are the exact ground truth geometry; named features are in
   ground_truth/features.yaml, in this same frame.
 -->

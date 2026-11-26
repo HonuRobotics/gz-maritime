@@ -107,7 +107,7 @@ sonar::Water HarborWater()
 }
 
 //////////////////////////////////////////////////
-/// \brief Scenes A, B and C of spike/sonar_phase1/scenes.md, and the
+/// \brief Scenes A, B and C of docs/design/render-a-ping.md, and the
 /// sensor pose for each.
 /// \param[in] _name The scene: A, B or C.
 /// \param[out] _pose The sensor's pose.

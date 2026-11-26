@@ -59,7 +59,7 @@ sonar::Water HarborWater()
 
 //////////////////////////////////////////////////
 /// \brief The ECHO with a 10 m window, no speckle: the scenes of
-/// spike/sonar_phase1/scenes.md.
+/// docs/design/render-a-ping.md.
 /// \return The configuration.
 sonar::SonarConfig CleanEcho()
 {

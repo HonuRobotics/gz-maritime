@@ -1,5 +1,5 @@
 # Commission for the shipwreck model, modeled on the Monohansett.
-# Spec: tools/maritime-workspace/notes/sonar_design/shipwreck.md
+# Described in docs/how-to/sonar-survey.md, "Part 2: Map a shipwreck"; built by build_shipwreck.py.
 
 commission: shipwreck
 
