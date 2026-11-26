@@ -2,7 +2,8 @@
 <!--
   Coastal water (Jerlov 3C) with still water at z = 0. One camera 3 m deep
   looks along +x at a plate 2.5 m away (left of the image) and a wall 6 m
-  away; one above the water looks at the same wall.
+  away; one beside it, pitched up 1 rad, sees the wall below and open
+  water above it; one above the water looks at the same wall.
 -->
 <sdf version="1.9">
   <world name="uwcam">
@@ -47,6 +48,22 @@
         <pose>0 0 -3 0 0 0</pose>
         <sensor name="cam" type="rgbd_camera">
           <topic>uwcam/under</topic>
+          <update_rate>10</update_rate>
+          <always_on>1</always_on>
+          <camera>
+            <horizontal_fov>1.2</horizontal_fov>
+            <image><width>160</width><height>120</height></image>
+            <clip><near>0.1</near><far>60</far></clip>
+            <depth_camera><clip><near>0.1</near><far>60</far></clip></depth_camera>
+          </camera>
+          <plugin filename="gz-maritime-underwater-camera-system"
+                  name="gz::sim::maritime::UnderwaterCamera"/>
+        </sensor>
+      </link>
+      <link name="pitched">
+        <pose>0 0 -3 0 -1.0 0</pose>
+        <sensor name="cam" type="rgbd_camera">
+          <topic>uwcam/pitched</topic>
           <update_rate>10</update_rate>
           <always_on>1</always_on>
           <camera>

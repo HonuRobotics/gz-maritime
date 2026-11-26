@@ -22,8 +22,11 @@
 		// x: lamps; y: beam steps; z: beam range, m; w: beam strength.
 		float4 uwLampInfo;
 		// x: caustics strength (scaled by the waves); y: marine snow
-		// density; z: time, s.
+		// density; w: how far snow is drawn, m.
 		float4 uwEffects;
+		// The caustics' four phases, each wrapped to [0, 2 pi) on the CPU in
+		// double, so the pattern moves on smoothly however long it runs.
+		float4 uwCausticPhase;
 		// Per lamp, 5 float4 (view space): position, type (1 spot, 0 point);
 		// direction, range; diffuse, linear attenuation; spot (1/(cos inner -
 		// cos outer), cos outer, falloff), quadratic attenuation; specular.

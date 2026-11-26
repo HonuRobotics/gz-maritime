@@ -93,7 +93,8 @@ if(BUILD_TESTING)
   # The table, the resolution and the sampler, without a running world.
   ament_add_gtest(water_optics_core_test test/water_optics_core_test.cc)
   if(TARGET water_optics_core_test)
-    target_link_libraries(water_optics_core_test ${PROJECT_NAME})
+    target_link_libraries(water_optics_core_test ${PROJECT_NAME}
+      gz_waves::gz_waves)
     # The docs it checks: the reference page and this package's README.
     target_compile_definitions(water_optics_core_test PRIVATE
       "DOCS_REFERENCE=\"${CMAKE_CURRENT_SOURCE_DIR}/../docs/reference/launch-and-world.md\""
