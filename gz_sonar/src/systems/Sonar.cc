@@ -317,7 +317,10 @@ class SonarPrivate
   /// \brief The latest table, on the simulation thread.
   public: std::shared_ptr<const LabelTable> table;
   public: std::atomic<bool> haveSonars{false};
-  public: std::atomic<bool> sceneSeen{false};
+  /// \brief Whether the render events are joined; while there are sonars
+  /// and they are not, every update asks the Sensors system for a frame,
+  /// whose scene update joins them.
+  public: std::atomic<bool> renderJoined{false};
 
   // ---- rendering thread
   public: common::ConnectionPtr sceneUpdateConn;
@@ -424,8 +427,9 @@ void Sonar::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
   d.FindVisuals(_ecm, all);
 
   // With no stock rendering sensor in the world, the Sensors system has no
-  // reason to start the render engine until asked.
-  if (d.haveSonars && !d.sceneSeen)
+  // reason to render until asked: at the start, and again whenever a sonar
+  // appears after the events were left because the last one had gone.
+  if (d.haveSonars && !d.renderJoined)
     d.events->Emit<events::ForceRender>();
 }
 
@@ -743,6 +747,7 @@ void SonarPrivate::OnSceneUpdate()
       return;
     this->preRenderConn.reset();
     this->renderConn.reset();
+    this->renderJoined = false;
     return;
   }
   if (!this->haveSonars)
@@ -753,6 +758,7 @@ void SonarPrivate::OnSceneUpdate()
     [this]() { this->OnPreRender(); });
   this->renderConn = this->events->Connect<events::Render>(
     [this]() { this->OnRender(); });
+  this->renderJoined = true;
 }
 
 //////////////////////////////////////////////////
@@ -957,7 +963,6 @@ void SonarPrivate::OnPreRender()
     this->scene = rendering::sceneFromFirstRenderEngine();
   if (!this->scene || !this->scene->IsInitialized())
     return;
-  this->sceneSeen = true;
   const auto t = std::chrono::duration_cast<nanoseconds>(this->scene->Time());
 
   {
