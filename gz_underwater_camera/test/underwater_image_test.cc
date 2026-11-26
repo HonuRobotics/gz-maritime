@@ -22,6 +22,7 @@
 #include <limits>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <gz/math/Helpers.hh>
@@ -510,6 +511,28 @@ TEST(Throughput, ParallelFramesAreTheSame)
     EXPECT_EQ(first, again) << threads << " threads";
   }
   SetMaxThreads(0);
+
+  // Two cameras at once, each on its own thread, share the pool: each gets
+  // the frame it gets alone
+  std::vector<std::uint8_t> outs[2];
+  std::vector<std::thread> cameras;
+  for (int c = 0; c < 2; ++c)
+  {
+    cameras.emplace_back([&, c]()
+    {
+      for (int n = 0; n < 5; ++n)
+      {
+        std::mt19937 own(11);
+        MakeUnderwater(rgb, z, rays, w, r, own, outs[c], o);
+        if (outs[c] != first)
+          return;
+      }
+    });
+  }
+  for (auto &t : cameras)
+    t.join();
+  EXPECT_EQ(outs[0], first);
+  EXPECT_EQ(outs[1], first);
 }
 
 /////////////////////////////////////////////////
