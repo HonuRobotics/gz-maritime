@@ -162,6 +162,23 @@ if(BUILD_TESTING)
       "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH};GZ_PARTITION=gz_underwater_effects_test")
   endif()
 
+  # Lamp edge cases: more than the shader takes, out of view, removed. A
+  # process of its own.
+  ament_add_gtest(lamp_edges_test test/lamp_edges_test.cc TIMEOUT 600)
+  if(TARGET lamp_edges_test)
+    target_compile_definitions(lamp_edges_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(lamp_edges_test
+      gz_underwater_camera::gz_underwater_camera
+      gz_water_optics::gz_water_optics
+      gz-sim::core
+      gz-transport::core
+      gz-msgs::core)
+    set_tests_properties(lamp_edges_test PROPERTIES
+      ENVIRONMENT
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH};GZ_PARTITION=gz_underwater_lamp_edges_test")
+  endif()
+
   # The renderer cannot install (no pieces there): the reference camera
   # draws the water. A process of its own, so nothing is installed before.
   ament_add_gtest(underwater_rendering_fallback_test
