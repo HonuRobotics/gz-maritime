@@ -24,15 +24,17 @@ patches' pixel boxes in that image are written beside it.
         [--visibility 4] [--width 1280 --height 720 --hfov 1.2] \
         [--chart-width 0.28] [--sun 0.8]
 
-Writes chart.sdf and chart.json. Run the world headless and save one frame
-of `chart/camera/underwater/image`:
+Writes chart.sdf and chart.json, the patches' boxes in its image. Run the
+world headless and save one frame of its underwater image:
 
-    gz sim -s -r chart.sdf
+    gz sim -s -r chart.sdf &
+    save_frame.py --topic /chart/camera/underwater/image --out sim.png
 """
 
 import argparse
 import json
 import math
+from pathlib import Path
 
 # The chart's patches, as the ColorChecker's published sRGB values (D65),
 # row by row.
@@ -51,6 +53,9 @@ PATCHES = [
     ('neutral 3.5', (85, 85, 85)), ('black', (52, 52, 52)),
 ]
 COLS, ROWS = 6, 4
+
+# The Jerlov water types gz_water_optics knows.
+JERLOV = ['I', 'IA', 'IB', 'II', 'III', '1C', '3C', '5C', '7C', '9C']
 
 
 def linear(c):
@@ -143,7 +148,8 @@ def main(argv=None):
     p.add_argument('--out', required=True, help='the world file to write (.sdf)')
     p.add_argument('--range', type=float, default=2.0, help='camera to chart, m')
     p.add_argument('--depth', type=float, default=5.0, help='of camera and chart, m')
-    p.add_argument('--jerlov', default='3C', help='Jerlov water type')
+    p.add_argument('--jerlov', default='3C', type=str.upper, choices=JERLOV,
+                   help='Jerlov water type')
     p.add_argument('--visibility', type=float, help='horizontal visibility, m')
     p.add_argument('--width', type=int, default=1280)
     p.add_argument('--height', type=int, default=720)
@@ -152,9 +158,11 @@ def main(argv=None):
     p.add_argument('--sun', type=float, default=0.8, help='the sun light diffuse level')
     p.add_argument('--ambient', type=float, default=0.3, help='the ambient light level')
     a = p.parse_args(argv)
+    if a.visibility is not None and a.visibility <= 0:
+        p.error('--visibility must be a positive number of metres')
     sdf, patches = world(a)
     open(a.out, 'w').write(sdf)
-    json_path = a.out.rsplit('.', 1)[0] + '.json'
+    json_path = Path(a.out).with_suffix('.json')
     json.dump(patches, open(json_path, 'w'), indent=1)
     print(f'wrote {a.out} and {json_path}')
 

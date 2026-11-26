@@ -176,18 +176,41 @@ under water, and simulate the same shot:
    measured range (1 to 4 m), at a measured depth, in daylight; note the
    water's visibility (or measure its Jerlov type). Shoot a few frames at
    each range, with the camera's white balance and exposure fixed.
-2. **Simulate the shot.** `make_chart_world.py --out chart.sdf --range 2
-   --depth 5 --jerlov 3C --width 1280 --height 720 --hfov 1.2`, with your
-   camera's resolution and field of view, then run it and save one frame of
-   `chart/camera/underwater/image`.
-3. **Mark the patches** in your photo: a `chart.json` of the 24 boxes, in
-   the same order (the simulated one shows the format).
-4. **Compare.** `chart_validation.py --real dive.png --sim sim.png
-   --patches chart.json --report report.png`. Under 10 degrees on average is
-   the target; OceanSim reports 8 to 14 for its scenes.
+2. **Simulate the shot**, in each water you think it may be. The tools are
+   installed in `lib/gz_underwater_camera`:
 
-Adjust the water (`<jerlov>`, `<visibility>`, or explicit coefficients)
-until the error is smallest: those are your water's optics.
+   ```bash
+   ros2 run gz_underwater_camera make_chart_world.py --out chart_3c.sdf \
+     --range 2 --depth 5 --jerlov 3C --width 1280 --height 720 --hfov 1.2
+   gz sim -s -r chart_3c.sdf &
+   ros2 run gz_underwater_camera save_frame.py \
+     --topic /chart/camera/underwater/image --out sim_3c.png
+   ```
+
+   with your camera's resolution and field of view; the same for `5C` and so
+   on. `chart_3c.json` holds the patches' boxes in the render.
+3. **Mark the patches** in your photo: a `dive.json` of the 24 boxes, in
+   the same order (`chart_3c.json` shows the format). They need not line up
+   with the render's.
+4. **Compare.**
+
+   ```bash
+   ros2 run gz_underwater_camera chart_validation.py \
+     --real dive.png --real-patches dive.json \
+     --sim 3C=sim_3c.png --sim 5C=sim_5c.png --sim-patches chart_3c.json \
+     --report report.png
+   ```
+
+   It lists the waters by their mean angular error, closest first, with the
+   error per patch: hue and saturation, not brightness. OceanSim reports 8
+   to 14 degrees for its scenes. It also gives the luminance of each render
+   against the photo: the same ratio on every patch is only exposure, a
+   spread between patches is the water.
+
+The water with the smallest error is the nearest; refine it with
+`<visibility>` or explicit coefficients the same way. Water types close to
+each other differ by a few degrees only, so compare a few, and read the
+brightness too.
 
 ## More of the water
 

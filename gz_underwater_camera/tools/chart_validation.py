@@ -13,47 +13,62 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Compare a simulated underwater image of a colour chart with a real one.
+Compare simulated underwater images of a colour chart with a real one.
 
-The metric is OceanSim's (arXiv:2503.01074): for each patch of the chart,
-the angle between the real and the simulated mean colour, as RGB vectors in
-linear light. It does not depend on brightness, only on hue and saturation,
-so an exposure difference between the two cameras does not count; what the
-water does to colour does.
+For each patch of the chart, two numbers, in linear light:
 
-    chart_validation.py --real real.png --sim sim.png --patches chart.json \
+* the angle between the real and the simulated mean colour, as RGB vectors
+  (OceanSim's metric, arXiv:2503.01074): hue and saturation, not brightness;
+* the ratio of their luminance, simulated over real: brightness. The same
+  ratio on every patch is an exposure difference between the two cameras;
+  a ratio that varies between patches is the water.
+
+    chart_validation.py --real dive.png --real-patches dive.json \
+        --sim 3C=sim_3c.png --sim 5C=sim_5c.png --sim-patches chart.json \
         [--report report.png] [--json result.json] [--threshold 10]
 
-chart.json holds the patches' pixel boxes, the same in both images:
+The boxes of the patches are given for each image, since a photo never
+lines up pixel for pixel with a render: --real-patches for the photo (mark
+them once by hand), --sim-patches for the renders (make_chart_world.py
+writes them). --patches gives the same boxes for both. A boxes file holds
 
     {"patches": [{"name": "dark skin", "box": [x0, y0, x1, y1]}, ...]}
 
-(make_chart_world.py writes it for a simulated scene; for real footage,
-mark the boxes once by hand.) Each box is shrunk by a fifth on every side
+in the same order for both. Each box is shrunk by a fifth on every side
 before averaging, to stay clear of the patch's edges.
 
-Exits 0 if the mean angular error is under the threshold (10 degrees by
-default, the plan's target), 1 if not.
+With one simulated image or several, one per water (name=image), it prints
+each water's errors, closest first: the nearest water types. There is no
+pass or fail, unless --threshold is given: then it exits 1 if the closest
+water's mean error is not under it. A patch too dark to have a colour in
+either image is left out and counted; more than --max-dark of them, and it
+exits 1.
 """
 
 import argparse
 import json
 import math
+from pathlib import Path
 import sys
 
 import numpy as np
 
+# Rec. 709 luminance weights, for linear RGB.
+LUMINANCE = np.array([0.2126, 0.7152, 0.0722])
 
-def srgb_to_linear(v):
-    """8-bit or [0, 1] sRGB to linear light."""
-    v = np.asarray(v, dtype=float)
-    if v.max() > 1.0:
-        v = v / 255.0
+
+def srgb_to_linear(image):
+    """Return an sRGB image in linear light, its scale from its data type."""
+    image = np.asarray(image)
+    if np.issubdtype(image.dtype, np.integer):
+        v = image.astype(float) / np.iinfo(image.dtype).max
+    else:
+        v = image.astype(float)
     return np.where(v <= 0.04045, v / 12.92, ((v + 0.055) / 1.055) ** 2.4)
 
 
 def angular_error(a, b):
-    """Return the angle between two RGB colours, in degrees."""
+    """Return the angle between two RGB colours, in degrees; NaN if black."""
     a = np.asarray(a, dtype=float)
     b = np.asarray(b, dtype=float)
     na, nb = np.linalg.norm(a), np.linalg.norm(b)
@@ -65,7 +80,7 @@ def angular_error(a, b):
 
 def patch_means(image, boxes, shrink=0.2):
     """Return the mean linear colour of each box, shrunk by `shrink` per side."""
-    lin = srgb_to_linear(image[..., :3])
+    lin = srgb_to_linear(np.asarray(image)[..., :3])
     out = []
     for x0, y0, x1, y1 in boxes:
         dx, dy = (x1 - x0) * shrink, (y1 - y0) * shrink
@@ -73,24 +88,52 @@ def patch_means(image, boxes, shrink=0.2):
         ya, yb = int(round(y0 + dy)), int(round(y1 - dy))
         if xb <= xa or yb <= ya:
             raise ValueError(f'box {(x0, y0, x1, y1)} is too small')
+        if xa < 0 or ya < 0 or xb > lin.shape[1] or yb > lin.shape[0]:
+            raise ValueError(f'box {(x0, y0, x1, y1)} is outside the image')
         out.append(lin[ya:yb, xa:xb].reshape(-1, 3).mean(axis=0))
     return np.array(out)
 
 
-def compare(real, sim, boxes):
-    """Return the per-patch angular errors and their summary."""
-    r = patch_means(real, boxes)
-    s = patch_means(sim, boxes)
+def compare(real, sim, real_boxes, sim_boxes=None):
+    """Return the per-patch angular errors and luminance ratios, summarised."""
+    if sim_boxes is None:
+        sim_boxes = real_boxes
+    if len(real_boxes) != len(sim_boxes):
+        raise ValueError(f'{len(real_boxes)} real patches, {len(sim_boxes)} '
+                         'simulated: they must be the same, in order')
+    r = patch_means(real, real_boxes)
+    s = patch_means(sim, sim_boxes)
     errors = [angular_error(a, b) for a, b in zip(r, s)]
+    ratios = [float(b @ LUMINANCE / (a @ LUMINANCE)) if a @ LUMINANCE > 0
+              else float('nan') for a, b in zip(r, s)]
     valid = [e for e in errors if not math.isnan(e)]
+    good = [q for q in ratios if not math.isnan(q) and q > 0]
+    nan = float('nan')
     return {
         'errors': errors,
-        'mean': float(np.mean(valid)) if valid else float('nan'),
-        'median': float(np.median(valid)) if valid else float('nan'),
-        'max': float(np.max(valid)) if valid else float('nan'),
+        'dark': len(errors) - len(valid),
+        'mean': float(np.mean(valid)) if valid else nan,
+        'median': float(np.median(valid)) if valid else nan,
+        'max': float(np.max(valid)) if valid else nan,
+        'luminance_ratios': ratios,
+        # The typical ratio, and how much it varies between patches (the
+        # standard deviation of its logarithm): 0 for an exposure difference
+        'luminance_ratio': float(np.median(good)) if good else nan,
+        'luminance_spread': float(np.std(np.log(good))) if good else nan,
         'real': r.tolist(),
         'sim': s.tolist(),
     }
+
+
+def json_safe(value):
+    """Return a value with every NaN as None, so it is valid JSON."""
+    if isinstance(value, dict):
+        return {k: json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [json_safe(v) for v in value]
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    return value
 
 
 def load_image(path):
@@ -98,14 +141,23 @@ def load_image(path):
     return np.asarray(Image.open(path).convert('RGB'))
 
 
-def report(path, real, sim, boxes, names, result, threshold):
-    """Draw a figure: the two images with the boxes, and the error per patch."""
+def load_boxes(path):
+    """Return the names and boxes of a patches file."""
+    spec = json.load(open(path))
+    names = [pt.get('name', str(i)) for i, pt in enumerate(spec['patches'])]
+    return names, [pt['box'] for pt in spec['patches']]
+
+
+def report(path, real, real_boxes, sims, sim_boxes, names, results, threshold):
+    """Draw a figure: the real and the closest simulated image, and the errors."""
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
+    best = min(results, key=lambda w: results[w]['mean'])
     fig = plt.figure(figsize=(13, 7.5))
-    for k, (img, title) in enumerate(((real, 'real'), (sim, 'simulated'))):
+    for k, (img, boxes, title) in enumerate(
+            ((real, real_boxes, 'real'), (sims[best], sim_boxes, f'simulated, {best}'))):
         ax = fig.add_subplot(2, 2, k + 1)
         ax.imshow(img)
         for x0, y0, x1, y1 in boxes:
@@ -113,44 +165,88 @@ def report(path, real, sim, boxes, names, result, threshold):
         ax.set_title(title)
         ax.axis('off')
     ax = fig.add_subplot(2, 1, 2)
-    x = np.arange(len(boxes))
-    colours = ['#2a78d6' if e <= threshold else '#d1342f' for e in result['errors']]
-    ax.bar(x, result['errors'], color=colours)
-    ax.axhline(threshold, color='#52514e', ls=(0, (4, 3)), lw=1)
-    ax.set_xticks(x, names, rotation=60, ha='right', fontsize=8)
+    x = np.arange(len(names))
+    width = 0.8 / len(results)
+    for k, water in enumerate(sorted(results, key=lambda w: results[w]['mean'])):
+        r = results[water]
+        ax.bar(x + k * width, [0 if math.isnan(e) else e for e in r['errors']], width,
+               label=f"{water}: mean {r['mean']:.1f} degrees")
+    if threshold is not None:
+        ax.axhline(threshold, color='#52514e', ls=(0, (4, 3)), lw=1)
+    ax.set_xticks(x + 0.4 - width / 2, names, rotation=60, ha='right', fontsize=8)
     ax.set_ylabel('RGB angular error (degrees)')
-    ax.set_title(f"mean {result['mean']:.1f}, median {result['median']:.1f}, "
-                 f"max {result['max']:.1f} degrees (target: mean under {threshold:g})", loc='left')
+    ax.legend(loc='upper left', fontsize=8)
     fig.tight_layout()
     fig.savefig(path, dpi=90)
     plt.close(fig)
 
 
+def parse_sim(text):
+    """Return (water, path) of a --sim argument, water=path or a path."""
+    if '=' in text:
+        water, path = text.split('=', 1)
+        return water, path
+    return Path(text).stem, text
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     p.add_argument('--real', required=True, help='the real image')
-    p.add_argument('--sim', required=True, help='the simulated image')
-    p.add_argument('--patches', required=True, help='the patches JSON')
+    p.add_argument('--sim', required=True, action='append',
+                   help='a simulated image, as water=path or path; repeat it '
+                        'for each water to compare')
+    p.add_argument('--patches', help='the boxes, the same in every image')
+    p.add_argument('--real-patches', help='the boxes in the real image')
+    p.add_argument('--sim-patches', help='the boxes in the simulated images')
     p.add_argument('--report', help='write a report figure here')
-    p.add_argument('--json', help='write the result here')
-    p.add_argument('--threshold', type=float, default=10.0,
-                   help='pass if the mean error is under this, degrees')
+    p.add_argument('--json', help='write the results here')
+    p.add_argument('--threshold', type=float,
+                   help='exit 1 if the closest mean error is not under this, '
+                        'degrees; by default there is no pass or fail')
+    p.add_argument('--max-dark', type=int, default=4,
+                   help='patches too dark to compare, at most (default 4)')
     a = p.parse_args(argv)
-    spec = json.load(open(a.patches))
-    boxes = [pt['box'] for pt in spec['patches']]
-    names = [pt.get('name', str(i)) for i, pt in enumerate(spec['patches'])]
-    real, sim = load_image(a.real), load_image(a.sim)
-    if real.shape != sim.shape:
-        sys.exit(f'the images differ in size: {real.shape} and {sim.shape}')
-    result = compare(real, sim, boxes)
-    for name, e in zip(names, result['errors']):
+    real_path = a.real_patches or a.patches
+    sim_path = a.sim_patches or a.patches
+    if not real_path or not sim_path:
+        p.error('give --patches, or --real-patches and --sim-patches')
+    names, real_boxes = load_boxes(real_path)
+    _, sim_boxes = load_boxes(sim_path)
+
+    real = load_image(a.real)
+    sims, results = {}, {}
+    for text in a.sim:
+        water, path = parse_sim(text)
+        sims[water] = load_image(path)
+        results[water] = compare(real, sims[water], real_boxes, sim_boxes)
+
+    order = sorted(results, key=lambda w: (math.isnan(results[w]['mean']),
+                                           results[w]['mean']))
+    for water in order:
+        r = results[water]
+        print(f"{water}: mean {r['mean']:.2f}, median {r['median']:.2f}, "
+              f"max {r['max']:.2f} degrees; luminance {r['luminance_ratio']:.2f} "
+              f"times the real, spread {r['luminance_spread']:.2f}; "
+              f"{r['dark']} patches too dark")
+    best = results[order[0]]
+    print(f'closest: {", ".join(order)}')
+    for name, e in zip(names, best['errors']):
         print(f'{name:>16}: {e:5.1f} degrees')
-    print(f"mean {result['mean']:.2f}, median {result['median']:.2f}, max {result['max']:.2f}")
+
     if a.report:
-        report(a.report, real, sim, boxes, names, result, a.threshold)
+        report(a.report, real, real_boxes, sims, sim_boxes, names, results,
+               a.threshold)
     if a.json:
-        json.dump(result, open(a.json, 'w'), indent=1)
-    return 0 if result['mean'] < a.threshold else 1
+        json.dump(json_safe({'closest': order, 'waters': results}),
+                  open(a.json, 'w'), indent=1, allow_nan=False)
+
+    if best['dark'] > a.max_dark:
+        print(f"{best['dark']} patches too dark to compare, more than "
+              f'{a.max_dark}', file=sys.stderr)
+        return 1
+    if a.threshold is not None and not best['mean'] < a.threshold:
+        return 1
+    return 0
 
 
 if __name__ == '__main__':

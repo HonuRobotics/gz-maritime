@@ -110,7 +110,8 @@ camera at full frame rate, use the GPU path
 
 ## Checking it against real footage
 
-Two tools, installed in `lib/gz_underwater_camera`:
+Three tools, installed in `lib/gz_underwater_camera` (`ros2 run
+gz_underwater_camera <tool>`):
 
 - `make_chart_world.py` writes a world that reproduces a colour chart
   photographed under water (a 24-patch ColorChecker at a given range and
@@ -118,20 +119,24 @@ Two tools, installed in `lib/gz_underwater_camera`:
   patches' pixel boxes in its image.
 - `chart_validation.py` compares the real and the simulated images patch by
   patch: the RGB angular error of each patch's mean colour in linear light,
-  the metric of OceanSim (arXiv:2503.01074), which ignores brightness. It
-  prints the errors, can draw a report, and passes when the mean is under
-  10 degrees.
+  the metric of OceanSim (arXiv:2503.01074), which ignores brightness, and
+  the luminance ratio per patch, which does not. Given one render per water,
+  each with its own boxes, it ranks the waters closest first; it fails only
+  with `--threshold`, or when more than `--max-dark` patches are too dark.
+- `save_frame.py` saves one frame of a camera topic as a PNG.
 
 ```bash
-make_chart_world.py --out chart.sdf --range 2 --depth 5 --jerlov 3C
-gz sim -s -r chart.sdf      # save one frame of chart/camera/underwater/image
-chart_validation.py --real dive.png --sim sim.png --patches chart.json --report report.png
+ros2 run gz_underwater_camera make_chart_world.py --out chart.sdf --range 2 --depth 5 --jerlov 3C
+gz sim -s -r chart.sdf &
+ros2 run gz_underwater_camera save_frame.py --topic /chart/camera/underwater/image --out sim.png
+ros2 run gz_underwater_camera chart_validation.py --real dive.png --real-patches dive.json \
+  --sim 3C=sim.png --sim-patches chart.json --report report.png
 ```
 
 ![An example report](../docs/design/images/uw-validation-example.png)
 
 The example above is **not a validation**: its "real" image is another
-simulation, in 5C water against 3C (13.4 degrees, a fail, as it should be).
+simulation, in 5C water against 3C (13.4 degrees).
 Real footage is still needed.
 
 ## Tests
@@ -152,8 +157,12 @@ colcon test --packages-select gz_underwater_camera
 - `test_chart_validation`: the metric (zero for the same colour, 90 for
   orthogonal ones, brightness not counted), patch means away from the
   edges, a closed loop on synthetic charts (the same water near zero, an
-  exposure difference near zero, another water far), the command line, and
-  the chart world (valid SDF, patches inside the image, in order).
+  exposure difference near zero, another water far), the nearest water
+  ranked first, each image with its own boxes, dark patches counted and the
+  JSON free of NaN, the scale from the data type, boxes too small or outside,
+  the luminance ratio telling exposure from water, the command line, a
+  camera image saved, and the chart world (valid SDF, patches inside the
+  image, in order; the water type checked; `--visibility`).
 - `underwater_camera_test`, rendered (needs a GPU): the published image
   against the model computed in the test from the in-air frame, pixel by
   pixel; the far wall fading into the veil more than the near plate; above

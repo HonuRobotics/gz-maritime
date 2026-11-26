@@ -95,23 +95,124 @@ def test_closed_loop_other_water_is_far():
     assert len(result['errors']) == 24
 
 
-def test_command_line(tmp_path):
+def save_chart(tmp_path, name, image, boxes):
+    """Write an image and its boxes; return their paths."""
     from PIL import Image
+    Image.fromarray(image).save(tmp_path / f'{name}.png')
+    json.dump({'patches': [{'name': n, 'box': b} for (n, _), b in zip(mcw.PATCHES, boxes)]},
+              open(tmp_path / f'{name}.json', 'w'))
+    return str(tmp_path / f'{name}.png'), str(tmp_path / f'{name}.json')
+
+
+def run_tool(*args):
+    return subprocess.run([sys.executable, str(TOOLS / 'chart_validation.py'), *args],
+                          capture_output=True, text=True)
+
+
+def test_command_line(tmp_path):
     real, boxes = chart_image('3C')
     sim, _ = chart_image('3C', gain=0.8)
-    Image.fromarray(real).save(tmp_path / 'real.png')
-    Image.fromarray(sim).save(tmp_path / 'sim.png')
-    json.dump({'patches': [{'name': n, 'box': b} for (n, _), b in zip(mcw.PATCHES, boxes)]},
-              open(tmp_path / 'chart.json', 'w'))
-    out = subprocess.run([sys.executable, str(TOOLS / 'chart_validation.py'),
-                          '--real', str(tmp_path / 'real.png'), '--sim', str(tmp_path / 'sim.png'),
-                          '--patches', str(tmp_path / 'chart.json'),
-                          '--report', str(tmp_path / 'report.png'),
-                          '--json', str(tmp_path / 'result.json')],
-                         capture_output=True, text=True)
+    real_png, chart = save_chart(tmp_path, 'real', real, boxes)
+    sim_png, _ = save_chart(tmp_path, 'sim', sim, boxes)
+    out = run_tool('--real', real_png, '--sim', f'3C={sim_png}', '--patches', chart,
+                   '--report', str(tmp_path / 'report.png'),
+                   '--json', str(tmp_path / 'result.json'))
     assert out.returncode == 0, out.stdout + out.stderr
     assert (tmp_path / 'report.png').is_file()
-    assert json.load(open(tmp_path / 'result.json'))['mean'] < 1.0
+    result = json.load(open(tmp_path / 'result.json'))
+    assert result['closest'] == ['3C']
+    assert result['waters']['3C']['mean'] < 1.0
+
+
+def test_nearest_water_comes_first(tmp_path):
+    # The real chart in 3C, simulated in 7C and 3C: 3C is the closest.
+    real, boxes = chart_image('3C')
+    real_png, chart = save_chart(tmp_path, 'real', real, boxes)
+    sims = []
+    for water in ('7C', '3C'):
+        png, _ = save_chart(tmp_path, water, chart_image(water)[0], boxes)
+        sims += ['--sim', f'{water}={png}']
+    out = run_tool('--real', real_png, *sims, '--patches', chart,
+                   '--json', str(tmp_path / 'result.json'))
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert json.load(open(tmp_path / 'result.json'))['closest'] == ['3C', '7C']
+    assert 'closest: 3C, 7C' in out.stdout
+
+
+def test_threshold_is_optional(tmp_path):
+    real, boxes = chart_image('3C')
+    real_png, chart = save_chart(tmp_path, 'real', real, boxes)
+    sim_png, _ = save_chart(tmp_path, 'sim', chart_image('7C')[0], boxes)
+    assert run_tool('--real', real_png, '--sim', sim_png, '--patches', chart).returncode == 0
+    out = run_tool('--real', real_png, '--sim', sim_png, '--patches', chart,
+                   '--threshold', '1')
+    assert out.returncode == 1
+
+
+def test_own_boxes_for_each_image(tmp_path):
+    # The photo and the render need not be the same size or line up.
+    real, real_boxes = chart_image('3C', size=(240, 360))
+    sim, sim_boxes = chart_image('3C', size=(360, 600))
+    real_png, real_chart = save_chart(tmp_path, 'real', real, real_boxes)
+    sim_png, sim_chart = save_chart(tmp_path, 'sim', sim, sim_boxes)
+    out = run_tool('--real', real_png, '--real-patches', real_chart,
+                   '--sim', sim_png, '--sim-patches', sim_chart,
+                   '--json', str(tmp_path / 'result.json'))
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert json.load(open(tmp_path / 'result.json'))['waters']['sim']['mean'] < 0.5
+
+
+def test_dark_patches_are_counted(tmp_path):
+    real, boxes = chart_image('3C')
+    sim = real.copy()
+    for x0, y0, x1, y1 in boxes[:6]:
+        sim[y0:y1, x0:x1] = 0
+    result = cv.compare(real, sim, boxes)
+    assert result['dark'] == 6
+    real_png, chart = save_chart(tmp_path, 'real', real, boxes)
+    sim_png, _ = save_chart(tmp_path, 'sim', sim, boxes)
+    out = run_tool('--real', real_png, '--sim', sim_png, '--patches', chart,
+                   '--json', str(tmp_path / 'result.json'))
+    assert out.returncode == 1, 'six dark patches, more than the four allowed'
+    text = open(tmp_path / 'result.json').read()
+    assert 'NaN' not in text
+    json.loads(text, parse_constant=lambda c: pytest.fail(f'{c} in the JSON'))
+    assert run_tool('--real', real_png, '--sim', sim_png, '--patches', chart,
+                    '--max-dark', '6').returncode == 0
+
+
+def test_scale_comes_from_the_data_type():
+    # A nearly black 8-bit frame is not read as [0, 1].
+    dark = np.ones((4, 4, 3), dtype=np.uint8)
+    assert cv.srgb_to_linear(dark).max() < 0.001
+    assert cv.srgb_to_linear(np.ones((4, 4, 3))).max() == pytest.approx(1.0)
+
+
+def test_box_too_small_or_outside():
+    img = np.zeros((10, 10, 3), dtype=np.uint8)
+    with pytest.raises(ValueError, match='too small'):
+        cv.patch_means(img, [[4, 2, 4, 8]])
+    with pytest.raises(ValueError, match='outside'):
+        cv.patch_means(img, [[5, 5, 20, 20]])
+
+
+def test_luminance_ratio_tells_exposure_from_water():
+    real, boxes = chart_image('3C')
+    exposure = cv.compare(real, chart_image('3C', gain=0.6)[0], boxes)
+    assert exposure['luminance_ratio'] == pytest.approx(0.6, rel=0.05)
+    water = cv.compare(real, chart_image('7C')[0], boxes)
+    assert water['luminance_spread'] > 3 * exposure['luminance_spread']
+
+
+def test_save_frame_reads_camera_images():
+    image_pb2 = pytest.importorskip('gz.msgs.image_pb2')
+    import save_frame
+    msg = image_pb2.Image()
+    msg.width, msg.height, msg.step = 2, 1, 8  # padded rows
+    msg.pixel_format_type = msg.DESCRIPTOR.fields_by_name[
+        'pixel_format_type'].enum_type.values_by_name['RGB_INT8'].number
+    msg.data = bytes([10, 20, 30, 40, 50, 60, 0, 0])
+    assert save_frame.to_array(msg).tolist() == [[[10, 20, 30], [40, 50, 60]]]
 
 
 def test_chart_world(tmp_path):
@@ -130,3 +231,15 @@ def test_chart_world(tmp_path):
     check = subprocess.run(['gz', 'sdf', '-k', str(out)], capture_output=True, text=True)
     text = check.stdout + check.stderr
     assert check.returncode == 0 and 'Valid' in text, text
+
+
+def test_chart_world_options(tmp_path):
+    out = tmp_path / 'run.1' / 'chart.sdf'
+    out.parent.mkdir()
+    mcw.main(['--out', str(out), '--jerlov', '5c', '--visibility', '4'])
+    assert (tmp_path / 'run.1' / 'chart.json').is_file()
+    text = out.read_text()
+    assert '<jerlov>5C</jerlov>' in text and '<visibility>4.0</visibility>' in text
+    for bad in (['--jerlov', '4C'], ['--visibility', '0']):
+        with pytest.raises(SystemExit):
+            mcw.main(['--out', str(tmp_path / 'x.sdf'), *bad])

@@ -696,8 +696,10 @@ below.** What this phase built is everything the comparison needs:
   ColorChecker at a range and depth, in a Jerlov type or visibility, facing
   the reference camera), and the patches' pixel boxes.
 - `chart_validation.py`: OceanSim's metric, the RGB angular error per patch
-  in linear light (brightness does not count), with a report and a pass at a
-  10 degree mean.
+  in linear light (brightness does not count), and the luminance ratio per
+  patch; one render per water, ranked closest first, each image with its own
+  boxes; a pass or fail only with `--threshold`.
+- `save_frame.py`: one frame of a camera topic as a PNG.
 - Tests: the metric's properties; a closed loop on synthetic charts (the
   same water near 0, an exposure change near 0, another water far); the
   command line; the chart world (valid SDF, patches in the image, in order).
