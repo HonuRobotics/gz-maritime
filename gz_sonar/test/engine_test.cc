@@ -19,7 +19,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
+#include <memory>
 #include <numeric>
+#include <thread>
 #include <vector>
 
 #include <gz/math/Pose3.hh>
@@ -434,22 +437,107 @@ TEST(Readout, ProfilingFlatSeabed)
 }
 
 /////////////////////////////////////////////////
-// Threads change how fast, never what: the same bits for 1 or 8 threads.
+// Threads change how fast, never what: the same bits for 1, 3, 8 or 24
+// threads, at the imaging preset's full fan.
 TEST(Engine, SameResultForAnyThreadCount)
 {
-  sonar::SonarConfig c = CleanEcho();
-  c.speckle = true;
+  sonar::SonarConfig c = sonar::EchoImaging();
   sonar::SyntheticScene scene;
   scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), 1);
   scene.AddBox({4.5, -0.5, 0}, {5.5, 0.5, 0.5}, Lambert(-15.0), 2);
+  scene.AddSphere({12, 3, 0.25}, 0.25, Lambert(-10.0), 3);
   const Pose3d pose(0, 0, 2, 0, 15.0 * kDeg, 0);
   c.threads = 1;
   const auto one = Ping(c, scene, pose, 3);
-  c.threads = 8;
-  const auto eight = Ping(c, scene, pose, 3);
-  EXPECT_EQ(one.data, eight.data);
-  EXPECT_EQ(one.labels, eight.labels);
+  for (std::size_t threads : {3u, 8u, 24u})
+  {
+    c.threads = threads;
+    const auto many = Ping(c, scene, pose, 3);
+    EXPECT_EQ(one.data, many.data) << threads << " threads";
+    EXPECT_EQ(one.labels, many.labels) << threads << " threads";
+  }
 }
+
+/////////////////////////////////////////////////
+// An engine reuses its buffers from ping to ping: a ping is the same as on
+// a fresh engine, whatever came before it.
+TEST(Engine, PingDoesNotDependOnThePrevious)
+{
+  sonar::SonarConfig c = CleanEcho();
+  c.threads = 4;
+  sonar::SyntheticScene near;
+  near.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), 1);
+  near.AddBox({2.5, -0.5, 0}, {3.5, 0.5, 1.5}, Lambert(-10.0), 2);
+  sonar::SyntheticScene far;
+  far.AddSphere({8, -1, 2}, 0.5, Lambert(-15.0), 3);
+  const Pose3d pose(0, 0, 2, 0, 15.0 * kDeg, 0);
+  const auto rays = sonar::RayFan(c);
+  auto nearHits = near.Cast(pose, rays, 1.5 * c.rangeMax);
+  sonar::AssignFootprints(nearHits, sonar::RayFanElevationCount(c));
+  auto farHits = far.Cast(pose, rays, 1.5 * c.rangeMax);
+  sonar::AssignFootprints(farHits, sonar::RayFanElevationCount(c));
+
+  const sonar::Engine fresh(c, HarborWater());
+  const auto expected = fresh.Ping(farHits, 5);
+  const sonar::Engine reused(c, HarborWater());
+  reused.Ping(nearHits, 4);
+  const auto after = reused.Ping(farHits, 5);
+  EXPECT_EQ(expected.data, after.data);
+  EXPECT_EQ(expected.labels, after.labels);
+  EXPECT_EQ(expected.ranges, after.ranges);
+  EXPECT_EQ(expected.azimuths, after.azimuths);
+}
+
+/////////////////////////////////////////////////
+// One per core by default, but no more than kDefaultMaxEngineThreads; an
+// explicit count is taken as given.
+TEST(Engine, ThreadCount)
+{
+  sonar::SonarConfig c = CleanEcho();
+  c.threads = 0;
+  const std::size_t cores =
+    std::max(1u, std::thread::hardware_concurrency());
+  EXPECT_EQ(sonar::Engine(c, HarborWater()).Threads(),
+    std::min(cores, sonar::kDefaultMaxEngineThreads));
+  c.threads = 3;
+  EXPECT_EQ(sonar::Engine(c, HarborWater()).Threads(), 3u);
+  c.threads = 1;
+  EXPECT_EQ(sonar::Engine(c, HarborWater()).Threads(), 1u);
+}
+
+#ifdef __linux__
+/////////////////////////////////////////////////
+// An engine's threads go with it: making and dropping engines, as a world
+// does when sonars are removed and spawned again, leaves no threads behind.
+TEST(Engine, NoThreadsLeftBehind)
+{
+  auto threadCount = []() {
+    std::size_t n = 0;
+    for (const auto &e : std::filesystem::directory_iterator("/proc/self/task"))
+    {
+      (void)e;
+      ++n;
+    }
+    return n;
+  };
+  sonar::SonarConfig c = CleanEcho();
+  c.threads = 8;
+  sonar::SyntheticScene scene;
+  scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), 1);
+  const Pose3d pose(0, 0, 2, 0, 15.0 * kDeg, 0);
+  const auto hits = scene.Cast(pose, sonar::RayFan(c), 1.5 * c.rangeMax);
+
+  const std::size_t before = threadCount();
+  for (int round = 0; round < 5; ++round)
+  {
+    auto engine = std::make_unique<sonar::Engine>(c, HarborWater());
+    EXPECT_EQ(threadCount(), before + 7);
+    engine->Ping(hits, static_cast<std::uint64_t>(round));
+    engine.reset();
+    EXPECT_EQ(threadCount(), before);
+  }
+}
+#endif
 
 /////////////////////////////////////////////////
 // Smoothed automatic gain: a sudden change moves the gain by 1 - e^(-dt/tau)

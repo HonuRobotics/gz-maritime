@@ -47,14 +47,14 @@ The software involved:
 
 - [gz-sim's Sensors system](https://gazebosim.org/api/sim/10/classgz_1_1sim_1_1systems_1_1Sensors.html), which every vehicle world loads, owns the rendering thread; gz-sim waits for it whenever a sensor is due, so its time is what slows the world.
 - gz-rendering (Ogre 2) draws the images, on the GPU if there is one.
-- `gz-maritime-sonar-system`, the sonar plugin, asks for each ping's render and gives every sonar sensor a worker thread of its own (the sidescan's two sides are two sensors, so two workers). On each ping the worker runs the `gz_sonar` model, and for the engine step it briefly starts one helper thread per CPU core. The worker runs alongside the simulation and slows it only if pings arrive faster than it finishes them.
+- `gz-maritime-sonar-system`, the sonar plugin, asks for each ping's render and gives every sonar sensor a worker thread of its own (the sidescan's two sides are two sensors, so two workers). On each ping the worker runs the `gz_sonar` model, and for the engine step it hands the work to a pool of threads the sensor starts once and keeps: one per CPU core, at most eight in all. The worker runs alongside the simulation and slows it only if pings arrive faster than it finishes them.
 
 ## Recommendations
 
 - All sonar sims are computational costsly, so only activate a sonar only where the scenario uses it. 
 - Imaging sonar (wide beam) sim is more costly than the profiling and side scan (narrow beam).  A single imaging sonar costs about a fifth of real time, a sidescan about a tenth, a profiler less.
 - A GPU is not required for scenes of this size. Without one, expect about the same real time factor.
-- More CPU cores help more than a faster GPU: most of each ping's work is on the CPU.
+- More CPU cores help more than a faster GPU: most of each ping's work is on the CPU. One sonar uses at most eight of them; more help a world with several sonars.
 - To make a sonar cheaper, lower its rate, its range window and samples, or `rays_per_beam` (the advanced parameters in the design's [SDF](sonar.md#sdf) section), at a cost in fidelity to check on the scene at hand. Truth labels cost little: the segmentation they come from is drawn anyway.
 
 To try llvmpipe in drydock, start `gz sim` with `__GLX_VENDOR_LIBRARY_NAME=mesa LIBGL_ALWAYS_SOFTWARE=1`, and for headless rendering also `__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json MESA_LOADER_DRIVER_OVERRIDE=kms_swrast`. Ogre's log, `~/.gz/rendering/ogre2.log`, names the renderer it used.

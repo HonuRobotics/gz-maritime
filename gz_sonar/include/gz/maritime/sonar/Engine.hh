@@ -19,6 +19,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 #include "gz/maritime/sonar/Config.hh"
@@ -86,17 +87,34 @@ double VerticalPattern(const SonarConfig &_config, double _elevation);
 /// spread over the range samples that the patch's footprint and the pulse
 /// cover, at the range the sonar computes with its assumed sound speed.
 /// Speckle multiplies each cell by an exponential draw with mean 1.
+///
+/// The engine keeps its own worker threads, started at construction and
+/// joined when it is destroyed, and its per-ping buffers and beam weights,
+/// so a ping starts no threads and allocates little. Pings on one engine
+/// run one at a time; two engines run independently.
 class Engine
 {
   /// \brief An engine for one sonar in a body of water.
   public: Engine(const SonarConfig &_config, const Water &_water);
 
-  /// \brief One ping.
+  /// \brief Joins the engine's threads.
+  public: ~Engine();
+
+  public: Engine(const Engine &) = delete;
+  public: Engine &operator=(const Engine &) = delete;
+  public: Engine(Engine &&) noexcept;
+  public: Engine &operator=(Engine &&) noexcept;
+
+  /// \brief One ping. Safe to call from any thread; concurrent calls on
+  /// one engine wait for each other.
   /// \param[in] _hits What each ray of the fan found.
   /// \param[in] _ping The ping number, which with the seed fixes the
   /// random draws.
   public: BeamIntensity Ping(const std::vector<RayHit> &_hits,
               std::uint64_t _ping) const;
+
+  /// \brief Threads a ping runs on, the caller's included.
+  public: std::size_t Threads() const;
 
   /// \brief The configuration.
   public: const SonarConfig &Config() const;
@@ -110,6 +128,10 @@ class Engine
   private: SonarConfig config;
   private: Water water;
   private: double alpha{0.0};
+
+  /// \brief The thread pool, the beam weights and the scratch buffers.
+  private: struct Implementation;
+  private: std::unique_ptr<Implementation> impl;
 };
 }  // namespace gz::maritime::sonar
 

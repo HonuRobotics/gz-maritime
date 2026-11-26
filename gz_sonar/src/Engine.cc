@@ -17,7 +17,10 @@
 #include "gz/maritime/sonar/Engine.hh"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
+#include <condition_variable>
+#include <mutex>
 #include <thread>
 
 #include "gz/maritime/sonar/Random.hh"
@@ -51,30 +54,122 @@ double Sinc2(double _x)
   return s * s;
 }
 
-/// \brief Run _fn(i) for i in [0, _n) on up to _threads threads, each
-/// taking a contiguous block. _fn must only touch what belongs to i.
-template<typename Fn>
-void ParallelFor(std::size_t _n, std::size_t _threads, Fn _fn)
+/// \brief Worker threads kept for the life of an engine. For(n, fn) runs
+/// fn(i) for every i in [0, n) on the workers and the calling thread, in
+/// chunks taken in turn, and returns when all are done. fn must only touch
+/// what belongs to i; then which thread runs which i does not change the
+/// result.
+class Pool
 {
-  const std::size_t t = std::min(_threads, _n);
-  if (t <= 1)
+  /// \brief A pool that runs on _threads threads, the caller's included.
+  public: explicit Pool(std::size_t _threads)
   {
-    for (std::size_t i = 0; i < _n; ++i)
-      _fn(i);
-    return;
+    for (std::size_t w = 1; w < _threads; ++w)
+      this->workers.emplace_back([this]() { this->Work(); });
   }
-  std::vector<std::thread> pool;
-  pool.reserve(t);
-  for (std::size_t w = 0; w < t; ++w)
+
+  public: ~Pool()
   {
-    pool.emplace_back([&, w]() {
-      for (std::size_t i = w * _n / t; i < (w + 1) * _n / t; ++i)
+    {
+      std::lock_guard<std::mutex> lock(this->mutex);
+      this->stop = true;
+    }
+    this->wake.notify_all();
+    for (auto &t : this->workers)
+      t.join();
+  }
+
+  public: Pool(const Pool &) = delete;
+  public: Pool &operator=(const Pool &) = delete;
+
+  /// \brief Threads a job runs on, the caller's included.
+  public: std::size_t Size() const
+  {
+    return this->workers.size() + 1;
+  }
+
+  public: template<typename Fn>
+  void For(std::size_t _n, Fn &_fn)
+  {
+    if (this->workers.empty() || _n <= 1)
+    {
+      for (std::size_t i = 0; i < _n; ++i)
         _fn(i);
-    });
+      return;
+    }
+    // Chunks several to a thread, so a thread that meets a busy part of the
+    // fan does not hold the others up.
+    this->job = [](void *_ctx, std::size_t _i) {
+      (*static_cast<Fn *>(_ctx))(_i);
+    };
+    this->ctx = &_fn;
+    this->count = _n;
+    this->chunk = std::max<std::size_t>(1, _n / (8 * this->Size()));
+    this->next.store(0, std::memory_order_relaxed);
+    {
+      std::lock_guard<std::mutex> lock(this->mutex);
+      this->busy = this->workers.size();
+      ++this->generation;
+    }
+    this->wake.notify_all();
+    this->Drain();
+    std::unique_lock<std::mutex> lock(this->mutex);
+    this->done.wait(lock, [this]() { return this->busy == 0; });
   }
-  for (auto &th : pool)
-    th.join();
-}
+
+  /// \brief Take chunks of the current job until none is left.
+  private: void Drain()
+  {
+    while (true)
+    {
+      const std::size_t first =
+        this->next.fetch_add(this->chunk, std::memory_order_relaxed);
+      if (first >= this->count)
+        return;
+      const std::size_t last = std::min(this->count, first + this->chunk);
+      for (std::size_t i = first; i < last; ++i)
+        this->job(this->ctx, i);
+    }
+  }
+
+  /// \brief A worker: sleep until a job or the stop, help with the job.
+  private: void Work()
+  {
+    std::uint64_t seen = 0;
+    while (true)
+    {
+      {
+        std::unique_lock<std::mutex> lock(this->mutex);
+        this->wake.wait(lock, [&]() {
+          return this->stop || this->generation != seen;
+        });
+        if (this->stop)
+          return;
+        seen = this->generation;
+      }
+      this->Drain();
+      std::lock_guard<std::mutex> lock(this->mutex);
+      if (--this->busy == 0)
+        this->done.notify_one();
+    }
+  }
+
+  private: std::vector<std::thread> workers;
+  private: std::mutex mutex;
+  private: std::condition_variable wake;
+  private: std::condition_variable done;
+  private: bool stop{false};
+  private: std::uint64_t generation{0};
+  private: std::size_t busy{0};
+
+  // The current job, written before the generation changes and read only
+  // while it runs.
+  private: void (*job)(void *, std::size_t){nullptr};
+  private: void *ctx{nullptr};
+  private: std::size_t count{0};
+  private: std::size_t chunk{1};
+  private: std::atomic<std::size_t> next{0};
+};
 
 /// \brief Stream numbers for the random draws of a ping.
 constexpr std::uint64_t kSpeckleStream = 1;
@@ -97,48 +192,75 @@ double VerticalPattern(const SonarConfig &_config, double _elevation)
   return std::exp(-M_LN2 * u * u);
 }
 
+/// \brief What every ping of one engine shares: its threads, the layout of
+/// the azimuth columns, the beam weights, and buffers reused from ping to
+/// ping.
+struct Engine::Implementation
+{
+  explicit Implementation(std::size_t _threads)
+    : pool(_threads)
+  {
+  }
+
+  /// \brief One ping at a time: the buffers below are the ping's.
+  std::mutex mutex;
+
+  /// \brief Azimuth columns: cols of them, colStep wide, from -azHalf.
+  double azHalf{0.0};
+  double colStep{0.0};
+  std::size_t cols{0};
+
+  /// \brief The output's range and azimuth axes.
+  std::vector<double> ranges;
+  std::vector<double> azimuths;
+
+  /// \brief The columns a beam gathers from, in column order, and their
+  /// weights: beam j's are taps[tapStart[j]] to taps[tapStart[j + 1]].
+  struct Tap
+  {
+    std::size_t col;
+    double weight;
+  };
+  std::vector<Tap> taps;
+  std::vector<std::size_t> tapStart;
+
+  /// \brief Column buffers, all zero between pings except where
+  /// [colLo, colHi] says a column was written, which the ping clears.
+  std::vector<double> colData;
+  std::vector<double> colBest;
+  std::vector<std::uint32_t> colLabel;
+  std::vector<long> colLo;
+  std::vector<long> colHi;
+
+  /// \brief The strongest contribution each output cell has seen.
+  std::vector<double> best;
+
+  /// \brief The hits sorted into columns.
+  std::vector<std::size_t> start;
+  std::vector<std::size_t> colOf;
+  std::vector<std::size_t> order;
+  std::vector<std::size_t> next;
+
+  /// \brief Last, so its threads are joined before anything they use goes.
+  Pool pool;
+};
+
 Engine::Engine(const SonarConfig &_config, const Water &_water)
   : config(_config), water(_water),
     alpha(AbsorptionDbPerMeter(_config.frequency, _water))
 {
-}
-
-const SonarConfig &Engine::Config() const
-{
-  return this->config;
-}
-
-const Water &Engine::WaterProperties() const
-{
-  return this->water;
-}
-
-double Engine::Absorption() const
-{
-  return this->alpha;
-}
-
-BeamIntensity Engine::Ping(const std::vector<RayHit> &_hits,
-  std::uint64_t _ping) const
-{
   const SonarConfig &c = this->config;
-  BeamIntensity out;
-  out.beams = c.beams;
-  out.samples = c.samples;
-  out.data.assign(c.beams * c.samples, 0.0);
-  out.labels.assign(c.beams * c.samples, 0);
+  const std::size_t threads = c.threads > 0 ? c.threads :
+    std::min<std::size_t>(kDefaultMaxEngineThreads,
+      std::max(1u, std::thread::hardware_concurrency()));
+  this->impl = std::make_unique<Implementation>(threads);
+  Implementation &d = *this->impl;
+
   for (std::size_t k = 0; k < c.samples; ++k)
-    out.ranges.push_back(c.SampleRange(k));
+    d.ranges.push_back(c.SampleRange(k));
   for (std::size_t j = 0; j < c.beams; ++j)
-    out.azimuths.push_back(c.BeamAzimuth(j));
+    d.azimuths.push_back(c.BeamAzimuth(j));
 
-  // The strongest contribution each cell has seen, for its label.
-  std::vector<double> best(c.beams * c.samples, 0.0);
-
-  const double assumed = c.AssumedSoundSpeed(this->water.soundSpeed);
-  const double rangeScale = assumed / this->water.soundSpeed;
-  const double dr = c.SampleSpacing();
-  const double pulseRange = 0.5 * assumed * c.pulseLength;
   const double beamSpacing = c.horizontalFov / static_cast<double>(c.beams);
 
   // How far, in beams, the horizontal pattern stays above the floor.
@@ -160,52 +282,124 @@ BeamIntensity Engine::Ping(const std::vector<RayHit> &_hits,
   // first summed into fine azimuth columns (the ray fan's spacing) and each
   // beam then gathers from the columns its pattern reaches. Same sums, far
   // fewer of them.
-  const double colStep = std::min(beamSpacing, c.beamWidth) /
+  d.colStep = std::min(beamSpacing, c.beamWidth) /
     static_cast<double>(std::max<std::size_t>(c.raysPerBeam, 1));
-  const double azHalf = 0.5 * c.horizontalFov + 2.0 * c.beamWidth;
-  const auto cols = static_cast<std::size_t>(std::ceil(2.0 * azHalf / colStep));
-  std::vector<double> colData(cols * c.samples, 0.0);
-  std::vector<double> colBest(cols * c.samples, 0.0);
-  std::vector<std::uint32_t> colLabel(cols * c.samples, 0);
-  std::vector<long> colLo(cols, static_cast<long>(c.samples));
-  std::vector<long> colHi(cols, -1);
+  d.azHalf = 0.5 * c.horizontalFov + 2.0 * c.beamWidth;
+  d.cols = static_cast<std::size_t>(std::ceil(2.0 * d.azHalf / d.colStep));
+
+  // The weights depend only on the configuration, so they are worked out
+  // once here rather than on every ping.
+  d.tapStart.push_back(0);
+  for (std::size_t j = 0; j < c.beams; ++j)
+  {
+    const double beamAz = d.azimuths[j];
+    const double reachAz = static_cast<double>(beamReach + 1) * beamSpacing;
+    const long first = std::max<long>(0, static_cast<long>(
+      std::floor((beamAz - reachAz + d.azHalf) / d.colStep)));
+    const long last = std::min<long>(static_cast<long>(d.cols) - 1,
+      static_cast<long>(std::ceil((beamAz + reachAz + d.azHalf) / d.colStep)));
+    for (long col = first; col <= last; ++col)
+    {
+      const double az = -d.azHalf +
+        (static_cast<double>(col) + 0.5) * d.colStep;
+      const double w = HorizontalPattern(c, az - beamAz);
+      if (w >= kPatternFloor)
+        d.taps.push_back({static_cast<std::size_t>(col), w});
+    }
+    d.tapStart.push_back(d.taps.size());
+  }
+
+  d.colData.assign(d.cols * c.samples, 0.0);
+  d.colBest.assign(d.cols * c.samples, 0.0);
+  d.colLabel.assign(d.cols * c.samples, 0);
+  d.colLo.assign(d.cols, static_cast<long>(c.samples));
+  d.colHi.assign(d.cols, -1);
+  d.best.assign(c.beams * c.samples, 0.0);
+}
+
+Engine::~Engine() = default;
+
+Engine::Engine(Engine &&) noexcept = default;
+
+Engine &Engine::operator=(Engine &&) noexcept = default;
+
+const SonarConfig &Engine::Config() const
+{
+  return this->config;
+}
+
+const Water &Engine::WaterProperties() const
+{
+  return this->water;
+}
+
+double Engine::Absorption() const
+{
+  return this->alpha;
+}
+
+std::size_t Engine::Threads() const
+{
+  return this->impl->pool.Size();
+}
+
+BeamIntensity Engine::Ping(const std::vector<RayHit> &_hits,
+  std::uint64_t _ping) const
+{
+  const SonarConfig &c = this->config;
+  Implementation &d = *this->impl;
+  std::lock_guard<std::mutex> lock(d.mutex);
+
+  BeamIntensity out;
+  out.beams = c.beams;
+  out.samples = c.samples;
+  out.data.assign(c.beams * c.samples, 0.0);
+  out.labels.assign(c.beams * c.samples, 0);
+  out.ranges = d.ranges;
+  out.azimuths = d.azimuths;
+
+  const double assumed = c.AssumedSoundSpeed(this->water.soundSpeed);
+  const double rangeScale = assumed / this->water.soundSpeed;
+  const double dr = c.SampleSpacing();
+  const double pulseRange = 0.5 * assumed * c.pulseLength;
+  const std::size_t cols = d.cols;
+  const double azHalf = d.azHalf;
+  const double colStep = d.colStep;
 
   // Sort the hits into their columns, keeping their order within each, so
   // every thread owns whole columns and then whole beams. Nothing is shared
   // between threads, and the sums run in the same order for any number of
   // threads: the result is the same bits whatever the machine.
-  std::vector<std::size_t> start(cols + 1, 0);
-  std::vector<std::size_t> colOf(_hits.size(), cols);
+  d.start.assign(cols + 1, 0);
+  d.colOf.resize(_hits.size());
   for (std::size_t i = 0; i < _hits.size(); ++i)
   {
     const RayHit &h = _hits[i];
     if (!h.hit || h.range <= 0.0 || std::abs(h.ray.azimuth) >= azHalf)
+    {
+      d.colOf[i] = cols;
       continue;
-    colOf[i] = std::min(cols - 1,
+    }
+    d.colOf[i] = std::min(cols - 1,
       static_cast<std::size_t>((h.ray.azimuth + azHalf) / colStep));
-    ++start[colOf[i] + 1];
+    ++d.start[d.colOf[i] + 1];
   }
   for (std::size_t col = 0; col < cols; ++col)
-    start[col + 1] += start[col];
-  std::vector<std::size_t> order(start[cols]);
+    d.start[col + 1] += d.start[col];
+  d.order.resize(d.start[cols]);
+  d.next.assign(d.start.begin(), d.start.end() - 1);
+  for (std::size_t i = 0; i < _hits.size(); ++i)
   {
-    std::vector<std::size_t> next(start.begin(), start.end() - 1);
-    for (std::size_t i = 0; i < _hits.size(); ++i)
-    {
-      if (colOf[i] < cols)
-        order[next[colOf[i]]++] = i;
-    }
+    if (d.colOf[i] < cols)
+      d.order[d.next[d.colOf[i]]++] = i;
   }
-
-  const std::size_t threads = c.threads > 0 ? c.threads :
-    std::max(1u, std::thread::hardware_concurrency());
 
   // Each column: the sonar equation for every hit in it, spread over the
   // range samples its footprint and the pulse cover.
-  ParallelFor(cols, threads, [&](std::size_t _col) {
-    for (std::size_t n = start[_col]; n < start[_col + 1]; ++n)
+  auto column = [&](std::size_t _col) {
+    for (std::size_t n = d.start[_col]; n < d.start[_col + 1]; ++n)
     {
-      const RayHit &h = _hits[order[n]];
+      const RayHit &h = _hits[d.order[n]];
       const double r = h.range;
       const double apparent = r * rangeScale;
       if (apparent < c.rangeMin || apparent >= c.rangeMax)
@@ -244,8 +438,8 @@ BeamIntensity Engine::Ping(const std::vector<RayHit> &_hits,
       const long k1 = std::min<long>(static_cast<long>(c.samples) - 1,
         static_cast<long>(std::floor((hi - c.rangeMin) / dr)));
 
-      colLo[_col] = std::min(colLo[_col], k0);
-      colHi[_col] = std::max(colHi[_col], k1);
+      d.colLo[_col] = std::min(d.colLo[_col], k0);
+      d.colHi[_col] = std::max(d.colHi[_col], k1);
       for (long k = k0; k <= k1; ++k)
       {
         const double cellLo = c.rangeMin + static_cast<double>(k) * dr;
@@ -255,46 +449,60 @@ BeamIntensity Engine::Ping(const std::vector<RayHit> &_hits,
           continue;
         const double add = level * overlap / width;
         const std::size_t idx = _col * c.samples + static_cast<std::size_t>(k);
-        colData[idx] += add;
-        if (add > colBest[idx])
+        d.colData[idx] += add;
+        if (add > d.colBest[idx])
         {
-          colBest[idx] = add;
-          colLabel[idx] = h.label;
+          d.colBest[idx] = add;
+          d.colLabel[idx] = h.label;
         }
       }
     }
-  });
+  };
+  d.pool.For(cols, column);
 
   // Each beam gathers from the columns its pattern reaches, in column order.
-  ParallelFor(c.beams, threads, [&](std::size_t _j) {
-    const double beamAz = out.azimuths[_j];
-    const double reachAz = static_cast<double>(beamReach + 1) * beamSpacing;
-    const long first = std::max<long>(0, static_cast<long>(
-      std::floor((beamAz - reachAz + azHalf) / colStep)));
-    const long last = std::min<long>(static_cast<long>(cols) - 1,
-      static_cast<long>(std::ceil((beamAz + reachAz + azHalf) / colStep)));
-    for (long col = first; col <= last; ++col)
+  auto beam = [&](std::size_t _j) {
+    double *best = d.best.data() + _j * c.samples;
+    std::fill(best, best + c.samples, 0.0);
+    for (std::size_t t = d.tapStart[_j]; t < d.tapStart[_j + 1]; ++t)
     {
-      const auto ucol = static_cast<std::size_t>(col);
-      if (colHi[ucol] < colLo[ucol])
+      const std::size_t col = d.taps[t].col;
+      if (d.colHi[col] < d.colLo[col])
         continue;
-      const double az = -azHalf + (static_cast<double>(col) + 0.5) * colStep;
-      const double w = HorizontalPattern(c, az - beamAz);
-      if (w < kPatternFloor)
-        continue;
-      for (long k = colLo[ucol]; k <= colHi[ucol]; ++k)
+      const double w = d.taps[t].weight;
+      for (long k = d.colLo[col]; k <= d.colHi[col]; ++k)
       {
-        const std::size_t from = ucol * c.samples + static_cast<std::size_t>(k);
-        const std::size_t idx = _j * c.samples + static_cast<std::size_t>(k);
-        out.data[idx] += w * colData[from];
-        if (w * colBest[from] > best[idx])
+        const auto uk = static_cast<std::size_t>(k);
+        const std::size_t from = col * c.samples + uk;
+        const std::size_t idx = _j * c.samples + uk;
+        out.data[idx] += w * d.colData[from];
+        if (w * d.colBest[from] > best[uk])
         {
-          best[idx] = w * colBest[from];
-          out.labels[idx] = colLabel[from];
+          best[uk] = w * d.colBest[from];
+          out.labels[idx] = d.colLabel[from];
         }
       }
     }
-  });
+  };
+  d.pool.For(c.beams, beam);
+
+  // Leave the column buffers zero for the next ping, clearing only what
+  // this one wrote.
+  auto clear = [&](std::size_t _col) {
+    if (d.colHi[_col] >= d.colLo[_col])
+    {
+      const std::size_t first = _col * c.samples +
+        static_cast<std::size_t>(d.colLo[_col]);
+      const std::size_t last = _col * c.samples +
+        static_cast<std::size_t>(d.colHi[_col]) + 1;
+      std::fill(d.colData.begin() + first, d.colData.begin() + last, 0.0);
+      std::fill(d.colBest.begin() + first, d.colBest.begin() + last, 0.0);
+      std::fill(d.colLabel.begin() + first, d.colLabel.begin() + last, 0u);
+    }
+    d.colLo[_col] = static_cast<long>(c.samples);
+    d.colHi[_col] = -1;
+  };
+  d.pool.For(cols, clear);
 
   if (c.speckle)
   {

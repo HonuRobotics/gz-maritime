@@ -82,6 +82,9 @@ enum class ProfilingDetection
   kAngleOfArrival,
 };
 
+/// \brief Most threads an engine takes when SonarConfig::threads is 0.
+inline constexpr std::size_t kDefaultMaxEngineThreads = 8;
+
 /// \brief Everything that describes one sonar. The defaults are a generic
 /// imaging sonar close to the ECHO; the presets below give each exemplar
 /// exactly (the ECHO's, for one, shades its sidelobes to -25 dB and reaches
@@ -216,8 +219,11 @@ struct SonarConfig
   /// at long range.
   double angleNoise{0.009};
 
-  /// \brief Threads the engine may use; 0 for one per core. The result is
-  /// the same whatever the number.
+  /// \brief Threads the engine may use, the pinging thread included; 0 for
+  /// one per core up to kDefaultMaxEngineThreads. Beyond about 8 a ping
+  /// gets no faster, and the cores are better left to the simulation and
+  /// to other sonars. Not settable from SDF. The result is the same
+  /// whatever the number.
   std::size_t threads{0};
 
   /// \brief The assumed sound speed, falling back to the water's.
