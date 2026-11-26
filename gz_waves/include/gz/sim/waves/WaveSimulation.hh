@@ -31,9 +31,9 @@ struct TileSize
   /// \brief Tile extent along x in metres.
   double x{0.0};
 
-  /// \brief Tile extent along y in metres. The tile is centred at the world
-  /// origin; samples outside (-x/2, +x/2) × (-y/2, +y/2) are interpreted modulo
-  /// the tile size.
+  /// \brief Tile extent along y in metres. The field is periodic: a tile
+  /// starts at the world origin and samples outside [0, x) × [0, y) are
+  /// interpreted modulo the tile size.
   double y{0.0};
 };
 
@@ -44,8 +44,9 @@ struct TileSize
 /// draws one backend-agnostic surface, so it never needs to know which backend
 /// is active.
 ///
-/// All arrays are column-major N×N — element (i, j) is at index `i + j*N` —
-/// and periodic over the tile. The pointers are owned by the wave-field
+/// All arrays are column-major N×N — element (i, j) is at index `i + j*N` and
+/// holds the water at world (i·tile/N, j·tile/N) — and periodic over the
+/// tile. The pointers are owned by the wave-field
 /// implementation and remain valid until the next `SetParameters`; the values
 /// they reference are refreshed by `Update`.
 struct WaveField2D
