@@ -378,6 +378,11 @@ std::optional<sonar::SonarConfig> LoadSonarConfig(const std::string &_type,
     return std::nullopt;
   // Unknown elements are most likely misspellings; say so rather than
   // ignore them.
+  //
+  // When you add a parameter, add its name here and also to SONAR_SETTINGS
+  // in bluerobotics_models, bluerobotics_parts/bluerobotics_parts/sonar.py,
+  // which keeps a copy of this list to check a vehicle's `sonar:` settings
+  // before they reach this reader.
   static const std::set<std::string> known = {
     "angle_noise", "beam_width", "beams", "detection", "detection_threshold",
     "dynamic_range", "elevation_rays", "elevation_span", "frequency", "gain",
