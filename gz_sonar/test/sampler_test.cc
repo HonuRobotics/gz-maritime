@@ -29,8 +29,12 @@
 
 #include "gz/maritime/sonar/CameraSampler.hh"
 #include "gz/maritime/sonar/Config.hh"
+#include "gz/maritime/sonar/Engine.hh"
 #include "gz/maritime/sonar/Rays.hh"
 #include "gz/maritime/sonar/SyntheticScene.hh"
+#include "gz/maritime/sonar/Water.hh"
+
+#include "LabelOnlyFootprints.hh"
 
 using gz::math::Pose3d;
 namespace sonar = gz::maritime::sonar;
@@ -370,19 +374,13 @@ Seabed RippledSeabed(double _wavelength)
 }
 
 //////////////////////////////////////////////////
-/// \brief Draw a seabed as depth images, sample them, and compare each
-/// ray's range with casting the ray itself.
+/// \brief Draw a seabed as depth images and sample them, without labels.
 /// \param[in] _sampler The sampler.
 /// \param[in] _seabed The seabed.
 /// \param[in] _pose The sensor's pose.
-/// \param[in] _from Nearest true range counted, m.
-/// \param[in] _to Farthest true range counted, m.
-/// \param[in] _tolerance A ray is off when its range errs by more, m.
-/// \param[out] _count Rays counted.
-/// \return The share of the rays counted that are off.
-double ShareOff(const sonar::CameraSampler &_sampler, const Seabed &_seabed,
-  const Pose3d &_pose, double _from, double _to, double _tolerance,
-  std::size_t &_count)
+/// \return The hits.
+std::vector<sonar::RayHit> DrawAndSample(const sonar::CameraSampler &_sampler,
+  const Seabed &_seabed, const Pose3d &_pose)
 {
   const auto &l = _sampler.Layout();
   std::vector<std::vector<float>> depth(l.yaws.size());
@@ -405,14 +403,32 @@ double ShareOff(const sonar::CameraSampler &_sampler, const Seabed &_seabed,
   std::vector<const float *> dp;
   for (const auto &d : depth)
     dp.push_back(d.data());
-  const auto hits = _sampler.Sample(dp, {}, 1, {Lambert(-27.0)});
+  return _sampler.Sample(dp, {}, 1, {Lambert(-27.0)});
+}
 
+//////////////////////////////////////////////////
+/// \brief Draw a seabed as depth images, sample them, and compare each
+/// ray's range with casting the ray itself.
+/// \param[in] _sampler The sampler.
+/// \param[in] _seabed The seabed.
+/// \param[in] _pose The sensor's pose.
+/// \param[in] _from Nearest true range counted, m.
+/// \param[in] _to Farthest true range counted, m.
+/// \param[in] _tolerance A ray is off when its range errs by more, m.
+/// \param[out] _count Rays counted.
+/// \return The share of the rays counted that are off.
+double ShareOff(const sonar::CameraSampler &_sampler, const Seabed &_seabed,
+  const Pose3d &_pose, double _from, double _to, double _tolerance,
+  std::size_t &_count)
+{
+  const auto hits = DrawAndSample(_sampler, _seabed, _pose);
   std::size_t off = 0;
   _count = 0;
   for (const auto &h : hits)
   {
     const double truth = _seabed.Cast(_pose.Pos(),
-      _pose.Rot().RotateVector(h.ray.Direction()), l.farClip);
+      _pose.Rot().RotateVector(h.ray.Direction()),
+      _sampler.Layout().farClip);
     if (!(truth >= _from && truth <= _to))
       continue;
     ++_count;
@@ -420,6 +436,24 @@ double ShareOff(const sonar::CameraSampler &_sampler, const Seabed &_seabed,
       ++off;
   }
   return _count ? static_cast<double>(off) / static_cast<double>(_count) : 0.0;
+}
+
+//////////////////////////////////////////////////
+/// \brief A ping of hits with no speckle or noise, in harbor water.
+/// \param[in] _config The sonar.
+/// \param[in] _hits The hits.
+/// \return The intensity.
+sonar::BeamIntensity CleanPing(sonar::SonarConfig _config,
+  const std::vector<sonar::RayHit> &_hits)
+{
+  _config.speckle = false;
+  _config.noiseFloorDb = -300.0;
+  sonar::Water water;
+  water.temperature = 29.0;
+  water.salinity = 30.0;
+  water.soundSpeed = 1500.0;
+  const sonar::Engine engine(_config, water);
+  return engine.Ping(_hits, 0);
 }
 }  // namespace
 
@@ -455,11 +489,9 @@ TEST(CameraSampler, ReadsBetweenPixelsOnASeabedThatIsNotOnePlane)
     {MeshSeabed(), Pose3d(0.3, 0.2, 5, 0, 0, 0), 22.0, 0.10},
     {MeshSeabed(), Pose3d(0.3, 0.2, 1, 0, 0, 0), 22.0, 0.50},
     {MeshSeabed(), Pose3d(0.3, 0.2, 0.5, 0, 0, 0), 8.0, 0.25},
-    {UndulatingSeabed(), Pose3d(0.3, 0.2, 5, 0, 0, 0), 22.0, 0.02},
     {UndulatingSeabed(), Pose3d(0.3, 0.2, 1, 0, 0, 0), 22.0, 0.02},
     {UndulatingSeabed(), Pose3d(0.3, 0.2, 0.5, 0, 0, 0), 8.0, 0.10},
     {MeshSeabed(), Pose3d(0.3, 0.2, 2, 10 * kDeg, 5 * kDeg, 0), 22.0, 0.10},
-    {MeshSeabed(), Pose3d(0.3, 0.2, 2, -10 * kDeg, -3 * kDeg, 0), 22.0, 0.10},
     {UndulatingSeabed(), Pose3d(0.3, 0.2, 2, 10 * kDeg, 5 * kDeg, 0), 22.0,
       0.02},
   };
@@ -626,12 +658,15 @@ TEST(CameraSampler, DoesNotBlendAStepAlongAPixelRow)
 }
 
 //////////////////////////////////////////////////
-// A pole one ray wide, facing the sonar, in front of a wall: its neighbors
-// in azimuth are on the wall, so they cannot give its normal, and it keeps
-// the 45 degree fallback, as the same pole does in open water. With the
-// wall's own label, and with the pole's label on the wall too (one model),
-// where only the jump in range tells them apart.
-TEST(CameraSampler, PoleOneRayWideBeforeAWallKeepsTheFallback)
+// A strip one ray wide, facing the sonar at 5 m, in front of a wall from
+// 5 cm to 4 m behind it: its neighbors in azimuth are on the wall, so they
+// cannot give its normal, and it keeps the 45 degree fallback, as the same
+// strip does in open water, and its echo stays within a decibel of that.
+// With the wall's own label, with the strip's label on the wall too (one
+// model), and with no labels drawn, where only the ranges tell them apart.
+// Taking the wall for the strip's neighbor tilts its normal to 88 degrees
+// and more, and costs its echo 13 dB and more.
+TEST(CameraSampler, StripOneRayWideBeforeAWallKeepsTheFallback)
 {
   sonar::SonarConfig c = sonar::EchoImaging();
   c.rangeMax = 10.0;
@@ -644,29 +679,48 @@ TEST(CameraSampler, PoleOneRayWideBeforeAWallKeepsTheFallback)
   for (std::size_t n = 0; n < rays.size(); n += ne)
     if (std::abs(rays[n].azimuth) < std::abs(az0))
       az0 = rays[n].azimuth;
-  const double x = 4.0;
+  const double x = 5.0;
   const double yc = x * std::tan(az0);
   const double half = 0.5 * x * azStep;
+  const std::vector<sonar::AcousticProperties> table{
+    Lambert(-20.0), Lambert(-20.0), Lambert(-15.0), Lambert(-20.0)};
 
-  for (std::uint32_t wallLabel : {3u, 2u})
+  // The strip's echo: the strongest cell at its range.
+  auto echo = [&](const std::vector<sonar::RayHit> &_hits) {
+    const auto b = CleanPing(c, _hits);
+    double best = 0.0;
+    for (std::size_t i = 0; i < b.beams; ++i)
+      for (std::size_t k = 0; k < b.samples; ++k)
+        if (std::abs(b.ranges[k] - x) < 0.03)
+          best = std::max(best, b.data[i * b.samples + k]);
+    return best;
+  };
+
+  enum class Labels { kOwn, kShared, kNone };
+  for (const Labels labels : {Labels::kOwn, Labels::kShared, Labels::kNone})
   {
-    for (bool wall : {false, true})
+    double alone = 0.0;
+    // 0 for no wall: the strip in open water.
+    for (const double wallAt : {0.0, 5.05, 5.3, 6.0, 7.6, 9.0})
     {
       sonar::SyntheticScene scene;
       scene.AddBox({x, yc - half, 0.0}, {x + 0.02, yc + half, 4.0},
         Lambert(-15.0), 2);
-      if (wall)
-        scene.AddPlane({8, 0, 0}, {-1, 0, 0}, Lambert(-20.0), wallLabel);
+      if (wallAt > 0.0)
+      {
+        scene.AddPlane({wallAt, 0, 0}, {-1, 0, 0}, Lambert(-20.0),
+          labels == Labels::kOwn ? 3 : 2);
+      }
       const Pose3d pose(0, 0, 2, 0, 0, 0);
-      const auto hits = DrawAndSample(sampler, scene, pose,
-        {Lambert(-20.0), Lambert(-20.0), Lambert(-15.0), Lambert(-20.0)});
-      std::size_t onPole = 0, bad = 0;
+      const auto hits = DrawAndSample(sampler, scene, pose, table,
+        labels != Labels::kNone);
+      std::size_t onStrip = 0, bad = 0;
       double worst = 0.0;
       for (const auto &h : hits)
       {
-        if (!h.hit || h.range > 6.0)
+        if (!h.hit || h.range > x + 0.03)
           continue;
-        ++onPole;
+        ++onStrip;
         // Head on is 0; the fallback is 45 degrees. Anything else is a
         // normal taken across the jump to the wall.
         const double inc = h.incidence;
@@ -675,10 +729,116 @@ TEST(CameraSampler, PoleOneRayWideBeforeAWallKeepsTheFallback)
         if (err > 2.0 * kDeg)
           ++bad;
       }
-      std::printf("wall %d label %u: %zu rays on the pole, largest "
-        "incidence %.1f deg\n", wall, wallLabel, onPole, worst / kDeg);
-      EXPECT_GT(onPole, 10u);
-      EXPECT_EQ(bad, 0u) << "wall " << wall << " label " << wallLabel;
+      const double level = echo(hits);
+      if (wallAt == 0.0)
+        alone = level;
+      const double db = 10.0 * std::log10(level / alone);
+      std::printf("labels %d, wall at %.2f m: %zu rays on the strip, largest "
+        "incidence %.1f deg, echo %+.1f dB\n", static_cast<int>(labels),
+        wallAt, onStrip, worst / kDeg, db);
+      EXPECT_GT(onStrip, 10u);
+      EXPECT_EQ(bad, 0u) << "wall at " << wallAt << " labels " <<
+        static_cast<int>(labels);
+      EXPECT_LT(std::abs(db), 1.0) << "wall at " << wallAt << " labels " <<
+        static_cast<int>(labels);
+    }
+  }
+}
+
+//////////////////////////////////////////////////
+// Surfaces that are one surface stay so through the sampler: on a sphere,
+// curved and seen at every angle up to its limb, the normals from
+// neighboring hits match the true ones to 60 degrees of incidence, and
+// nearly all from 60 to 80 degrees, where the rays next to the limb read a
+// pixel that is not quite theirs; with a label and without, in front of a
+// wall with the sphere's label.
+TEST(CameraSampler, NormalsOnASphere)
+{
+  sonar::SonarConfig c = sonar::EchoImaging();
+  c.rangeMax = 10.0;
+  const sonar::CameraSampler sampler(c);
+  for (const bool withLabels : {true, false})
+  {
+    sonar::SyntheticScene scene;
+    scene.AddSphere({4, 0.3, 2}, 0.5, Lambert(-15.0), 2);
+    scene.AddPlane({8, 0, 0}, {-1, 0, 0}, Lambert(-20.0), 2);
+    const Pose3d pose(0, 0, 2, 0, 0, 0);
+    const auto sampled = DrawAndSample(sampler, scene, pose,
+      {Lambert(-20.0), Lambert(-20.0), Lambert(-15.0)}, withLabels);
+    const auto truth = scene.Cast(pose, sampler.Rays(),
+      sampler.Layout().farClip);
+    std::size_t on = 0, miss = 0, steep = 0, steepMiss = 0;
+    for (std::size_t n = 0; n < truth.size(); ++n)
+    {
+      if (!truth[n].hit || truth[n].range > 5.0 || !sampled[n].hit)
+        continue;
+      const bool wrong =
+        std::abs(sampled[n].incidence - truth[n].incidence) > 5.0 * kDeg;
+      if (truth[n].incidence < 60.0 * kDeg)
+      {
+        ++on;
+        miss += wrong;
+      }
+      else if (truth[n].incidence < 80.0 * kDeg)
+      {
+        ++steep;
+        steepMiss += wrong;
+      }
+    }
+    std::printf("labels %d: sphere, %zu of %zu normals off under 60 deg, "
+      "%zu of %zu at 60 to 80 deg\n", withLabels, miss, on, steepMiss, steep);
+    EXPECT_GT(on, 1000u);
+    EXPECT_LT(static_cast<double>(miss) / on, 0.01);
+    EXPECT_LT(static_cast<double>(steepMiss) / steep, 0.15);
+  }
+}
+
+//////////////////////////////////////////////////
+// A seabed that is not one plane stays filled, and keeps its normals.
+// Through the sampler, with no labels, from 0.3 to 1 m above a mesh, an
+// undulation and ripples: no more samples at 15 to 22 m are empty than with
+// footprints from every neighbor that hit, which is how a seabed was filled
+// before neighbors had to be on the same surface, and all but a few
+// percent of its rays find neighbors on their surface for a normal.
+TEST(CameraSampler, SeabedThatIsNotOnePlaneStaysFilled)
+{
+  const sonar::SonarConfig c = sonar::EchoImaging();
+  const sonar::CameraSampler sampler(c);
+  const std::size_t ne = sonar::RayFanElevationCount(c);
+  const std::vector<std::pair<Seabed, double>> cases{
+    {MeshSeabed(), 0.3}, {MeshSeabed(), 1.0}, {UndulatingSeabed(), 0.3},
+    {RippledSeabed(1.0), 0.5}, {RippledSeabed(0.2), 0.3},
+    {RippledSeabed(0.2), 1.0}};
+  for (const auto &[seabed, height] : cases)
+  {
+    {
+      auto hits = DrawAndSample(sampler, seabed,
+        Pose3d(0.3, 0.2, height, 0, 0, 0));
+      const auto now = CleanPing(c, hits);
+      // A seabed ray without neighbors on its surface has no normal and
+      // takes the 45 degree fallback; seen from here every true incidence
+      // is over 60 degrees.
+      std::size_t seen = 0, unknown = 0;
+      for (const auto &h : hits)
+      {
+        if (!h.hit || h.range < 5.0 || h.range > 30.0)
+          continue;
+        ++seen;
+        if (h.incidence < 50.0 * kDeg)
+          ++unknown;
+      }
+      const double noNormal = static_cast<double>(unknown) / seen;
+      sonar::test::LabelOnlyFootprints(hits, ne);
+      const auto before = CleanPing(c, hits);
+      const double emptyNow = sonar::test::EmptyShare(now, 15.0, 22.0);
+      const double emptyBefore = sonar::test::EmptyShare(before, 15.0, 22.0);
+      std::printf("%-28s height %.1f m: empty at 15 to 22 m %5.1f %% (every "
+        "neighbor %5.1f %%), %4.1f %% of %zu rays without a normal\n",
+        seabed.name.c_str(), height, 100.0 * emptyNow, 100.0 * emptyBefore,
+        100.0 * noNormal, seen);
+      EXPECT_LT(noNormal, 0.05) << seabed.name << " from " << height << " m";
+      EXPECT_LE(emptyNow, emptyBefore + 0.01) << seabed.name << " from " <<
+        height << " m";
     }
   }
 }

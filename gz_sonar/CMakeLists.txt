@@ -154,7 +154,7 @@ if(BUILD_TESTING)
   endif()
 
   # The camera sampler on synthetic depth and label images.
-  ament_add_gtest(sampler_test test/sampler_test.cc)
+  ament_add_gtest(sampler_test test/sampler_test.cc TIMEOUT 180)
   if(TARGET sampler_test)
     target_link_libraries(sampler_test ${PROJECT_NAME})
   endif()

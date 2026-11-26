@@ -158,31 +158,91 @@ inline constexpr double kMaxFanCells = 33554432.0;
 /// \return True if the fan can be built.
 bool CheckRayFan(const SonarConfig &_config, std::string &_error);
 
-/// \brief The steepest slant a surface is taken to have: the tangent of its
-/// largest incidence angle, 50 (88.9 degrees). Past it a lone ray's
-/// footprint stops growing, and a jump in range between neighboring rays is
-/// taken for two surfaces rather than one seen at a grazing angle.
+/// \brief The steepest slant a surface is taken to have when nothing else
+/// can be said: the tangent of its incidence angle, 50 (88.9 degrees). Past
+/// it a lone ray's footprint stops growing, and two neighboring rays with
+/// open water beside them are taken for two surfaces.
 constexpr double kMaxSlant = 50.0;
 
-/// \brief Whether two neighboring rays on the grid hit the same surface:
-/// both hit, with the same label, and their ranges differ by no more than a
-/// surface at kMaxSlant would give across the ray spacing. The bound tells
-/// apart parts of one model (a plate and a wall behind it) and, when no
-/// labels are drawn, everything; a flat seabed seen at a grazing angle out
-/// to a sonar's range stays within it.
+/// \brief The steepest slant two neighboring rays alone can vouch for when
+/// a third ray is there to ask: the tangent of the incidence angle, 1 (45
+/// degrees). A jump in range between them up to what such a surface gives
+/// is one surface; a larger jump is one surface only if the third ray
+/// carries it on (kCarryOn). 45 degrees is also the incidence a hit gets
+/// when its normal is unknown, so taking a near and a far surface for one
+/// within this bound costs no more than not knowing the normal.
+constexpr double kTwoRaySlant = 1.0;
+
+/// \brief How evenly 1/range must carry on to a third ray for a larger jump
+/// between two rays to be one surface seen at a slant: the two steps of
+/// 1/range differ by no more than half the larger.
+constexpr double kCarryOn = 0.5;
+
+/// \brief Bit of SurfaceLinks: the ray and the next in its azimuth column
+/// (one elevation step on) hit the same surface.
+constexpr std::uint8_t kLinkElevation = 1;
+
+/// \brief Bit of SurfaceLinks: the ray and the one beside it in the next
+/// azimuth column hit the same surface.
+constexpr std::uint8_t kLinkAzimuth = 2;
+
+/// \brief The angle between two rays.
+/// \param[in] _a One ray.
+/// \param[in] _b The other.
+/// \return The angle, rad.
+double AngleBetween(const Ray &_a, const Ray &_b);
+
+/// \brief Whether two neighboring rays on the grid hit the same surface.
+/// Both must hit, with the same label. Then either their ranges differ by
+/// no more than a surface at kTwoRaySlant would give across the angle
+/// between them, or 1/range carries on evenly (kCarryOn) to the next ray
+/// along the grid line, on either side. Two ranges alone fit a plate's edge
+/// and the wall behind it as well as one surface seen at a slant; the third
+/// ray tells them apart, since 1/range is linear in direction on a plane,
+/// at any grazing angle, and level on each side of a step. So the test
+/// tells apart parts of one model and, when no labels are drawn,
+/// everything, and it does not split a plane that three rays in a line
+/// hit. What it cannot tell is a gap no wider than the far surface's own
+/// step from ray to ray. Where neither next ray hit anything with the same
+/// label, the two rays are all there is. A plane seen at a grazing angle
+/// goes on toward the sonar, so if the next ray on the nearer hit's side
+/// found open water they are one surface only up to kMaxSlant; at the
+/// grid's edge, or beside something with another label, nothing speaks
+/// against a plane and they are one surface. A fan with two rays in
+/// elevation therefore cannot tell a plate from the wall behind it there.
 /// \param[in] _hit One ray's hit.
 /// \param[in] _neighbor Its neighbor's hit.
+/// \param[in] _angle The angle between the two rays, rad.
+/// \param[in] _before The hit of the ray before _hit on the grid line
+/// through the two, or null at the grid's edge.
+/// \param[in] _after The hit of the ray after _neighbor on that line, or
+/// null.
 /// \return True if they hit the same surface.
-bool SameSurface(const RayHit &_hit, const RayHit &_neighbor);
+bool SameSurface(const RayHit &_hit, const RayHit &_neighbor, double _angle,
+  const RayHit *_before, const RayHit *_after);
+
+/// \brief For each ray of the grid, which of its next neighbors hit the
+/// same surface (SameSurface): kLinkElevation, kLinkAzimuth, or both.
+/// \param[in] _hits Hits in RayFan order.
+/// \param[in] _elevationCount Rays per azimuth column.
+/// \return One byte of bits per hit.
+std::vector<std::uint8_t> SurfaceLinks(const std::vector<RayHit> &_hits,
+  std::size_t _elevationCount);
 
 /// \brief Set each hit's footprint from its neighbors on the ray grid:
 /// RayFan's order, azimuth columns of _elevationCount rays each. Only
 /// neighbors on the same surface (SameSurface) count, so a ray at the edge
-/// of a target does not take the jump to the background behind it, and the
-/// footprint is no larger than one on a surface at kMaxSlant.
+/// of a target does not take the jump to the background behind it.
 /// \param[in,out] _hits Hits in RayFan order.
 /// \param[in] _elevationCount Rays per azimuth column.
 void AssignFootprints(std::vector<RayHit> &_hits, std::size_t _elevationCount);
+
+/// \brief The same, with the links already found.
+/// \param[in,out] _hits Hits in RayFan order.
+/// \param[in] _elevationCount Rays per azimuth column.
+/// \param[in] _links SurfaceLinks of the hits.
+void AssignFootprints(std::vector<RayHit> &_hits, std::size_t _elevationCount,
+  const std::vector<std::uint8_t> &_links);
 }  // namespace gz::maritime::sonar
 
 #endif  // GZ_MARITIME_SONAR_RAYS_HH_

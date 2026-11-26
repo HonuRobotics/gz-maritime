@@ -42,6 +42,8 @@
 #include "gz/maritime/sonar/SyntheticScene.hh"
 #include "gz/maritime/sonar/Water.hh"
 
+#include "LabelOnlyFootprints.hh"
+
 using gz::math::Pose3d;
 using gz::math::Vector3d;
 namespace sonar = gz::maritime::sonar;
@@ -1153,75 +1155,276 @@ TEST(Readout, GainTrackerSmooths)
 }
 
 //////////////////////////////////////////////////
-// A plate at 4 m in front of a wall at 8 m. Where a ray on the plate's
-// edge has a neighbor on the wall, the jump is not a slanted surface, so
-// the footprint must not spread the plate's echo across it, whether or not
-// the two share a label (parts of one model do). The water between them
-// stays empty.
+// A plate at 4 m in front of a wall, from 0.5 m to 5.5 m behind it. Where a
+// ray on the plate's edge has a neighbor on the wall, the jump is not a
+// slanted surface, so the footprint must not spread the plate's echo across
+// it: the water between them stays empty. With the wall's own label, with
+// the plate's label on the wall (parts of one model share one), and with
+// no labels drawn, where only the ranges tell them apart. The plate's
+// edges are tested in azimuth and in elevation, whose ray steps differ by
+// five times.
 TEST(Engine, FootprintDoesNotSpanAJump)
 {
   const sonar::SonarConfig c = CleanEcho();
-  for (std::uint32_t wallLabel : {3u, 2u})
+  const std::vector<std::pair<std::uint32_t, std::uint32_t>> labels{
+    {2u, 3u}, {2u, 2u}, {0u, 0u}};
+  for (const auto &[plateLabel, wallLabel] : labels)
   {
-    sonar::SyntheticScene scene;
-    scene.AddRectangle({4, 0, 2}, {-1, 0, 0}, {0, 1, 0}, 0.5, 0.5,
-      Lambert(-15.0), 2);
-    scene.AddPlane({8, 0, 0}, {-1, 0, 0}, Lambert(-20.0), wallLabel);
-    const auto b = Ping(c, scene, Pose3d(0, 0, 2, 0, 0, 0));
-
-    double plate = 0.0, gap = 0.0;
-    for (std::size_t i = 0; i < b.beams; ++i)
+    for (const double wallAt : {4.5, 4.7, 5.0, 5.5, 6.0, 6.1, 7.0, 8.0, 9.5})
     {
-      if (std::abs(b.azimuths[i]) > std::atan(0.4 / 4.0))
-        continue;
-      for (std::size_t k = 0; k < b.samples; ++k)
+      sonar::SyntheticScene scene;
+      scene.AddRectangle({4, 0, 2}, {-1, 0, 0}, {0, 1, 0}, 0.5, 0.5,
+        Lambert(-15.0), plateLabel);
+      scene.AddPlane({wallAt, 0, 0}, {-1, 0, 0}, Lambert(-20.0), wallLabel);
+      const auto b = Ping(c, scene, Pose3d(0, 0, 2, 0, 0, 0));
+
+      double plate = 0.0, gap = 0.0;
+      for (std::size_t i = 0; i < b.beams; ++i)
       {
-        const double r = b.ranges[k];
-        const double v = b.data[i * b.samples + k];
-        if (r > 3.5 && r < 4.5)
-          plate = std::max(plate, v);
-        else if (r > 4.5 && r < 7.5)
-          gap = std::max(gap, v);
+        if (std::abs(b.azimuths[i]) > std::atan(0.4 / 4.0))
+          continue;
+        for (std::size_t k = 0; k < b.samples; ++k)
+        {
+          const double r = b.ranges[k];
+          const double v = b.data[i * b.samples + k];
+          if (r > 3.5 && r < 4.15)
+            plate = std::max(plate, v);
+          else if (r > 4.15 && r < wallAt - 0.15)
+            gap = std::max(gap, v);
+        }
       }
+      ASSERT_GT(plate, 0.0);
+      std::printf("labels %u and %u, wall at %.1f m: gap %.1f dB relative to "
+        "the plate\n", plateLabel, wallLabel, wallAt,
+        gap > 0.0 ? 10.0 * std::log10(gap / plate) : -999.0);
+      EXPECT_EQ(gap, 0.0) << "labels " << plateLabel << " and " <<
+        wallLabel << ", wall at " << wallAt << " m";
     }
-    ASSERT_GT(plate, 0.0);
-    std::printf("wall label %u: gap %.1f dB relative to the plate\n",
-      wallLabel, gap > 0.0 ? 10.0 * std::log10(gap / plate) : -999.0);
-    EXPECT_EQ(gap, 0.0) << "wall label " << wallLabel;
   }
 }
 
 //////////////////////////////////////////////////
-// The bound on a jump between neighbors is loose enough for a flat seabed
-// seen at a grazing angle: from 1 m above it, out to the end of the ECHO's
-// 30 m window, every pair of neighboring rays on the seabed is one surface.
-TEST(Rays, SeabedAtGrazingAnglesIsOneSurface)
+// A flat seabed is one surface at any grazing angle: from 0.2 to 5 m above
+// it, out to the end of the window, every pair of neighboring rays on the
+// seabed is linked, for the imaging sonar, the sidescan and the profiler,
+// level and as mounted. Their ray steps differ a lot: the ECHO's elevation
+// step is 5.3 times its azimuth step, the sidescan's azimuth step half its
+// elevation step.
+TEST(Rays, FlatSeabedIsOneSurfaceAtAnyGrazingAngle)
 {
-  const sonar::SonarConfig c = sonar::EchoImaging();
-  sonar::SyntheticScene scene;
-  scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), 1);
-  const auto rays = sonar::RayFan(c);
-  const auto hits = scene.Cast(Pose3d(0, 0, 1, 0, 0, 0), rays, 1.5 * c.rangeMax);
-  const std::size_t ne = sonar::RayFanElevationCount(c);
-  std::size_t pairs = 0, split = 0;
-  for (std::size_t n = 0; n + 1 < hits.size(); ++n)
+  struct Mount
   {
-    for (std::size_t m : {n + 1, n + ne})
+    const char *name;
+    sonar::SonarConfig config;
+    double roll;
+    double pitch;
+  };
+  const std::vector<Mount> mounts{
+    {"imaging, level", sonar::EchoImaging(), 0.0, 0.0},
+    {"imaging, 15 deg down", sonar::EchoImaging(), 0.0, 15.0 * kDeg},
+    {"imaging, rolled 20 deg", sonar::EchoImaging(), 20.0 * kDeg, 0.0},
+    {"sidescan, level", sonar::OmniscanSidescan(), 0.0, 0.0},
+    {"sidescan, 20 deg down", sonar::OmniscanSidescan(), 0.0, 20.0 * kDeg},
+    {"profiler, level", sonar::SurveyorProfiling(), 0.0, 0.0},
+    {"profiler, on its side", sonar::SurveyorProfiling(), 90.0 * kDeg, 0.0},
+  };
+  for (const auto &m : mounts)
+  {
+    const sonar::SonarConfig &c = m.config;
+    const auto rays = sonar::RayFan(c);
+    const std::size_t ne = sonar::RayFanElevationCount(c);
+    for (const double height : {0.2, 0.3, 0.5, 1.0, 2.0, 5.0})
     {
-      if (m >= hits.size() || (m == n + 1 && m % ne == 0))
-        continue;
-      if (!hits[n].hit || !hits[m].hit || hits[n].range > c.rangeMax ||
-          hits[m].range > c.rangeMax)
+      sonar::SyntheticScene scene;
+      scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), 1);
+      const auto hits = scene.Cast(Pose3d(0, 0, height, m.roll, m.pitch, 0),
+        rays, 1.5 * c.rangeMax);
+      const auto links = sonar::SurfaceLinks(hits, ne);
+      std::size_t pairs = 0, split = 0;
+      for (std::size_t n = 0; n < hits.size(); ++n)
       {
-        continue;
+        if (!hits[n].hit)
+          continue;
+        if (n % ne + 1 < ne && hits[n + 1].hit)
+        {
+          ++pairs;
+          if (!(links[n] & sonar::kLinkElevation))
+            ++split;
+        }
+        if (n + ne < hits.size() && hits[n + ne].hit)
+        {
+          ++pairs;
+          if (!(links[n] & sonar::kLinkAzimuth))
+            ++split;
+        }
       }
-      ++pairs;
-      if (!sonar::SameSurface(hits[n], hits[m]))
-        ++split;
+      EXPECT_EQ(split, 0u) << m.name << " from " << height << " m, of " <<
+        pairs << " pairs";
     }
   }
-  EXPECT_GT(pairs, 10000u);
-  EXPECT_EQ(split, 0u);
+}
+
+namespace
+{
+//////////////////////////////////////////////////
+/// \brief The ECHO with two rays in elevation, so no ray has a second
+/// neighbor above or below it.
+/// \return The configuration.
+sonar::SonarConfig TwoElevationRays()
+{
+  sonar::SonarConfig c = sonar::EchoImaging();
+  c.elevationSpan = 2.0;
+  c.elevationRays = 2;
+  return c;
+}
+
+//////////////////////////////////////////////////
+/// \brief One ping of a flat seabed, with footprints from the library or
+/// from every neighbor of the same label.
+/// \param[in] _config The sonar.
+/// \param[in] _pose Its pose.
+/// \param[in] _label The seabed's label.
+/// \param[in] _labelOnly Whether to take the footprints of
+/// LabelOnlyFootprints.
+/// \return The intensity.
+sonar::BeamIntensity SeabedPing(const sonar::SonarConfig &_config,
+  const Pose3d &_pose, std::uint32_t _label, bool _labelOnly)
+{
+  sonar::SyntheticScene scene;
+  scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), _label);
+  const sonar::Engine engine(_config, HarborWater());
+  auto hits = scene.Cast(_pose, sonar::RayFan(_config),
+    1.5 * _config.rangeMax);
+  const std::size_t ne = sonar::RayFanElevationCount(_config);
+  if (_labelOnly)
+    sonar::test::LabelOnlyFootprints(hits, ne);
+  else
+    sonar::AssignFootprints(hits, ne);
+  return engine.Ping(hits, 0);
+}
+}  // namespace
+
+//////////////////////////////////////////////////
+// A flat seabed stays filled from any height. From 0.2 to 5 m above it,
+// where the grazing angle falls to half a degree, with a label on the
+// seabed and without, for the imaging sonar, the sidescan and the profiler,
+// level and tilted: no more samples of the far half of the window are empty
+// than with footprints from every neighbor of the same label, which is how
+// the seabed was filled before neighbors had to be on the same surface.
+// From 0.3 m up to 5 m the level imaging sonar leaves none empty at 15 to
+// 22 m. (From 0.2 m its rays are too far apart on the seabed out there for
+// a footprint, which lies evenly about its ray's range, to reach from one
+// to the next; and the last quarter of the window can hold the empty ring
+// of echoes dropped past its end. Both are the same either way.)
+TEST(Engine, FlatSeabedStaysFilledFromAnyHeight)
+{
+  struct Mount
+  {
+    const char *name;
+    sonar::SonarConfig config;
+    double roll;
+    double pitch;
+    bool full;
+  };
+  const std::vector<Mount> mounts{
+    {"imaging, level", sonar::EchoImaging(), 0.0, 0.0, true},
+    {"imaging, 15 deg down", sonar::EchoImaging(), 0.0, 15.0 * kDeg, false},
+    {"sidescan, level", sonar::OmniscanSidescan(), 0.0, 0.0, false},
+    {"sidescan, 20 deg down", sonar::OmniscanSidescan(), 0.0, 20.0 * kDeg,
+      false},
+    {"profiler, level", sonar::SurveyorProfiling(), 0.0, 0.0, false},
+    {"profiler, on its side", sonar::SurveyorProfiling(), 90.0 * kDeg, 0.0,
+      false},
+    {"imaging, 2 rays up", TwoElevationRays(), 0.0, 0.0, false},
+    {"imaging, 2 rays up, 15", TwoElevationRays(), 0.0, 15.0 * kDeg, false},
+  };
+  for (const auto &m : mounts)
+  {
+    sonar::SonarConfig c = m.config;
+    c.speckle = false;
+    c.noiseFloorDb = -300.0;
+    const double mid = 0.5 * c.rangeMax;
+    const double far = 0.73 * c.rangeMax;
+    for (const double height : {0.2, 0.3, 0.5, 1.0, 2.0, 4.0, 5.0})
+    {
+      for (const std::uint32_t label : {1u, 0u})
+      {
+        const Pose3d pose(0, 0, height, m.roll, m.pitch, 0);
+        const auto now = SeabedPing(c, pose, label, false);
+        const auto before = SeabedPing(c, pose, label, true);
+        const double emptyNow = sonar::test::EmptyShare(now, mid, far);
+        const double emptyBefore = sonar::test::EmptyShare(before, mid, far);
+        const double allNow = sonar::test::EmptyShare(now, mid, c.rangeMax);
+        const double allBefore =
+          sonar::test::EmptyShare(before, mid, c.rangeMax);
+        std::printf("%-24s %.1f m, label %u: empty at %.0f to %.0f m %5.1f %% "
+          "(label only %5.1f %%), to %.0f m %5.1f %% (%5.1f %%)\n", m.name,
+          height, label, mid, far, 100.0 * emptyNow, 100.0 * emptyBefore,
+          c.rangeMax, 100.0 * allNow, 100.0 * allBefore);
+        EXPECT_LE(emptyNow, emptyBefore) << m.name << " from " << height;
+        EXPECT_LE(allNow, allBefore) << m.name << " from " << height;
+        if (m.full && height > 0.25)
+          EXPECT_EQ(emptyNow, 0.0) << m.name << " from " << height;
+      }
+    }
+  }
+}
+
+//////////////////////////////////////////////////
+// The shadow behind a sill on a seabed seen at a grazing angle stays empty
+// when the sill and the seabed share a label or none is drawn: the rays
+// over the sill's top edge hit the seabed far behind it, a jump that the
+// seabed's own even change of 1/range must not vouch for. Sills of 1 m and
+// 0.5 m, from 2 m and 1 m up; the shadow is several rays long.
+TEST(Engine, ShadowOnAGrazingSeabedStaysEmpty)
+{
+  const sonar::SonarConfig c = sonar::EchoImaging();
+  // A narrow fan, so every ray sees the sill and its shadow at the ranges
+  // they have on the axis, and no sidelobe brings in another range.
+  sonar::SonarConfig clean = c;
+  clean.horizontalFov = 6.0 * kDeg;
+  clean.beams = 12;
+  clean.speckle = false;
+  clean.noiseFloorDb = -300.0;
+  for (const double height : {2.0, 1.0})
+  {
+    for (const double top : {1.0, 0.5})
+    {
+      for (const std::uint32_t boxLabel : {2u, 1u, 0u})
+      {
+        const std::uint32_t seabedLabel = boxLabel == 0u ? 0u : 1u;
+        sonar::SyntheticScene scene;
+        scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), seabedLabel);
+        scene.AddBox({8.0, -100.0, 0}, {9.0, 100.0, top}, Lambert(-15.0),
+          boxLabel);
+        const auto b = Ping(clean, scene, Pose3d(0, 0, height, 0, 0, 0));
+        // From the sill's far top edge to where the ray over it meets the
+        // seabed, less a meter there: the first seabed ray's footprint
+        // lies evenly about its range and reaches back a little.
+        const double from = std::hypot(9.0, height - top);
+        const double to = std::min(c.rangeMax,
+          from * height / std::max(height - top, 1e-9));
+        std::size_t cells = 0, lit = 0;
+        for (std::size_t i = 0; i < b.beams; ++i)
+        {
+          for (std::size_t k = 0; k < b.samples; ++k)
+          {
+            if (b.ranges[k] < from + 0.2 || b.ranges[k] > to - 1.0)
+              continue;
+            ++cells;
+            if (b.data[i * b.samples + k] > 0.0)
+              ++lit;
+          }
+        }
+        std::printf("height %.0f m, box %.1f m, labels %u and %u: shadow "
+          "%.1f to %.1f m, %zu of %zu cells lit\n", height, top, boxLabel,
+          seabedLabel, from, to, lit, cells);
+        EXPECT_GT(cells, 100u);
+        EXPECT_EQ(lit, 0u) << "height " << height << " sill " << top <<
+          " labels " << boxLabel << " and " << seabedLabel;
+      }
+    }
+  }
 }
 
 namespace
@@ -1817,32 +2020,113 @@ TEST(Rays, FanGeometry)
 
 //////////////////////////////////////////////////
 // Neighbors are one surface when they share a label and their ranges are
-// within what a surface at kMaxSlant gives; the footprint is half the
-// range between the two neighbors on the surface, the larger over the two
-// directions of the grid.
+// within what a surface at kTwoRaySlant gives across the angle between the
+// two rays, not across the fan's larger step: 0.01 rad apart at 5 m, up to
+// 5 cm. A larger jump is one surface only if 1/range carries on evenly to
+// a third ray, as on a plane seen at a grazing angle, and not if the third
+// ray shows the far surface level behind the near one's edge. With no
+// third ray to ask, the two are one surface up to kMaxSlant if open water
+// lies where a plane would go on, and at any slant if not.
 TEST(Rays, SameSurfaceAndFootprint)
 {
   sonar::RayHit a = OneHit(5.0);
   sonar::RayHit b = OneHit(5.0);
-  EXPECT_TRUE(sonar::SameSurface(a, b));
+  b.ray.azimuth = 0.01;
+  // The fan's other step is five times larger; it must not loosen the test.
+  a.ray.spacing = b.ray.spacing = 0.05;
+  const double angle = sonar::AngleBetween(a.ray, b.ray);
+  EXPECT_NEAR(angle, 0.01, 1e-9);
+  // Out of the fan's plane the same azimuth step spans less angle.
+  sonar::RayHit up = OneHit(5.0), upNext = OneHit(5.0);
+  up.ray.elevation = upNext.ray.elevation = 60.0 * kDeg;
+  upNext.ray.azimuth = 0.01;
+  EXPECT_NEAR(sonar::AngleBetween(up.ray, upNext.ray), 0.005, 1e-6);
+
+  // A third ray level with the first, as the face of a plate is, and one
+  // that hit nothing: open water.
+  const sonar::RayHit level = OneHit(5.0);
+  const sonar::RayHit miss;
+  EXPECT_TRUE(sonar::SameSurface(a, b, angle, &level, &miss));
   b.label = 2;
-  EXPECT_FALSE(sonar::SameSurface(a, b));
+  EXPECT_FALSE(sonar::SameSurface(a, b, angle, &level, &miss));
   b.label = 1;
-  const double bound = 5.0 * a.ray.spacing * sonar::kMaxSlant;
+  // Beside the plate's face the two vouch for 45 degrees and no more.
+  const double bound = 5.0 * angle * sonar::kTwoRaySlant;
   b.range = 5.0 + 0.9 * bound;
-  EXPECT_TRUE(sonar::SameSurface(a, b));
+  EXPECT_TRUE(sonar::SameSurface(a, b, angle, &level, &miss));
+  EXPECT_TRUE(sonar::SameSurface(b, a, angle, &miss, &level));
   b.range = 5.0 + 1.1 * bound;
-  EXPECT_FALSE(sonar::SameSurface(a, b));
+  EXPECT_FALSE(sonar::SameSurface(a, b, angle, &level, &miss));
+  EXPECT_FALSE(sonar::SameSurface(b, a, angle, &miss, &level));
+  // With open water on both sides they are all there is: one surface up to
+  // kMaxSlant, a plate two rays wide seen at a slant.
+  const double most = 5.0 * angle * sonar::kMaxSlant;
+  b.range = 5.0 + 0.9 * most;
+  EXPECT_TRUE(sonar::SameSurface(a, b, angle, &miss, &miss));
+  EXPECT_FALSE(sonar::SameSurface(a, b, angle, &level, &miss));
+  b.range = 5.0 + 1.1 * most;
+  EXPECT_FALSE(sonar::SameSurface(a, b, angle, &miss, &miss));
+  EXPECT_FALSE(sonar::SameSurface(b, a, angle, &miss, &miss));
+  // At the grid's edge on the nearer hit's side, or with something of
+  // another label there, a plane seen at a grazing angle is still
+  // possible, and a plane is not split; on the farther side the edge says
+  // nothing.
+  sonar::RayHit other = OneHit(4.0);
+  other.label = 2;
+  EXPECT_TRUE(sonar::SameSurface(a, b, angle, nullptr, &miss));
+  EXPECT_TRUE(sonar::SameSurface(b, a, angle, &miss, nullptr));
+  EXPECT_TRUE(sonar::SameSurface(a, b, angle, &other, &miss));
+  EXPECT_FALSE(sonar::SameSurface(a, b, angle, &miss, nullptr));
+
+  // A plane seen at a grazing angle: 1/range falls by the same amount from
+  // ray to ray, here 6.7, 10 and 20 m, and the next ray misses. The jump
+  // from 10 to 20 m is far past any bound, and one surface with the ray
+  // before, whichever way round the pair is given.
+  sonar::RayHit p0 = OneHit(1.0 / 0.15), p1 = OneHit(10.0), p2 = OneHit(20.0);
+  EXPECT_TRUE(sonar::SameSurface(p1, p2, angle, &p0, &miss));
+  EXPECT_TRUE(sonar::SameSurface(p2, p1, angle, &miss, &p0));
+  // The edge of a plate at 10 m before a wall at 20 m: the plate is level
+  // before the jump and the wall after it, so neither side carries on, nor
+  // does one alone.
+  const sonar::RayHit plate = OneHit(10.0), wall = OneHit(20.0);
+  EXPECT_FALSE(sonar::SameSurface(p1, p2, angle, &plate, &wall));
+  EXPECT_FALSE(sonar::SameSurface(p1, p2, angle, &plate, &miss));
+  EXPECT_FALSE(sonar::SameSurface(p1, p2, angle, nullptr, &wall));
 
   // Three columns of three, range rising 1 cm a ray in elevation, the same
-  // across azimuth.
+  // across azimuth: the footprint is half the range between the two
+  // neighbors on the surface, the larger over the two directions of the
+  // grid, or the distance to the only one.
   std::vector<sonar::RayHit> hits;
   for (int i = 0; i < 3; ++i)
+  {
     for (int k = 0; k < 3; ++k)
+    {
       hits.push_back(OneHit(5.0 + 0.01 * k));
+      hits.back().ray.azimuth = 0.01 * i;
+      hits.back().ray.elevation = 0.01 * k;
+    }
+  }
   sonar::AssignFootprints(hits, 3);
   EXPECT_NEAR(hits[4].footprint, 0.01, 1e-12);
   EXPECT_NEAR(hits[3].footprint, 0.01, 1e-12);
+  const auto links = sonar::SurfaceLinks(hits, 3);
+  EXPECT_EQ(links[0], sonar::kLinkElevation | sonar::kLinkAzimuth);
+  EXPECT_EQ(links[2], sonar::kLinkAzimuth);
+  EXPECT_EQ(links[6], sonar::kLinkElevation);
+  EXPECT_EQ(links[8], 0u);
+  // One column, and one row: the grid's edges in each direction.
+  std::vector<sonar::RayHit> column(hits.begin(), hits.begin() + 3);
+  sonar::AssignFootprints(column, 3);
+  EXPECT_NEAR(column[1].footprint, 0.01, 1e-12);
+  std::vector<sonar::RayHit> row{hits[0], hits[3], hits[6]};
+  row[1].range = 5.02;
+  sonar::AssignFootprints(row, 1);
+  EXPECT_NEAR(row[0].footprint, 0.02, 1e-12);
+  EXPECT_NEAR(row[1].footprint, 0.0, 1e-12);
+  // A grid that does not divide into columns is left alone.
+  sonar::AssignFootprints(row, 2);
+  EXPECT_NEAR(row[0].footprint, 0.02, 1e-12);
 }
 
 //////////////////////////////////////////////////

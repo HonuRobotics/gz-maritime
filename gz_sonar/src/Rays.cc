@@ -189,57 +189,142 @@ std::size_t RayFanElevationCount(const SonarConfig &_config)
 }
 
 //////////////////////////////////////////////////
-bool SameSurface(const RayHit &_hit, const RayHit &_neighbor)
+double AngleBetween(const Ray &_a, const Ray &_b)
+{
+  return std::acos(std::clamp(_a.Direction().Dot(_b.Direction()), -1.0, 1.0));
+}
+
+//////////////////////////////////////////////////
+bool SameSurface(const RayHit &_hit, const RayHit &_neighbor, double _angle,
+  const RayHit *_before, const RayHit *_after)
 {
   if (!_hit.hit || !_neighbor.hit || _hit.label != _neighbor.label)
     return false;
   // From the nearer of the two, so the test is the same both ways.
   const double r = std::min(_hit.range, _neighbor.range);
-  const double spacing = std::max(_hit.ray.spacing, _neighbor.ray.spacing);
-  return std::abs(_hit.range - _neighbor.range) <= r * spacing * kMaxSlant;
+  const double jump = std::abs(_hit.range - _neighbor.range);
+  if (jump <= r * _angle * kTwoRaySlant)
+    return true;
+  // A larger jump is one surface seen at a slant, or two surfaces; the two
+  // ranges alone fit either. A third ray tells: on a plane 1/r is linear
+  // in the ray's direction, so it changes by as much again to the next ray
+  // along the line, at any grazing angle, while past the edge of a plate
+  // the wall behind it does not carry on at the jump's rate.
+  const double q0 = 1.0 / _hit.range;
+  const double q1 = 1.0 / _neighbor.range;
+  const double d = q1 - q0;
+  auto witness = [&](const RayHit *_third) {
+    return _third && _third->hit && _third->label == _hit.label;
+  };
+  auto carriesOn = [&](double _step) {
+    return std::abs(_step - d) <=
+      kCarryOn * std::max(std::abs(_step), std::abs(d));
+  };
+  const bool before = witness(_before);
+  const bool after = witness(_after);
+  if (before || after)
+  {
+    return (before && carriesOn(q0 - 1.0 / _before->range)) ||
+      (after && carriesOn(1.0 / _after->range - q1));
+  }
+  // No third ray on either side is on a surface with this label. A plane
+  // seen at a grazing angle goes on toward the sonar, so the next ray on
+  // the nearer hit's side would have hit it: if that ray found open water,
+  // the two are one surface only up to the steepest slant. If there is no
+  // such ray (the grid's edge) or it hit something else, nothing speaks
+  // against a plane, and a plane is not split.
+  const RayHit *nearer = _hit.range <= _neighbor.range ? _before : _after;
+  return !nearer || nearer->hit || jump <= r * _angle * kMaxSlant;
+}
+
+//////////////////////////////////////////////////
+std::vector<std::uint8_t> SurfaceLinks(const std::vector<RayHit> &_hits,
+  std::size_t _elevationCount)
+{
+  std::vector<std::uint8_t> links(_hits.size(), 0);
+  const std::size_t ne = _elevationCount;
+  if (ne == 0 || _hits.empty() || _hits.size() % ne != 0)
+    return links;
+  const std::size_t cols = _hits.size() / ne;
+  // Rays of one row share an elevation, and an azimuth step spans less
+  // angle the farther the row is from the fan's plane.
+  std::vector<double> cosElevation(ne);
+  for (std::size_t k = 0; k < ne; ++k)
+    cosElevation[k] = std::cos(_hits[k].ray.elevation);
+  for (std::size_t i = 0; i < cols; ++i)
+  {
+    for (std::size_t k = 0; k < ne; ++k)
+    {
+      const std::size_t n = i * ne + k;
+      const RayHit &h = _hits[n];
+      if (!h.hit)
+        continue;
+      if (k + 1 < ne && _hits[n + 1].hit)
+      {
+        const double angle =
+          std::abs(_hits[n + 1].ray.elevation - h.ray.elevation);
+        if (SameSurface(h, _hits[n + 1], angle, k > 0 ? &_hits[n - 1] : nullptr,
+            k + 2 < ne ? &_hits[n + 2] : nullptr))
+        {
+          links[n] |= kLinkElevation;
+        }
+      }
+      if (i + 1 < cols && _hits[n + ne].hit)
+      {
+        const double angle = cosElevation[k] *
+          std::abs(_hits[n + ne].ray.azimuth - h.ray.azimuth);
+        if (SameSurface(h, _hits[n + ne], angle,
+            i > 0 ? &_hits[n - ne] : nullptr,
+            i + 2 < cols ? &_hits[n + 2 * ne] : nullptr))
+        {
+          links[n] |= kLinkAzimuth;
+        }
+      }
+    }
+  }
+  return links;
 }
 
 //////////////////////////////////////////////////
 void AssignFootprints(std::vector<RayHit> &_hits, std::size_t _elevationCount)
 {
-  if (_elevationCount == 0 || _hits.size() % _elevationCount != 0)
+  AssignFootprints(_hits, _elevationCount,
+    SurfaceLinks(_hits, _elevationCount));
+}
+
+//////////////////////////////////////////////////
+void AssignFootprints(std::vector<RayHit> &_hits, std::size_t _elevationCount,
+  const std::vector<std::uint8_t> &_links)
+{
+  const std::size_t ne = _elevationCount;
+  if (ne == 0 || _hits.size() % ne != 0 || _links.size() != _hits.size())
     return;
-  const std::size_t cols = _hits.size() / _elevationCount;
-  auto at = [&](long _i, long _k) -> const RayHit * {
-    if (_i < 0 || _k < 0 || _i >= static_cast<long>(cols) ||
-        _k >= static_cast<long>(_elevationCount))
-    {
-      return nullptr;
-    }
-    return &_hits[static_cast<std::size_t>(_i) * _elevationCount +
-      static_cast<std::size_t>(_k)];
-  };
+  const std::size_t cols = _hits.size() / ne;
   // The spread toward one pair of neighbors: half the distance between
   // their ranges, or the distance to the one that shares the surface.
-  auto spread = [](const RayHit &_h, const RayHit *_a, const RayHit *_b) {
-    const bool okA = _a && SameSurface(_h, *_a);
-    const bool okB = _b && SameSurface(_h, *_b);
-    if (okA && okB)
-      return 0.5 * std::abs(_a->range - _b->range);
-    if (okA)
-      return std::abs(_a->range - _h.range);
-    if (okB)
-      return std::abs(_b->range - _h.range);
+  auto spread = [&](std::size_t _n, bool _okA, std::size_t _a, bool _okB,
+      std::size_t _b) {
+    if (_okA && _okB)
+      return 0.5 * std::abs(_hits[_a].range - _hits[_b].range);
+    if (_okA)
+      return std::abs(_hits[_a].range - _hits[_n].range);
+    if (_okB)
+      return std::abs(_hits[_b].range - _hits[_n].range);
     return 0.0;
   };
   std::vector<double> footprint(_hits.size(), 0.0);
   for (std::size_t i = 0; i < cols; ++i)
   {
-    for (std::size_t k = 0; k < _elevationCount; ++k)
+    for (std::size_t k = 0; k < ne; ++k)
     {
-      const RayHit &h = _hits[i * _elevationCount + k];
-      if (!h.hit)
+      const std::size_t n = i * ne + k;
+      if (!_hits[n].hit)
         continue;
-      const auto li = static_cast<long>(i);
-      const auto lk = static_cast<long>(k);
-      footprint[i * _elevationCount + k] = std::max(
-        spread(h, at(li, lk - 1), at(li, lk + 1)),
-        spread(h, at(li - 1, lk), at(li + 1, lk)));
+      footprint[n] = std::max(
+        spread(n, k > 0 && (_links[n - 1] & kLinkElevation), n - 1,
+          _links[n] & kLinkElevation, n + 1),
+        spread(n, i > 0 && (_links[n - ne] & kLinkAzimuth), n - ne,
+          _links[n] & kLinkAzimuth, n + ne));
     }
   }
   for (std::size_t n = 0; n < _hits.size(); ++n)

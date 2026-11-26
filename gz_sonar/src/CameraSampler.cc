@@ -392,10 +392,19 @@ std::vector<RayHit> CameraSampler::Sample(
     points[n] = hits[n].ray.Direction() * hits[n].range;
   // A neighbor counts only on the same surface: a neighbor on the wall
   // behind a pole one ray wide would tilt the pole's normal to grazing.
+  const std::vector<std::uint8_t> links = SurfaceLinks(hits, ne);
   auto ok = [&](std::size_t _n, long _i, long _k) {
-    return _i >= 0 && _k >= 0 && _i < static_cast<long>(cols) &&
-      _k < static_cast<long>(ne) && SameSurface(hits[_n],
-        hits[static_cast<std::size_t>(_i) * ne + static_cast<std::size_t>(_k)]);
+    if (_i < 0 || _k < 0 || _i >= static_cast<long>(cols) ||
+        _k >= static_cast<long>(ne))
+    {
+      return false;
+    }
+    const std::size_t m = static_cast<std::size_t>(_i) * ne +
+      static_cast<std::size_t>(_k);
+    // The link is kept by the earlier of the two on the grid.
+    const bool sameColumn = static_cast<std::size_t>(_i) == _n / ne;
+    return (links[std::min(_n, m)] &
+      (sameColumn ? kLinkElevation : kLinkAzimuth)) != 0;
   };
   for (std::size_t i = 0; i < cols; ++i)
   {
@@ -439,7 +448,7 @@ std::vector<RayHit> CameraSampler::Sample(
     }
   }
 
-  AssignFootprints(hits, ne);
+  AssignFootprints(hits, ne, links);
   return hits;
 }
 }  // namespace gz::maritime::sonar
