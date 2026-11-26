@@ -33,7 +33,14 @@ depth in one pass, and give the sensor a `<topic>`:
 ```
 
 The world needs the water optics system for there to be any water; without
-it the image is the plain camera's.
+it the camera is in clear water, and only its own response (exposure, white
+balance, noise) applies.
+
+It works only while someone listens to its output: with nobody subscribed,
+it does not listen to the camera either, so the camera is not rendered for
+it. Each frame is processed on a thread of the plugin's own, with the water
+of the step the frame was rendered at, and the simulation does not wait for
+it; a frame that comes while another is processed replaces the one waiting.
 
 | Topic | Type | What |
 |---|---|---|
@@ -49,8 +56,8 @@ it the image is the plain camera's.
 | `<exposure>` | `1` | A gain on linear light, or `auto`: the mean luminance aimed at 0.18. |
 | `<max_gain>` | `16` | With `auto`, the gain stays within 1/max and max. |
 | `<white_balance>` | `none` | `none`, or `grey_world`: each channel's mean made the mean luminance, so the water's tint is taken out, as a camera's auto white balance does. |
-| `<shot_noise>`, `<read_noise>` | `0` | Gaussian noise on linear light, of variance shot_noise · signal + read_noise². |
-| `<seed>` | `1` | The noise's seed. |
+| `<shot_noise>`, `<read_noise>` | `0` | Gaussian noise on the linear light the sensor caught, of variance shot_noise · signal + read_noise², before the gain, which amplifies it as in a real camera. |
+| `<seed>` | `1` | The noise's seed, mixed with the sensor's scoped name: each camera, say each of a stereo pair, gets its own noise, the same every run. |
 
 ## What it computes
 
@@ -74,9 +81,11 @@ For each pixel, from the in-air frame's colour J and z-depth:
    with B∞(z_cam) = B∞ exp(−K_d z_cam), the veil at the camera's depth, in
    units of a white surface lit by the surface daylight. A pixel that hits
    nothing sees the open water: the veil, or the sky through the surface.
-5. **The camera.** Exposure, white balance, noise; back to sRGB.
+5. **The camera.** Noise on the light caught, then exposure and white
+   balance; back to sRGB.
 
-With the camera above the water, the image is copied unchanged. Depth comes
+With the camera above the water, only step 5 applies: with the default
+response, the image comes out unchanged. Depth comes
 from the world's water optics: below the wave field's local surface.
 
 ## Limits
@@ -100,10 +109,19 @@ colcon test --packages-select gz_underwater_camera
   trip for all 256 values; the model, every pixel against the closed form,
   at two ranges and with the object's depth; β^D ≠ β^B against the fog
   model; a climbing ray clipped at the surface; nothing hit is the veil; in
-  air and in clear water the image unchanged; fixed and auto exposure; grey
-  world neutralising a tint; the noise's mean and variance; 640×480 within a
-  15 Hz frame; every parameter documented.
-- `underwater_camera_test`, rendered (needs a GPU): the published image
-  against the model computed in the test from the in-air frame, pixel by
-  pixel; the far wall fading into the veil more than the near plate; above
-  the water, byte for byte the plain image; the depth image untouched.
+  air and in clear water the image unchanged; the response in air too, its
+  gain amplifying the noise; fixed and auto exposure; grey world
+  neutralising a tint; the noise's mean and variance; 640×480 within a 15 Hz
+  frame; every parameter documented.
+- `underwater_camera_frames_test`, frames sent by the test, nothing
+  rendered: clear water without water optics; listening only while
+  listened to; each frame with the water of its own step; frames that do not
+  fit skipped; each camera of a stereo pair its own, repeatable noise; a
+  reset; the plugin where it does not belong, and parameters that make no
+  sense; the system destroyed while frames flow (under AddressSanitizer,
+  the use after free it used to have).
+- `underwater_camera_test`, rendered (skipped without a GPU): the published
+  image against the model computed in the test from the in-air frame, pixel
+  by pixel, looking ahead and pitched up over open water; the far wall
+  fading into the veil more than the near plate; above the water, byte for
+  byte the plain image; the depth image untouched.

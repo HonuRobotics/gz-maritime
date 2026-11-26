@@ -99,19 +99,30 @@ FrameStats MakeUnderwater(const std::vector<std::uint8_t> &_rgb,
   const auto &k = _rays.Camera();
   const std::size_t n = static_cast<std::size_t>(k.width) * k.height;
   _out.resize(n * 3);
-  if (_rgb.size() < n * 3 || _depth.size() < n || !(_water.cameraDepth > 0))
+  if (_rgb.size() < n * 3 || _depth.size() < n)
   {
-    // In air (or a frame that does not match the table): unchanged.
+    // A frame that does not match the table: unchanged.
     std::copy(_rgb.begin(), _rgb.begin() + std::min(_rgb.size(), n * 3),
               _out.begin());
     return stats;
   }
-  stats.underwater = true;
 
   const auto &lin = SrgbTable();
   const double inf = std::numeric_limits<double>::infinity();
   std::vector<Rgb> img(n);
-  for (std::uint32_t v = 0; v < k.height; ++v)
+  // Two stages: the water, only under it; then the camera's own response,
+  // always, so its gain and noise do not switch off above the water, or
+  // when the renderer has drawn the water already.
+  stats.underwater = _water.cameraDepth > 0;
+  if (!stats.underwater)
+  {
+    for (std::size_t i = 0; i < n; ++i)
+    {
+      img[i].Set(lin[_rgb[3 * i]], lin[_rgb[3 * i + 1]],
+                 lin[_rgb[3 * i + 2]]);
+    }
+  }
+  for (std::uint32_t v = 0; stats.underwater && v < k.height; ++v)
   {
     for (std::uint32_t u = 0; u < k.width; ++u)
     {
@@ -191,14 +202,16 @@ FrameStats MakeUnderwater(const std::vector<std::uint8_t> &_rgb,
   {
     for (int c = 0; c < 3; ++c)
     {
-      double s = img[i][c] * gain * wb[c];
+      // The noise is the sensor's, on the light it caught: the gain and
+      // the white balance amplify it, as in a real camera.
+      double s = img[i][c];
       if (noisy)
       {
         const double var = _response.shotNoise * std::max(0.0, s) +
                            _response.readNoise * _response.readNoise;
         s += std::sqrt(var) * unit(_rng);
       }
-      _out[3 * i + c] = LinearToSrgb(s);
+      _out[3 * i + c] = LinearToSrgb(s * gain * wb[c]);
     }
   }
   return stats;
