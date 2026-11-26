@@ -227,53 +227,61 @@ TEST(CameraSampler, ExactOnASeabedAtGrazingAngles)
 }
 
 /////////////////////////////////////////////////
-// Two walls square to the camera, at 4 m and 8 m, meeting along a row of
-// pixels and sharing a label, as two parts of one model would. Across the
-// row the four pixels around a ray differ in v only, so 1/z has no twist
-// there; the step must still not be interpolated, or a ray would put an
-// echo in the empty water between the walls.
+// Walls square to the camera, near and far, meeting along rows of pixels
+// and sharing a label, as two parts of one model would. Across a row the
+// four pixels around a ray differ in v only, so 1/z has no twist there;
+// the step must still not be interpolated, or a ray would put an echo in
+// the empty water between the walls. The walls alternate row by row, so
+// every ray's four pixels straddle a step (a single step at the middle
+// row falls between two rays of the fan and tests nothing). At 4 m and 8 m,
+// and at 4 m and 4.4 m, a step of 10 %: more than the 2 % within which
+// depths are blended without the planarity test.
 TEST(CameraSampler, DoesNotBlendAStepAlongAPixelRow)
 {
   const sonar::SonarConfig c = sonar::EchoImaging();
   const sonar::CameraSampler sampler(c);
   const auto &l = sampler.Layout();
-  const float zNear = 4.0f, zFar = 8.0f;
-  const std::size_t size = static_cast<std::size_t>(l.width) * l.height;
-  std::vector<std::vector<float>> depth(l.yaws.size());
-  std::vector<std::vector<std::uint8_t>> labels(l.yaws.size(),
-    std::vector<std::uint8_t>(size, 1));
-  for (auto &d : depth)
+  for (const float zFar : {8.0f, 4.4f})
   {
-    d.resize(size);
-    for (unsigned int v = 0; v < l.height; ++v)
-      for (unsigned int u = 0; u < l.width; ++u)
-        d[v * l.width + u] = v < l.height / 2 ? zFar : zNear;
-  }
-  std::vector<const float *> dp;
-  std::vector<const std::uint8_t *> lp;
-  for (std::size_t i = 0; i < depth.size(); ++i)
-  {
-    dp.push_back(depth[i].data());
-    lp.push_back(labels[i].data());
-  }
-  const auto hits = sampler.Sample(dp, lp, 1, {Lambert(-20.0)});
+    const float zNear = 4.0f;
+    const std::size_t size = static_cast<std::size_t>(l.width) * l.height;
+    std::vector<std::vector<float>> depth(l.yaws.size());
+    std::vector<std::vector<std::uint8_t>> labels(l.yaws.size(),
+      std::vector<std::uint8_t>(size, 1));
+    for (auto &d : depth)
+    {
+      d.resize(size);
+      for (unsigned int v = 0; v < l.height; ++v)
+        for (unsigned int u = 0; u < l.width; ++u)
+          d[v * l.width + u] = v % 2 ? zFar : zNear;
+    }
+    std::vector<const float *> dp;
+    std::vector<const std::uint8_t *> lp;
+    for (std::size_t i = 0; i < depth.size(); ++i)
+    {
+      dp.push_back(depth[i].data());
+      lp.push_back(labels[i].data());
+    }
+    const auto hits = sampler.Sample(dp, lp, 1, {Lambert(-20.0)});
 
-  std::size_t between = 0, checked = 0;
-  for (const auto &h : hits)
-  {
-    ASSERT_TRUE(h.hit);
-    // Depth along the axis of the camera the ray falls in: the nearest one.
-    const auto d = h.ray.Direction();
-    double cosAxis = 0.0;
-    for (double yaw : l.yaws)
-      cosAxis = std::max(cosAxis, d.X() * std::cos(yaw) + d.Y() * std::sin(yaw));
-    const double z = h.range * cosAxis;
-    ++checked;
-    if (z > zNear + 1e-3 && z < zFar - 1e-3)
-      ++between;
+    std::size_t between = 0, checked = 0;
+    for (const auto &h : hits)
+    {
+      ASSERT_TRUE(h.hit);
+      // Depth along the axis of the camera the ray falls in: the nearest one.
+      const auto d = h.ray.Direction();
+      double cosAxis = 0.0;
+      for (double yaw : l.yaws)
+        cosAxis = std::max(cosAxis,
+          d.X() * std::cos(yaw) + d.Y() * std::sin(yaw));
+      const double z = h.range * cosAxis;
+      ++checked;
+      if (z > zNear + 1e-3 && z < zFar - 1e-3)
+        ++between;
+    }
+    EXPECT_GT(checked, 1000u);
+    EXPECT_EQ(between, 0u) << "far wall at " << zFar << " m";
   }
-  EXPECT_GT(checked, 1000u);
-  EXPECT_EQ(between, 0u);
 }
 
 /////////////////////////////////////////////////
@@ -332,4 +340,79 @@ TEST(CameraSampler, PoleOneRayWideBeforeAWallKeepsTheFallback)
       EXPECT_EQ(bad, 0u) << "wall " << wall << " label " << wallLabel;
     }
   }
+}
+
+/////////////////////////////////////////////////
+// A box face seen square on, with the box's top seen at a grazing angle
+// above it. A ray on the face just under the edge has a neighbor on the
+// face and one on the top, both the same surface by the jump between them;
+// the one-sided difference with the smaller jump is the one on the face,
+// so the face keeps its own normal up to its edge, within the few degrees
+// a millimeter's misread of range at the edge costs; the top's normal is
+// over 80 degrees away.
+TEST(CameraSampler, NormalOnAFaceStaysOnTheFaceAtItsEdge)
+{
+  sonar::SonarConfig c = sonar::EchoImaging();
+  c.rangeMax = 10.0;
+  const sonar::CameraSampler sampler(c);
+  sonar::SyntheticScene scene;
+  scene.AddBox({4.0, -0.5, 0.0}, {5.0, 0.5, 0.5}, Lambert(-15.0), 2);
+  const Pose3d pose(0, 0, 1, 0, 0, 0);
+  const auto sampled = DrawAndSample(sampler, scene, pose,
+    {Lambert(-20.0), Lambert(-20.0), Lambert(-15.0)});
+  const auto truth = scene.Cast(pose, sampler.Rays(),
+    sampler.Layout().farClip);
+  std::size_t face = 0, miss = 0;
+  for (std::size_t n = 0; n < truth.size(); ++n)
+  {
+    // On the face, away from its side edges.
+    if (!truth[n].hit || !sampled[n].hit || truth[n].incidence > 30.0 * kDeg ||
+        std::abs(truth[n].ray.azimuth) > 0.1)
+    {
+      continue;
+    }
+    ++face;
+    if (std::abs(sampled[n].incidence - truth[n].incidence) > 5.0 * kDeg)
+      ++miss;
+  }
+  std::printf("%zu rays on the face, %zu with the wrong normal\n", face, miss);
+  EXPECT_GT(face, 500u);
+  EXPECT_EQ(miss, 0u);
+}
+
+/////////////////////////////////////////////////
+// The sampler reads hits past the end of the range window, to half as far
+// again: a sonar that assumes too slow a sound speed reads them inside it.
+// Every hit carries the footprint its neighbors give it.
+TEST(CameraSampler, HitsPastTheWindowAndFootprints)
+{
+  const sonar::SonarConfig c = sonar::EchoImaging();
+  const sonar::CameraSampler sampler(c);
+  sonar::SyntheticScene scene;
+  scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), 1);
+  const Pose3d pose(0, 0, 2, 0, 0, 0);
+  const auto sampled = DrawAndSample(sampler, scene, pose,
+    {Lambert(-20.0), Lambert(-27.0)});
+  const auto truth = scene.Cast(pose, sampler.Rays(),
+    sampler.Layout().farClip);
+  std::size_t past = 0, inside = 0, withFootprint = 0;
+  for (std::size_t n = 0; n < truth.size(); ++n)
+  {
+    if (!truth[n].hit)
+      continue;
+    if (truth[n].range > c.rangeMax && truth[n].range < 1.4 * c.rangeMax)
+    {
+      ++past;
+      EXPECT_TRUE(sampled[n].hit) << "range " << truth[n].range;
+    }
+    else if (truth[n].range < c.rangeMax)
+    {
+      ++inside;
+      if (sampled[n].footprint > 0.0)
+        ++withFootprint;
+    }
+  }
+  EXPECT_GT(past, 1000u);
+  EXPECT_GT(inside, 10000u);
+  EXPECT_GT(static_cast<double>(withFootprint) / inside, 0.99);
 }

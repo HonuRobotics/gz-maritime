@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
+#include <limits>
 #include <memory>
 #include <numeric>
 #include <thread>
@@ -32,6 +33,7 @@
 
 #include "gz/maritime/sonar/Config.hh"
 #include "gz/maritime/sonar/Engine.hh"
+#include "gz/maritime/sonar/Random.hh"
 #include "gz/maritime/sonar/Rays.hh"
 #include "gz/maritime/sonar/Readout.hh"
 #include "gz/maritime/sonar/SyntheticScene.hh"
@@ -746,4 +748,652 @@ TEST(Rays, SeabedAtGrazingAnglesIsOneSurface)
   }
   EXPECT_GT(pairs, 10000u);
   EXPECT_EQ(split, 0u);
+}
+
+namespace
+{
+/// \brief One ray straight ahead, hitting a Lambert patch head on: the
+/// sonar equation can be worked by hand for it.
+sonar::RayHit OneHit(double _range)
+{
+  sonar::RayHit h;
+  h.hit = true;
+  h.range = _range;
+  h.ray.solidAngle = 1e-4;
+  h.ray.spacing = 0.01;
+  h.properties = Lambert(-20.0);
+  h.label = 1;
+  return h;
+}
+
+double Total(const sonar::BeamIntensity &_b)
+{
+  return std::accumulate(_b.data.begin(), _b.data.end(), 0.0);
+}
+
+/// \brief The samples a beam's echo covers, first to last.
+std::pair<std::size_t, std::size_t> Extent(const sonar::BeamIntensity &_b,
+  std::size_t _beam)
+{
+  std::size_t first = _b.samples, last = 0;
+  for (std::size_t k = 0; k < _b.samples; ++k)
+  {
+    if (_b.At(_beam, k) > 0.0)
+    {
+      first = std::min(first, k);
+      last = k;
+    }
+  }
+  return {first, last};
+}
+}  // namespace
+
+/////////////////////////////////////////////////
+// The sonar equation for one ray, term by term against the hand value:
+// the echo of a patch filling a fixed solid angle falls as 1 / R^2 and
+// two-way absorption, rises with the solid angle and the Lambert strength,
+// goes as mu cos^2 over cos with incidence (the patch's area grows as
+// 1 / cos), and the vertical pattern takes 3 dB off at the edge of the
+// vertical field of view and 12 dB at twice that.
+TEST(Engine, SonarEquationForOneRay)
+{
+  sonar::SonarConfig c = CleanEcho();
+  const sonar::Engine engine(c, HarborWater());
+  const double alpha = engine.Absorption();
+  auto total = [&](const sonar::RayHit &_h) {
+    return Total(engine.Ping({_h}, 0));
+  };
+  const double ref = total(OneHit(2.0));
+  ASSERT_GT(ref, 0.0);
+
+  EXPECT_NEAR(10.0 * std::log10(ref / total(OneHit(6.0))),
+    20.0 * std::log10(3.0) + 2.0 * alpha * 4.0, 1e-6);
+
+  sonar::RayHit h = OneHit(2.0);
+  h.ray.solidAngle = 2e-4;
+  EXPECT_NEAR(total(h) / ref, 2.0, 1e-9);
+
+  h = OneHit(2.0);
+  h.properties = Lambert(-10.0);
+  EXPECT_NEAR(total(h) / ref, 10.0, 1e-9);
+
+  h = OneHit(2.0);
+  h.incidence = 75.0 * kDeg;
+  EXPECT_NEAR(total(h) / ref, std::cos(75.0 * kDeg), 1e-9);
+
+  h = OneHit(2.0);
+  h.ray.elevation = 0.5 * c.verticalFov;
+  EXPECT_NEAR(total(h) / ref, 0.5, 1e-9);
+  h.ray.elevation = -c.verticalFov;
+  EXPECT_NEAR(total(h) / ref, 1.0 / 16.0, 1e-9);
+  // Five half-widths out, 75 dB down: below the -50 dB floor, dropped.
+  h.ray.elevation = 2.5 * c.verticalFov;
+  EXPECT_EQ(total(h), 0.0);
+}
+
+/////////////////////////////////////////////////
+// Sample k covers [rangeMin + k dr, rangeMin + (k + 1) dr) and is
+// published at its center: an echo 0.3 samples past a center is brightest
+// in that sample, and its published range is 0.3 samples short.
+TEST(Engine, EchoInTheSampleThatHoldsItsRange)
+{
+  const sonar::SonarConfig c = CleanEcho();
+  const double dr = c.SampleSpacing();
+  const sonar::Engine engine(c, HarborWater());
+  for (std::size_t k : {std::size_t{0}, std::size_t{100}, c.samples - 1})
+  {
+    const double r = c.rangeMin + (static_cast<double>(k) + 0.8) * dr;
+    const auto b = engine.Ping({OneHit(r)}, 0);
+    const auto [beam, sample] = Brightest(b);
+    (void)beam;
+    EXPECT_EQ(sample, k);
+    EXPECT_NEAR(b.ranges[sample], r - 0.3 * dr, 1e-9);
+  }
+}
+
+/////////////////////////////////////////////////
+// The range window is [rangeMin, rangeMax) in apparent range: an echo
+// outside it is dropped whole, even where a long pulse would smear it
+// across the edge, and an echo just inside is kept. With a mis-set sound
+// speed the window is applied to the range the sonar thinks it sees.
+TEST(Engine, RangeWindowIsHalfOpen)
+{
+  sonar::SonarConfig c = CleanEcho();
+  c.pulseLength = 1e-4;
+  auto total = [&](double _range) {
+    const sonar::Engine engine(c, HarborWater());
+    return Total(engine.Ping({OneHit(_range)}, 0));
+  };
+  EXPECT_EQ(total(c.rangeMax), 0.0);
+  EXPECT_EQ(total(c.rangeMax + 0.01), 0.0);
+  EXPECT_EQ(total(c.rangeMin - 0.01), 0.0);
+  EXPECT_GT(total(c.rangeMax - 0.05), 0.0);
+  EXPECT_GT(total(c.rangeMin + 0.05), 0.0);
+
+  // Assumed 1450 m/s in 1500 m/s water: 10.2 m reads as 9.86 m.
+  c.soundSpeed = 1450.0;
+  EXPECT_GT(total(10.2), 0.0);
+  EXPECT_EQ(total(10.4), 0.0);
+}
+
+/////////////////////////////////////////////////
+// An echo spreads uniformly over the wider of the pulse (c tau / 2) and its
+// footprint in range, given by the sampler or estimated from the incidence
+// and capped at 8 samples; spreading moves energy between samples but
+// never changes the total.
+TEST(Engine, PulseAndFootprintSpreadTheEcho)
+{
+  sonar::SonarConfig c = CleanEcho();
+  const double dr = c.SampleSpacing();
+  const std::size_t beam = c.beams / 2;
+  auto ping = [&](const sonar::RayHit &_h) {
+    const sonar::Engine engine(c, HarborWater());
+    return engine.Ping({_h}, 0);
+  };
+  auto span = [&](const sonar::BeamIntensity &_b) {
+    const auto [first, last] = Extent(_b, beam);
+    return static_cast<double>(last - first + 1) * dr;
+  };
+
+  // A 7.5 mm pulse is under a sample: one or two samples.
+  const auto shortPulse = ping(OneHit(5.0));
+  EXPECT_LE(span(shortPulse), 2.0 * dr);
+
+  // A 75 mm pulse.
+  c.pulseLength = 1e-4;
+  const auto longPulse = ping(OneHit(5.0));
+  EXPECT_GE(span(longPulse), 0.075);
+  EXPECT_LE(span(longPulse), 0.075 + 2.0 * dr);
+  EXPECT_NEAR(Total(longPulse) / Total(shortPulse), 1.0, 1e-9);
+
+  // A 0.3 m footprint from the sampler, wider than the pulse.
+  sonar::RayHit h = OneHit(5.0);
+  h.footprint = 0.3;
+  const auto wide = ping(h);
+  EXPECT_GE(span(wide), 0.3);
+  EXPECT_LE(span(wide), 0.3 + 2.0 * dr);
+  EXPECT_NEAR(Total(wide) / Total(shortPulse), 1.0, 1e-9);
+
+  // No footprint given, near grazing: estimated, and capped at 8 samples.
+  c.pulseLength = 1e-5;
+  h = OneHit(5.0);
+  h.incidence = 85.0 * kDeg;
+  h.ray.spacing = 0.05;
+  const auto capped = ping(h);
+  EXPECT_GE(span(capped), 8.0 * dr);
+  EXPECT_LE(span(capped), 10.0 * dr);
+}
+
+/////////////////////////////////////////////////
+// One ray off to the side: across every beam, the echo follows the
+// horizontal pattern down to its -50 dB floor, sidelobes included, and is
+// zero beyond it.
+TEST(Engine, BeamProfileFollowsThePatternToTheFloor)
+{
+  const sonar::SonarConfig c = CleanEcho();
+  // A ray of the fan, so its azimuth is the center of one of the engine's
+  // azimuth columns.
+  const auto rays = sonar::RayFan(c);
+  double az = rays[0].azimuth;
+  for (const auto &r : rays)
+    if (std::abs(r.azimuth - 0.2) < std::abs(az - 0.2))
+      az = r.azimuth;
+  sonar::RayHit h = OneHit(5.0);
+  h.ray.azimuth = az;
+  const sonar::Engine engine(c, HarborWater());
+  const auto b = engine.Ping({h}, 0);
+
+  std::vector<double> profile(c.beams, 0.0);
+  for (std::size_t j = 0; j < c.beams; ++j)
+    for (std::size_t k = 0; k < c.samples; ++k)
+      profile[j] += b.At(j, k);
+  std::size_t j0 = 0;
+  for (std::size_t j = 0; j < c.beams; ++j)
+    if (profile[j] > profile[j0])
+      j0 = j;
+  const double w0 = sonar::HorizontalPattern(c, az - c.BeamAzimuth(j0));
+  std::size_t sidelobes = 0;
+  for (std::size_t j = 0; j < c.beams; ++j)
+  {
+    const double w = sonar::HorizontalPattern(c, az - c.BeamAzimuth(j));
+    if (w > 2e-5)
+    {
+      EXPECT_NEAR(profile[j] / profile[j0], w / w0, 1e-9 * w / w0)
+        << "beam " << j;
+      if (w < 1e-3)
+        ++sidelobes;
+    }
+    else if (w < 0.5e-5)
+    {
+      EXPECT_EQ(profile[j], 0.0) << "beam " << j;
+    }
+  }
+  EXPECT_GT(sidelobes, 10u);
+}
+
+/////////////////////////////////////////////////
+// Without speckle the noise is still drawn: exponential, mean and standard
+// deviation both the noise floor.
+TEST(Readout, NoiseWithoutSpeckleIsExponential)
+{
+  sonar::SonarConfig c = CleanEcho();
+  c.tvg = sonar::Tvg::kNone;
+  c.gainDb = 0.0;
+  c.noiseFloorDb = -100.0;
+  const auto l = sonar::ReadLevels(Flat(c, 0.0), c, 0.0, 0);
+  const auto [mean, std] = MeanStd(Powers(l, -100.0));
+  EXPECT_NEAR(mean, 1.0, 0.02);
+  EXPECT_NEAR(std, 1.0, 0.03);
+}
+
+/////////////////////////////////////////////////
+// The time-varied gain by hand: the spreading law in dB per decade, plus
+// two-way absorption when asked for.
+TEST(Readout, TimeVariedGainByHand)
+{
+  sonar::SonarConfig c = CleanEcho();
+  c.tvg = sonar::Tvg::kNone;
+  EXPECT_DOUBLE_EQ(sonar::TimeVariedGain(c, 0.2, 10.0), 0.0);
+  c.tvg = sonar::Tvg::kSpreading;
+  EXPECT_NEAR(sonar::TimeVariedGain(c, 0.2, 10.0), 30.0, 1e-12);
+  c.tvg = sonar::Tvg::kSpreadingAbsorption;
+  EXPECT_NEAR(sonar::TimeVariedGain(c, 0.2, 10.0), 34.0, 1e-12);
+  c.tvgSpreading = 40.0;
+  EXPECT_NEAR(sonar::TimeVariedGain(c, 0.05, 100.0), 90.0, 1e-12);
+}
+
+/////////////////////////////////////////////////
+// A ray's echo falls as 20 log R plus two-way absorption, so a time-varied
+// gain of 20 log R + 2 alpha R brings it to the same published level at
+// any range. One-way absorption in the gain would leave about 1 dB between
+// 3 m and 8 m at 700 kHz.
+TEST(Readout, TvgFlattensOneRay)
+{
+  sonar::SonarConfig c = CleanEcho();
+  c.tvg = sonar::Tvg::kSpreadingAbsorption;
+  c.tvgSpreading = 20.0;
+  c.gainDb = 0.0;
+  const sonar::Engine engine(c, HarborWater());
+  ASSERT_GT(engine.Absorption() * 5.0, 1.0);
+  auto published = [&](double _range) {
+    const auto l = sonar::ReadLevels(engine.Ping({OneHit(_range)}, 0), c,
+      engine.Absorption(), 0);
+    double sum = 0.0;
+    for (double d : l.db)
+      sum += std::pow(10.0, d / 10.0);
+    return 10.0 * std::log10(sum);
+  };
+  EXPECT_NEAR(published(3.0), published(8.0), 0.1);
+}
+
+/////////////////////////////////////////////////
+// Automatic gain by hand. A uniform frame: the median goes to -24 dB.
+// Unlit cells do not count. A sparse frame, where more than 0.1 % of the
+// lit cells are a strong target: the cap puts the target at full scale.
+// With a tracker, the gain moves part of the way per ping.
+TEST(Readout, AutomaticGainByHand)
+{
+  sonar::SonarConfig c = CleanEcho();
+  c.tvg = sonar::Tvg::kNone;
+  c.gainDb.reset();
+  auto flat = Flat(c, 1e-6);
+  EXPECT_NEAR(sonar::ReadLevels(flat, c, 0.0, 0).gainDb, 36.0, 1e-9);
+
+  auto half = flat;
+  for (std::size_t i = 0; i < half.data.size(); i += 2)
+    half.data[i] = 0.0;
+  EXPECT_NEAR(sonar::ReadLevels(half, c, 0.0, 0).gainDb, 36.0, 1e-9);
+
+  auto sparse = flat;
+  for (std::size_t i = 0; i < sparse.data.size(); i += 100)
+    sparse.data[i] = 1e-2;
+  EXPECT_NEAR(sonar::ReadLevels(sparse, c, 0.0, 0).gainDb, 20.0, 1e-9);
+
+  // Speckled, the median of the echoes is that of an exponential, ln 2:
+  // 1.6 dB below the mean. Unlit cells still do not count.
+  sonar::SonarConfig speckled = c;
+  speckled.speckle = true;
+  const double lnTwoDb = 10.0 * std::log10(std::log(2.0));
+  EXPECT_NEAR(sonar::ReadLevels(flat, speckled, 0.0, 0).gainDb,
+    36.0 - lnTwoDb, 0.05);
+  EXPECT_NEAR(sonar::ReadLevels(half, speckled, 0.0, 0).gainDb,
+    36.0 - lnTwoDb, 0.05);
+
+  c.gainTimeConstant = 1.0;
+  sonar::GainTracker t;
+  EXPECT_NEAR(sonar::ReadLevels(flat, c, 0.0, 0, &t, 0.1).gainDb, 36.0, 1e-9);
+  EXPECT_NEAR(sonar::ReadLevels(Flat(c, 1e-4), c, 0.0, 1, &t, 0.1).gainDb,
+    36.0 - 20.0 * (1.0 - std::exp(-0.1)), 1e-9);
+}
+
+namespace
+{
+/// \brief Profiler levels by hand: noise everywhere, no gain, and in each
+/// beam one sample _snr dB above the noise at the given range.
+sonar::Levels ProfilerLevels(const sonar::SonarConfig &_config,
+  const std::vector<double> &_range, const std::vector<double> &_snr)
+{
+  sonar::Levels l;
+  l.beams = _range.size();
+  l.samples = _config.samples;
+  for (std::size_t k = 0; k < l.samples; ++k)
+    l.ranges.push_back(_config.SampleRange(k));
+  for (std::size_t j = 0; j < l.beams; ++j)
+    l.azimuths.push_back(-0.5 + static_cast<double>(j) /
+      static_cast<double>(l.beams));
+  l.tvgDb.assign(l.samples, 0.0);
+  l.gainDb = 0.0;
+  l.db.assign(l.beams * l.samples, _config.noiseFloorDb);
+  const double dr = _config.SampleSpacing();
+  for (std::size_t j = 0; j < l.beams; ++j)
+  {
+    const auto k = static_cast<std::size_t>(
+      (_range[j] - _config.rangeMin) / dr);
+    l.db[j * l.samples + k] = _config.noiseFloorDb + _snr[j];
+  }
+  return l;
+}
+
+std::pair<double, double> RangeStats(const sonar::SonarConfig &_config,
+  double _snr)
+{
+  const std::size_t beams = 100;
+  const sonar::Levels l = ProfilerLevels(_config,
+    std::vector<double>(beams, 10.0), std::vector<double>(beams, _snr));
+  const std::size_t k = static_cast<std::size_t>(
+    (10.0 - _config.rangeMin) / _config.SampleSpacing());
+  std::vector<double> err;
+  for (std::uint64_t ping = 0; ping < 50; ++ping)
+    for (const auto &s : sonar::ReadProfiling(l, _config, 1500.0, ping))
+      err.push_back(s.range - l.ranges[k]);
+  double mean = 0.0;
+  for (double e : err)
+    mean += e / static_cast<double>(err.size());
+  double var = 0.0;
+  for (double e : err)
+    var += (e - mean) * (e - mean) / static_cast<double>(err.size());
+  return {mean, std::sqrt(var)};
+}
+}  // namespace
+
+/////////////////////////////////////////////////
+// The detection threshold is a level above the noise: 13 dB does not pass
+// 15, 16 does.
+TEST(Readout, ProfilingThreshold)
+{
+  sonar::SonarConfig c = sonar::SurveyorProfiling();
+  c.detection = sonar::ProfilingDetection::kBeamformed;
+  ASSERT_DOUBLE_EQ(c.detectionThresholdDb, 15.0);
+  const std::vector<double> ranges(40, 10.0);
+  EXPECT_TRUE(sonar::ReadProfiling(ProfilerLevels(c, ranges,
+    std::vector<double>(40, 13.0)), c, 1500.0, 0).empty());
+  EXPECT_EQ(sonar::ReadProfiling(ProfilerLevels(c, ranges,
+    std::vector<double>(40, 16.0)), c, 1500.0, 0).size(), 40u);
+}
+
+/////////////////////////////////////////////////
+// Range noise: unbiased, rangeNoise at high signal-to-noise and twice that
+// at the threshold, sigma = rangeNoise (1 + 10^(-margin / 20)); half a
+// sample by default.
+TEST(Readout, ProfilingRangeNoise)
+{
+  sonar::SonarConfig c = sonar::SurveyorProfiling();
+  c.detection = sonar::ProfilingDetection::kBeamformed;
+  c.rangeNoise = 0.02;
+  const auto [mean, high] = RangeStats(c, 60.0);
+  EXPECT_NEAR(mean, 0.0, 0.002);
+  EXPECT_NEAR(high, 0.02 * (1.0 + std::pow(10.0, -45.0 / 20.0)), 0.001);
+  const auto [mean2, low] = RangeStats(c, 15.5);
+  (void)mean2;
+  EXPECT_NEAR(low, 0.02 * (1.0 + std::pow(10.0, -0.5 / 20.0)), 0.002);
+
+  c.rangeNoise.reset();
+  const auto [mean3, half] = RangeStats(c, 60.0);
+  (void)mean3;
+  EXPECT_NEAR(half, 0.5 * c.SampleSpacing(), 0.05 * c.SampleSpacing());
+}
+
+/////////////////////////////////////////////////
+// Beamformed soundings far from the median of their neighbors are flagged,
+// at the edge of the fan as in the middle, and no others.
+TEST(Readout, OutlierFilterFlagsTheOddSounding)
+{
+  sonar::SonarConfig c = sonar::SurveyorProfiling();
+  c.detection = sonar::ProfilingDetection::kBeamformed;
+  c.rangeNoise = 1e-6;
+  std::vector<double> ranges(20, 10.0);
+  ranges[0] = 11.0;
+  ranges[10] = 11.0;
+  const auto s = sonar::ReadProfiling(ProfilerLevels(c, ranges,
+    std::vector<double>(20, 40.0)), c, 1500.0, 0);
+  ASSERT_EQ(s.size(), 20u);
+  for (std::size_t j = 0; j < s.size(); ++j)
+  {
+    EXPECT_EQ(s[j].flag, (j == 0 || j == 10) ? sonar::SoundingFlag::kBadFilter :
+      sonar::SoundingFlag::kOk) << "beam " << j;
+  }
+}
+
+/////////////////////////////////////////////////
+// Angle of arrival: each sector reports its strongest echo, at that beam's
+// angle plus angle noise of the configured standard deviation.
+TEST(Readout, AngleOfArrivalTakesEachSectorsStrongest)
+{
+  sonar::SonarConfig c = sonar::SurveyorProfiling();
+  c.detection = sonar::ProfilingDetection::kAngleOfArrival;
+  c.maxSoundings = 2;
+  c.angleNoise = 0.0;
+  std::vector<double> snr(20, 0.0);
+  snr[3] = 30.0;
+  snr[7] = 40.0;
+  snr[15] = 20.0;
+  const auto l = ProfilerLevels(c, std::vector<double>(20, 10.0), snr);
+  const auto s = sonar::ReadProfiling(l, c, 1500.0, 0);
+  ASSERT_EQ(s.size(), 2u);
+  EXPECT_DOUBLE_EQ(s[0].angle, l.azimuths[7]);
+  EXPECT_DOUBLE_EQ(s[1].angle, l.azimuths[15]);
+
+  c.angleNoise = 0.01;
+  std::vector<double> err;
+  for (std::uint64_t ping = 0; ping < 2000; ++ping)
+    for (const auto &x : sonar::ReadProfiling(l, c, 1500.0, ping))
+      err.push_back(x.angle - (x.angle < 0.0 ? l.azimuths[7] : l.azimuths[15]));
+  double var = 0.0;
+  for (double e : err)
+    var += e * e / static_cast<double>(err.size());
+  EXPECT_NEAR(std::sqrt(var), 0.01, 0.0005);
+}
+
+/////////////////////////////////////////////////
+// Every draw depends on the seed, the ping and the stream; the normal draw
+// is standard.
+TEST(Random, SeedPingAndStreamAllMatter)
+{
+  const double base = sonar::Random(1, 0, 0).Uniform();
+  EXPECT_NE(sonar::Random(2, 0, 0).Uniform(), base);
+  EXPECT_NE(sonar::Random(1, 1, 0).Uniform(), base);
+  EXPECT_NE(sonar::Random(1, 0, 1).Uniform(), base);
+  EXPECT_EQ(sonar::Random(1, 0, 0).Uniform(), base);
+
+  sonar::Random rng(5, 6, 7);
+  const int n = 200000;
+  double sum = 0.0, sum2 = 0.0;
+  for (int i = 0; i < n; ++i)
+  {
+    const double x = rng.Normal();
+    sum += x;
+    sum2 += x * x;
+  }
+  EXPECT_NEAR(sum / n, 0.0, 0.01);
+  EXPECT_NEAR(std::sqrt(sum2 / n), 1.0, 0.01);
+}
+
+/////////////////////////////////////////////////
+// The seed changes the speckle of a frame.
+TEST(Readout, SeedChangesTheSpeckle)
+{
+  sonar::SonarConfig c = CleanEcho();
+  c.speckle = true;
+  auto frame = [&](std::uint64_t _seed) {
+    c.seed = _seed;
+    return sonar::ReadLevels(Flat(c, 1e-6), c, 0.0, 3).db;
+  };
+  EXPECT_EQ(frame(1), frame(1));
+  EXPECT_NE(frame(1), frame(2));
+}
+
+/////////////////////////////////////////////////
+// Francois and Garrison, worked by hand from the paper's equations, where
+// one term dominates. In fresh water only pure-water viscosity is left,
+// A3 P3 f^2; the paper fits A3 with one polynomial up to 20 C and another
+// above, which meet at 20 C, and it falls with temperature. At the worlds'
+// harbor water (29 C, 30 PSU) the totals at the three presets'
+// frequencies. At 1 kHz, boric acid.
+TEST(Water, AbsorptionTermByTerm)
+{
+  sonar::Water w;
+  w.salinity = 0.0;
+  // dB/km at 1 MHz, fresh water: 1e6 kHz^2 times A3.
+  w.temperature = 10.0;
+  EXPECT_NEAR(sonar::AbsorptionDbPerMeter(1e6, w) * 1000.0, 310.8, 0.5);
+  w.temperature = 29.0;
+  EXPECT_NEAR(sonar::AbsorptionDbPerMeter(1e6, w) * 1000.0, 170.15, 0.3);
+  // Proportional to f^2.
+  EXPECT_NEAR(sonar::AbsorptionDbPerMeter(2e6, w) /
+    sonar::AbsorptionDbPerMeter(1e6, w), 4.0, 1e-9);
+  // The pressure correction P3 at 1000 m: 1 - 3.83e-2 + 4.9e-4.
+  sonar::Water deep = w;
+  deep.depth = 1000.0;
+  EXPECT_NEAR(sonar::AbsorptionDbPerMeter(1e6, deep) /
+    sonar::AbsorptionDbPerMeter(1e6, w), 0.96219, 1e-5);
+  // The two polynomials meet at 20 C.
+  sonar::Water below = w, above = w;
+  below.temperature = 20.0 - 1e-6;
+  above.temperature = 20.0 + 1e-6;
+  EXPECT_NEAR(sonar::AbsorptionDbPerMeter(1e6, above) /
+    sonar::AbsorptionDbPerMeter(1e6, below), 1.0, 1e-3);
+  double last = std::numeric_limits<double>::infinity();
+  for (double t = 0.0; t <= 35.0; t += 1.0)
+  {
+    w.temperature = t;
+    const double a = sonar::AbsorptionDbPerMeter(1e6, w);
+    EXPECT_LT(a, last) << t << " C";
+    last = a;
+  }
+
+  // The harbor: magnesium sulfate and pure water, dB/km.
+  const sonar::Water harbor = HarborWater();
+  EXPECT_NEAR(sonar::AbsorptionDbPerMeter(240e3, harbor) * 1000.0, 95.76, 0.3);
+  EXPECT_NEAR(sonar::AbsorptionDbPerMeter(450e3, harbor) * 1000.0, 159.66, 0.5);
+  EXPECT_NEAR(sonar::AbsorptionDbPerMeter(700e3, harbor) * 1000.0, 223.51, 0.7);
+  sonar::Water harborDeep = harbor;
+  harborDeep.depth = 1000.0;
+  EXPECT_NEAR(sonar::AbsorptionDbPerMeter(700e3, harborDeep) * 1000.0, 200.75,
+    0.6);
+
+  // 1 kHz, 10 C, 35 PSU: boric acid 0.0515 of 0.0601 dB/km.
+  sonar::Water sea;
+  sea.temperature = 10.0;
+  sea.salinity = 35.0;
+  EXPECT_NEAR(sonar::AbsorptionDbPerMeter(1e3, sea) * 1000.0, 0.06013, 0.0005);
+  // 300 Hz, 30 PSU, below the boric relaxation (1.03 kHz here), so it
+  // scales with its frequency: boric acid 0.00836 of 0.00902 dB/km.
+  sea.salinity = 30.0;
+  EXPECT_NEAR(sonar::AbsorptionDbPerMeter(300.0, sea) * 1000.0, 0.009021,
+    0.00015);
+}
+
+/////////////////////////////////////////////////
+// The fan reaches elevationSpan half-widths of the vertical beam, with
+// elevationRays rays per two half-widths; each ray stands for its share of
+// solid angle and is spaced by the coarser of its two steps.
+TEST(Rays, FanGeometry)
+{
+  const sonar::SonarConfig c = sonar::EchoImaging();
+  const auto rays = sonar::RayFan(c);
+  const std::size_t ne = sonar::RayFanElevationCount(c);
+  EXPECT_EQ(ne, 96u);
+  const double elStep = rays[1].elevation - rays[0].elevation;
+  const double azStep = rays[ne].azimuth - rays[0].azimuth;
+  EXPECT_NEAR(rays[ne - 1].elevation + 0.5 * elStep,
+    0.5 * c.verticalFov * c.elevationSpan, 1e-12);
+  EXPECT_NEAR(rays[0].elevation - 0.5 * elStep,
+    -0.5 * c.verticalFov * c.elevationSpan, 1e-12);
+  for (std::size_t n : {std::size_t{0}, ne / 2, ne - 1})
+  {
+    EXPECT_NEAR(rays[n].solidAngle,
+      azStep * elStep * std::cos(rays[n].elevation), 1e-15);
+    EXPECT_NEAR(rays[n].spacing, std::max(azStep, elStep), 1e-15);
+  }
+}
+
+/////////////////////////////////////////////////
+// Neighbors are one surface when they share a label and their ranges are
+// within what a surface at kMaxSlant gives; the footprint is half the
+// range between the two neighbors on the surface, the larger over the two
+// directions of the grid.
+TEST(Rays, SameSurfaceAndFootprint)
+{
+  sonar::RayHit a = OneHit(5.0);
+  sonar::RayHit b = OneHit(5.0);
+  EXPECT_TRUE(sonar::SameSurface(a, b));
+  b.label = 2;
+  EXPECT_FALSE(sonar::SameSurface(a, b));
+  b.label = 1;
+  const double bound = 5.0 * a.ray.spacing * sonar::kMaxSlant;
+  b.range = 5.0 + 0.9 * bound;
+  EXPECT_TRUE(sonar::SameSurface(a, b));
+  b.range = 5.0 + 1.1 * bound;
+  EXPECT_FALSE(sonar::SameSurface(a, b));
+
+  // Three columns of three, range rising 1 cm a ray in elevation, the same
+  // across azimuth.
+  std::vector<sonar::RayHit> hits;
+  for (int i = 0; i < 3; ++i)
+    for (int k = 0; k < 3; ++k)
+      hits.push_back(OneHit(5.0 + 0.01 * k));
+  sonar::AssignFootprints(hits, 3);
+  EXPECT_NEAR(hits[4].footprint, 0.01, 1e-12);
+  EXPECT_NEAR(hits[3].footprint, 0.01, 1e-12);
+}
+
+/////////////////////////////////////////////////
+// Each cell takes the label of its strongest contribution: two targets at
+// one range, three beams apart, each label wins in its own beams, whichever
+// way the beams are gathered.
+TEST(Engine, LabelOfTheStrongestContribution)
+{
+  const sonar::SonarConfig c = CleanEcho();
+  const auto rays = sonar::RayFan(c);
+  auto nearest = [&](double _az) {
+    double best = rays[0].azimuth;
+    for (const auto &r : rays)
+      if (std::abs(r.azimuth - _az) < std::abs(best - _az))
+        best = r.azimuth;
+    return best;
+  };
+  const std::size_t ja = 120, jb = 123;
+  sonar::RayHit a = OneHit(5.0);
+  a.ray.azimuth = nearest(c.BeamAzimuth(ja));
+  a.label = 1;
+  sonar::RayHit b = OneHit(5.0);
+  b.ray.azimuth = nearest(c.BeamAzimuth(jb));
+  b.label = 2;
+  const sonar::Engine engine(c, HarborWater());
+  for (const auto &hits : {std::vector<sonar::RayHit>{a, b},
+                           std::vector<sonar::RayHit>{b, a}})
+  {
+    const auto out = engine.Ping(hits, 0);
+    for (std::size_t j : {ja - 1, ja, ja + 1, jb - 1, jb, jb + 1})
+    {
+      const auto [first, last] = Extent(out, j);
+      ASSERT_LE(first, last);
+      for (std::size_t k = first; k <= last; ++k)
+      {
+        if (out.At(j, k) > 0.0)
+          EXPECT_EQ(out.labels[j * out.samples + k], j < ja + 2 ? 1u : 2u)
+            << "beam " << j;
+      }
+    }
+  }
 }
