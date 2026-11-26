@@ -43,19 +43,6 @@ using namespace maritime;
 
 namespace
 {
-  /// \brief The per-channel tags, and the spec member each sets.
-  struct VectorTag
-  {
-    const char *name;
-    std::optional<water_optics::Rgb> water_optics::WaterOpticsSpec::*member;
-  };
-  const VectorTag kVectorTags[] = {
-      {"attenuation", &water_optics::WaterOpticsSpec::attenuation},
-      {"backscatter", &water_optics::WaterOpticsSpec::backscatter},
-      {"veil", &water_optics::WaterOpticsSpec::veil},
-      {"diffuse_attenuation",
-       &water_optics::WaterOpticsSpec::diffuseAttenuation}};
-
   /// \brief Three numbers from text.
   std::optional<water_optics::Rgb> ParseRgb(const std::string &_text)
   {
@@ -120,11 +107,16 @@ class gz::sim::maritime::WaterOpticsPrivate
   /// \brief The spec as the world file set it, for a reset.
   public: water_optics::WaterOpticsSpec initialSpec;
 
+  /// \brief Whether the world file's spec was valid: if not, a reset goes
+  /// back to clear water.
+  public: bool initialValid{false};
+
   /// \brief The resolved optics.
   public: water_optics::WaterOpticsData optics;
 
-  /// \brief Whether the world file's spec was valid. If not, the world has
-  /// no water optics (clear water) and the topic is not offered.
+  /// \brief Whether the world has water optics. Not until a valid spec
+  /// came, from the world file or, after a bad one, the topic: until then
+  /// the world has clear water.
   public: bool valid{false};
 
   /// \brief The world entity.
@@ -142,12 +134,14 @@ class gz::sim::maritime::WaterOpticsPrivate
   /// \brief Ground truth publisher.
   public: transport::Node::Publisher pub;
 
-  /// \brief Ground truth period, simulation time.
-  public: std::chrono::steady_clock::duration publishPeriod{
+  /// \brief Ground truth period, wall time, so it keeps coming while the
+  /// world is paused; none to publish only on a change.
+  public: std::optional<std::chrono::steady_clock::duration> publishPeriod{
       std::chrono::seconds(1)};
 
-  /// \brief Simulation time of the last publication.
-  public: std::optional<std::chrono::steady_clock::duration> lastPublish;
+  /// \brief Wall time of the last publication; none to publish at the
+  /// next step, e.g. after a change.
+  public: std::optional<std::chrono::steady_clock::time_point> lastPublish;
 };
 
 //////////////////////////////////////////////////
@@ -175,12 +169,16 @@ bool WaterOpticsPrivate::Apply(const msgs::Param &_msg)
       spec.jerlov = value.string_value();
       continue;
     }
-    if ("visibility" == key || "water_level" == key)
+    bool known = false;
+    for (const auto &param : water_optics::NumberParams())
     {
-      if ("visibility" == key && empty)
-      {
-        spec.visibility.reset();
+      if (key != param.name)
         continue;
+      known = true;
+      if (empty && param.removable)
+      {
+        param.set(spec, std::nullopt);
+        break;
       }
       const auto number = ReadNumber(value);
       if (!number)
@@ -189,21 +187,17 @@ bool WaterOpticsPrivate::Apply(const msgs::Param &_msg)
                << "ignored\n";
         return false;
       }
-      if ("visibility" == key)
-        spec.visibility = *number;
-      else
-        spec.waterLevel = *number;
-      continue;
+      param.set(spec, *number);
+      break;
     }
-    bool known = false;
-    for (const auto &tag : kVectorTags)
+    for (const auto &param : water_optics::ColourParams())
     {
-      if (key != tag.name)
+      if (known || key != param.name)
         continue;
       known = true;
       if (empty)
       {
-        (spec.*tag.member).reset();
+        (spec.*param.spec).reset();
         break;
       }
       const auto rgb = text ? ParseRgb(value.string_value()) : std::nullopt;
@@ -213,7 +207,7 @@ bool WaterOpticsPrivate::Apply(const msgs::Param &_msg)
                << "string, \"r g b\"; message ignored\n";
         return false;
       }
-      spec.*tag.member = *rgb;
+      spec.*param.spec = *rgb;
       break;
     }
     if (!known)
@@ -234,7 +228,12 @@ bool WaterOpticsPrivate::Apply(const msgs::Param &_msg)
   if (!warning.empty())
     gzwarn << "WaterOptics: " << warning << "\n";
   this->spec = spec;
+  // The same water, e.g. an empty message or the values it has: nothing
+  // to replicate or publish.
+  if (this->valid && water_optics::SameWater(optics, this->optics))
+    return false;
   this->optics = optics;
+  this->valid = true;
   return true;
 }
 
@@ -242,6 +241,12 @@ bool WaterOpticsPrivate::Apply(const msgs::Param &_msg)
 void WaterOpticsPrivate::Write(EntityComponentManager &_ecm)
 {
   ++this->optics.generation;
+  if (!_ecm.Component<components::WaterOptics>(this->world))
+  {
+    // The first good water, after a world file with a bad one
+    _ecm.CreateComponent(this->world, components::WaterOptics(this->optics));
+    return;
+  }
   // SetComponentData leaves the change unmarked, and the mark is what
   // replicates the optics to the GUI and sensors.
   if (_ecm.SetComponentData<components::WaterOptics>(this->world,
@@ -272,9 +277,11 @@ void WaterOptics::Configure(const Entity &_entity,
 
   // Every element the plugin reads; any other is warned about, so a typo
   // such as <visibilty> does not leave the water unchanged in silence.
-  const std::set<std::string> known{"jerlov", "visibility", "water_level",
-      "publish_rate", "attenuation", "backscatter", "veil",
-      "diffuse_attenuation"};
+  std::set<std::string> known{"jerlov", "publish_rate"};
+  for (const auto &param : water_optics::NumberParams())
+    known.insert(param.name);
+  for (const auto &param : water_optics::ColourParams())
+    known.insert(param.name);
   for (auto e = _sdf->GetFirstElement(); e; e = e->GetNextElement())
   {
     if (!known.count(e->GetName()))
@@ -284,24 +291,6 @@ void WaterOptics::Configure(const Entity &_entity,
     }
   }
 
-  auto &spec = d.spec;
-  spec.jerlov = _sdf->Get<std::string>("jerlov", "").first;
-  if (_sdf->HasElement("visibility"))
-    spec.visibility = _sdf->Get<double>("visibility");
-  spec.waterLevel = _sdf->Get<double>("water_level", 0.0).first;
-  for (const auto &tag : kVectorTags)
-  {
-    if (!_sdf->HasElement(tag.name))
-      continue;
-    const auto rgb = ParseRgb(_sdf->Get<std::string>(tag.name));
-    if (!rgb)
-    {
-      gzerr << "WaterOptics: <" << tag.name << "> needs three numbers, "
-            << "r g b; the world has clear water\n";
-      return;
-    }
-    spec.*tag.member = *rgb;
-  }
   const double rate = _sdf->Get<double>("publish_rate", 1.0).first;
   if (rate > 0.0)
   {
@@ -309,19 +298,17 @@ void WaterOptics::Configure(const Entity &_entity,
         std::chrono::steady_clock::duration>(
         std::chrono::duration<double>(1.0 / rate));
   }
-
-  std::string error, warning;
-  if (!water_optics::Resolve(spec, d.optics, error, warning))
+  else if (rate == 0.0)
   {
-    gzerr << "WaterOptics: " << error << "; the world has clear water\n";
-    return;
+    d.publishPeriod.reset();
   }
-  if (!warning.empty())
-    gzwarn << "WaterOptics: " << warning << "\n";
-  d.initialSpec = spec;
-  d.valid = true;
-  d.Write(_ecm);
+  else
+  {
+    gzwarn << "WaterOptics: <publish_rate> must not be negative; 1 Hz\n";
+  }
 
+  // The topics come first: after a bad world file, a good message on the
+  // set topic still brings the water.
   std::string worldName = "default";
   if (const auto *name = _ecm.Component<components::Name>(_entity))
     worldName = name->Data();
@@ -329,6 +316,44 @@ void WaterOptics::Configure(const Entity &_entity,
   d.node.Subscribe(base + "/water_optics/set", &WaterOpticsPrivate::OnSet,
                    &d);
   d.pub = d.node.Advertise<msgs::Param>(base + "/water_optics_info");
+
+  auto &spec = d.spec;
+  spec.jerlov = _sdf->Get<std::string>("jerlov", "").first;
+  for (const auto &param : water_optics::NumberParams())
+  {
+    if (_sdf->HasElement(param.name))
+      param.set(spec, _sdf->Get<double>(param.name));
+  }
+  for (const auto &param : water_optics::ColourParams())
+  {
+    if (!_sdf->HasElement(param.name))
+      continue;
+    const auto rgb = ParseRgb(_sdf->Get<std::string>(param.name));
+    if (!rgb)
+    {
+      gzerr << "WaterOptics: <" << param.name << "> needs three numbers, "
+            << "r g b; the world has clear water until a good one comes on "
+            << base << "/water_optics/set\n";
+      d.spec = water_optics::WaterOpticsSpec{};
+      return;
+    }
+    spec.*param.spec = *rgb;
+  }
+
+  std::string error, warning;
+  if (!water_optics::Resolve(spec, d.optics, error, warning))
+  {
+    gzerr << "WaterOptics: " << error << "; the world has clear water until "
+          << "a good one comes on " << base << "/water_optics/set\n";
+    d.spec = water_optics::WaterOpticsSpec{};
+    return;
+  }
+  if (!warning.empty())
+    gzwarn << "WaterOptics: " << warning << "\n";
+  d.initialSpec = spec;
+  d.initialValid = true;
+  d.valid = true;
+  d.Write(_ecm);
 
   gzmsg << "WaterOptics: Jerlov " << d.optics.jerlov << ", visibility "
         << d.optics.Visibility() << " m, attenuation "
@@ -339,8 +364,6 @@ void WaterOptics::Configure(const Entity &_entity,
 void WaterOptics::PreUpdate(const UpdateInfo &, EntityComponentManager &_ecm)
 {
   auto &d = *this->dataPtr;
-  if (!d.valid)
-    return;
   std::vector<msgs::Param> pending;
   {
     const std::lock_guard<std::mutex> lock(d.mutex);
@@ -357,14 +380,20 @@ void WaterOptics::PreUpdate(const UpdateInfo &, EntityComponentManager &_ecm)
 }
 
 //////////////////////////////////////////////////
-void WaterOptics::PostUpdate(const UpdateInfo &_info,
+void WaterOptics::PostUpdate(const UpdateInfo &/*_info*/,
     const EntityComponentManager &)
 {
   auto &d = *this->dataPtr;
-  if (!d.valid || _info.paused)
+  if (!d.valid)
     return;
-  if (d.lastPublish && _info.simTime - *d.lastPublish < d.publishPeriod)
+  // On a change, and every period of wall time, paused or not: the optics
+  // do not depend on time, and a paused world still has its water.
+  const auto now = std::chrono::steady_clock::now();
+  if (d.lastPublish &&
+      (!d.publishPeriod || now - *d.lastPublish < *d.publishPeriod))
+  {
     return;
+  }
 
   msgs::Param msg;
   auto &p = *msg.mutable_params();
@@ -379,26 +408,36 @@ void WaterOptics::PostUpdate(const UpdateInfo &_info,
     p[_k].set_double_value(_v);
   };
   setText("jerlov", d.optics.jerlov);
-  setNumber("visibility", d.optics.Visibility());
-  setText("attenuation", ToText(d.optics.attenuation));
-  setText("backscatter", ToText(d.optics.backscatter));
-  setText("veil", ToText(d.optics.veil));
-  setText("diffuse_attenuation", ToText(d.optics.diffuseAttenuation));
-  setNumber("water_level", d.optics.waterLevel);
+  for (const auto &param : water_optics::NumberParams())
+    setNumber(param.name, param.get(d.optics));
+  for (const auto &param : water_optics::ColourParams())
+    setText(param.name, ToText(d.optics.*param.data));
   setNumber("generation", static_cast<double>(d.optics.generation));
   d.pub.Publish(msg);
-  d.lastPublish = _info.simTime;
+  d.lastPublish = now;
 }
 
 //////////////////////////////////////////////////
 void WaterOptics::Reset(const UpdateInfo &, EntityComponentManager &_ecm)
 {
   auto &d = *this->dataPtr;
-  if (!d.valid)
+  {
+    const std::lock_guard<std::mutex> lock(d.mutex);
+    d.pending.clear();
+  }
+  if (!d.initialValid)
+  {
+    // Back to the clear water of a bad world file
+    d.spec = water_optics::WaterOpticsSpec{};
+    d.valid = false;
+    if (_ecm.Component<components::WaterOptics>(d.world))
+      _ecm.RemoveComponent<components::WaterOptics>(d.world);
     return;
+  }
   d.spec = d.initialSpec;
   std::string error, warning;
   water_optics::Resolve(d.spec, d.optics, error, warning);
+  d.valid = true;
   d.Write(_ecm);
   {
     const std::lock_guard<std::mutex> lock(d.mutex);
