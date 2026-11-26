@@ -91,10 +91,11 @@ std::optional<CameraLayout> PlanCameraLayout(const SonarConfig &_config,
 /// For each ray of the fan (RayFan's grid), the depth is read at the ray's
 /// exact position in its camera by interpolating 1/z between the four
 /// neighboring pixels, which is exact on a plane. It interpolates where
-/// their depths are within 2 % of each other, or where 1/z is planar over
-/// them and the next pixels and they share a label, as on a plane seen at a
-/// grazing angle; elsewhere, at a silhouette, the nearest pixel is kept, so
-/// a target and the background behind it are not blended. Depth is along the
+/// their depths are within 2 % of each other, or where 1/z changes evenly
+/// over them and the next pixels (second differences under half the first)
+/// and they share a label, as on a seabed seen at a grazing angle, flat or
+/// not quite; elsewhere, at a step or a silhouette, the nearest pixel is
+/// kept, so a target and the background behind it are not blended. Depth is along the
 /// camera's optical axis and is converted to range along the ray. Normals
 /// come from neighboring hits on the ray grid on the same surface
 /// (SameSurface; the one-sided difference with the smaller range jump), and
@@ -145,15 +146,18 @@ class CameraSampler
               const std::vector<AcousticProperties> &_properties) const;
 
   /// \brief Whether the four pixels from (_u0, _v0) to (_u0 + 1, _v0 + 1)
-  /// lie on one plane: 1/z affine over them and one pixel beyond on each
-  /// axis, and one label when labels are given.
+  /// lie on one smooth surface: along each row and column of the four and
+  /// one pixel beyond, 1/z bends by no more than half its change from one
+  /// pixel to the next, and they share a label when labels are given. True
+  /// on a plane, on a seabed's creases and undulations; false across a
+  /// step between two surfaces.
   /// \param[in] _depth The camera's depth image.
   /// \param[in] _u0 The column of the first pixel.
   /// \param[in] _v0 The row of the first pixel.
   /// \param[in] _labels The camera's label image, or null.
   /// \param[in] _channels Bytes per label pixel.
-  /// \return True if the four pixels lie on one plane.
-  private: bool Planar(const float *_depth, long _u0, long _v0,
+  /// \return True if the four pixels lie on one smooth surface.
+  private: bool Smooth(const float *_depth, long _u0, long _v0,
               const std::uint8_t *_labels, unsigned int _channels) const;
 
   /// \brief Where each ray falls in its camera.

@@ -20,7 +20,9 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdint>
+#include <functional>
 #include <limits>
+#include <string>
 #include <vector>
 
 #include <gz/math/Pose3.hh>
@@ -165,10 +167,12 @@ namespace
 /// \param[in] _scene The scene.
 /// \param[in] _pose The sensor's pose.
 /// \param[in] _table Acoustic properties by label.
+/// \param[in] _withLabels Whether label images are drawn too.
 /// \return The hits.
 std::vector<sonar::RayHit> DrawAndSample(const sonar::CameraSampler &_sampler,
   const sonar::SyntheticScene &_scene, const Pose3d &_pose,
-  const std::vector<sonar::AcousticProperties> &_table)
+  const std::vector<sonar::AcousticProperties> &_table,
+  bool _withLabels = true)
 {
   std::vector<std::vector<float>> depth;
   std::vector<std::vector<std::uint8_t>> labels;
@@ -178,7 +182,8 @@ std::vector<sonar::RayHit> DrawAndSample(const sonar::CameraSampler &_sampler,
   for (std::size_t i = 0; i < depth.size(); ++i)
   {
     dp.push_back(depth[i].data());
-    lp.push_back(labels[i].data());
+    if (_withLabels)
+      lp.push_back(labels[i].data());
   }
   return _sampler.Sample(dp, lp, 1, _table);
 }
@@ -237,6 +242,328 @@ TEST(CameraSampler, ExactOnASeabedAtGrazingAngles)
       farErr.size());
     EXPECT_LT(nearMax, 0.01 * dr);
     EXPECT_LT(farMax, 0.1 * dr);
+  }
+}
+
+namespace
+{
+//////////////////////////////////////////////////
+/// \brief A seabed that is not one plane: its height over the plane z = 0,
+/// cast by marching along the ray.
+struct Seabed
+{
+  /// \brief What the seabed is, for the printed table.
+  std::string name;
+
+  /// \brief Height at (x, y), m.
+  std::function<double(double, double)> height;
+
+  /// \brief The largest height either way, m.
+  double amplitude{0.0};
+
+  /// \brief Marching step, m: well under the seabed's shortest feature.
+  double step{0.05};
+
+  /// \brief Range to the seabed along a ray, m.
+  /// \param[in] _origin The ray's start, above the seabed.
+  /// \param[in] _dir Its unit direction.
+  /// \param[in] _maxRange Farthest hit, m.
+  /// \return The range, or infinity for a miss.
+  double Cast(const gz::math::Vector3d &_origin,
+    const gz::math::Vector3d &_dir, double _maxRange) const
+  {
+    const double inf = std::numeric_limits<double>::infinity();
+    if (_dir.Z() >= 0.0)
+      return inf;
+    auto above = [&](double _t) {
+      const auto p = _origin + _dir * _t;
+      return p.Z() - this->height(p.X(), p.Y());
+    };
+    // The seabed lies between z = -amplitude and +amplitude.
+    double t = std::max(0.0, (_origin.Z() - this->amplitude) / -_dir.Z());
+    const double tEnd = std::min(_maxRange,
+      (_origin.Z() + this->amplitude) / -_dir.Z() + this->step);
+    double before = t;
+    for (; t <= tEnd; before = t, t += this->step)
+    {
+      if (above(t) > 0.0)
+        continue;
+      double lo = before, hi = t;
+      for (int i = 0; i < 40; ++i)
+      {
+        const double mid = 0.5 * (lo + hi);
+        (above(mid) > 0.0 ? lo : hi) = mid;
+      }
+      return hi < _maxRange ? hi : inf;
+    }
+    return inf;
+  }
+};
+
+//////////////////////////////////////////////////
+/// \brief A mesh of triangles on a 1 m grid, each vertex up to 1 cm above
+/// or below the plane: flat facets that meet at creases.
+/// \return The seabed.
+Seabed MeshSeabed()
+{
+  Seabed s;
+  s.name = "mesh, 1 m cells, +-1 cm";
+  s.amplitude = 0.01;
+  s.step = 0.05;
+  s.height = [](double _x, double _y) {
+    auto vertex = [](long _i, long _j) {
+      auto h = static_cast<std::uint32_t>(_i * 73856093L) ^
+        static_cast<std::uint32_t>(_j * 19349663L);
+      h = (h ^ (h >> 13)) * 0x5bd1e995u;
+      h ^= h >> 15;
+      return 0.01 * (2.0 * (h & 0xffffu) / 65535.0 - 1.0);
+    };
+    const double fi = std::floor(_x), fj = std::floor(_y);
+    const auto i = static_cast<long>(fi), j = static_cast<long>(fj);
+    const double a = _x - fi, b = _y - fj;
+    const double z00 = vertex(i, j), z11 = vertex(i + 1, j + 1);
+    // Two triangles per cell, split along the diagonal.
+    if (a >= b)
+    {
+      const double z10 = vertex(i + 1, j);
+      return z00 + a * (z10 - z00) + b * (z11 - z10);
+    }
+    const double z01 = vertex(i, j + 1);
+    return z00 + b * (z01 - z00) + a * (z11 - z01);
+  };
+  return s;
+}
+
+//////////////////////////////////////////////////
+/// \brief A smooth undulation, 5 cm high over 20 m.
+/// \return The seabed.
+Seabed UndulatingSeabed()
+{
+  Seabed s;
+  s.name = "undulation, 5 cm over 20 m";
+  s.amplitude = 0.05;
+  s.step = 0.2;
+  s.height = [](double _x, double _y) {
+    return 0.05 * std::sin(2.0 * M_PI * _x / 20.0) *
+      std::cos(2.0 * M_PI * _y / 20.0);
+  };
+  return s;
+}
+
+//////////////////////////////////////////////////
+/// \brief Ripples 1 cm high, crests across the sonar's axis.
+/// \param[in] _wavelength Crest to crest, m.
+/// \return The seabed.
+Seabed RippledSeabed(double _wavelength)
+{
+  Seabed s;
+  char name[64];
+  std::snprintf(name, sizeof(name), "ripples, 1 cm, every %.1f m",
+    _wavelength);
+  s.name = name;
+  s.amplitude = 0.01;
+  s.step = _wavelength / 16.0;
+  s.height = [_wavelength](double _x, double) {
+    return 0.01 * std::sin(2.0 * M_PI * _x / _wavelength);
+  };
+  return s;
+}
+
+//////////////////////////////////////////////////
+/// \brief Draw a seabed as depth images, sample them, and compare each
+/// ray's range with casting the ray itself.
+/// \param[in] _sampler The sampler.
+/// \param[in] _seabed The seabed.
+/// \param[in] _pose The sensor's pose.
+/// \param[in] _from Nearest true range counted, m.
+/// \param[in] _to Farthest true range counted, m.
+/// \param[in] _tolerance A ray is off when its range errs by more, m.
+/// \param[out] _count Rays counted.
+/// \return The share of the rays counted that are off.
+double ShareOff(const sonar::CameraSampler &_sampler, const Seabed &_seabed,
+  const Pose3d &_pose, double _from, double _to, double _tolerance,
+  std::size_t &_count)
+{
+  const auto &l = _sampler.Layout();
+  std::vector<std::vector<float>> depth(l.yaws.size());
+  for (std::size_t c = 0; c < l.yaws.size(); ++c)
+  {
+    depth[c].resize(static_cast<std::size_t>(l.width) * l.height);
+    for (unsigned int v = 0; v < l.height; ++v)
+    {
+      for (unsigned int u = 0; u < l.width; ++u)
+      {
+        const auto d = _sampler.PixelRay(c, u, v).Direction();
+        const double range = _seabed.Cast(_pose.Pos(),
+          _pose.Rot().RotateVector(d), l.farClip);
+        const double cosAxis = d.X() * std::cos(l.yaws[c]) +
+          d.Y() * std::sin(l.yaws[c]);
+        depth[c][v * l.width + u] = static_cast<float>(range * cosAxis);
+      }
+    }
+  }
+  std::vector<const float *> dp;
+  for (const auto &d : depth)
+    dp.push_back(d.data());
+  const auto hits = _sampler.Sample(dp, {}, 1, {Lambert(-27.0)});
+
+  std::size_t off = 0;
+  _count = 0;
+  for (const auto &h : hits)
+  {
+    const double truth = _seabed.Cast(_pose.Pos(),
+      _pose.Rot().RotateVector(h.ray.Direction()), l.farClip);
+    if (!(truth >= _from && truth <= _to))
+      continue;
+    ++_count;
+    if (!h.hit || std::abs(h.range - truth) > _tolerance)
+      ++off;
+  }
+  return _count ? static_cast<double>(off) / static_cast<double>(_count) : 0.0;
+}
+}  // namespace
+
+//////////////////////////////////////////////////
+// Seabeds that are not one plane, seen at grazing angles at the far end of
+// the ECHO's window: a mesh whose facets meet at creases of a degree or
+// so, and a smooth undulation. Their depths are still read between pixels,
+// so from 2 m up nearly every ray is within one range sample of casting the
+// ray itself, also with the sonar pitched and rolled, which is the same as
+// a sloping seabed. A test for one exact plane refuses every crease and
+// leaves 79 to 96 % of these rays more than a sample off (0 % from 5 m up,
+// where neighboring depths are within 2 %). From 1 m and 0.5 m up the mesh
+// is seen at 1 to 2 degrees, no more than its creases' own angle, and a
+// pixel covers a meter or more of range: reading between pixels halves the
+// share or better, but a crease inside a pixel cannot be placed.
+TEST(CameraSampler, ReadsBetweenPixelsOnASeabedThatIsNotOnePlane)
+{
+  const sonar::SonarConfig c = sonar::EchoImaging();
+  const double dr = (c.rangeMax - c.rangeMin) / static_cast<double>(c.samples);
+  const sonar::CameraSampler sampler(c);
+  struct Case
+  {
+    Seabed seabed;
+    Pose3d pose;
+    double from;
+    double limit;
+  };
+  // From 0.5 m up the fan's rays are 6 m apart on the seabed at 22 m, so
+  // the band starts nearer to hold enough of them.
+  const std::vector<Case> cases{
+    {MeshSeabed(), Pose3d(0.3, 0.2, 2, 0, 0, 0), 22.0, 0.10},
+    {UndulatingSeabed(), Pose3d(0.3, 0.2, 2, 0, 0, 0), 22.0, 0.02},
+    {MeshSeabed(), Pose3d(0.3, 0.2, 5, 0, 0, 0), 22.0, 0.10},
+    {MeshSeabed(), Pose3d(0.3, 0.2, 1, 0, 0, 0), 22.0, 0.50},
+    {MeshSeabed(), Pose3d(0.3, 0.2, 0.5, 0, 0, 0), 8.0, 0.25},
+    {UndulatingSeabed(), Pose3d(0.3, 0.2, 5, 0, 0, 0), 22.0, 0.02},
+    {UndulatingSeabed(), Pose3d(0.3, 0.2, 1, 0, 0, 0), 22.0, 0.02},
+    {UndulatingSeabed(), Pose3d(0.3, 0.2, 0.5, 0, 0, 0), 8.0, 0.10},
+    {MeshSeabed(), Pose3d(0.3, 0.2, 2, 10 * kDeg, 5 * kDeg, 0), 22.0, 0.10},
+    {MeshSeabed(), Pose3d(0.3, 0.2, 2, -10 * kDeg, -3 * kDeg, 0), 22.0, 0.10},
+    {UndulatingSeabed(), Pose3d(0.3, 0.2, 2, 10 * kDeg, 5 * kDeg, 0), 22.0,
+      0.02},
+  };
+  for (const auto &k : cases)
+  {
+    std::size_t count = 0;
+    const double share = ShareOff(sampler, k.seabed, k.pose, k.from, 30.0, dr,
+      count);
+    std::printf("%-28s height %.1f m roll %3.0f pitch %2.0f deg: %5.1f %% of "
+      "%zu rays at %.0f to 30 m off by more than a sample\n",
+      k.seabed.name.c_str(), k.pose.Pos().Z(), k.pose.Rot().Roll() / kDeg,
+      k.pose.Rot().Pitch() / kDeg, 100.0 * share, count, k.from);
+    EXPECT_GT(count, 1000u);
+    EXPECT_LT(share, k.limit) << k.seabed.name << " from " <<
+      k.pose.Pos().Z() << " m";
+  }
+}
+
+//////////////////////////////////////////////////
+// Ripples 1 cm high: whether they can be read depends on their length
+// against a pixel's. At 22 to 30 m from 2 m up a pixel covers 0.5 to 0.9 m
+// of seabed along the range. Ripples 5 m long are resolved and read between
+// pixels. Ripples of 1 m or 0.2 m are not in the depth image at all, which
+// holds one depth per pixel: most rays are then off by more than a sample
+// however the image is read, though by less than the stretch of seabed the
+// ray stands for.
+TEST(CameraSampler, RipplesFinerThanAPixelAreNotResolved)
+{
+  const sonar::SonarConfig c = sonar::EchoImaging();
+  const double dr = (c.rangeMax - c.rangeMin) / static_cast<double>(c.samples);
+  const sonar::CameraSampler sampler(c);
+  for (const double wavelength : {5.0, 1.0, 0.2})
+  {
+    const Seabed seabed = RippledSeabed(wavelength);
+    std::size_t count = 0;
+    const double share = ShareOff(sampler, seabed,
+      Pose3d(0.3, 0.2, 2, 0, 0, 0), 22.0, 30.0, dr, count);
+    std::printf("%-28s height 2.0 m: %5.1f %% of %zu rays at 22 to 30 m off "
+      "by more than a sample\n", seabed.name.c_str(), 100.0 * share, count);
+    EXPECT_GT(count, 1000u);
+    if (wavelength > 2.0)
+      EXPECT_LT(share, 0.02);
+  }
+}
+
+//////////////////////////////////////////////////
+// Steps stay steps where the seabed around them is read between pixels: a
+// box 1 m high and a low sill of 0.2 m on a seabed seen at a grazing angle,
+// from 2 m and from 1 m up, with labels and without (then only the depths
+// tell the box from the seabed). No ray reads a hit in the shadow behind
+// the box, between its top and the seabed beyond; a ray at an edge may read
+// the other side of it, as the nearest pixel does, but not the empty water.
+TEST(CameraSampler, StepOnAGrazingSeabedIsNotBlended)
+{
+  const sonar::SonarConfig c = sonar::EchoImaging();
+  const double dr = (c.rangeMax - c.rangeMin) / static_cast<double>(c.samples);
+  const sonar::CameraSampler sampler(c);
+  const std::vector<sonar::AcousticProperties> table{
+    Lambert(-20.0), Lambert(-27.0), Lambert(-15.0)};
+  for (const double height : {2.0, 1.0})
+  {
+    for (const double top : {1.0, 0.2})
+    {
+      for (const bool withLabels : {true, false})
+      {
+        sonar::SyntheticScene scene;
+        scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), 1);
+        scene.AddBox({12.0, -3.0, 0}, {13.0, 3.0, top}, Lambert(-15.0), 2);
+        const Pose3d pose(0, 0, height, 0, 0, 0);
+        const auto sampled = DrawAndSample(sampler, scene, pose, table,
+          withLabels);
+        const auto truth = scene.Cast(pose, sampler.Rays(),
+          sampler.Layout().farClip);
+        // The shadow on the ground: from under the box's far top edge to
+        // where the ray over that edge meets the seabed.
+        const double shadowFrom = 13.0;
+        const double shadowTo = 13.0 * height / (height - top);
+        std::size_t near = 0, inShadow = 0, off = 0;
+        for (std::size_t n = 0; n < truth.size(); ++n)
+        {
+          if (!truth[n].hit || std::abs(truth[n].ray.azimuth) > 10.0 * kDeg ||
+              truth[n].range < 10.0 || truth[n].range > c.rangeMax)
+          {
+            continue;
+          }
+          ++near;
+          ASSERT_TRUE(sampled[n].hit);
+          if (std::abs(sampled[n].range - truth[n].range) > dr)
+            ++off;
+          // How far ahead the ray's hit is; the sonar is level.
+          const double x = sampled[n].range * sampled[n].ray.Direction().X();
+          if (x > shadowFrom + dr && x < shadowTo - dr)
+            ++inShadow;
+        }
+        std::printf("height %.0f m, box %.1f m, labels %d: shadow %.2f to "
+          "%.2f m, %zu of %zu rays in it, %zu off by more than a sample\n",
+          height, top, withLabels, shadowFrom, shadowTo, inShadow, near, off);
+        EXPECT_GT(near, 1000u);
+        EXPECT_EQ(inShadow, 0u);
+        // The fan has few rays in elevation out here, so those at the box's
+        // edges, read from the nearest pixel, are several percent of them.
+        EXPECT_LT(static_cast<double>(off) / near, 0.10);
+      }
+    }
   }
 }
 

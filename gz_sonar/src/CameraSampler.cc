@@ -36,15 +36,26 @@ namespace
 /// \brief Neighboring depths within this fraction are one surface.
 constexpr double kContinuous = 0.02;
 
-/// \brief How far 1/z may depart from a plane over the pixels around a ray,
-/// relative to 1/z there, for them to count as one plane: the read is then
-/// off by about this fraction of the depth at most, 3 mm at 30 m, a tenth
-/// of an ECHO sample. Float depth rounds to 6e-8 of its value, so rounding
-/// alone moves a second difference by a few 1e-7; a depth buffer whose
-/// precision falls off with distance can leave a few 1e-5 at the far end of
-/// the window, still well inside. A step between two surfaces fails unless
-/// it is shallower than this, when blending it is harmless.
+/// \brief How far 1/z may bend over the pixels around a ray, relative to
+/// 1/z there, whatever its gradient: the floor under kSmooth, for a surface
+/// seen square on along one axis of the image, where 1/z barely changes and
+/// rounding is all a second difference holds. Float depth rounds to 6e-8 of
+/// its value, so rounding alone moves a second difference by a few 1e-7; a
+/// depth buffer whose precision falls off with distance can leave a few
+/// 1e-5 at the far end of the window, still well inside. A read is off by
+/// about this fraction of the depth at most, 3 mm at 30 m, a tenth of an
+/// ECHO sample.
 constexpr double kPlanar = 1e-4;
+
+/// \brief How far 1/z may bend over the pixels around a ray, relative to
+/// its change from one pixel to the next there: second differences up to
+/// half the largest first difference. A plane has none; the creases of a
+/// seabed mesh, an undulation and a curved hull seen at a slant have second
+/// differences a fraction of the first. Across a step between two surfaces
+/// the second difference is the step itself, so a step fails unless it is
+/// smaller than what the surfaces change by over a pixel anyway, and the
+/// read is then off by less than that.
+constexpr double kSmooth = 0.5;
 
 //////////////////////////////////////////////////
 math::Vector3d Rotate(double _yaw, const math::Vector3d &_v)
@@ -210,7 +221,7 @@ CameraSampler::CameraSampler(const SonarConfig &_config,
 }
 
 //////////////////////////////////////////////////
-bool CameraSampler::Planar(const float *_depth, long _u0, long _v0,
+bool CameraSampler::Smooth(const float *_depth, long _u0, long _v0,
   const std::uint8_t *_labels, unsigned int _channels) const
 {
   const auto w = static_cast<long>(this->layout.width);
@@ -227,9 +238,8 @@ bool CameraSampler::Planar(const float *_depth, long _u0, long _v0,
     }
   }
   // 1/z over the quad and one pixel beyond it on each axis (on the other
-  // side at the image's edge). A plane has no twist over the quad and no
-  // second difference along either axis. The twist alone would pass a step
-  // along a row or column of pixels; the second differences catch it.
+  // side at the image's edge): three pixels in a line along each row and
+  // each column of the quad.
   const long ue = _u0 > 0 ? _u0 - 1 : _u0 + 2;
   const long ve = _v0 > 0 ? _v0 - 1 : _v0 + 2;
   if (ue < 0 || ue >= w || ve < 0 || ve >= h)
@@ -248,17 +258,28 @@ bool CameraSampler::Planar(const float *_depth, long _u0, long _v0,
   const double q1v = inv(_u0 + 1, ve);
   if (qu0 <= 0.0 || qu1 <= 0.0 || q0v <= 0.0 || q1v <= 0.0)
     return false;
-  // Second difference along u through the extra column: its pixels sit at
-  // ue, u0, u0 + 1 in some order, evenly spaced.
-  auto second = [](long _e, long _a, double _qe, double _q0, double _q1) {
-    return _e < _a ? _qe - 2.0 * _q0 + _q1 : _q0 - 2.0 * _q1 + _qe;
+  // One line of three: the extra pixel, then the quad's two, or the quad's
+  // two and then the extra one. Its second difference, and the larger of
+  // its two first differences.
+  struct Line
+  {
+    double second;
+    double first;
   };
-  const double tol = kPlanar * std::max({q00, q10, q01, q11});
-  return std::abs(q00 + q11 - q10 - q01) <= tol &&
-    std::abs(second(ue, _u0, qu0, q00, q10)) <= tol &&
-    std::abs(second(ue, _u0, qu1, q01, q11)) <= tol &&
-    std::abs(second(ve, _v0, q0v, q00, q01)) <= tol &&
-    std::abs(second(ve, _v0, q1v, q10, q11)) <= tol;
+  auto line = [](bool _extraFirst, double _qe, double _q0, double _q1) {
+    const double a = _extraFirst ? _q0 - _qe : _q1 - _q0;
+    const double b = _extraFirst ? _q1 - _q0 : _qe - _q1;
+    return Line{std::abs(b - a), std::max(std::abs(a), std::abs(b))};
+  };
+  const Line u0 = line(ue < _u0, qu0, q00, q10);
+  const Line u1 = line(ue < _u0, qu1, q01, q11);
+  const Line v0 = line(ve < _v0, q0v, q00, q01);
+  const Line v1 = line(ve < _v0, q1v, q10, q11);
+  const double tol = std::max(
+    kPlanar * std::max({q00, q10, q01, q11}),
+    kSmooth * std::max({u0.first, u1.first, v0.first, v1.first}));
+  return u0.second <= tol && u1.second <= tol && v0.second <= tol &&
+    v1.second <= tol && std::abs(q00 + q11 - q10 - q01) <= tol;
 }
 
 //////////////////////////////////////////////////
@@ -314,7 +335,8 @@ std::vector<RayHit> CameraSampler::Sample(
     double z = dd[pv * w + pu];
 
     // 1/z is linear in screen space on a plane; interpolate it across the
-    // four pixels around the ray, unless they straddle a silhouette.
+    // four pixels around the ray, unless they straddle a step or a
+    // silhouette.
     const double x = l.u - 0.5;
     const double y = l.v - 0.5;
     const long u0 = std::clamp(static_cast<long>(std::floor(x)), 0L, w - 2);
@@ -329,10 +351,11 @@ std::vector<RayHit> CameraSampler::Sample(
     const double zMax = std::max({z00, z10, z01, z11});
     bool blend = std::isfinite(zMax) && zMin > 0.0;
     // Close depths are one surface; that keeps curved surfaces seen near
-    // head on. On a plane seen at a grazing angle depth changes faster than
-    // that from pixel to pixel, but 1/z is still affine in screen space.
+    // head on. On a surface seen at a grazing angle depth changes faster
+    // than that from pixel to pixel, but 1/z changes evenly: exactly so on
+    // a plane, nearly so on a seabed that is not quite one.
     if (blend && zMax - zMin >= kContinuous * zMin)
-      blend = this->Planar(dd, u0, v0, _labels.size() > l.camera ?
+      blend = this->Smooth(dd, u0, v0, _labels.size() > l.camera ?
         _labels[l.camera] : nullptr, _channels);
     if (blend)
     {
