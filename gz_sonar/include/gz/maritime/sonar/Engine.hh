@@ -95,10 +95,16 @@ double VerticalPattern(const SonarConfig &_config, double _elevation);
 /// The result is the mean intensity: speckle is drawn in the readout
 /// (ReadLevels), on the echo and the noise together.
 ///
-/// The engine keeps its own worker threads, started at construction and
-/// joined when it is destroyed, and its per-ping buffers and beam weights,
-/// so a ping starts no threads and allocates little. Pings on one engine
-/// run one at a time; two engines run independently.
+/// The engine keeps its per-ping buffers and beam weights, and every engine
+/// of the process shares one set of worker threads: kDefaultMaxEngineThreads
+/// less one at most, however many engines there are. They start with the
+/// first engine that uses more than one thread and are joined when the last
+/// such engine is destroyed, so a ping starts no threads and allocates
+/// little, and no thread outlives the engines. Pings on one engine run one
+/// at a time. Pings of two engines that coincide take turns at the threads,
+/// each running on all of them: that keeps the process within its thread
+/// count, and is faster than running side by side, since each ping then has
+/// the processor's cache to itself.
 class Engine
 {
   /// \brief An engine for one sonar in a body of water.
@@ -106,7 +112,7 @@ class Engine
   /// \param[in] _water The water.
   public: Engine(const SonarConfig &_config, const Water &_water);
 
-  /// \brief Joins the engine's threads.
+  /// \brief Joins the shared threads if this is the last engine using them.
   public: ~Engine();
 
   public: Engine(const Engine &) = delete;
@@ -114,8 +120,8 @@ class Engine
   public: Engine(Engine &&) noexcept;
   public: Engine &operator=(Engine &&) noexcept;
 
-  /// \brief One ping. Safe to call from any thread; concurrent calls on
-  /// one engine wait for each other.
+  /// \brief One ping. Safe to call from any thread; concurrent calls wait
+  /// for each other, on one engine or on several that use threads.
   /// \param[in] _hits What each ray of the fan found.
   /// \param[in] _ping The ping number. Unused since speckle moved to the
   /// readout; kept so callers need not change.
@@ -123,7 +129,9 @@ class Engine
   public: BeamIntensity Ping(const std::vector<RayHit> &_hits,
               std::uint64_t _ping) const;
 
-  /// \brief Threads a ping runs on, the caller's included.
+  /// \brief Most threads a ping of this engine runs on, the caller's
+  /// included: SonarConfig::threads, or all the shared threads if that is 0
+  /// or more than there are.
   /// \return The number of threads.
   public: std::size_t Threads() const;
 
@@ -143,7 +151,8 @@ class Engine
   private: Water water;
   private: double alpha{0.0};
 
-  /// \brief The thread pool, the beam weights and the scratch buffers.
+  /// \brief The beam weights, the scratch buffers and the hold on the
+  /// shared threads.
   private: struct Implementation;
   private: std::unique_ptr<Implementation> impl;
 };

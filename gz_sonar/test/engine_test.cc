@@ -17,6 +17,8 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <atomic>
+#include <cerrno>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -42,6 +44,57 @@
 using gz::math::Pose3d;
 using gz::math::Vector3d;
 namespace sonar = gz::maritime::sonar;
+
+// The thread-failure test makes the system refuse threads by standing in
+// for pthread_create, which a sanitizer does too; with one, the test is
+// skipped.
+#if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
+#define GZ_SONAR_TEST_SANITIZED
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer) || \
+    __has_feature(memory_sanitizer)
+#define GZ_SONAR_TEST_SANITIZED
+#endif
+#endif
+
+#if defined(__linux__) && !defined(GZ_SONAR_TEST_SANITIZED)
+#define GZ_SONAR_TEST_CAN_REFUSE_THREADS
+#include <dlfcn.h>
+#include <pthread.h>
+
+namespace
+{
+/// \brief Threads the system still grants before it refuses with EAGAIN;
+/// negative for no limit.
+std::atomic<int> threadsGranted{-1};
+
+/// \brief Threads refused so far.
+std::atomic<int> threadsRefused{0};
+}  // namespace
+
+//////////////////////////////////////////////////
+/// \brief Stands in for the C library's pthread_create, which
+/// std::thread calls, to refuse a thread on request.
+extern "C" int pthread_create(pthread_t *_thread, const pthread_attr_t *_attr,
+  void *(*_start)(void *), void *_arg) noexcept
+{
+  using Create = int (*)(pthread_t *, const pthread_attr_t *,
+    void *(*)(void *), void *);
+  static const auto real =
+    reinterpret_cast<Create>(dlsym(RTLD_NEXT, "pthread_create"));
+  int granted = threadsGranted.load();
+  while (granted > 0 &&
+         !threadsGranted.compare_exchange_weak(granted, granted - 1))
+  {
+  }
+  if (granted == 0)
+  {
+    ++threadsRefused;
+    return EAGAIN;
+  }
+  return real(_thread, _attr, _start, _arg);
+}
+#endif
 
 namespace
 {
@@ -581,8 +634,9 @@ TEST(Readout, ProfilingEmptyWaterIsQuiet)
 }
 
 //////////////////////////////////////////////////
-// Threads change how fast, never what: the same bits for 1, 3, 8 or 24
-// threads, at the imaging preset's full fan.
+// Threads change how fast, never what: the same bits for 1, 2, 3, 8 or 24
+// threads (as many of them as the machine gives), at the imaging preset's
+// full fan.
 TEST(Engine, SameResultForAnyThreadCount)
 {
   sonar::SonarConfig c = sonar::EchoImaging();
@@ -593,7 +647,7 @@ TEST(Engine, SameResultForAnyThreadCount)
   const Pose3d pose(0, 0, 2, 0, 15.0 * kDeg, 0);
   c.threads = 1;
   const auto one = Ping(c, scene, pose, 3);
-  for (std::size_t threads : {3u, 8u, 24u})
+  for (std::size_t threads : {0u, 2u, 3u, 5u, 8u, 24u})
   {
     c.threads = threads;
     const auto many = Ping(c, scene, pose, 3);
@@ -633,55 +687,285 @@ TEST(Engine, PingDoesNotDependOnThePrevious)
 }
 
 //////////////////////////////////////////////////
-// One per core by default, but no more than kDefaultMaxEngineThreads; an
-// explicit count is taken as given.
+// One per core by default, but no more than kDefaultMaxEngineThreads; a
+// smaller count is taken as given, and a larger one gets what there is.
 TEST(Engine, ThreadCount)
 {
   sonar::SonarConfig c = CleanEcho();
   c.threads = 0;
-  const std::size_t cores =
-    std::max(1u, std::thread::hardware_concurrency());
-  EXPECT_EQ(sonar::Engine(c, HarborWater()).Threads(),
-    std::min(cores, sonar::kDefaultMaxEngineThreads));
-  c.threads = 3;
-  EXPECT_EQ(sonar::Engine(c, HarborWater()).Threads(), 3u);
-  c.threads = 1;
-  EXPECT_EQ(sonar::Engine(c, HarborWater()).Threads(), 1u);
+  const std::size_t all = std::min<std::size_t>(
+    std::max(1u, std::thread::hardware_concurrency()),
+    sonar::kDefaultMaxEngineThreads);
+  EXPECT_EQ(sonar::Engine(c, HarborWater()).Threads(), all);
+  for (std::size_t threads : {1u, 2u, 3u, 8u, 9u, 24u, 300u})
+  {
+    c.threads = threads;
+    EXPECT_EQ(sonar::Engine(c, HarborWater()).Threads(),
+      std::min(threads, all)) << threads;
+  }
 }
+
+namespace
+{
+//////////////////////////////////////////////////
+/// \brief Threads of this process.
+/// \return The number of threads.
+std::size_t ThreadsOfProcess()
+{
+  std::size_t n = 0;
+  for (const auto &e : std::filesystem::directory_iterator("/proc/self/task"))
+  {
+    (void)e;
+    ++n;
+  }
+  return n;
+}
+
+//////////////////////////////////////////////////
+/// \brief Worker threads the engines of this process share.
+/// \return The number of threads.
+std::size_t SharedWorkers()
+{
+  return std::min<std::size_t>(
+    std::max(1u, std::thread::hardware_concurrency()),
+    sonar::kDefaultMaxEngineThreads) - 1;
+}
+}  // namespace
 
 #ifdef __linux__
 //////////////////////////////////////////////////
-// An engine's threads go with it: making and dropping engines, as a world
-// does when sonars are removed and spawned again, leaves no threads behind.
+// The engines share their threads, and the threads go with the last engine:
+// eight sonars run no more threads than one, and making and dropping
+// engines, as a world does when sonars are removed and spawned again,
+// leaves no threads behind.
 TEST(Engine, NoThreadsLeftBehind)
 {
-  auto threadCount = []() {
-    std::size_t n = 0;
-    for (const auto &e : std::filesystem::directory_iterator("/proc/self/task"))
-    {
-      (void)e;
-      ++n;
-    }
-    return n;
-  };
   sonar::SonarConfig c = CleanEcho();
-  c.threads = 8;
   sonar::SyntheticScene scene;
   scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), 1);
   const Pose3d pose(0, 0, 2, 0, 15.0 * kDeg, 0);
   const auto hits = scene.Cast(pose, sonar::RayFan(c), 1.5 * c.rangeMax);
 
-  const std::size_t before = threadCount();
+  const std::size_t before = ThreadsOfProcess();
   for (int round = 0; round < 5; ++round)
   {
-    auto engine = std::make_unique<sonar::Engine>(c, HarborWater());
-    EXPECT_EQ(threadCount(), before + 7);
-    engine->Ping(hits, static_cast<std::uint64_t>(round));
-    engine.reset();
-    EXPECT_EQ(threadCount(), before);
+    // An engine on one thread starts none.
+    c.threads = 1;
+    auto single = std::make_unique<sonar::Engine>(c, HarborWater());
+    EXPECT_EQ(ThreadsOfProcess(), before);
+
+    std::vector<std::unique_ptr<sonar::Engine>> engines;
+    for (std::size_t threads : {0u, 8u, 3u, 0u, 2u, 24u, 0u, 0u})
+    {
+      c.threads = threads;
+      engines.push_back(std::make_unique<sonar::Engine>(c, HarborWater()));
+      EXPECT_EQ(ThreadsOfProcess(), before + SharedWorkers());
+    }
+    for (auto &engine : engines)
+      engine->Ping(hits, static_cast<std::uint64_t>(round));
+    EXPECT_EQ(ThreadsOfProcess(), before + SharedWorkers());
+
+    // The threads stay while any engine uses them, whichever it is.
+    std::swap(engines[round], engines.back());
+    while (engines.size() > 1)
+    {
+      engines.pop_back();
+      EXPECT_EQ(ThreadsOfProcess(), before + SharedWorkers());
+    }
+    engines.clear();
+    EXPECT_EQ(ThreadsOfProcess(), before);
   }
 }
 #endif
+
+//////////////////////////////////////////////////
+// Engines that ping at the same moment take turns at the shared threads
+// and share nothing else: every ping is the same bits as alone on one
+// thread, for sonars of each kind and thread limit, while other engines
+// come and go, and none waits forever.
+TEST(Engine, EnginesPingingAtOnce)
+{
+  sonar::SyntheticScene scene;
+  scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), 1);
+  scene.AddBox({4.5, -0.5, 0}, {5.5, 0.5, 0.5}, Lambert(-15.0), 2);
+  scene.AddSphere({12, 3, 0.25}, 0.25, Lambert(-10.0), 3);
+  const Pose3d pose(0, 0, 2, 0, 15.0 * kDeg, 0);
+
+  struct Sonar
+  {
+    sonar::SonarConfig config;
+    std::vector<sonar::RayHit> hits;
+    sonar::BeamIntensity expected;
+    std::unique_ptr<sonar::Engine> engine;
+  };
+  std::vector<Sonar> sonars;
+  auto add = [&](sonar::SonarConfig _config, std::size_t _threads) {
+    Sonar s;
+    s.config = _config;
+    s.hits = scene.Cast(pose, sonar::RayFan(_config),
+      1.5 * _config.rangeMax);
+    sonar::AssignFootprints(s.hits, sonar::RayFanElevationCount(_config));
+    s.config.threads = 1;
+    s.expected = sonar::Engine(s.config, HarborWater()).Ping(s.hits, 0);
+    s.config.threads = _threads;
+    s.engine = std::make_unique<sonar::Engine>(s.config, HarborWater());
+    sonars.push_back(std::move(s));
+  };
+  sonar::SonarConfig oneCell = CleanEcho();
+  oneCell.beams = 1;
+  oneCell.samples = 1;
+  add(CleanEcho(), 0);
+  add(CleanEcho(), 0);
+  add(CleanEcho(), 3);
+  add(CleanEcho(), 1);
+  add(sonar::EchoImaging(), 0);
+  add(sonar::OmniscanSidescan(), 0);
+  add(sonar::SurveyorProfiling(), 2);
+  add(oneCell, 300);
+
+  for (int repetition = 0; repetition < 3; ++repetition)
+  {
+    std::atomic<int> wrong{0};
+    std::atomic<bool> go{false};
+    std::atomic<bool> stop{false};
+    std::vector<std::thread> threads;
+    for (Sonar &s : sonars)
+    {
+      threads.emplace_back([&]() {
+        while (!go)
+          std::this_thread::yield();
+        for (std::uint64_t ping = 0; ping < 12; ++ping)
+        {
+          const auto out = s.engine->Ping(s.hits, ping);
+          if (out.data != s.expected.data || out.labels != s.expected.labels)
+            ++wrong;
+        }
+      });
+    }
+    // Sonars spawned and removed meanwhile, as in a running world.
+    std::thread churn([&]() {
+      sonar::SonarConfig c = CleanEcho();
+      while (!go)
+        std::this_thread::yield();
+      for (std::size_t n = 0; !stop; ++n)
+      {
+        c.threads = n % 4;
+        const sonar::Engine engine(c, HarborWater());
+        const auto out = engine.Ping(sonars[0].hits, n);
+        if (out.data != sonars[0].expected.data)
+          ++wrong;
+      }
+    });
+    go = true;
+    for (auto &t : threads)
+      t.join();
+    stop = true;
+    churn.join();
+    EXPECT_EQ(wrong, 0) << "repetition " << repetition;
+  }
+}
+
+//////////////////////////////////////////////////
+// Pings from several threads on one engine wait for each other, with the
+// other engines' pings going on around them.
+TEST(Engine, OneEngineFromSeveralThreads)
+{
+  const sonar::SonarConfig c = CleanEcho();
+  sonar::SyntheticScene scene;
+  scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), 1);
+  scene.AddSphere({5, 1, 1}, 0.5, Lambert(-10.0), 2);
+  const Pose3d pose(0, 0, 2, 0, 15.0 * kDeg, 0);
+  auto hits = scene.Cast(pose, sonar::RayFan(c), 1.5 * c.rangeMax);
+  sonar::AssignFootprints(hits, sonar::RayFanElevationCount(c));
+  const std::vector<sonar::RayHit> none;
+
+  const sonar::Engine engine(c, HarborWater());
+  const sonar::Engine other(c, HarborWater());
+  const auto expected = engine.Ping(hits, 0);
+  const auto empty = engine.Ping(none, 0);
+  EXPECT_EQ(std::count(empty.data.begin(), empty.data.end(), 0.0),
+    static_cast<std::ptrdiff_t>(empty.data.size()));
+
+  std::atomic<int> wrong{0};
+  std::vector<std::thread> threads;
+  for (int t = 0; t < 6; ++t)
+  {
+    threads.emplace_back([&, t]() {
+      for (std::uint64_t ping = 0; ping < 10; ++ping)
+      {
+        // Two threads on the other engine, four on this one, and every
+        // other ping of one of them with no hit at all.
+        const sonar::Engine &e = t < 2 ? other : engine;
+        const bool blank = t == 5 && ping % 2 == 1;
+        const auto out = e.Ping(blank ? none : hits, ping);
+        if (out.data != (blank ? empty.data : expected.data) ||
+            out.labels != (blank ? empty.labels : expected.labels))
+        {
+          ++wrong;
+        }
+      }
+    });
+  }
+  for (auto &t : threads)
+    t.join();
+  EXPECT_EQ(wrong, 0);
+}
+
+//////////////////////////////////////////////////
+// A system that refuses a thread after granting others leaves an engine
+// that works on those it got, and the next engine to start the threads
+// gets them all. The old pool never returned from its constructor.
+TEST(Engine, ThreadThatFailsToStart)
+{
+#ifdef GZ_SONAR_TEST_CAN_REFUSE_THREADS
+  if (SharedWorkers() == 0)
+    GTEST_SKIP() << "one core: the engines start no threads";
+  sonar::SonarConfig c = CleanEcho();
+  sonar::SyntheticScene scene;
+  scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), 1);
+  scene.AddBox({2.5, -0.5, 0}, {3.5, 0.5, 1.5}, Lambert(-10.0), 2);
+  const Pose3d pose(0, 0, 2, 0, 15.0 * kDeg, 0);
+  auto hits = scene.Cast(pose, sonar::RayFan(c), 1.5 * c.rangeMax);
+  sonar::AssignFootprints(hits, sonar::RayFanElevationCount(c));
+  c.threads = 1;
+  const auto expected = sonar::Engine(c, HarborWater()).Ping(hits, 0);
+  c.threads = 0;
+
+  // Refused at the first thread, after some, and at the last.
+  for (std::size_t granted : {std::size_t(0), SharedWorkers() / 2,
+       SharedWorkers() - 1})
+  {
+    const std::size_t before = ThreadsOfProcess();
+    threadsRefused = 0;
+    threadsGranted = static_cast<int>(granted);
+    {
+      const sonar::Engine engine(c, HarborWater());
+      threadsGranted = -1;
+      EXPECT_EQ(threadsRefused, 1) << granted;
+      EXPECT_EQ(engine.Threads(), granted + 1);
+      EXPECT_EQ(ThreadsOfProcess(), before + granted);
+      for (std::uint64_t ping = 0; ping < 3; ++ping)
+      {
+        const auto out = engine.Ping(hits, ping);
+        EXPECT_EQ(out.data, expected.data) << granted;
+        EXPECT_EQ(out.labels, expected.labels) << granted;
+      }
+      // A second engine shares the short pool while the first lives.
+      const sonar::Engine second(c, HarborWater());
+      EXPECT_EQ(second.Threads(), granted + 1);
+      EXPECT_EQ(second.Ping(hits, 0).data, expected.data);
+    }
+    // With both gone the threads are joined, and the next engine starts a
+    // full set.
+    const sonar::Engine next(c, HarborWater());
+    EXPECT_EQ(next.Threads(), SharedWorkers() + 1);
+    EXPECT_EQ(next.Ping(hits, 0).data, expected.data);
+  }
+  threadsGranted = -1;
+#else
+  GTEST_SKIP() << "cannot refuse a thread on this build";
+#endif
+}
 
 //////////////////////////////////////////////////
 // Smoothed automatic gain: a sudden change moves the gain by 1 - e^(-dt/tau)

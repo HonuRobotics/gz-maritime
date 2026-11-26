@@ -20,8 +20,11 @@
 #include <atomic>
 #include <cmath>
 #include <condition_variable>
+#include <memory>
 #include <mutex>
+#include <system_error>
 #include <thread>
+#include <vector>
 
 
 namespace gz::maritime::sonar
@@ -54,19 +57,64 @@ double Sinc2(double _x)
   return s * s;
 }
 
-/// \brief Worker threads kept for the life of an engine. For(n, fn) runs
-/// fn(i) for every i in [0, n) on the workers and the calling thread, in
-/// chunks taken in turn, and returns when all are done. fn must only touch
-/// what belongs to i; then which thread runs which i does not change the
-/// result.
+/// \brief The worker threads every engine of the process shares. For(n,
+/// threads, fn) runs fn(i) for every i in [0, n) on the calling thread and
+/// on the workers, in chunks taken in turn, and returns when all are done.
+/// fn must only touch what belongs to i; then which thread runs which i
+/// does not change the result.
+///
+/// One caller at a time: an engine holds the pool's turn (Turn) for the
+/// threaded part of a ping, so pings that coincide run one after the other,
+/// each on all the threads, and the process never runs more than the pool's
+/// size. That is also the faster way: a ping works through tens of
+/// megabytes of buffers, and eight at once on a 12-core machine fight over
+/// the cache until each takes about 400 ms, where in turns the last of the
+/// eight is done after 200 ms.
+///
+/// The engines own the pool together (Shared): it starts with the first
+/// engine that wants threads and is joined when the last one goes. A static
+/// pool would be joined at exit or at the library's unload, in an order
+/// nothing here controls: an engine in a static of another library would
+/// outlive it. Owned this way, no worker is alive unless an engine is, and
+/// the only static is a weak pointer that starts and joins nothing.
 class Pool
 {
-  /// \brief A pool that runs on _threads threads, the caller's included.
+  /// \brief The pool of the process, started if no engine holds one.
+  /// \return The pool.
+  public: static std::shared_ptr<Pool> Shared()
+  {
+    static std::mutex mutex;
+    static std::weak_ptr<Pool> shared;
+    std::lock_guard<std::mutex> lock(mutex);
+    std::shared_ptr<Pool> pool = shared.lock();
+    if (!pool)
+    {
+      pool = std::make_shared<Pool>(std::min<std::size_t>(
+        kDefaultMaxEngineThreads,
+        std::max(1u, std::thread::hardware_concurrency())));
+      shared = pool;
+    }
+    return pool;
+  }
+
+  /// \brief A pool that runs a job on up to _threads threads, the caller's
+  /// included. If the system refuses a thread, the pool keeps those that
+  /// started: a ping is slower and no different.
   /// \param[in] _threads The number of threads.
   public: explicit Pool(std::size_t _threads)
   {
-    for (std::size_t w = 1; w < _threads; ++w)
-      this->workers.emplace_back([this]() { this->Work(); });
+    this->workers.reserve(_threads);
+    try
+    {
+      for (std::size_t w = 1; w < _threads; ++w)
+        this->workers.emplace_back([this]() { this->Work(); });
+    }
+    catch (const std::system_error &)
+    {
+      // The workers that started wait on this pool; they stay, and the
+      // destructor joins them. Leaving by the exception instead would
+      // destroy the condition variable under them, which never returns.
+    }
   }
 
   public: ~Pool()
@@ -83,94 +131,151 @@ class Pool
   public: Pool(const Pool &) = delete;
   public: Pool &operator=(const Pool &) = delete;
 
-  /// \brief Threads a job runs on, the caller's included.
+  /// \brief Threads a job can run on, the caller's included.
   /// \return The number of threads.
   public: std::size_t Size() const
   {
     return this->workers.size() + 1;
   }
 
-  public: template<typename Fn>
-  void For(std::size_t _n, Fn &_fn)
+  /// \brief Wait for the pool: the caller has it until the lock goes.
+  /// \return The lock that holds the turn.
+  public: std::unique_lock<std::mutex> Turn()
   {
-    if (this->workers.empty() || _n <= 1)
+    return std::unique_lock<std::mutex>(this->turn);
+  }
+
+  /// \brief Run _fn(i) for every i in [0, _n). Call with the turn held.
+  /// \param[in] _n How many.
+  /// \param[in] _threads Most threads to run on, the caller's included.
+  /// \param[in] _fn What to run.
+  public: template<typename Fn>
+  void For(std::size_t _n, std::size_t _threads, Fn &_fn)
+  {
+    const std::size_t threads = std::min(_threads, this->Size());
+    if (threads <= 1 || _n <= 1)
     {
       for (std::size_t i = 0; i < _n; ++i)
         _fn(i);
       return;
     }
-    // Chunks several to a thread, so a thread that meets a busy part of the
-    // fan does not hold the others up.
-    this->job = [](void *_ctx, std::size_t _i) {
+    Job job;
+    job.run = [](void *_ctx, std::size_t _i) {
       (*static_cast<Fn *>(_ctx))(_i);
     };
-    this->ctx = &_fn;
-    this->count = _n;
-    this->chunk = std::max<std::size_t>(1, _n / (8 * this->Size()));
-    this->next.store(0, std::memory_order_relaxed);
+    job.ctx = &_fn;
+    job.count = _n;
+    // Chunks several to a thread, so a thread that meets a busy part of the
+    // fan does not hold the others up.
+    job.chunk = std::max<std::size_t>(1, _n / (8 * threads));
+    job.helpers = threads - 1;
     {
       std::lock_guard<std::mutex> lock(this->mutex);
-      this->busy = this->workers.size();
-      ++this->generation;
+      this->job = &job;
     }
     this->wake.notify_all();
-    this->Drain();
-    std::unique_lock<std::mutex> lock(this->mutex);
-    this->done.wait(lock, [this]() { return this->busy == 0; });
+
+    // The job is on this stack: whatever happens, the pool forgets it and
+    // every worker leaves it before this returns.
+    struct Finish
+    {
+      Pool &pool;
+      Job &job;
+      ~Finish()
+      {
+        // Nothing left to take, also when _fn threw.
+        this->job.next.store(this->job.count, std::memory_order_relaxed);
+        std::unique_lock<std::mutex> lock(this->pool.mutex);
+        this->pool.job = nullptr;
+        this->job.done.wait(lock, [this]() { return this->job.active == 0; });
+      }
+    } finish{*this, job};
+    Drain(job);
   }
 
-  /// \brief Take chunks of the current job until none is left.
-  private: void Drain()
+  /// \brief One call of For.
+  private: struct Job
+  {
+    void (*run)(void *, std::size_t){nullptr};
+    void *ctx{nullptr};
+    std::size_t count{0};
+    std::size_t chunk{1};
+    std::atomic<std::size_t> next{0};
+
+    /// \brief Most workers that may help, and how many do; the pool's mutex
+    /// guards active.
+    std::size_t helpers{0};
+    std::size_t active{0};
+
+    /// \brief Signaled when the last worker leaves.
+    std::condition_variable done;
+  };
+
+  /// \brief Take chunks of a job until none is left.
+  /// \param[in] _job The job.
+  private: static void Drain(Job &_job)
   {
     while (true)
     {
       const std::size_t first =
-        this->next.fetch_add(this->chunk, std::memory_order_relaxed);
-      if (first >= this->count)
+        _job.next.fetch_add(_job.chunk, std::memory_order_relaxed);
+      if (first >= _job.count)
         return;
-      const std::size_t last = std::min(this->count, first + this->chunk);
+      const std::size_t last = std::min(_job.count, first + _job.chunk);
       for (std::size_t i = first; i < last; ++i)
-        this->job(this->ctx, i);
+        _job.run(_job.ctx, i);
     }
+  }
+
+  /// \brief The job, if a free worker should help: it has work left and
+  /// room for a helper. Call with the mutex held.
+  /// \return The job, or null.
+  private: Job *Pick() const
+  {
+    if (this->job && this->job->active < this->job->helpers &&
+        this->job->next.load(std::memory_order_relaxed) < this->job->count)
+    {
+      return this->job;
+    }
+    return nullptr;
   }
 
   /// \brief A worker: sleep until a job or the stop, help with the job.
   private: void Work()
   {
-    std::uint64_t seen = 0;
+    std::unique_lock<std::mutex> lock(this->mutex);
     while (true)
     {
-      {
-        std::unique_lock<std::mutex> lock(this->mutex);
-        this->wake.wait(lock, [&]() {
-          return this->stop || this->generation != seen;
-        });
-        if (this->stop)
-          return;
-        seen = this->generation;
-      }
-      this->Drain();
-      std::lock_guard<std::mutex> lock(this->mutex);
-      if (--this->busy == 0)
-        this->done.notify_one();
+      Job *help = nullptr;
+      this->wake.wait(lock, [&]() {
+        help = this->Pick();
+        return this->stop || help;
+      });
+      if (this->stop)
+        return;
+      ++help->active;
+      lock.unlock();
+      Drain(*help);
+      lock.lock();
+      // Under the mutex, so the caller cannot see zero, return and take the
+      // job away before the notify is through.
+      if (--help->active == 0)
+        help->done.notify_one();
     }
   }
 
   private: std::vector<std::thread> workers;
+
+  /// \brief Held by the engine whose ping has the pool.
+  private: std::mutex turn;
+
+  /// \brief Guards stop, job and the job's active.
   private: std::mutex mutex;
   private: std::condition_variable wake;
-  private: std::condition_variable done;
   private: bool stop{false};
-  private: std::uint64_t generation{0};
-  private: std::size_t busy{0};
 
-  // The current job, written before the generation changes and read only
-  // while it runs.
-  private: void (*job)(void *, std::size_t){nullptr};
-  private: void *ctx{nullptr};
-  private: std::size_t count{0};
-  private: std::size_t chunk{1};
-  private: std::atomic<std::size_t> next{0};
+  /// \brief The call of For now running, if any.
+  private: Job *job{nullptr};
 };
 }  // namespace
 
@@ -193,16 +298,11 @@ double VerticalPattern(const SonarConfig &_config, double _elevation)
   return std::exp(-M_LN2 * u * u);
 }
 
-/// \brief What every ping of one engine shares: its threads, the layout of
-/// the azimuth columns, the beam weights, and buffers reused from ping to
-/// ping.
+/// \brief What every ping of one engine shares: the layout of the azimuth
+/// columns, the beam weights, buffers reused from ping to ping, and its
+/// hold on the process's threads.
 struct Engine::Implementation
 {
-  explicit Implementation(std::size_t _threads)
-    : pool(_threads)
-  {
-  }
-
   /// \brief One ping at a time: the buffers below are the ping's.
   std::mutex mutex;
 
@@ -242,8 +342,32 @@ struct Engine::Implementation
   std::vector<std::size_t> order;
   std::vector<std::size_t> next;
 
-  /// \brief Last, so its threads are joined before anything they use goes.
-  Pool pool;
+  /// \brief Most threads a ping runs on, the caller's included.
+  std::size_t threads{1};
+
+  /// \brief The process's pool, kept alive while this engine is; null for
+  /// an engine on one thread, which needs none.
+  std::shared_ptr<Pool> pool;
+
+  /// \brief Wait for the process's threads, if this engine uses them.
+  /// \return The lock that holds them, to be kept for the Fors of a ping.
+  std::unique_lock<std::mutex> Turn()
+  {
+    return this->pool ? this->pool->Turn() : std::unique_lock<std::mutex>();
+  }
+
+  /// \brief Run _fn(i) for every i in [0, _n) on this engine's threads.
+  template<typename Fn>
+  void For(std::size_t _n, Fn &_fn)
+  {
+    if (this->pool)
+    {
+      this->pool->For(_n, this->threads, _fn);
+      return;
+    }
+    for (std::size_t i = 0; i < _n; ++i)
+      _fn(i);
+  }
 };
 
 //////////////////////////////////////////////////
@@ -252,11 +376,14 @@ Engine::Engine(const SonarConfig &_config, const Water &_water)
     alpha(AbsorptionDbPerMeter(_config.frequency, _water))
 {
   const SonarConfig &c = this->config;
-  const std::size_t threads = c.threads > 0 ? c.threads :
-    std::min<std::size_t>(kDefaultMaxEngineThreads,
-      std::max(1u, std::thread::hardware_concurrency()));
-  this->impl = std::make_unique<Implementation>(threads);
+  this->impl = std::make_unique<Implementation>();
   Implementation &d = *this->impl;
+  if (c.threads != 1)
+  {
+    d.pool = Pool::Shared();
+    d.threads = c.threads > 0 ?
+      std::min(c.threads, d.pool->Size()) : d.pool->Size();
+  }
 
   for (std::size_t k = 0; k < c.samples; ++k)
     d.ranges.push_back(c.SampleRange(k));
@@ -349,7 +476,7 @@ double Engine::Absorption() const
 //////////////////////////////////////////////////
 std::size_t Engine::Threads() const
 {
-  return this->impl->pool.Size();
+  return this->impl->threads;
 }
 
 //////////////////////////////////////////////////
@@ -468,7 +595,10 @@ BeamIntensity Engine::Ping(const std::vector<RayHit> &_hits,
       }
     }
   };
-  d.pool.For(cols, column);
+  // From here the ping runs on the process's threads, after any other
+  // engine's ping that has them, and keeps them until its buffers are clear.
+  std::unique_lock<std::mutex> turn = d.Turn();
+  d.For(cols, column);
 
   // Each beam gathers from the columns its pattern reaches, in column order.
   auto beam = [&](std::size_t _j) {
@@ -494,7 +624,7 @@ BeamIntensity Engine::Ping(const std::vector<RayHit> &_hits,
       }
     }
   };
-  d.pool.For(c.beams, beam);
+  d.For(c.beams, beam);
 
   // Leave the column buffers zero for the next ping, clearing only what
   // this one wrote.
@@ -512,7 +642,9 @@ BeamIntensity Engine::Ping(const std::vector<RayHit> &_hits,
     d.colLo[_col] = static_cast<long>(c.samples);
     d.colHi[_col] = -1;
   };
-  d.pool.For(cols, clear);
+  d.For(cols, clear);
+  if (turn)
+    turn.unlock();
 
   // Speckle is drawn in the readout, on the echo and the noise together.
   (void)_ping;
