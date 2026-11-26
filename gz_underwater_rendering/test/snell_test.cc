@@ -20,9 +20,14 @@
 
 #include <gz/msgs/image.pb.h>
 
+#include <algorithm>
 #include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include <cmath>
 #include <functional>
+#include <iostream>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <thread>
@@ -105,4 +110,77 @@ TEST(Snell, WindowAt48Point6Degrees)
   const double angle = sum / n * 180.0 / GZ_PI;
   std::cout << "Snell's window half-angle: " << angle << " degrees\n";
   EXPECT_NEAR(angle, std::asin(1 / 1.333) * 180 / GZ_PI, 1.0);
+}
+
+/////////////////////////////////////////////////
+// A camera above the still water, below the crests: the crests higher than
+// the camera face it and are seen from above, reflecting the sky. Drawn as
+// if from below, with the water drawn, they would fade into the veil, here
+// pure green.
+TEST(Snell, CrestsAboveACameraOnABoatAreSeenFromAbove)
+{
+  std::mutex mutex;
+  std::vector<msgs::Image> frames;
+  bool rendered = false;
+  transport::Node node;
+  std::function<void(const msgs::Image &)> cb = [&](const msgs::Image &_m)
+  {
+    const std::lock_guard<std::mutex> lock(mutex);
+    rendered = true;
+    if (_m.header().stamp().sec() >= 2)
+      frames.push_back(_m);
+  };
+  node.Subscribe("/uwcrest/cam", cb);
+  ServerConfig config;
+  config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, "crest.sdf"));
+  auto server = std::make_unique<Server>(config);
+  server->Run(false, 0, false);
+  for (int i = 0; i < 600; ++i)
+  {
+    {
+      const std::lock_guard<std::mutex> lock(mutex);
+      // A whole wave period at 5 Hz
+      if (frames.size() >= 30 || (i == 200 && !rendered))
+        break;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  }
+  server.reset();
+  const std::lock_guard<std::mutex> lock(mutex);
+  if (!rendered)
+    GTEST_SKIP() << "nothing rendered: no GPU?";
+  ASSERT_GE(frames.size(), 30u);
+  // Frames with the camera in air: the top row is the sky, blue. Under a
+  // crest it is the surface seen from below, faded into the green veil.
+  std::size_t dark = 0, above = 0, inAir = 0;
+  for (const auto &m : frames)
+  {
+    int sky = 0;
+    for (std::uint32_t u = 0; u < m.width(); ++u)
+    {
+      const auto *p = reinterpret_cast<const std::uint8_t *>(
+          m.data().data() + 3 * u);
+      sky += p[2] > p[1] && p[2] > 150;
+    }
+    if (sky < static_cast<int>(m.width()) * 9 / 10)
+      continue;
+    ++inAir;
+    // Green: the veil, which only the surface seen from below fades into.
+    // From above, the surface is the sky's blue reflected, or the deep blue
+    // at grazing angles.
+    for (std::uint32_t v = 0; v < m.height(); ++v)
+    {
+      for (std::uint32_t u = 0; u < m.width(); ++u, ++above)
+      {
+        const auto *p = reinterpret_cast<const std::uint8_t *>(
+            m.data().data() + v * m.step() + 3 * u);
+        dark += p[1] > 40 && p[1] > p[0] + 30 && p[1] > p[2] + 30;
+      }
+    }
+  }
+  std::cout << "camera in air in " << inAir << " frames of " << frames.size()
+            << "\n";
+  ASSERT_GE(inAir, 5u) << "the camera was never above the surface";
+  std::cout << "green pixels: " << dark << " of " << above << "\n";
+  EXPECT_LT(dark, above / 250) << "crests above the camera drawn from below";
 }

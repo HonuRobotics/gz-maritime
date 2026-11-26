@@ -129,13 +129,16 @@ gz_underwater_camera <tool>`):
 - `chart_validation.py` compares the real and the simulated images patch by
   patch: the RGB angular error of each patch's mean colour in linear light,
   the metric of OceanSim (arXiv:2503.01074), which ignores brightness, and
-  the luminance ratio per patch, which does not. Given one render per water,
-  each with its own boxes, it ranks the waters closest first; it fails only
-  with `--threshold`, or when more than `--max-dark` patches are too dark.
+  the luminance ratio per patch, printed but not ranked on. Given one render
+  per water, each with its own boxes, it ranks the waters closest first,
+  those with more than `--max-dark` dark patches last; it fails with
+  `--threshold`, when the closest has too many dark patches, or when an
+  image's patches differ by less than `--min-contrast` (the chart lost in
+  the water).
 - `save_frame.py` saves one frame of a camera topic as a PNG.
 
 ```bash
-ros2 run gz_underwater_camera make_chart_world.py --out chart.sdf --range 2 --depth 5 --jerlov 3C
+ros2 run gz_underwater_camera make_chart_world.py --out chart.sdf --range 0.5 --depth 2 --jerlov 3C
 gz sim -s -r chart.sdf &
 ros2 run gz_underwater_camera save_frame.py --topic /chart/camera/underwater/image --out sim.png
 ros2 run gz_underwater_camera chart_validation.py --real dive.png --real-patches dive.json \
@@ -145,7 +148,7 @@ ros2 run gz_underwater_camera chart_validation.py --real dive.png --real-patches
 ![An example report](../docs/design/images/uw-validation-example.png)
 
 The example above is **not a validation**: its "real" image is another
-simulation, in 5C water against 3C (13.4 degrees).
+simulation, in 5C water, against 3C (8.5 degrees) and 7C (11.0).
 Real footage is still needed.
 
 ## Tests
@@ -166,13 +169,18 @@ colcon test --packages-select gz_underwater_camera
   of Snell's law, a dome port unchanged; every parameter documented.
 - `test_chart_validation`: the metric (zero for the same colour, 90 for
   orthogonal ones, brightness not counted), patch means away from the
-  edges, a closed loop on synthetic charts (the same water near zero, an
-  exposure difference near zero, another water far), the nearest water
-  ranked first, each image with its own boxes, dark patches counted and the
-  JSON free of NaN, the scale from the data type, boxes too small or outside,
-  the luminance ratio telling exposure from water, the command line, a
-  camera image saved, and the chart world (valid SDF, patches inside the
-  image, in order; the water type checked; `--visibility`).
+  edges, a closed loop on synthetic charts drawn by the camera's own model
+  per channel from the Jerlov table (kept the same as `Jerlov.cc` by a
+  test): the same water near zero, an exposure difference near zero, the
+  neighbouring waters 5 to 10 degrees or more away; the nearest water ranked
+  first, each image with its own boxes, nearly black patches counted as
+  dark and a water with too many ranked last, the JSON free of NaN, a lost
+  chart and a repeated name refused, files read at their own depth (16 bit,
+  floating point), boxes too small or outside, the luminance ratio of an
+  exposure difference, the command line, a camera image saved, the chart
+  world (valid SDF, patches inside the image, in order; every argument
+  checked), and the chart world rendered (skipped without a GPU): its
+  patches differ, and the model's 3C chart picks the 3C render over 5C.
 - `underwater_camera_frames_test`, frames sent by the test, nothing
   rendered: clear water without water optics; listening only while
   listened to; each frame with the water of its own step; frames that do not

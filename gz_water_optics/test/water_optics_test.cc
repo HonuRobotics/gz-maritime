@@ -330,6 +330,29 @@ TEST(WaterOpticsSystem, NumbersAndMessagesThatChangeNothing)
 }
 
 /////////////////////////////////////////////////
+// Caustics and marine snow out of 0 to 1, from the world file and from the
+// topic: clamped, the rest of the water kept, not thrown away.
+TEST(WaterOpticsSystem, StrengthsOutOfRangeAreClamped)
+{
+  Sim run("optics_strengths.sdf");
+  run.Steps(2);
+  ASSERT_TRUE(run.valid) << "the whole water was thrown away";
+  EXPECT_EQ(run.optics.jerlov, "3C");
+  EXPECT_DOUBLE_EQ(run.optics.caustics, 1.0);
+  EXPECT_DOUBLE_EQ(run.optics.marineSnow, 0.0);
+
+  transport::Node node;
+  const std::string topic = "/world/optics/water_optics/set";
+  Send(node, topic, SetNumber("marine_snow", 3.5));
+  ASSERT_TRUE(StepPast(run, run.optics.generation));
+  EXPECT_DOUBLE_EQ(run.optics.marineSnow, 1.0);
+  Send(node, topic, SetNumber("caustics", -0.5));
+  ASSERT_TRUE(StepPast(run, run.optics.generation));
+  EXPECT_DOUBLE_EQ(run.optics.caustics, 0.0);
+  EXPECT_EQ(run.optics.jerlov, "3C");
+}
+
+/////////////////////////////////////////////////
 // A reset brings back the world file's water.
 TEST(WaterOpticsSystem, ResetBringsBackTheWorldFile)
 {

@@ -20,7 +20,10 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <chrono>
+#include <condition_variable>
 #include <cstdint>
+#include <deque>
 #include <exception>
 #include <functional>
 #include <limits>
@@ -67,6 +70,95 @@ double Luminance(const Rgb &_c)
 /// \brief SetMaxThreads's value
 std::atomic<unsigned int> gMaxThreads{0};
 
+/// \brief Threads kept for ParallelFor, made on first use: one fewer than
+/// the cores, at most 15, so a frame does not start threads of its own.
+/// Several callers (several cameras) can use it at once.
+class Pool
+{
+  public: static Pool &Instance()
+  {
+    static Pool pool;
+    return pool;
+  }
+
+  /// \brief Queue a task.
+  public: void Push(std::function<void()> _task)
+  {
+    {
+      const std::lock_guard<std::mutex> lock(this->mutex);
+      this->tasks.push_back(std::move(_task));
+    }
+    this->cv.notify_one();
+  }
+
+  /// \brief Run one queued task here, if there is one.
+  /// \return Whether one ran.
+  public: bool RunOne()
+  {
+    std::function<void()> task;
+    {
+      const std::lock_guard<std::mutex> lock(this->mutex);
+      if (this->tasks.empty())
+        return false;
+      task = std::move(this->tasks.front());
+      this->tasks.pop_front();
+    }
+    task();
+    return true;
+  }
+
+  private: Pool()
+  {
+    const unsigned int cores = std::max(1u, std::thread::hardware_concurrency());
+    for (unsigned int i = 0; i + 1 < std::min(cores, 16u); ++i)
+    {
+      try
+      {
+        this->threads.emplace_back([this]() { this->Work(); });
+      }
+      catch (const std::system_error &)
+      {
+        // Fewer threads: the callers run the rest themselves
+        break;
+      }
+    }
+  }
+
+  private: ~Pool()
+  {
+    {
+      const std::lock_guard<std::mutex> lock(this->mutex);
+      this->stop = true;
+    }
+    this->cv.notify_all();
+    for (auto &t : this->threads)
+      t.join();
+  }
+
+  private: void Work()
+  {
+    for (;;)
+    {
+      std::function<void()> task;
+      {
+        std::unique_lock<std::mutex> lock(this->mutex);
+        this->cv.wait(lock, [this]() { return this->stop || !this->tasks.empty(); });
+        if (this->stop && this->tasks.empty())
+          return;
+        task = std::move(this->tasks.front());
+        this->tasks.pop_front();
+      }
+      task();
+    }
+  }
+
+  private: std::mutex mutex;
+  private: std::condition_variable cv;
+  private: std::deque<std::function<void()>> tasks;
+  private: std::vector<std::thread> threads;
+  private: bool stop{false};
+};
+
 void ParallelFor(std::size_t _n, std::size_t _grain,
                  const std::function<void(std::size_t, std::size_t)> &_work)
 {
@@ -80,42 +172,58 @@ void ParallelFor(std::size_t _n, std::size_t _grain,
     _work(0, _n);
     return;
   }
-  // The first exception of any piece, rethrown once every thread is joined
-  std::mutex mutex;
-  std::exception_ptr error;
-  const auto run = [&](std::size_t _begin, std::size_t _end)
+  // This call's pieces still to finish, and the first exception of any,
+  // rethrown once all are done
+  struct Latch
   {
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::size_t left{0};
+    std::exception_ptr error;
+  } latch;
+  latch.left = pieces;
+  const auto run = [&latch, &_work](std::size_t _begin, std::size_t _end)
+  {
+    std::exception_ptr error;
     try
     {
       _work(_begin, _end);
     }
     catch (...)
     {
-      const std::lock_guard<std::mutex> lock(mutex);
-      if (!error)
-        error = std::current_exception();
+      error = std::current_exception();
     }
+    const std::lock_guard<std::mutex> lock(latch.mutex);
+    if (error && !latch.error)
+      latch.error = error;
+    if (--latch.left == 0)
+      latch.cv.notify_all();
   };
-  std::vector<std::thread> threads;
-  threads.reserve(pieces - 1);
+  auto &pool = Pool::Instance();
   for (std::size_t p = 1; p < pieces; ++p)
   {
     const std::size_t begin = _n * p / pieces, end = _n * (p + 1) / pieces;
-    try
-    {
-      threads.emplace_back(run, begin, end);
-    }
-    catch (const std::system_error &)
-    {
-      // No thread to be had: this piece here
-      run(begin, end);
-    }
+    pool.Push([&run, begin, end]() { run(begin, end); });
   }
   run(0, _n / pieces);
-  for (auto &t : threads)
-    t.join();
-  if (error)
-    std::rethrow_exception(error);
+  // Help with what is queued, this call's or another's, rather than wait
+  // idle: nothing waits on a pool with no thread free
+  for (;;)
+  {
+    {
+      std::unique_lock<std::mutex> lock(latch.mutex);
+      if (latch.left == 0)
+        break;
+    }
+    if (!pool.RunOne())
+    {
+      std::unique_lock<std::mutex> lock(latch.mutex);
+      latch.cv.wait_for(lock, std::chrono::milliseconds(1),
+                        [&latch]() { return latch.left == 0; });
+    }
+  }
+  if (latch.error)
+    std::rethrow_exception(latch.error);
 }
 
 /// \brief Standard normal numbers from a 32-bit generator, by Box-Muller:

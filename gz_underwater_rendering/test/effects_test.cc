@@ -17,7 +17,9 @@
 // Caustics and marine snow, in the GPU path.
 #include <gtest/gtest.h>
 
+#include <gz/msgs/annotated_axis_aligned_2d_box_v.pb.h>
 #include <gz/msgs/image.pb.h>
+#include <gz/msgs/laserscan.pb.h>
 #include <gz/msgs/param.pb.h>
 
 #include <algorithm>
@@ -29,6 +31,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <string>
 #include <thread>
 #include <utility>
@@ -396,24 +399,26 @@ TEST(Lamps, OneThatGivesNoLightIsLeftOut)
 }
 
 /////////////////////////////////////////////////
-// <quality>low</quality>: fewer steps in the beam and the snow drawn half
-// as far. The lit scene is as bright, within 10 %, and the snow is there.
-TEST(Quality, LowIsCloseToMedium)
+// <quality>: low and high are close to medium, the default, each with its
+// marine snow; a value it does not know is medium, the same image.
+TEST(Quality, LowAndHighCloseToMediumUnknownIsMedium)
 {
-  double mean[2] = {0, 0};
-  std::size_t bright[2] = {0, 0};
-  int k = 0;
-  for (const auto &[world, topic] :
-       {std::pair<std::string, std::string>{"snow.sdf", "/uwsnow/cam/image"},
-        {"snow_low.sdf", "/uwsnow/cam/image"}})
+  const std::vector<std::string> worlds{"snow.sdf", "snow_low.sdf",
+                                        "snow_high.sdf", "snow_ultra.sdf"};
+  std::vector<double> mean(worlds.size(), 0.0);
+  std::vector<std::size_t> bright(worlds.size(), 0);
+  std::vector<std::string> pixels(worlds.size());
+  for (std::size_t k = 0; k < worlds.size(); ++k)
   {
-    Capture c(world, {topic});
+    const std::string topic = "/uwsnow/cam/image";
+    Capture c(worlds[k], {topic});
     const auto f = c.Next(topic, 1);
     if (!c.Rendered())
       GTEST_SKIP() << "nothing rendered: no GPU?";
     c.server.reset();
-    ASSERT_EQ(f.size(), 1u);
+    ASSERT_EQ(f.size(), 1u) << worlds[k];
     const auto &m = f[0];
+    pixels[k] = m.data();
     for (std::uint32_t v = 0; v < m.height(); ++v)
     {
       for (std::uint32_t u = 2; u + 2 < m.width(); ++u)
@@ -424,12 +429,16 @@ TEST(Quality, LowIsCloseToMedium)
         bright[k] += g > around + 0.02 && g > 1.5 * around;
       }
     }
-    ++k;
   }
   std::cout << "linear green, medium " << mean[0] << ", low " << mean[1]
-            << "; specks " << bright[0] << " and " << bright[1] << "\n";
-  EXPECT_NEAR(mean[1], mean[0], 0.1 * mean[0]);
-  EXPECT_GT(bright[1], 5u) << "no marine snow at low quality";
+            << ", high " << mean[2] << "; specks " << bright[0] << ", "
+            << bright[1] << " and " << bright[2] << "\n";
+  for (std::size_t k : {1u, 2u})
+  {
+    EXPECT_NEAR(mean[k], mean[0], 0.1 * mean[0]) << worlds[k];
+    EXPECT_GT(bright[k], 5u) << "no marine snow: " << worlds[k];
+  }
+  EXPECT_EQ(pixels[3], pixels[0]) << "an unknown quality is not medium";
 }
 
 /////////////////////////////////////////////////
@@ -516,6 +525,48 @@ TEST(WaveDepth, TheCameraIsUnderTheWaveNotTheStillLevel)
 }
 
 /////////////////////////////////////////////////
+// A slow camera beside a fast one, at the same place under the waves: each
+// frame of the slow one is, pixel for pixel, the fast one's of the same
+// instant. The surface over a camera is asked for each pass, whatever the
+// camera's rate, not kept from a frame before.
+TEST(WaveDepth, ASlowCameraBesideAFastOne)
+{
+  Capture c("wave_depth_rates.sdf", {"/uwrates/fast", "/uwrates/slow"});
+  // Eight seconds, two wave periods, after the wave has grown
+  c.Next("/uwrates/fast", 30);
+  if (!c.Rendered())
+    GTEST_SKIP() << "nothing rendered: no GPU?";
+  c.Next("/uwrates/fast", 80);
+  c.Next("/uwrates/slow", 1);
+  c.server.reset();
+  const auto fast = c.Last("/uwrates/fast", 200);
+  const auto slow = c.Last("/uwrates/slow", 16);
+  const auto stamp = [](const msgs::Image &_m)
+  {
+    return _m.header().stamp().sec() * 1000000000LL +
+           _m.header().stamp().nsec();
+  };
+  std::map<long long, const msgs::Image *> byStamp;
+  for (const auto &m : fast)
+    byStamp[stamp(m)] = &m;
+  int same = 0, differ = 0;
+  std::set<std::string> distinct;
+  for (const auto &m : slow)
+  {
+    const auto it = byStamp.find(stamp(m));
+    if (it == byStamp.end())
+      continue;
+    (it->second->data() == m.data() ? same : differ) += 1;
+    distinct.insert(m.data());
+  }
+  std::cout << "slow frames: " << same << " the fast one's, " << differ
+            << " not; " << distinct.size() << " different images\n";
+  EXPECT_GE(same + differ, 10);
+  EXPECT_EQ(differ, 0);
+  EXPECT_GE(distinct.size(), 2u) << "the wave did not move the water";
+}
+
+/////////////////////////////////////////////////
 // What nothing lights (Ogre's unlit shaders: a particle emitter's particles)
 // is seen through the water too: particles 2 m away have the colour they
 // have in air, faded over the 2 m, plus the veil built over them.
@@ -557,4 +608,116 @@ TEST(Unlit, FadesAndTakesTheVeil)
             << inWater << ", expected " << expected << "\n";
   ASSERT_GT(inAir, 0.1) << "no particles in view";
   EXPECT_NEAR(inWater, expected, 0.02);
+}
+
+/////////////////////////////////////////////////
+// Sensors that are not colour cameras do not see the water, nor the
+// backdrop drawn around the world: a lidar's scan (open water out of range),
+// a thermal image and a bounding box camera's boxes are the same with the
+// GPU path and without it.
+TEST(Backdrop, LidarThermalAndBoxesUntouched)
+{
+  struct Seen
+  {
+    msgs::LaserScan scan;
+    msgs::Image thermal;
+    msgs::AnnotatedAxisAligned2DBox_V boxes;
+    bool rendered{false};
+  };
+  const auto see = [](const std::string &_world)
+  {
+    Seen seen;
+    std::mutex m;
+    int got = 0;
+    const auto late = [](const msgs::Header &_h)
+    { return _h.stamp().sec() >= 1; };
+    transport::Node node;
+    std::function<void(const msgs::LaserScan &)> onScan =
+        [&](const msgs::LaserScan &_msg)
+        {
+          const std::lock_guard<std::mutex> lock(m);
+          seen.rendered = true;
+          if (late(_msg.header()) && !seen.scan.ranges_size())
+          {
+            seen.scan = _msg;
+            ++got;
+          }
+        };
+    std::function<void(const msgs::Image &)> onThermal =
+        [&](const msgs::Image &_msg)
+        {
+          const std::lock_guard<std::mutex> lock(m);
+          seen.rendered = true;
+          if (late(_msg.header()) && !seen.thermal.width())
+          {
+            seen.thermal = _msg;
+            ++got;
+          }
+        };
+    std::function<void(const msgs::AnnotatedAxisAligned2DBox_V &)> onBoxes =
+        [&](const msgs::AnnotatedAxisAligned2DBox_V &_msg)
+        {
+          const std::lock_guard<std::mutex> lock(m);
+          if (late(_msg.header()) && !seen.boxes.has_header())
+          {
+            seen.boxes = _msg;
+            ++got;
+          }
+        };
+    node.Subscribe("/uwsensors/lidar", onScan);
+    node.Subscribe("/uwsensors/thermal", onThermal);
+    node.Subscribe("/uwsensors/boxes", onBoxes);
+    ServerConfig config;
+    config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, _world));
+    auto server = std::make_unique<Server>(config);
+    server->Run(false, 0, false);
+    for (int i = 0; i < 600; ++i)
+    {
+      {
+        const std::lock_guard<std::mutex> lock(m);
+        if (got == 3 || (i == 200 && !seen.rendered))
+          break;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    server.reset();
+    node.Unsubscribe("/uwsensors/lidar");
+    node.Unsubscribe("/uwsensors/thermal");
+    node.Unsubscribe("/uwsensors/boxes");
+    const std::lock_guard<std::mutex> lock(m);
+    EXPECT_TRUE(!seen.rendered || got == 3) << _world << ": topics missing";
+    return seen;
+  };
+  const Seen off = see("sensors_off.sdf");
+  if (!off.rendered)
+    GTEST_SKIP() << "nothing rendered: no GPU?";
+  const Seen on = see("sensors_on.sdf");
+
+  // The lidar: the box in the middle, open water out of range elsewhere
+  ASSERT_GT(off.scan.ranges_size(), 0);
+  ASSERT_EQ(on.scan.ranges_size(), off.scan.ranges_size());
+  int hits = 0, misses = 0, differ = 0;
+  for (int i = 0; i < off.scan.ranges_size(); ++i)
+  {
+    const double a = off.scan.ranges(i), b = on.scan.ranges(i);
+    std::isfinite(a) && a < 50 ? ++hits : ++misses;
+    differ += !(a == b || (!std::isfinite(a) && !std::isfinite(b)));
+  }
+  std::cout << "lidar: " << hits << " hits, " << misses << " out of range, "
+            << differ << " different\n";
+  EXPECT_GT(hits, 0);
+  EXPECT_GT(misses, 0) << "the lidar hit something in open water";
+  EXPECT_EQ(differ, 0);
+
+  // The thermal image, byte for byte
+  ASSERT_GT(off.thermal.width(), 0u);
+  EXPECT_EQ(on.thermal.data(), off.thermal.data());
+
+  // The boxes: the target's alone, in the same place
+  ASSERT_EQ(off.boxes.annotated_box_size(), 1);
+  ASSERT_EQ(on.boxes.annotated_box_size(), 1);
+  const auto &a = off.boxes.annotated_box(0), &b = on.boxes.annotated_box(0);
+  EXPECT_EQ(b.label(), a.label());
+  EXPECT_EQ(b.box().min_corner().x(), a.box().min_corner().x());
+  EXPECT_EQ(b.box().max_corner().y(), a.box().max_corner().y());
 }

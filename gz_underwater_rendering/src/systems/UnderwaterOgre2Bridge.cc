@@ -44,18 +44,23 @@
 #include <regex>
 #include <set>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 #include "UnderwaterOgre2Bridge.hh"
 
 #include <gz/common/Console.hh>
+#include <gz/rendering/BoundingBoxCamera.hh>
 #include <gz/rendering/Light.hh>
 #include <gz/rendering/RenderEngine.hh>
 #include <gz/rendering/RenderingIface.hh>
 #include <gz/rendering/Scene.hh>
+#include <gz/rendering/SegmentationCamera.hh>
+#include <gz/rendering/ThermalCamera.hh>
 #include <gz/rendering/config.hh>
 #include <gz/rendering/ogre2/Ogre2Light.hh>
+#include <gz/rendering/ogre2/Ogre2Scene.hh>
 
 #include <OgreArchive.h>
 #include <OgreArchiveManager.h>
@@ -272,11 +277,78 @@ class Surface
 /// water is; without it a camera under water would see the sky or the
 /// background colour past the last thing in view. The shader makes it
 /// clear (alpha 0) for cameras above the water.
-class Backdrop
+class Backdrop : public Ogre::Camera::Listener
 {
+  /// \brief Hidden while a camera renders that must not see it: one that is
+  /// not a colour camera (bounding boxes, segmentation, thermal; those swap
+  /// the materials of gz-rendering's own items only, and would read the
+  /// backdrop, which is not one, as a thing filling the view), or an
+  /// orthographic one, which is drawn as in air. Before culling, as their
+  /// own material switchers work.
+  public: void cameraPreRenderScene(Ogre::Camera *_camera) override
+  {
+    const auto it = this->items.find(_camera->getSceneManager());
+    if (it == this->items.end())
+      return;
+    this->hiding = _camera->getProjectionType() == Ogre::PT_ORTHOGRAPHIC ||
+        this->solid.count(_camera->getName()) > 0;
+    if (!this->hiding)
+      return;
+    this->wasVisible = it->second->getVisible();
+    it->second->setVisible(false);
+  }
+
+  /// \brief Shown again as it was, after such a camera.
+  public: void cameraPostRenderScene(Ogre::Camera *_camera) override
+  {
+    const auto it = this->items.find(_camera->getSceneManager());
+    if (it != this->items.end() && this->hiding)
+      it->second->setVisible(this->wasVisible);
+    this->hiding = false;
+  }
+
+  /// \brief Listen to every camera of every scene, new ones as they come,
+  /// and note which are not colour cameras: the bounding box, segmentation
+  /// and thermal sensors, whose Ogre camera carries the sensor's name.
+  private: void WatchCameras()
+  {
+    if (!gz::rendering::isEngineLoaded("ogre2"))
+      return;
+    gz::rendering::RenderEngine *engine = gz::rendering::engine("ogre2");
+    for (unsigned int s = 0; engine && s < engine->SceneCount(); ++s)
+    {
+      const auto scene = engine->SceneByIndex(s);
+      const auto *ogreScene =
+          dynamic_cast<const gz::rendering::Ogre2Scene *>(scene.get());
+      if (!ogreScene)
+        continue;
+      Ogre::SceneManager *sm = ogreScene->OgreSceneManager();
+      for (unsigned int i = 0; i < scene->SensorCount(); ++i)
+      {
+        const auto sensor = scene->SensorByIndex(i);
+        if (std::dynamic_pointer_cast<gz::rendering::BoundingBoxCamera>(
+                sensor) ||
+            std::dynamic_pointer_cast<gz::rendering::SegmentationCamera>(
+                sensor) ||
+            std::dynamic_pointer_cast<gz::rendering::ThermalCamera>(sensor))
+        {
+          this->solid.insert(sensor->Name());
+        }
+      }
+      auto cameras = sm->getCameraIterator();
+      while (cameras.hasMoreElements())
+      {
+        Ogre::Camera *camera = cameras.getNext();
+        if (this->watched.insert({sm, camera->getName(), camera}).second)
+          camera->addListener(this);
+      }
+    }
+  }
+
   /// \brief Show it in every scene, around the water level, or hide it.
   public: void Update(bool _show, float _level)
   {
+    this->WatchCameras();
     Ogre::Root *root = Ogre::Root::getSingletonPtr();
     if (!root)
       return;
@@ -336,6 +408,31 @@ class Backdrop
       }
     }
     this->items.clear();
+    // Stop listening to the cameras still there
+    if (gz::rendering::isEngineLoaded("ogre2"))
+    {
+      for (const auto &[sm, name, camera] : this->watched)
+      {
+        if (root && Alive(root, sm) &&
+            sm->findCameraNoThrow(name) == camera)
+        {
+          camera->removeListener(this);
+        }
+      }
+    }
+    this->watched.clear();
+  }
+
+  /// \brief Whether a scene manager is still Ogre's.
+  private: static bool Alive(Ogre::Root *_root, Ogre::SceneManager *_sm)
+  {
+    auto managers = _root->getSceneManagerIterator();
+    while (managers.hasMoreElements())
+    {
+      if (managers.getNext() == _sm)
+        return true;
+    }
+    return false;
   }
 
   /// \brief The box in one scene.
@@ -450,6 +547,19 @@ class Backdrop
 
   private: std::map<Ogre::SceneManager *, Ogre::Item *> items;
 
+  /// \brief The cameras listened to: scene, name, camera.
+  private: std::set<std::tuple<Ogre::SceneManager *, std::string,
+                               Ogre::Camera *>> watched;
+
+  /// \brief The backdrop's visibility before a camera hid it.
+  private: bool wasVisible{false};
+
+  /// \brief Whether the camera rendering now hid it.
+  private: bool hiding{false};
+
+  /// \brief The names of the cameras that are not colour cameras.
+  private: std::set<std::string> solid;
+
   /// \brief Set when the box could not be made: not tried again.
   private: bool failed{false};
 };
@@ -534,8 +644,16 @@ class UnderwaterListener : public ChainedListener
   /// \brief Set from any thread when the plugin is gone: draw nothing.
   public: std::atomic<bool> released{false};
 
-  private: bool On(bool _caster) const
-  { return this->water.active && !this->released && !_caster; }
+  /// \brief Whether the water is drawn in a pass: not for an orthographic
+  /// camera (the GUI's orthographic view), whose fragments the model gets
+  /// wrong; it is drawn as in air, as the unlit shaders draw it.
+  private: bool On(bool _caster, Ogre::SceneManager *_sm) const
+  {
+    if (!this->water.active || this->released || _caster)
+      return false;
+    const Ogre::Camera *camera = _sm->getCamerasInProgress().renderingCamera;
+    return !camera || camera->getProjectionType() != Ogre::PT_ORTHOGRAPHIC;
+  }
 
   /// \brief The scene's lamps (spot and point lights), as of the last
   /// preparePassHash.
@@ -660,7 +778,7 @@ class UnderwaterListener : public ChainedListener
     if (this->previous)
       this->previous->preparePassHash(_shadow, _caster, _dual, _sm, _hlms);
     this->backdrop.BeforePass(_sm);
-    if (!this->On(_caster))
+    if (!this->On(_caster, _sm))
       return;
     _hlms->_setProperty("gz_underwater", 1);
     this->CollectLamps(_sm);
@@ -678,7 +796,7 @@ class UnderwaterListener : public ChainedListener
         this->previous->getPassBufferSize(_shadow, _caster, _dual, _sm) : 0u;
     // Ogre aligns each listener's block to 16 bytes.
     size = (size + 15u) & ~15u;
-    return size + (this->On(_caster) ? kBlockBytes : 0u);
+    return size + (this->On(_caster, _sm) ? kBlockBytes : 0u);
   }
 
   public: float *preparePassBuffer(const Ogre::CompositorShadowNode *_shadow,
@@ -688,7 +806,7 @@ class UnderwaterListener : public ChainedListener
     if (this->previous)
       _ptr = this->previous->preparePassBuffer(_shadow, _caster, _dual, _sm,
                                                _ptr);
-    if (!this->On(_caster))
+    if (!this->On(_caster, _sm))
       return _ptr;
     // Collect the lamps again for this pass: the block's size does not
     // depend on how many there are, so the data never depends on the order
