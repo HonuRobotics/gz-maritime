@@ -65,6 +65,7 @@ install(DIRECTORY include/ DESTINATION include)
 # The validation tools: a chart world to reproduce real footage, and the
 # comparison with it (UNDERWATER_CAMERA_PLAN.md, phase 6).
 install(PROGRAMS tools/chart_validation.py tools/make_chart_world.py
+  tools/save_frame.py
   DESTINATION lib/${PROJECT_NAME})
 install(
   TARGETS ${PROJECT_NAME}

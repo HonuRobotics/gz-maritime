@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -51,8 +52,11 @@ namespace gz::sim::maritime
 /// server's sensors and in the GUI, is seen through the world's water
 /// (gz_water_optics), per fragment, on the GPU, by the same model as the
 /// reference camera (gz_underwater_camera). Cameras above the water are
-/// untouched. It marks the world with the UnderwaterRendering component, so
-/// a reference camera does not apply the water a second time.
+/// untouched. Once the renderer draws the water it marks the world with the
+/// UnderwaterRendering component, so a reference camera does not apply the
+/// water a second time. If it cannot (another render engine, or Ogre's
+/// pieces not as this was written for), the world is not marked and the
+/// reference camera draws the water.
 class UnderwaterRendering
   : public System,
     public ISystemConfigure,
@@ -88,14 +92,17 @@ class UnderwaterRendering
   public: void PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm) override
   {
     this->sampler.Sync(_ecm);
-    // Mark the world: the renderer draws the water. In the GUI's own
-    // entity manager this is a no-op that nobody reads.
+    // Mark the world while the renderer draws the water, and only then:
+    // otherwise the reference camera does. In the GUI's own entity manager
+    // this is a no-op that nobody reads.
     const Entity world = worldEntity(_ecm);
-    if (world != kNullEntity &&
-        !_ecm.Component<components::UnderwaterRendering>(world))
-    {
+    const bool marked = world != kNullEntity &&
+        _ecm.Component<components::UnderwaterRendering>(world);
+    const bool drawing = this->installed.load();
+    if (world != kNullEntity && drawing && !marked)
       _ecm.CreateComponent(world, components::UnderwaterRendering());
-    }
+    else if (marked && !drawing)
+      _ecm.RemoveComponent<components::UnderwaterRendering>(world);
     const std::lock_guard<std::mutex> lock(this->mutex);
     if (!this->sampler.Valid())
     {
@@ -198,6 +205,8 @@ class UnderwaterRendering
           !this->listCameras || !this->setElevations ||
           !this->install(this->piecesDir.c_str()))
       {
+        gzerr << "UnderwaterRendering: not installed; the reference camera "
+              << "draws the water instead\n";
         this->failed = true;
         return;
       }
@@ -245,7 +254,8 @@ class UnderwaterRendering
   /// \brief The wave over each of them: id, height each. Guarded by mutex.
   private: std::vector<float> elevations;
   private: static constexpr int kMaxCameras = 32;
-  private: bool installed{false};
+  /// \brief Set on the render thread, read on the simulation thread
+  private: std::atomic<bool> installed{false};
   private: bool failed{false};
   private: std::optional<bool> announced;
   /// \brief <quality>: 0 low, 1 medium, 2 high.

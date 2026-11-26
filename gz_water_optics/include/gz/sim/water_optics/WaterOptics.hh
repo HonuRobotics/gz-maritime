@@ -72,8 +72,9 @@ struct WaterOpticsSpec
   double daylight{1.0};
 
   /// \brief Strength of the caustics the waves cast on what faces up, 0 to
-  /// 1; scaled by how high the waves are (none on flat water).
-  double caustics{1.0};
+  /// 1; scaled by how high the waves are (none on flat water). Off unless
+  /// asked for.
+  double caustics{0.0};
 
   /// \brief Marine snow: the fraction of 25 cm cells near the camera that
   /// hold a speck, 0 to 1. 0, none.
@@ -113,7 +114,7 @@ struct WaterOpticsData
   double daylight{1.0};
 
   /// \brief Caustics strength, 0 to 1.
-  double caustics{1.0};
+  double caustics{0.0};
 
   /// \brief Marine snow density, 0 to 1.
   double marineSnow{0.0};

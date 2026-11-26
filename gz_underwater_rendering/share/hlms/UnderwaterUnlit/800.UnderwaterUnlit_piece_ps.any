@@ -12,7 +12,7 @@
 @property( gz_underwater && !hlms_shadowcaster && !gz_render_solid_color && !hlms_identity_viewproj && !hlms_identity_viewproj_dynamic )
 // The unlit pixel shader declares the pass buffer only for planar
 // reflections and point shadows.
-@piece( custom_ps_uniformStructDeclaration )
+@piece( custom_ps_uniformStructDeclaration_underwater_unlit )
 	@property( !has_planar_reflections && !hlms_shadowcaster_point )
 		@insertpiece( PassStructDecl )
 	@end

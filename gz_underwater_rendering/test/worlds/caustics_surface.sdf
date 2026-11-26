@@ -14,6 +14,7 @@
       <wave><model>CWR</model><number>1</number><amplitude>0.3</amplitude><period>4</period><direction>0</direction><steepness>0</steepness><tau>0.5</tau></wave>
     </plugin>
     <plugin filename="gz-maritime-water-optics-system" name="gz::sim::maritime::WaterOptics">
+      <caustics>1</caustics>
       <attenuation>0 0 0</attenuation><backscatter>0 0 0</backscatter><veil>0 0 0</veil>
       <diffuse_attenuation>0.2 0.2 0.2</diffuse_attenuation>
     </plugin>
