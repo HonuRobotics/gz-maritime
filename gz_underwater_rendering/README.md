@@ -162,7 +162,8 @@ off, set its intensity to 0: it then costs nothing.
   water's colour, not the sky or the scene's background. A black box around
   the world (100 km wide, from 100 m above the water to 12 km below) is
   drawn behind everything, at the far plane and after the sky; through the
-  water it is the veil. It is drawn after the opaque items, so the pixels
+  water it is the veil. Bounding box, segmentation and thermal cameras do not see it:
+  it is hidden while they render. It is drawn after the opaque items, so the pixels
   they cover are not shaded twice. Cameras above the water, depth images, lidars and
   segmentation do not see it.
 
@@ -242,7 +243,13 @@ specks fixed frame to frame, none once the snow is off, the depth image
 unchanged; at night with the lamps off, nothing to see.
 
 `snell_test`, rendered: Snell's window's half-angle 48.5 degrees (Snell's
-law: 48.6), from 5 m below near-flat water. The rendered tests skip
+law: 48.6), from 5 m below near-flat water; a camera above the still water
+in a 1 m sea seeing the crests higher than itself from above.
+
+`effects_test` also: `<quality>` low and high close to medium, an unknown
+value the medium image; a lidar's scan, a thermal image and a bounding box
+camera's boxes the same with the GPU path and without (the backdrop is
+hidden from those cameras). The rendered tests skip
 without a GPU.
 
 `lamp_edges_test`, rendered, in a process of its own: five lamps, one past
