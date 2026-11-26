@@ -31,8 +31,14 @@ double Backscatter(const AcousticProperties &_properties, double _incidence)
   double sigma = std::pow(10.0, _properties.lambertDb / 10.0) * c * c;
   if (_properties.specularDb)
   {
+    // The Kirchhoff approximation near normal incidence for Gaussian facet
+    // slopes of rms w: R^2 / (8 pi w^2) at the peak. The 1 / (8 pi w^2)
+    // makes the lobe carry the energy of a mirror: a sphere of radius a with
+    // R^2 = 1 has the target strength of a rigid sphere, a^2 / 4, whatever
+    // w, where a bare R^2 peak gave it 8 pi w^2 of that, 9 dB short at 0.07.
     const double w = _properties.specularWidth;
-    sigma += std::pow(10.0, *_properties.specularDb / 10.0) *
+    sigma += std::pow(10.0, *_properties.specularDb / 10.0) /
+      (8.0 * M_PI * w * w) *
       std::exp(-_incidence * _incidence / (2.0 * w * w));
   }
   return sigma;

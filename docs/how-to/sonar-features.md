@@ -26,7 +26,7 @@ Every surface echoes; how strongly is set in SDF. Nothing has to be marked for t
 </visual>
 ```
 
-Lambert strength (dB) is how much a rough surface scatters back; the specular terms (dB, and width in radians) add a glint seen only head on, as glass gives. The same attributes on a `<model>` apply to all its visuals.
+Lambert strength (dB) is how much a rough surface scatters back; the specular terms (the square of the reflection coefficient in dB, 0 for a perfect reflector, and the width in radians) add a glint seen only head on, as glass gives; a wider glint is seen over more angles but is dimmer. The same attributes on a `<model>` apply to all its visuals.
 
 ### Hide a surface
 

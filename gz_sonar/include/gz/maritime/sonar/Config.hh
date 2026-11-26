@@ -38,24 +38,27 @@ struct AcousticProperties
   /// are an extrapolation. 
   double lambertDb{-20.0};
 
-  /// \brief Specular strength, 10 log10 S, dB: the glint off a smooth
-  /// surface seen near head on. Near normal incidence the return follows the
-  /// square of the reflection coefficient, which the impedance contrast sets
-  /// (APL-UW TR 9407, Eq. 37, p. IV-27). Typically -20 (a faint glint off a
-  /// rough surface) to about 0 (glass, metal plate, smooth concrete). Larger
-  /// values give a brighter glint; empty for a purely diffuse surface.
+  /// \brief Specular strength, 10 log10 R^2, dB: the square of the
+  /// reflection coefficient at normal incidence, which the impedance
+  /// contrast with the water sets (APL-UW TR 9407, Eq. 37, p. IV-27). The
+  /// lobe's peak is R^2 / (8 pi w^2), the Kirchhoff approximation near
+  /// normal incidence, so the glint carries the energy a mirror would: a
+  /// sphere of radius a returns R^2 a^2 / 4 whatever the width. Typically
+  /// -20 (a faint glint off a rough surface) to about 0 (glass, metal
+  /// plate, smooth concrete). Larger values give a brighter glint; empty for
+  /// a purely diffuse surface.
   std::optional<double> specularDb;
 
   /// \brief Angular width of the specular lobe, rad. Typically 0.02 to
   /// 0.03 for very smooth surfaces to 0.17 to 0.35 for rough ones; 0.07
   /// (4 degrees) suits most man-made objects. Larger values show the glint
-  /// over a wider range of viewing angles, at the same peak; smaller values
-  /// make it a brief flash seen only square on.
+  /// over a wider range of viewing angles, at a lower peak; smaller values
+  /// make it a brighter, briefer flash seen only square on.
   double specularWidth{0.07};
 };
 
 /// \brief Backscatter per unit area at an incidence angle:
-/// mu cos^2(theta) + S exp(-theta^2 / 2 w^2).
+/// mu cos^2(theta) + R^2 / (8 pi w^2) exp(-theta^2 / 2 w^2).
 /// \param[in] _properties The surface.
 /// \param[in] _incidence Angle between the ray and the surface normal, rad.
 /// \return The backscatter cross section per unit area, linear.

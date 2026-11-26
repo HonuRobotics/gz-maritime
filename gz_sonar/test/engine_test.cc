@@ -127,7 +127,9 @@ TEST(Scattering, LambertAndSpecular)
 
   p.specularDb = 0.0;
   p.specularWidth = 4.0 * kDeg;
-  EXPECT_NEAR(sonar::Backscatter(p, 0.0), 1.01, 1e-12);
+  const double w = 4.0 * kDeg;
+  EXPECT_NEAR(sonar::Backscatter(p, 0.0), 0.01 + 1.0 / (8.0 * M_PI * w * w),
+    1e-9);
   // Well outside the lobe only Lambert remains.
   EXPECT_NEAR(sonar::Backscatter(p, 30.0 * kDeg),
     0.01 * std::pow(std::cos(30.0 * kDeg), 2), 1e-9);
@@ -183,6 +185,35 @@ TEST(Engine, SpreadingAndAbsorption)
   const double expected = 40.0 * std::log10(2.0) +
     2.0 * engine.Absorption() * 4.0;
   EXPECT_NEAR(total(4.0) - total(8.0), expected, 0.5);
+}
+
+/////////////////////////////////////////////////
+// The specular term is tied to the reflection coefficient: a sphere of
+// radius a with R^2 = 1 has the target strength of a rigid sphere, a^2 / 4,
+// whatever the width of its lobe. Measured against a Lambert sphere, whose
+// target strength is 2 pi a^2 mu / 3, so the sonar's own scale cancels.
+TEST(Engine, SpecularSphereIsARigidSphere)
+{
+  sonar::SonarConfig c = CleanEcho();
+  c.raysPerBeam = 8;
+  c.elevationRays = 512;
+  const double a = 0.25;
+  auto total = [&](const sonar::AcousticProperties &_p) {
+    sonar::SyntheticScene scene;
+    scene.AddSphere({5, 0, 0}, a, _p, 1);
+    return TotalDb(Ping(c, scene, Pose3d::Zero));
+  };
+  const double mu = 0.1;
+  const double lambert = total(Lambert(10.0 * std::log10(mu)));
+  for (double w : {0.05, 0.1})
+  {
+    sonar::AcousticProperties p = Lambert(-200.0);
+    p.specularDb = 0.0;
+    p.specularWidth = w;
+    EXPECT_NEAR(total(p) - lambert,
+      10.0 * std::log10((a * a / 4.0) / (2.0 * M_PI * a * a * mu / 3.0)),
+      0.5) << "width " << w;
+  }
 }
 
 /////////////////////////////////////////////////
