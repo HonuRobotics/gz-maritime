@@ -215,8 +215,10 @@ off, set its intensity to 0: it then costs nothing.
 - **Unlit materials** (a particle emitter's particles; gz-rendering draws
   markers, lines and the grid with PBS) keep their own colour, faded over
   the range, with the veil: no daylight fades them and no lamp lights them.
-  The lamps' beams and marine snow in front of them are not drawn, nor is
-  the water for an orthographic camera.
+  The lamps' beams and marine snow in front of them are not drawn.
+- **An orthographic camera** (the GUI's orthographic view) is drawn as in
+  air, with no backdrop: the model's ranges do not fit it. The lamps, hidden
+  from Ogre while the water is drawn, are dark in it.
 - **Depth below the wave over the camera.** As in the reference camera,
   the water's surface is a flat level for each camera: the still level
   plus the wave over the camera, which the renderer asks the plugin's water
@@ -269,11 +271,17 @@ for 0.3092 from the formula and their colour in air.
 law: 48.6), from 5 m below near-flat water; a camera above the still water
 in a 1 m sea seeing the crests higher than itself from above.
 
-`effects_test` also: `<quality>` low and high close to medium, an unknown
+`effects_test` also: a slow camera beside a fast one, each slow frame
+the fast one's of the same instant, under the waves; `<quality>` low and
+high close to medium, an unknown
 value the medium image; a lidar's scan, a thermal image and a bounding box
 camera's boxes the same with the GPU path and without (the backdrop is
 hidden from those cameras). The rendered tests skip
 without a GPU.
+
+`orthographic_test`, rendered, the bridge driven through its C interface
+without Gazebo: a perspective camera sees a box through the water as the
+model has it, an orthographic one beside it as in air.
 
 `lamp_edges_test`, rendered, in a process of its own: five lamps, one past
 the limit, which Ogre lights as in air, and four that light nothing in view

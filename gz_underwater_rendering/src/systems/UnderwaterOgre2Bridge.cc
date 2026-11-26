@@ -279,15 +279,20 @@ class Surface
 /// clear (alpha 0) for cameras above the water.
 class Backdrop : public Ogre::Camera::Listener
 {
-  /// \brief Hidden while a camera that is not a colour camera renders
-  /// (bounding boxes, segmentation, thermal): those swap the materials of
-  /// gz-rendering's own items only, and would read the backdrop, which is
-  /// not one, as a thing filling the view. Before culling, as their own
-  /// material switchers work.
+  /// \brief Hidden while a camera renders that must not see it: one that is
+  /// not a colour camera (bounding boxes, segmentation, thermal; those swap
+  /// the materials of gz-rendering's own items only, and would read the
+  /// backdrop, which is not one, as a thing filling the view), or an
+  /// orthographic one, which is drawn as in air. Before culling, as their
+  /// own material switchers work.
   public: void cameraPreRenderScene(Ogre::Camera *_camera) override
   {
     const auto it = this->items.find(_camera->getSceneManager());
     if (it == this->items.end())
+      return;
+    this->hiding = _camera->getProjectionType() == Ogre::PT_ORTHOGRAPHIC ||
+        this->solid.count(_camera->getName()) > 0;
+    if (!this->hiding)
       return;
     this->wasVisible = it->second->getVisible();
     it->second->setVisible(false);
@@ -297,13 +302,14 @@ class Backdrop : public Ogre::Camera::Listener
   public: void cameraPostRenderScene(Ogre::Camera *_camera) override
   {
     const auto it = this->items.find(_camera->getSceneManager());
-    if (it != this->items.end())
+    if (it != this->items.end() && this->hiding)
       it->second->setVisible(this->wasVisible);
+    this->hiding = false;
   }
 
-  /// \brief Listen to the cameras that must not see the backdrop: the
-  /// bounding box, segmentation and thermal cameras of every scene, whose
-  /// Ogre camera carries the sensor's name. New ones are found as they come.
+  /// \brief Listen to every camera of every scene, new ones as they come,
+  /// and note which are not colour cameras: the bounding box, segmentation
+  /// and thermal sensors, whose Ogre camera carries the sensor's name.
   private: void WatchCameras()
   {
     if (!gz::rendering::isEngineLoaded("ogre2"))
@@ -320,20 +326,21 @@ class Backdrop : public Ogre::Camera::Listener
       for (unsigned int i = 0; i < scene->SensorCount(); ++i)
       {
         const auto sensor = scene->SensorByIndex(i);
-        if (!std::dynamic_pointer_cast<gz::rendering::BoundingBoxCamera>(
-                sensor) &&
-            !std::dynamic_pointer_cast<gz::rendering::SegmentationCamera>(
-                sensor) &&
-            !std::dynamic_pointer_cast<gz::rendering::ThermalCamera>(sensor))
+        if (std::dynamic_pointer_cast<gz::rendering::BoundingBoxCamera>(
+                sensor) ||
+            std::dynamic_pointer_cast<gz::rendering::SegmentationCamera>(
+                sensor) ||
+            std::dynamic_pointer_cast<gz::rendering::ThermalCamera>(sensor))
         {
-          continue;
+          this->solid.insert(sensor->Name());
         }
-        Ogre::Camera *camera = sm->findCameraNoThrow(sensor->Name());
-        if (camera && this->watched.insert({sm, sensor->Name(), camera})
-                          .second)
-        {
+      }
+      auto cameras = sm->getCameraIterator();
+      while (cameras.hasMoreElements())
+      {
+        Ogre::Camera *camera = cameras.getNext();
+        if (this->watched.insert({sm, camera->getName(), camera}).second)
           camera->addListener(this);
-        }
       }
     }
   }
@@ -547,6 +554,12 @@ class Backdrop : public Ogre::Camera::Listener
   /// \brief The backdrop's visibility before a camera hid it.
   private: bool wasVisible{false};
 
+  /// \brief Whether the camera rendering now hid it.
+  private: bool hiding{false};
+
+  /// \brief The names of the cameras that are not colour cameras.
+  private: std::set<std::string> solid;
+
   /// \brief Set when the box could not be made: not tried again.
   private: bool failed{false};
 };
@@ -631,8 +644,16 @@ class UnderwaterListener : public ChainedListener
   /// \brief Set from any thread when the plugin is gone: draw nothing.
   public: std::atomic<bool> released{false};
 
-  private: bool On(bool _caster) const
-  { return this->water.active && !this->released && !_caster; }
+  /// \brief Whether the water is drawn in a pass: not for an orthographic
+  /// camera (the GUI's orthographic view), whose fragments the model gets
+  /// wrong; it is drawn as in air, as the unlit shaders draw it.
+  private: bool On(bool _caster, Ogre::SceneManager *_sm) const
+  {
+    if (!this->water.active || this->released || _caster)
+      return false;
+    const Ogre::Camera *camera = _sm->getCamerasInProgress().renderingCamera;
+    return !camera || camera->getProjectionType() != Ogre::PT_ORTHOGRAPHIC;
+  }
 
   /// \brief The scene's lamps (spot and point lights), as of the last
   /// preparePassHash.
@@ -757,7 +778,7 @@ class UnderwaterListener : public ChainedListener
     if (this->previous)
       this->previous->preparePassHash(_shadow, _caster, _dual, _sm, _hlms);
     this->backdrop.BeforePass(_sm);
-    if (!this->On(_caster))
+    if (!this->On(_caster, _sm))
       return;
     _hlms->_setProperty("gz_underwater", 1);
     this->CollectLamps(_sm);
@@ -775,7 +796,7 @@ class UnderwaterListener : public ChainedListener
         this->previous->getPassBufferSize(_shadow, _caster, _dual, _sm) : 0u;
     // Ogre aligns each listener's block to 16 bytes.
     size = (size + 15u) & ~15u;
-    return size + (this->On(_caster) ? kBlockBytes : 0u);
+    return size + (this->On(_caster, _sm) ? kBlockBytes : 0u);
   }
 
   public: float *preparePassBuffer(const Ogre::CompositorShadowNode *_shadow,
@@ -785,7 +806,7 @@ class UnderwaterListener : public ChainedListener
     if (this->previous)
       _ptr = this->previous->preparePassBuffer(_shadow, _caster, _dual, _sm,
                                                _ptr);
-    if (!this->On(_caster))
+    if (!this->On(_caster, _sm))
       return _ptr;
     // Collect the lamps again for this pass: the block's size does not
     // depend on how many there are, so the data never depends on the order

@@ -31,6 +31,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <string>
 #include <thread>
 #include <utility>
@@ -521,6 +522,48 @@ TEST(WaveDepth, TheCameraIsUnderTheWaveNotTheStillLevel)
   EXPECT_LE(nBelow, 56) << "never above the trough";
   EXPECT_GT(both, 60);
   EXPECT_EQ(wrong, 0);
+}
+
+/////////////////////////////////////////////////
+// A slow camera beside a fast one, at the same place under the waves: each
+// frame of the slow one is, pixel for pixel, the fast one's of the same
+// instant. The surface over a camera is asked for each pass, whatever the
+// camera's rate, not kept from a frame before.
+TEST(WaveDepth, ASlowCameraBesideAFastOne)
+{
+  Capture c("wave_depth_rates.sdf", {"/uwrates/fast", "/uwrates/slow"});
+  // Eight seconds, two wave periods, after the wave has grown
+  c.Next("/uwrates/fast", 30);
+  if (!c.Rendered())
+    GTEST_SKIP() << "nothing rendered: no GPU?";
+  c.Next("/uwrates/fast", 80);
+  c.Next("/uwrates/slow", 1);
+  c.server.reset();
+  const auto fast = c.Last("/uwrates/fast", 200);
+  const auto slow = c.Last("/uwrates/slow", 16);
+  const auto stamp = [](const msgs::Image &_m)
+  {
+    return _m.header().stamp().sec() * 1000000000LL +
+           _m.header().stamp().nsec();
+  };
+  std::map<long long, const msgs::Image *> byStamp;
+  for (const auto &m : fast)
+    byStamp[stamp(m)] = &m;
+  int same = 0, differ = 0;
+  std::set<std::string> distinct;
+  for (const auto &m : slow)
+  {
+    const auto it = byStamp.find(stamp(m));
+    if (it == byStamp.end())
+      continue;
+    (it->second->data() == m.data() ? same : differ) += 1;
+    distinct.insert(m.data());
+  }
+  std::cout << "slow frames: " << same << " the fast one's, " << differ
+            << " not; " << distinct.size() << " different images\n";
+  EXPECT_GE(same + differ, 10);
+  EXPECT_EQ(differ, 0);
+  EXPECT_GE(distinct.size(), 2u) << "the wave did not move the water";
 }
 
 /////////////////////////////////////////////////
