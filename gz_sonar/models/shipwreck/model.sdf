@@ -15,62 +15,41 @@
   <model name="shipwreck">
     <static>true</static>
     <link name="wreck">
-      <visual name="hull">
+      <visual name="hull" gz:acoustic_lambert="-25">
         <pose>0 0 0 1.5708 0 1.5708</pose>
         <geometry><mesh><uri>model://shipwreck/meshes/hull_visual.glb</uri></mesh></geometry>
-        <gz:acoustic_lambert>-25</gz:acoustic_lambert>
       </visual>
-      <visual name="mast">
+      <visual name="mast" gz:acoustic_lambert="-25">
         <pose>0 0 0 1.5708 0 1.5708</pose>
         <geometry><mesh><uri>model://shipwreck/meshes/mast_visual.glb</uri></mesh></geometry>
-        <gz:acoustic_lambert>-25</gz:acoustic_lambert>
       </visual>
-      <visual name="boiler">
+      <visual name="boiler" gz:acoustic_lambert="-15" gz:acoustic_specular="-5" gz:acoustic_specular_width="0.1">
         <pose>0 0 0 1.5708 0 1.5708</pose>
         <geometry><mesh><uri>model://shipwreck/meshes/boiler_visual.glb</uri></mesh></geometry>
-        <gz:acoustic_lambert>-15</gz:acoustic_lambert>
-        <gz:acoustic_specular>-5</gz:acoustic_specular>
-        <gz:acoustic_specular_width>0.1</gz:acoustic_specular_width>
       </visual>
-      <visual name="engine">
+      <visual name="engine" gz:acoustic_lambert="-15" gz:acoustic_specular="-5" gz:acoustic_specular_width="0.1">
         <pose>0 0 0 1.5708 0 1.5708</pose>
         <geometry><mesh><uri>model://shipwreck/meshes/engine_visual.glb</uri></mesh></geometry>
-        <gz:acoustic_lambert>-15</gz:acoustic_lambert>
-        <gz:acoustic_specular>-5</gz:acoustic_specular>
-        <gz:acoustic_specular_width>0.1</gz:acoustic_specular_width>
       </visual>
-      <visual name="debris">
+      <visual name="debris" gz:acoustic_lambert="-15" gz:acoustic_specular="-5" gz:acoustic_specular_width="0.1">
         <pose>0 0 0 1.5708 0 1.5708</pose>
         <geometry><mesh><uri>model://shipwreck/meshes/debris_visual.glb</uri></mesh></geometry>
-        <gz:acoustic_lambert>-15</gz:acoustic_lambert>
-        <gz:acoustic_specular>-5</gz:acoustic_specular>
-        <gz:acoustic_specular_width>0.1</gz:acoustic_specular_width>
       </visual>
-      <visual name="propeller">
+      <visual name="propeller" gz:acoustic_lambert="-15" gz:acoustic_specular="-3" gz:acoustic_specular_width="0.07">
         <pose>0 0 0 1.5708 0 1.5708</pose>
         <geometry><mesh><uri>model://shipwreck/meshes/propeller_visual.glb</uri></mesh></geometry>
-        <gz:acoustic_lambert>-15</gz:acoustic_lambert>
-        <gz:acoustic_specular>-3</gz:acoustic_specular>
-        <gz:acoustic_specular_width>0.07</gz:acoustic_specular_width>
       </visual>
-      <visual name="bell">
+      <visual name="bell" gz:acoustic_lambert="-15" gz:acoustic_specular="-3" gz:acoustic_specular_width="0.07">
         <pose>0 0 0 1.5708 0 1.5708</pose>
         <geometry><mesh><uri>model://shipwreck/meshes/bell_visual.glb</uri></mesh></geometry>
-        <gz:acoustic_lambert>-15</gz:acoustic_lambert>
-        <gz:acoustic_specular>-3</gz:acoustic_specular>
-        <gz:acoustic_specular_width>0.07</gz:acoustic_specular_width>
       </visual>
-      <visual name="name_plate">
+      <visual name="name_plate" gz:acoustic_lambert="-20" gz:acoustic_specular="-5" gz:acoustic_specular_width="0.05">
         <pose>0 0 0 1.5708 0 1.5708</pose>
         <geometry><mesh><uri>model://shipwreck/meshes/name_plate_visual.glb</uri></mesh></geometry>
-        <gz:acoustic_lambert>-20</gz:acoustic_lambert>
-        <gz:acoustic_specular>-5</gz:acoustic_specular>
-        <gz:acoustic_specular_width>0.05</gz:acoustic_specular_width>
       </visual>
-      <visual name="coal">
+      <visual name="coal" gz:acoustic_lambert="-22">
         <pose>0 0 0 1.5708 0 1.5708</pose>
         <geometry><mesh><uri>model://shipwreck/meshes/coal_visual.glb</uri></mesh></geometry>
-        <gz:acoustic_lambert>-22</gz:acoustic_lambert>
       </visual>
       <collision name="aft_section_collision">
         <pose>-10.400 0 1.15 0 0 0</pose>

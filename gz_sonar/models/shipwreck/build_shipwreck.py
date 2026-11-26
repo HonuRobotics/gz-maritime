@@ -392,14 +392,15 @@ def write_sdf(parts):
     vis = []
     for name, _, cls, _, _ in parts:
         lam, spec, width = ACOUSTIC[cls]
-        ac = f"        <gz:acoustic_lambert>{lam}</gz:acoustic_lambert>\n"
+        # The acoustic marks are attributes of the visual, as gz:buoyancy is of
+        # a collision.
+        ac = f' gz:acoustic_lambert="{lam}"'
         if spec is not None:
-            ac += (f"        <gz:acoustic_specular>{spec}</gz:acoustic_specular>\n"
-                   f"        <gz:acoustic_specular_width>{width}</gz:acoustic_specular_width>\n")
-        vis.append(f"""      <visual name="{name}">
+            ac += f' gz:acoustic_specular="{spec}" gz:acoustic_specular_width="{width}"'
+        vis.append(f"""      <visual name="{name}"{ac}>
         <pose>0 0 0 1.5708 0 1.5708</pose>
         <geometry><mesh><uri>model://shipwreck/meshes/{name}_visual.glb</uri></mesh></geometry>
-{ac}      </visual>""")
+      </visual>""")
     bx, by, bz = gz((0, BOILER_LEN / 2, BOILER_Z))
     ex, ey, ez = gz((0, sum(ENGINE_Y) / 2, 1.55))
     a0, a1 = y_of(STANDING_FROM), y_of(L)

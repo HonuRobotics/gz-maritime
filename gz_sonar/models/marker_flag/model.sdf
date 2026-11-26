@@ -1,8 +1,7 @@
 <?xml version="1.0"?>
 <sdf version="1.12" xmlns:gz="http://gazebosim.org/schema">
-  <model name="marker_flag">
+  <model name="marker_flag" gz:acoustic_transparent="true">
     <static>true</static>
-    <gz:acoustic_transparent/>
     <link name="link">
       <visual name="pole">
         <pose>0 0 1 0 0 0</pose>

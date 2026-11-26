@@ -40,9 +40,8 @@
       <static>true</static>
       <pose>5 0 0.25 0 0 0</pose>
       <link name="link">
-        <visual name="body">
+        <visual name="body" gz:acoustic_lambert="-15">
           <geometry><box><size>1 1 0.5</size></box></geometry>
-          <gz:acoustic_lambert>-15</gz:acoustic_lambert>
         </visual>
       </link>
     </model>

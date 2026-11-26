@@ -131,10 +131,9 @@
     </include>
 
     <!-- Visual only water surface at the z=0 graded buoyancy waterline. -->
-    <model name="water_surface">
+    <model name="water_surface" gz:acoustic_transparent="true">
       <static>true</static>
       <!-- Drawn for the cameras only: sonars do not see it (gz_sonar). -->
-      <gz:acoustic_transparent/>
       <link name="link">
         <visual name="visual">
           <transparency>0.4</transparency>

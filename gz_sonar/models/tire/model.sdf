@@ -3,10 +3,9 @@
   <model name="tire">
     <static>true</static>
     <link name="link">
-      <visual name="rubber">
+      <visual name="rubber" gz:acoustic_lambert="-25">
         <geometry><cylinder><radius>0.35</radius><length>0.25</length></cylinder></geometry>
         <material><diffuse>0.08 0.08 0.08 1</diffuse><ambient>0.08 0.08 0.08 1</ambient></material>
-        <gz:acoustic_lambert>-25</gz:acoustic_lambert>
       </visual>
       <collision name="rubber">
         <geometry><cylinder><radius>0.35</radius><length>0.25</length></cylinder></geometry>

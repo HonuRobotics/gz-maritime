@@ -60,9 +60,11 @@ struct AcousticMarks
   bool transparent{false};
 };
 
-/// \brief Read gz:acoustic_lambert, gz:acoustic_specular,
-/// gz:acoustic_specular_width and gz:acoustic_transparent from the direct
-/// children of an element.
+/// \brief Read the acoustic marks of a <visual> or <model>: its attributes
+/// gz:acoustic_lambert, gz:acoustic_specular, gz:acoustic_specular_width
+/// (numbers) and gz:acoustic_transparent (true or false), as in
+/// <visual name="glass" gz:acoustic_lambert="-30">. A malformed value is
+/// reported and left unset.
 AcousticMarks ReadAcousticMarks(const sdf::ElementPtr &_element);
 
 /// \brief Read a block of acoustic values written without the prefix, as in

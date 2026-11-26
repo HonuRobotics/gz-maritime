@@ -97,9 +97,8 @@
     </model>
 
     <!-- Drawn for the cameras only: the sonar does not see the surface. -->
-    <model name="water_surface">
+    <model name="water_surface" gz:acoustic_transparent="true">
       <static>true</static>
-      <gz:acoustic_transparent/>
       <link name="link">
         <visual name="visual">
           <transparency>0.4</transparency>

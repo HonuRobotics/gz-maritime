@@ -3,10 +3,9 @@
   <model name="sonar_box">
     <static>true</static>
     <link name="link">
-      <visual name="body">
+      <visual name="body" gz:acoustic_lambert="-15">
         <geometry><box><size>0.5 0.5 0.5</size></box></geometry>
         <material><diffuse>0.6 0.6 0.6 1</diffuse><ambient>0.6 0.6 0.6 1</ambient></material>
-        <gz:acoustic_lambert>-15</gz:acoustic_lambert>
       </visual>
       <collision name="body">
         <geometry><box><size>0.5 0.5 0.5</size></box></geometry>

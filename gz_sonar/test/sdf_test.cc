@@ -182,14 +182,14 @@ TEST(SonarSdf, MalformedValuesAreRefused)
 
 namespace
 {
-/// \brief One <visual> with the given acoustic marks.
-gz::sim::maritime::AcousticMarks Marks(const std::string &_body)
+/// \brief One <visual> with the given acoustic mark attributes.
+gz::sim::maritime::AcousticMarks Marks(const std::string &_attributes)
 {
   const std::string xml =
     "<?xml version='1.0'?><sdf version='1.12' "
     "xmlns:gz='http://gazebosim.org/schema'><model name='m'><link name='l'>"
-    "<visual name='v'><geometry><box><size>1 1 1</size></box></geometry>" +
-    _body + "</visual></link></model></sdf>";
+    "<visual name='v' " + _attributes + "><geometry><box><size>1 1 1</size>"
+    "</box></geometry></visual></link></model></sdf>";
   static sdf::Root root;
   root = sdf::Root();
   const auto errors = root.LoadSdfString(xml);
@@ -215,17 +215,17 @@ sdf::ElementPtr Plugin(const std::string &_body)
 
 TEST(SonarSdf, TransparentTakesItsValue)
 {
-  EXPECT_TRUE(Marks("<gz:acoustic_transparent/>").transparent);
-  EXPECT_TRUE(Marks("<gz:acoustic_transparent>true</gz:acoustic_transparent>")
-    .transparent);
-  EXPECT_FALSE(Marks("<gz:acoustic_transparent>false</gz:acoustic_transparent>")
-    .transparent);
+  EXPECT_TRUE(Marks(R"(gz:acoustic_transparent="true")").transparent);
+  EXPECT_TRUE(Marks(R"(gz:acoustic_transparent="1")").transparent);
+  EXPECT_FALSE(Marks(R"(gz:acoustic_transparent="false")").transparent);
   EXPECT_FALSE(Marks("").transparent);
   // A malformed value is reported and left unset.
-  EXPECT_FALSE(Marks("<gz:acoustic_lambert>loud</gz:acoustic_lambert>")
-    .lambertDb.has_value());
-  EXPECT_DOUBLE_EQ(*Marks("<gz:acoustic_lambert>-27</gz:acoustic_lambert>")
-    .lambertDb, -27.0);
+  EXPECT_FALSE(Marks(R"(gz:acoustic_lambert="loud")").lambertDb.has_value());
+  const auto m = Marks(R"(gz:acoustic_lambert="-27" gz:acoustic_specular="-3" )"
+    R"(gz:acoustic_specular_width="0.07")");
+  EXPECT_DOUBLE_EQ(*m.lambertDb, -27.0);
+  EXPECT_DOUBLE_EQ(*m.specularDb, -3.0);
+  EXPECT_DOUBLE_EQ(*m.specularWidth, 0.07);
 }
 
 TEST(SonarSdf, WaterIsChecked)

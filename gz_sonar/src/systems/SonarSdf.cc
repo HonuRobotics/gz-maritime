@@ -335,23 +335,60 @@ std::optional<double> MarkValue(const sdf::ElementPtr &_e,
 }
 }  // namespace
 
+/// \brief An attribute's value, if the element has it.
+std::optional<std::string> Attribute(const sdf::ElementPtr &_e,
+  const std::string &_name)
+{
+  if (!_e || !_e->HasAttribute(_name))
+    return std::nullopt;
+  return _e->GetAttribute(_name)->GetAsString();
+}
+
+/// \brief One acoustic mark, an attribute, strictly: a value that does not
+/// parse whole as a finite number is reported and left unset.
+std::optional<double> MarkAttribute(const sdf::ElementPtr &_e,
+  const std::string &_name)
+{
+  const auto t = Attribute(_e, _name);
+  if (!t)
+    return std::nullopt;
+  const auto v = ParseNumber(*t);
+  if (!v)
+  {
+    gzerr << "sonar: " << _name << " must be a finite number, not [" << *t
+          << "]; ignored\n";
+  }
+  return v;
+}
+
 AcousticMarks ReadAcousticMarks(const sdf::ElementPtr &_element)
 {
   AcousticMarks m;
-  m.lambertDb = MarkValue(_element, "gz:acoustic_lambert");
-  m.specularDb = MarkValue(_element, "gz:acoustic_specular");
-  m.specularWidth = MarkValue(_element, "gz:acoustic_specular_width");
-  // <gz:acoustic_transparent/> alone means true; a value says which.
-  if (auto t = Text(_element, "gz:acoustic_transparent"))
+  // Attributes of the <visual> or <model>, as gz:buoyancy is of a collision;
+  // namespaced, so SDFormat keeps them without knowing them.
+  m.lambertDb = MarkAttribute(_element, "gz:acoustic_lambert");
+  m.specularDb = MarkAttribute(_element, "gz:acoustic_specular");
+  m.specularWidth = MarkAttribute(_element, "gz:acoustic_specular_width");
+  if (auto t = Attribute(_element, "gz:acoustic_transparent"))
   {
-    if (t->empty())
-      m.transparent = true;
-    else if (auto f = ParseFlag(*t))
+    if (auto f = ParseFlag(*t))
       m.transparent = *f;
     else
     {
-      gzerr << "sonar: <gz:acoustic_transparent> must be true or false, not ["
+      gzerr << "sonar: gz:acoustic_transparent must be true or false, not ["
             << *t << "]; taken as false\n";
+    }
+  }
+  // The older spelling, child elements, is no longer read: say so.
+  for (const char *name : {"gz:acoustic_lambert", "gz:acoustic_specular",
+                           "gz:acoustic_specular_width",
+                           "gz:acoustic_transparent"})
+  {
+    if (_element && _element->HasElement(name))
+    {
+      gzwarn << "sonar: <" << name << "> as a child element is not read; "
+             << "write it as an attribute of the <" << _element->GetName()
+             << ">, " << name << "=\"...\"\n";
     }
   }
   return m;

@@ -128,7 +128,7 @@ What a real device delivers differs by sonar, so what the sonar plugin publishes
 
 ### Acoustic properties of the scene
 
-Each surface needs the two backscatter terms above: the Lambert strength μ and, for smooth objects, the specular strength S and width w. Materials of a mesh part live in its `.glb`, and the SDF `<visual>` of a `.glb` must not declare a `<material>`, so acoustic properties cannot come from SDF materials; the simple targets in `gz_sonar`, primitives with no mesh, keep an SDF material for their color. They are set with `gz:` custom elements, the way the project already marks collisions for buoyancy and wind. Strengths are in dB (10 log₁₀ μ and 10 log₁₀ S), the form backscatter is quoted in the literature, and the width is in radians, as SDF gives every angle. Ground truth labels come from the same pass: each ray knows which entity it hit. Labels are the segmentation camera's 8 bits, one id per model and property set for the whole world, so a world can tell 254 surfaces apart; past that, the rest share one id with the default properties, and labeling per ping by range is the way beyond it.
+Each surface needs the two backscatter terms above: the Lambert strength μ and, for smooth objects, the specular strength S and width w. Materials of a mesh part live in its `.glb`, and the SDF `<visual>` of a `.glb` must not declare a `<material>`, so acoustic properties cannot come from SDF materials; the simple targets in `gz_sonar`, primitives with no mesh, keep an SDF material for their color. They are set with `gz:` attributes on the `<visual>` or `<model>`, the way the project already marks collisions for buoyancy and wind. Strengths are in dB (10 log₁₀ μ and 10 log₁₀ S), the form backscatter is quoted in the literature, and the width is in radians, as SDF gives every angle. Ground truth labels come from the same pass: each ray knows which entity it hit. Labels are the segmentation camera's 8 bits, one id per model and property set for the whole world, so a world can tell 254 surfaces apart; past that, the rest share one id with the default properties, and labeling per ping by range is the way beyond it.
 
 Nothing has to be marked for the sonar to see it. Every surface gets values from the first of these that sets them:
 
@@ -139,21 +139,19 @@ Nothing has to be marked for the sonar to see it. Every surface gets values from
 
 So an unmarked model is a plain diffuse scatterer, and marking is only needed for the objects a task depends on: targets, lookalikes, the wreck. The specular term is never on by default, because a glint on every flat face would make everything look smooth.
 
-The seabed is named in the world rather than marked, because site worlds take their terrain from Fuel models that we do not edit: the sonar system's `<seabed>` lists the seabed models and their values. Three kinds of surface return no echo at all: the water surface drawn by `gz_waves_rendering`, which the engine hides from its cameras; the model that carries the sonar, so a hull or mount never echoes into its own sensor; and anything marked `<gz:acoustic_transparent/>`, for visual-only objects such as markers above the water.
+The seabed is named in the world rather than marked, because site worlds take their terrain from Fuel models that we do not edit: the sonar system's `<seabed>` lists the seabed models and their values. Three kinds of surface return no echo at all: the water surface drawn by `gz_waves_rendering`, which the engine hides from its cameras; the model that carries the sonar, so a hull or mount never echoes into its own sensor; and anything marked `gz:acoustic_transparent="true"`, for visual-only objects such as markers above the water.
 
 ```xml
 <!-- A hollow glass float: smooth, so weak diffuse scattering and a strong
      specular glint when the sonar looks at it head on. -->
-<visual name="float">
+<visual name="float" gz:acoustic_lambert="-30" gz:acoustic_specular="-3"
+        gz:acoustic_specular_width="0.07">
   <geometry><sphere><radius>0.2</radius></sphere></geometry>
-  <gz:acoustic_lambert>-30</gz:acoustic_lambert>
-  <gz:acoustic_specular>-3</gz:acoustic_specular>
-  <gz:acoustic_specular_width>0.07</gz:acoustic_specular_width>
 </visual>
 
 <!-- A course marker that is only for the cameras. -->
-<visual name="flag">
-  <gz:acoustic_transparent/>
+<visual name="flag" gz:acoustic_transparent="true">
+  ...
 </visual>
 
 <!-- In the world: the water, the seabed, and the default for anything unmarked. -->
@@ -177,7 +175,7 @@ On a visual, or directly under a model:
 - `gz:acoustic_lambert`: diffuse backscatter strength, 10 log₁₀ μ, in dB. Lambert-equivalent values for the generic bottom types of [APL-UW TR 9407](https://apps.dtic.mil/sti/pdfs/ADB199453.pdf) (1994; approved for public release in 1997) (Table 3, pp. IV-23 to IV-25, and Figure 2, p. IV-26), read at 30 kHz and 20° grazing: about +1 dB for rough rock, −6 for rock, −10 for cobble, −13 for sandy gravel, −18 to −19 for sand and −23 to −28 for silt. The handbook covers 10 to 100 kHz, below these sonars' 240 to 700 kHz, where its values run a few dB stronger, so applying them here is an extrapolation. The built-in default for objects is −20 dB.
 - `gz:acoustic_specular`: strength of the glint near normal incidence, in dB. Near normal incidence the return follows the square of the reflection coefficient, which the impedance contrast between water and the surface sets (APL-UW TR 9407, Eq. 37, p. IV-27). From about −20 dB, a faint glint off a rough surface, to around 0 dB for smooth, hard surfaces such as glass, metal plate or concrete. Off unless set.
 - `gz:acoustic_specular_width`: angular width of that glint, in radians ([Jackson and Richardson, High-Frequency Seafloor Acoustics](https://link.springer.com/chapter/10.1007/978-0-387-36945-7_6)). From 0.02 to 0.03 (1 to 2°) for very smooth surfaces to 0.17 to 0.35 (10 to 20°) for rough ones; about 0.07 (4°) suits most man-made objects.
-- `gz:acoustic_transparent`: the sonar does not see this surface. Present or absent.
+- `gz:acoustic_transparent`: the sonar does not see this surface. `true` or `false`.
 
 In the world's sonar system:
 
