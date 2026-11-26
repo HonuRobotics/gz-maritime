@@ -173,9 +173,9 @@ intensity of 0 costs nothing.
   in the camera plugin.
 - **The camera's port**: `<port>flat</port>` refracts like a flat port
   (a narrower, magnified view); `<port>dome</port>` changes nothing.
-- **Caustics** dance on a shallow seabed under waves: on by default with the
-  `underwater_optics` model (`<caustics>` in the water optics, 0 to turn
-  them off). None on flat water.
+- **Caustics** dance on a shallow seabed under waves:
+  `<caustics>1</caustics>` in the water optics, with the `underwater_optics`
+  model in the world. Off by default; none on flat water.
 - **Marine snow**: `<marine_snow>0.2</marine_snow>` in the water optics;
   specks show in the lamps' light.
 - **The surface from below** shows Snell's window: the sky through a

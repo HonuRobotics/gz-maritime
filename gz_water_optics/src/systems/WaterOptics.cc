@@ -298,7 +298,7 @@ void WaterOptics::Configure(const Entity &_entity,
     spec.visibility = _sdf->Get<double>("visibility");
   spec.waterLevel = _sdf->Get<double>("water_level", 0.0).first;
   spec.daylight = _sdf->Get<double>("daylight", 1.0).first;
-  spec.caustics = _sdf->Get<double>("caustics", 1.0).first;
+  spec.caustics = _sdf->Get<double>("caustics", 0.0).first;
   spec.marineSnow = _sdf->Get<double>("marine_snow", 0.0).first;
   for (const auto &tag : kVectorTags)
   {

@@ -33,7 +33,7 @@ world system:
 | `<veil>` | Per red, green, blue, the veil's colour just below the surface as a fraction of the daylight there. Optional. |
 | `<water_level>` | World z of the still water, m. Default 0. Under a wave field, depth is measured below the local wave surface. |
 | `<daylight>` | How strong the daylight is, against the renderer's sun: it scales the veil. Default 1; 0 at night, when only the vehicle's lamps light the water. |
-| `<caustics>` | Strength of the caustics on what faces up, 0 to 1, default 1; scaled by the waves' height (none on flat water). |
+| `<caustics>` | Strength of the caustics on what faces up, 0 to 1, default 0 (off); scaled by the waves' height (none on flat water). |
 | `<marine_snow>` | Fraction of 25 cm cells near the camera holding a speck of marine snow, 0 to 1, default 0. |
 | `<publish_rate>` | Rate of the ground truth, Hz, simulation time. Default 1. |
 

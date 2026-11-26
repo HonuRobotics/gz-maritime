@@ -127,8 +127,9 @@ off, set its intensity to 0: it then costs nothing.
 
 - **Caustics**: on what faces up under waves, a moving pattern of light
   focused by the surface, its contrast fading with depth as `exp(−K_d z)`.
-  Its strength is the water's `<caustics>`, scaled by how high the waves are
-  (estimated from the wave field at 64 points): none on flat water.
+  Its strength is the water's `<caustics>`, off by default, scaled by how
+  high the waves are (estimated from the wave field at 64 points): none on
+  flat water.
 - **Marine snow**: the water's `<marine_snow>` is the fraction of 25 cm
   cells near the camera holding a speck. Specks are fixed in the world
   (hashed per cell, found by walking the cells each view ray crosses, up to
