@@ -338,6 +338,9 @@ class SonarPrivate
   /// and they are not, every update asks the Sensors system for a frame,
   /// whose scene update joins them.
   public: std::atomic<bool> renderJoined{false};
+  /// \brief When the first sonar appeared, for the missing-Sensors warning.
+  public: nanoseconds firstSonarTime{-1};
+  public: bool warnedNoRender{false};
 
   // ---- rendering thread
   public: common::ConnectionPtr sceneUpdateConn;
@@ -442,6 +445,22 @@ void Sonar::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
   d.rescan = false;
   d.FindSonars(_ecm, all);
   d.FindVisuals(_ecm, all);
+
+  // A sonar renders only through the Sensors system's rendering thread; if
+  // that has not started 5 s of sim time after the first sonar, the world
+  // probably does not load it. Say so once.
+  if (d.haveSonars && !d.renderJoined && !d.warnedNoRender)
+  {
+    if (d.firstSonarTime.count() < 0)
+      d.firstSonarTime = d.now;
+    else if (d.now - d.firstSonarTime > std::chrono::seconds(5))
+    {
+      gzwarn << "Sonar: no frame rendered 5 s after the first sonar appeared; "
+             << "does the world load gz-sim-sensors-system (the Sensors "
+             << "system)? Without it no sonar pings.\n";
+      d.warnedNoRender = true;
+    }
+  }
 
   // With no stock rendering sensor in the world, the Sensors system has no
   // reason to render until asked: at the start, and again whenever a sonar
@@ -1112,6 +1131,14 @@ void SonarPrivate::OnRender()
     const auto due = DueTime(rig.next, rate);
     if (t < due)
       continue;
+    // Off (its enable service) or nobody listening: skip this ping's render
+    // and model, but keep to the rate grid so ping numbers stay tied to time.
+    if (!rig.request.sonar->IsActive() || !rig.request.sonar->HasConnections())
+    {
+      while (DueTime(rig.next, rate) <= t)
+        ++rig.next;
+      continue;
+    }
     // The vehicle was removed this step: gz-sim has destroyed its link visual,
     // which leaves the cameras without a parent (drawing from the world
     // origin) until the rig itself goes at the next frame. Skip it.

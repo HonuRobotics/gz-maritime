@@ -66,6 +66,16 @@ parts:
 
 In a BlueROV2 or BlueBoat config a sonar part emits its sensors, `sonar:` fills their `<gz:sonar>`, and the launch starts the bridge with the right topics, frames and kinds. Three parts are sonars: `sonoptix_echo_multibeam` (imaging), `omniscan_450_sidescan` (a sidescan bar with a beam to each side) and `surveyor_multibeam` (a profiler looking down). `bluerov2_sonar.yaml` in `bluerov2_description` and `blueboat_sonar.yaml` in `blueboat_description` are complete examples.
 
+## Switch it off
+
+A sonar does nothing while nobody subscribes to it. To turn one off while subscribers stay connected, and back on:
+
+```bash
+gz service -s /my_vehicle/sonar_forward/image/enable --reqtype gz.msgs.Boolean --reptype gz.msgs.Empty --req 'data: false'
+```
+
+`data: true` turns it back on; `<topic>/set_rate` (a `gz.msgs.Double`) changes its rate.
+
 ## Check
 
 ```bash

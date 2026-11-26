@@ -28,6 +28,7 @@
 #include <thread>
 #include <vector>
 
+#include <gz/msgs/boolean.pb.h>
 #include <gz/sensors/Sensor.hh>
 #include <gz/transport/Node.hh>
 #include <sdf/Sensor.hh>
@@ -113,9 +114,17 @@ class SonarSensor : public sensors::Sensor
   /// \brief Whether the ground-truth labels topic is on.
   public: bool Labels() const;
 
+  /// \brief Whether anyone subscribes to this sonar's data, labels or
+  /// water column. With no one listening the world system skips the
+  /// sonar's pings, as gz-sim does for its own rendering sensors.
+  public: bool HasConnections() const override;
+
   /// \brief Start over after a world reset: the automatic gain forgets
   /// the pings it has seen.
   public: void ResetState();
+
+  /// \brief The <topic>/enable service: true turns the sonar on, false off.
+  private: void OnEnable(const msgs::Boolean &_enable);
 
   private: void Work();
   private: void Process(const PingFrame &_frame);

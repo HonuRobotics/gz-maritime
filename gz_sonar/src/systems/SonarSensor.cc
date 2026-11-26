@@ -21,6 +21,7 @@
 #include <utility>
 
 #include <gz/common/Console.hh>
+#include <gz/msgs/boolean.pb.h>
 
 #include "SonarSdf.hh"
 #include "gz/maritime/sonar/sonar_detections.pb.h"
@@ -121,6 +122,10 @@ bool SonarSensor::Load(const sdf::Sensor &_sdf, const std::string &_type,
     this->labelsPub = this->node.Advertise<gz::maritime::sonar::SonarLabels>(
       this->Topic() + "/labels");
   }
+  // Turn the sonar off and on at run time; off, it costs nothing.
+  const std::string enableTopic = this->Topic() + "/enable";
+  if (!this->node.Advertise(enableTopic, &SonarSensor::OnEnable, this))
+    gzerr << "Sonar [" << this->Name() << "]: cannot advertise [" << enableTopic << "]\n";
   this->worker = std::thread([this]() { this->Work(); });
 
   const auto &l = this->sampler->Layout();
@@ -175,6 +180,22 @@ const std::string &SonarSensor::Type() const
   return this->type;
 }
 
+bool SonarSensor::HasConnections() const
+{
+  return (this->imagePub && this->imagePub.HasConnections()) ||
+    (this->labelsPub && this->labelsPub.HasConnections()) ||
+    (this->waterColumnPub && this->waterColumnPub.HasConnections());
+}
+
+//////////////////////////////////////////////////
+void SonarSensor::OnEnable(const msgs::Boolean &_enable)
+{
+  this->SetActive(_enable.data());
+  gzmsg << "Sonar [" << this->Name() << "] " << (_enable.data() ? "on" : "off")
+        << "\n";
+}
+
+//////////////////////////////////////////////////
 bool SonarSensor::Labels() const
 {
   return this->labels;
