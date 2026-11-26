@@ -48,7 +48,7 @@ struct WaterOpticsSpec
   std::string jerlov;
 
   /// \brief Horizontal visibility of a black target, m. Scales the type's
-  /// absorption and scattering, keeping its colour.
+  /// absorption and scattering above pure water's.
   std::optional<double> visibility;
 
   /// \brief Attenuation of an object's light, beta^D, 1/m, per channel.
@@ -116,9 +116,11 @@ struct WaterOpticsData
 ///   published absorption a, scattering b and diffuse attenuation K_d per
 ///   channel: attenuation = backscatter = c = a + b, veil = b / c (the
 ///   single-scattering albedo), diffuse attenuation = K_d.
-/// * A visibility scales a, b and K_d of every channel by
-///   4.8 / (visibility c_green): the water keeps its colour (the veil and
-///   the ratios between channels) and only its murkiness changes.
+/// * A visibility scales what a, b and K_d have above pure water's (type
+///   I), every channel by the same factor, so that 4.8 / c_green comes out
+///   at the visibility: clearer water turns bluer, as real water does, and
+///   it can be no clearer than pure water (about 100 m). Type I itself
+///   cannot be scaled.
 /// * Each explicit coefficient then replaces its derived value.
 /// \param[in] _spec What the world asks for.
 /// \param[out] _out The optics, when the spec is valid; its generation is

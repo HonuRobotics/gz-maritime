@@ -273,7 +273,7 @@ What a world says to the water optics system,
 | Markup | Meaning |
 |---|---|
 | `<jerlov>` | The Jerlov water type, below. Default `1C`. |
-| `<visibility>` | Horizontal visibility of a black target, m: scales the type's absorption, scattering and diffuse attenuation by the same factor so that 4.8 / c in the green comes out at this distance (Zaneveld and Pegau 2003). The water keeps its colour. |
+| `<visibility>` | Horizontal visibility of a black target, m: scales what the type's absorption, scattering and diffuse attenuation have above pure water's (type `I`) by the same factor, so that 4.8 / c in the green comes out at this distance (Zaneveld and Pegau 2003). Clearer water turns bluer; beyond about 100 m, clearer than pure water, and for type `I`, it is an error. |
 | `<attenuation>` | β^D, how fast an object's light fades with range, 1/m, as `r g b`. Replaces c = a + b. |
 | `<backscatter>` | β^B, how fast the veil builds with range, 1/m, as `r g b`. Replaces c. |
 | `<veil>` | B∞, the veil just below the surface as a fraction of the daylight there, as `r g b`. Replaces b / c. |

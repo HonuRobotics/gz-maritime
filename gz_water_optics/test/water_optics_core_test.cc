@@ -197,7 +197,7 @@ TEST(Resolve, DefaultsToCoastal1C)
 // several types and visibilities.
 TEST(Resolve, VisibilitySetsStrength)
 {
-  for (const std::string name : {"I", "3C", "9C"})
+  for (const std::string name : {"IB", "3C", "9C"})
   {
     for (const double v : {1.0, 5.0, 20.0})
     {
@@ -211,25 +211,53 @@ TEST(Resolve, VisibilitySetsStrength)
 }
 
 /////////////////////////////////////////////////
-// Visibility keeps the colour: the ratios between channels, and the veil.
-TEST(Resolve, VisibilityKeepsColour)
+// Visibility scales what the type has above pure water: at the type's own
+// visibility nothing changes, and clearer water comes closer to pure water,
+// which is bluer.
+TEST(Resolve, VisibilityScalesAbovePureWater)
 {
-  for (const std::string name : {"I", "II", "3C", "9C"})
+  for (const std::string name : {"IB", "II", "3C", "9C"})
   {
     WaterOpticsSpec plain;
     plain.jerlov = name;
-    WaterOpticsSpec scaled = plain;
-    scaled.visibility = 2.5;
     const auto a = MustResolve(plain);
-    const auto b = MustResolve(scaled);
-    EXPECT_NEAR(b.attenuation.X() / b.attenuation.Y(),
-                a.attenuation.X() / a.attenuation.Y(), 1e-12) << name;
-    EXPECT_NEAR(b.attenuation.Z() / b.attenuation.Y(),
-                a.attenuation.Z() / a.attenuation.Y(), 1e-12) << name;
-    ExpectRgb(b.veil, a.veil, 1e-12);
-    EXPECT_NEAR(b.diffuseAttenuation.X() / b.attenuation.X(),
-                a.diffuseAttenuation.X() / a.attenuation.X(), 1e-12) << name;
+    WaterOpticsSpec same = plain;
+    same.visibility = a.Visibility();
+    const auto b = MustResolve(same);
+    ExpectRgb(b.attenuation, a.attenuation, 1e-9);
+    ExpectRgb(b.veil, a.veil, 1e-9);
+    ExpectRgb(b.diffuseAttenuation, a.diffuseAttenuation, 1e-9);
+
+    // Clearer: red fades faster than green, relative to the type
+    WaterOpticsSpec clearer = plain;
+    clearer.visibility = 1.5 * a.Visibility();
+    const auto c = MustResolve(clearer);
+    EXPECT_GT(c.attenuation.X() / c.attenuation.Y(),
+              a.attenuation.X() / a.attenuation.Y()) << name;
   }
+
+  // As clear as pure water: type I
+  WaterOpticsSpec pure;
+  pure.jerlov = "I";
+  const auto i = MustResolve(pure);
+  WaterOpticsSpec clearest;
+  clearest.jerlov = "3C";
+  clearest.visibility = i.Visibility();
+  ExpectRgb(MustResolve(clearest).attenuation, i.attenuation, 1e-9);
+}
+
+/////////////////////////////////////////////////
+// Nothing is clearer than pure water, and pure water cannot be scaled.
+TEST(Resolve, VisibilityNoClearerThanPureWater)
+{
+  WaterOpticsSpec spec;
+  spec.jerlov = "3C";
+  spec.visibility = 150.0;
+  EXPECT_NE(MustFail(spec).find("pure water"), std::string::npos);
+
+  spec.jerlov = "I";
+  spec.visibility = 50.0;
+  EXPECT_NE(MustFail(spec).find("pure water"), std::string::npos);
 }
 
 /////////////////////////////////////////////////

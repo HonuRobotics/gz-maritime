@@ -38,7 +38,8 @@ you can see.
 ## Set how far you can see
 
 Divers and pilots describe water by its visibility. Give it in metres and
-the system scales the water type to it, keeping its colour:
+the system scales the water type to it. Clearer water turns bluer, as
+real water does, and none is clearer than pure water, about 100 m:
 
 ```xml
 <plugin filename="gz-maritime-water-optics-system"
