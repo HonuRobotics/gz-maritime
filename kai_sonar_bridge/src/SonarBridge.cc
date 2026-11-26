@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <chrono>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
@@ -41,6 +42,12 @@ constexpr std::size_t kWaterfallLines = 400;
 
 /// \brief The longer side of a drawn fan, pixels.
 constexpr int kFanSide = 600;
+
+/// \brief Default period of the lazy subscription check, ms. The first
+/// ping after a ROS subscriber appears waits this long at most, and the
+/// sonar pings on this long after the last one leaves; reading a few
+/// counts five times a second costs nothing next to one ping.
+constexpr int kHeartbeatMs = 200;
 
 //////////////////////////////////////////////////
 /// \brief The QoS of every topic the bridge publishes. Reliable, because a
@@ -170,6 +177,10 @@ struct Sonar
   /// \brief The gz subscription; not valid while there is none.
   public: gz::transport::Node::Subscriber gzSub;
 
+  /// \brief True once a refused subscription has been logged, so a topic
+  /// gz-transport keeps refusing is reported once, not at every check.
+  public: bool refused{false};
+
   /// \brief Protects the view's state below.
   public: std::mutex mutex;
 
@@ -196,6 +207,10 @@ class SonarBridge::Implementation
   /// \brief Leave a sonar's gz topic, if subscribed.
   /// \param[in,out] _s The sonar.
   public: void Unsubscribe(Sonar &_s);
+
+  /// \brief The lazy check: subscribe to each sonar whose ROS topics have
+  /// a subscriber, and leave each whose topics have none.
+  public: void Update();
 
   /// \brief Convert and publish an image, and draw its view.
   /// \param[in,out] _s The sonar.
@@ -230,6 +245,9 @@ class SonarBridge::Implementation
   /// \brief The sonars.
   public: std::vector<std::shared_ptr<Sonar>> sonars;
 
+  /// \brief Runs the lazy check; null when not lazy.
+  public: rclcpp::TimerBase::SharedPtr timer;
+
   /// \brief Shared with every gz callback; see Gate.
   public: std::shared_ptr<Gate> gate{std::make_shared<Gate>()};
 };
@@ -249,6 +267,15 @@ SonarBridge::SonarBridge(const rclcpp::NodeOptions &_options)
   const auto kinds = this->declare_parameter<std::vector<std::string>>(
     "kinds", std::vector<std::string>{});
   this->dataPtr->view = this->declare_parameter<bool>("view", true);
+  const bool lazy = this->declare_parameter<bool>("lazy", true);
+  rcl_interfaces::msg::ParameterDescriptor heartbeatDesc;
+  heartbeatDesc.description = "Period of the lazy subscription check, ms";
+  heartbeatDesc.integer_range.resize(1);
+  heartbeatDesc.integer_range[0].from_value = 1;
+  heartbeatDesc.integer_range[0].to_value = 60000;
+  heartbeatDesc.integer_range[0].step = 1;
+  const auto heartbeat = this->declare_parameter<int>(
+    "subscription_heartbeat", kHeartbeatMs, heartbeatDesc);
 
   if (gzTopics.size() != rosTopics.size())
   {
@@ -291,25 +318,35 @@ SonarBridge::SonarBridge(const rclcpp::NodeOptions &_options)
           rosTopics[i] + "/view", PublisherQoS());
       }
     }
-    if (!this->dataPtr->Subscribe(*s))
+    // Lazy, the gz topic is joined by the first check that finds a ROS
+    // subscriber: a gz subscriber makes the sonar ping, whoever it is.
+    if (!lazy && !this->dataPtr->Subscribe(*s))
       continue;
-    RCLCPP_INFO(this->get_logger(), "%s [%s] -> [%s]",
+    RCLCPP_INFO(this->get_logger(), "%s [%s] -> [%s]%s",
       s->detections ? "profiler" : "sonar", gzTopics[i].c_str(),
-      rosTopics[i].c_str());
+      rosTopics[i].c_str(), lazy ? " (lazy)" : "");
     this->dataPtr->sonars.push_back(s);
+  }
+  if (lazy)
+  {
+    this->dataPtr->timer = this->create_wall_timer(
+      std::chrono::milliseconds(heartbeat),
+      [this]() { this->dataPtr->Update(); });
   }
 }
 
 //////////////////////////////////////////////////
 SonarBridge::~SonarBridge()
 {
-  // Leave gz first, so no new callback is handed out, then close the gate:
-  // that waits for the callbacks already running, and turns away any that
-  // gz-transport had already started. Only then do the publishers and the
-  // node go.
+  // Stop the lazy check, then close the gate: that waits for the gz
+  // callbacks and the check already running, and turns away any that start
+  // later. With nothing of the node's running, leave gz. Only then do the
+  // publishers and the node go.
+  if (this->dataPtr->timer)
+    this->dataPtr->timer->cancel();
+  this->dataPtr->gate->Close();
   for (auto &s : this->dataPtr->sonars)
     this->dataPtr->Unsubscribe(*s);
-  this->dataPtr->gate->Close();
 }
 
 //////////////////////////////////////////////////
@@ -345,10 +382,15 @@ bool SonarBridge::Implementation::Subscribe(Sonar &_s)
   }
   if (!_s.gzSub.Valid())
   {
-    RCLCPP_ERROR(this->node->get_logger(), "cannot subscribe to [%s]",
-      _s.gzTopic.c_str());
+    if (!_s.refused)
+    {
+      RCLCPP_ERROR(this->node->get_logger(), "cannot subscribe to [%s]",
+        _s.gzTopic.c_str());
+    }
+    _s.refused = true;
     return false;
   }
+  _s.refused = false;
   return true;
 }
 
@@ -358,6 +400,28 @@ void SonarBridge::Implementation::Unsubscribe(Sonar &_s)
   if (_s.gzSub.Valid())
     _s.gzSub.Unsubscribe();
   _s.gzSub = gz::transport::Node::Subscriber();
+}
+
+//////////////////////////////////////////////////
+void SonarBridge::Implementation::Update()
+{
+  // Through the gate, like a gz callback: the executor may run this on
+  // another thread than the one destroying the node.
+  const Pass pass(*this->gate);
+  if (!pass)
+    return;
+  for (auto &s : this->sonars)
+  {
+    if (Wanted(s->pub) || Wanted(s->viewPub) || Wanted(s->detPub) ||
+        Wanted(s->cloudPub))
+    {
+      this->Subscribe(*s);
+    }
+    else
+    {
+      this->Unsubscribe(*s);
+    }
+  }
 }
 
 //////////////////////////////////////////////////

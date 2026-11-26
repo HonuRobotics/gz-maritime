@@ -18,6 +18,7 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -207,7 +208,8 @@ class SonarBridgeTest : public ::testing::Test
 
   /// \brief The bridge's options for this test's two sonars: the image
   /// and the soundings, both stamped "frame".
-  /// \param[in] _extra More parameters.
+  /// \param[in] _extra More parameters; one given twice takes the later
+  /// value.
   /// \return The options.
   protected: rclcpp::NodeOptions Options(
     const std::vector<rclcpp::Parameter> &_extra = {}) const
@@ -218,8 +220,18 @@ class SonarBridgeTest : public ::testing::Test
       {"ros_topics", std::vector<std::string>{
         this->rosImageTopic, this->rosSoundingsTopic}},
       {"frame_ids", std::vector<std::string>{"frame", "frame"}},
-      {"kinds", std::vector<std::string>{"image", "detections"}}};
-    p.insert(p.end(), _extra.begin(), _extra.end());
+      {"kinds", std::vector<std::string>{"image", "detections"}},
+      // A short period for the lazy check, so the tests do not wait on it.
+      {"subscription_heartbeat", 10}};
+    for (const auto &e : _extra)
+    {
+      p.erase(std::remove_if(p.begin(), p.end(),
+        [&e](const rclcpp::Parameter &_p)
+        {
+          return _p.get_name() == e.get_name();
+        }), p.end());
+      p.push_back(e);
+    }
     return rclcpp::NodeOptions().parameter_overrides(p);
   }
 
@@ -241,6 +253,18 @@ class SonarBridgeTest : public ::testing::Test
     this->executor.remove_node(_bridge);
     EXPECT_EQ(_bridge.use_count(), 1);
     _bridge.reset();
+  }
+
+  /// \brief Whether a gz publisher keeps its state for a while: for
+  /// checking that a connection does not appear, or does not go.
+  /// \param[in] _pub The publisher.
+  /// \param[in] _connected The state it should keep.
+  /// \return True if it had that state throughout, 50 lazy checks long.
+  protected: static bool Stays(const gz::transport::Node::Publisher &_pub,
+    bool _connected)
+  {
+    return !WaitFor([&]() { return _pub.HasConnections() != _connected; },
+      500ms);
   }
 
   /// \brief Publish on gz until a condition holds.
@@ -348,6 +372,151 @@ TEST_F(SonarBridgeTest, MismatchedListsBridgeNothing)
 }
 
 //////////////////////////////////////////////////
+TEST_F(SonarBridgeTest, SubscribesOnlyWhileRosListens)
+{
+  // HasConnections is what the sonar sensor asks before it pings.
+  auto bridge = this->Start(this->Options());
+  EXPECT_TRUE(Stays(this->imagePub, false));
+  EXPECT_TRUE(Stays(this->soundingsPub, false));
+
+  const GzImage gzImage = ImageOf(5, 4);
+  const GzDetections gzSoundings = Soundings();
+  // Each ROS topic of a sonar brings the gz subscription and takes it
+  // away again, more than once, and leaves the other sonar alone.
+  for (int round = 0; round < 3; ++round)
+  {
+    SCOPED_TRACE("round " + std::to_string(round));
+    {
+      Listener<RosImage> image(*this->listener, this->rosImageTopic);
+      ASSERT_TRUE(WaitFor([&]() { return this->imagePub.HasConnections(); }));
+      EXPECT_FALSE(this->soundingsPub.HasConnections());
+      EXPECT_TRUE(this->PublishUntil(
+        [&]() { this->imagePub.Publish(gzImage); },
+        [&]() { return image.Count() > 0; }));
+    }
+    ASSERT_TRUE(WaitFor([&]() { return !this->imagePub.HasConnections(); }));
+    {
+      Listener<Image> view(*this->listener, this->rosImageTopic + "/view");
+      ASSERT_TRUE(WaitFor([&]() { return this->imagePub.HasConnections(); }));
+      EXPECT_TRUE(this->PublishUntil(
+        [&]() { this->imagePub.Publish(gzImage); },
+        [&]() { return view.Count() > 0; }));
+    }
+    ASSERT_TRUE(WaitFor([&]() { return !this->imagePub.HasConnections(); }));
+    {
+      Listener<RosDetections> soundings(*this->listener,
+        this->rosSoundingsTopic);
+      ASSERT_TRUE(WaitFor(
+        [&]() { return this->soundingsPub.HasConnections(); }));
+      EXPECT_FALSE(this->imagePub.HasConnections());
+      EXPECT_TRUE(this->PublishUntil(
+        [&]() { this->soundingsPub.Publish(gzSoundings); },
+        [&]() { return soundings.Count() > 0; }));
+    }
+    ASSERT_TRUE(WaitFor(
+      [&]() { return !this->soundingsPub.HasConnections(); }));
+    {
+      Listener<PointCloud2> points(*this->listener,
+        this->rosSoundingsTopic + "/points");
+      ASSERT_TRUE(WaitFor(
+        [&]() { return this->soundingsPub.HasConnections(); }));
+      EXPECT_TRUE(this->PublishUntil(
+        [&]() { this->soundingsPub.Publish(gzSoundings); },
+        [&]() { return points.Count() > 0; }));
+    }
+    ASSERT_TRUE(WaitFor(
+      [&]() { return !this->soundingsPub.HasConnections(); }));
+  }
+  EXPECT_TRUE(Stays(this->imagePub, false));
+  this->Stop(bridge);
+}
+
+//////////////////////////////////////////////////
+TEST_F(SonarBridgeTest, StaysSubscribedUntilTheLastListenerLeaves)
+{
+  auto bridge = this->Start(this->Options());
+  auto image = std::make_unique<Listener<RosImage>>(*this->listener,
+    this->rosImageTopic);
+  auto second = std::make_unique<Listener<RosImage>>(*this->listener,
+    this->rosImageTopic);
+  auto view = std::make_unique<Listener<Image>>(*this->listener,
+    this->rosImageTopic + "/view");
+  ASSERT_TRUE(WaitFor([&]() { return this->imagePub.HasConnections(); }));
+  // Two on the data and one on the view: the subscription holds while any
+  // of the three is left, whichever goes first.
+  image.reset();
+  EXPECT_TRUE(Stays(this->imagePub, true));
+  second.reset();
+  EXPECT_TRUE(Stays(this->imagePub, true));
+  const GzImage gzImage = ImageOf(5, 4);
+  EXPECT_TRUE(this->PublishUntil(
+    [&]() { this->imagePub.Publish(gzImage); },
+    [&]() { return view->Count() > 0; }));
+  view.reset();
+  EXPECT_TRUE(WaitFor([&]() { return !this->imagePub.HasConnections(); }));
+  this->Stop(bridge);
+}
+
+//////////////////////////////////////////////////
+TEST_F(SonarBridgeTest, NoViewNoViewTopics)
+{
+  // Without views a subscriber on the view's name is nobody's subscriber.
+  auto bridge = this->Start(this->Options({{"view", false}}));
+  Listener<Image> view(*this->listener, this->rosImageTopic + "/view");
+  Listener<PointCloud2> points(*this->listener,
+    this->rosSoundingsTopic + "/points");
+  EXPECT_TRUE(Stays(this->imagePub, false));
+  EXPECT_FALSE(this->soundingsPub.HasConnections());
+  Listener<RosImage> image(*this->listener, this->rosImageTopic);
+  EXPECT_TRUE(WaitFor([&]() { return this->imagePub.HasConnections(); }));
+  this->Stop(bridge);
+}
+
+//////////////////////////////////////////////////
+TEST_F(SonarBridgeTest, NotLazySubscribesAtOnce)
+{
+  auto bridge = this->Start(this->Options({{"lazy", false}}));
+  EXPECT_TRUE(WaitFor([&]() { return this->imagePub.HasConnections(); }));
+  EXPECT_TRUE(WaitFor([&]() { return this->soundingsPub.HasConnections(); }));
+  // And holds on with a listener come and gone.
+  {
+    Listener<RosImage> image(*this->listener, this->rosImageTopic);
+    const GzImage gzImage = ImageOf(5, 4);
+    EXPECT_TRUE(this->PublishUntil(
+      [&]() { this->imagePub.Publish(gzImage); },
+      [&]() { return image.Count() > 0; }));
+  }
+  EXPECT_TRUE(Stays(this->imagePub, true));
+  // Destroying the bridge lets go.
+  this->Stop(bridge);
+  EXPECT_TRUE(WaitFor([&]() { return !this->imagePub.HasConnections(); }));
+  EXPECT_TRUE(WaitFor(
+    [&]() { return !this->soundingsPub.HasConnections(); }));
+}
+
+//////////////////////////////////////////////////
+TEST_F(SonarBridgeTest, DestroyedBridgeLetsGo)
+{
+  // A lazy bridge destroyed while subscribed leaves the gz topic too.
+  Listener<RosImage> image(*this->listener, this->rosImageTopic);
+  for (int round = 0; round < 3; ++round)
+  {
+    auto bridge = this->Start(this->Options());
+    ASSERT_TRUE(WaitFor([&]() { return this->imagePub.HasConnections(); }));
+    this->Stop(bridge);
+    ASSERT_TRUE(WaitFor([&]() { return !this->imagePub.HasConnections(); }));
+  }
+}
+
+//////////////////////////////////////////////////
+TEST_F(SonarBridgeTest, HeartbeatMustBePositive)
+{
+  EXPECT_THROW(
+    SonarBridge(this->Options({{"subscription_heartbeat", 0}})),
+    rclcpp::exceptions::InvalidParameterValueException);
+}
+
+//////////////////////////////////////////////////
 TEST_F(SonarBridgeTest, DestroyedWhilePingsArrive)
 {
   // A gz publisher in this process runs the bridge's callback on its own
@@ -389,9 +558,10 @@ TEST_F(SonarBridgeTest, DestroyedWhilePingsArrive)
     std::atomic<bool> &run;
     std::vector<std::thread> &threads;
   } join{run, publishers};
-  for (int i = 0; i < 25; ++i)
+  for (int i = 0; i < 26; ++i)
   {
-    auto bridge = this->Start(this->Options());
+    // Lazy and not, in turn.
+    auto bridge = this->Start(this->Options({{"lazy", i % 2 == 0}}));
     // Until this bridge has drawn a view and a cloud: its callbacks run.
     const std::size_t views = view.Count();
     const std::size_t clouds = points.Count();

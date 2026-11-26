@@ -44,6 +44,8 @@ ros2 launch kai_sonar_bridge sonar_bridge.launch.xml \
 
 `ros_gz_bridge` cannot convert the sonar's message; this bridge publishes `marine_acoustic_msgs/ProjectedSonarImage`, and a `/view` image beside it. Each image is stamped with the frame in `frame_ids`, which TF must carry: `ProjectedSonarImage` puts Z along the beam and X up, so give the vehicle's URDF a fixed frame on the sonar, rotated from the sensor's by roll 180°, pitch −90° (`rpy="3.14159 -1.5708 0"`). Without `frame_ids` the bridge warns and stamps the gz sensor's name with `_acoustic` appended, which TF does not know.
 
+The bridge is lazy, as `ros_gz_bridge` is with `lazy`: it subscribes to a sonar's gz topic only while one of that sonar's ROS topics has a subscriber, checking every `subscription_heartbeat` (200 ms by default), so a bridge nobody listens to leaves the sonar idle. `lazy:=false` subscribes from the start.
+
 ## Sidescan and profiler
 
 A sidescan is one sensor per side, `gz:type="sidescan_sonar"`, each posed to look out to its side and down; each side publishes its own line per ping. A profiler is `gz:type="profiling_sonar"`, posed to look down with its fan across the track; it publishes its soundings (`gz.maritime.sonar.SonarDetections`) on its topic, and the bridge needs to be told so, with one `kinds` entry per sonar:
@@ -70,7 +72,7 @@ In a BlueROV2 or BlueBoat config a sonar part emits its sensors, `sonar:` fills 
 
 ## Switch it off
 
-A sonar does nothing while nobody subscribes to it. To turn one off while subscribers stay connected, and back on:
+A sonar pings only while something subscribes to its gz topic, and the bridge subscribes only while a ROS node subscribes to one of that sonar's topics, so a sonar nobody listens to does nothing, with the bridge running or not. To turn one off while subscribers stay connected, and back on:
 
 ```bash
 gz service -s /my_vehicle/sonar_forward/image/enable --reqtype gz.msgs.Boolean --reptype gz.msgs.Empty --req 'data: false'

@@ -49,7 +49,7 @@ ros2 topic info /bluerov2/sonar_forward/image
 ros2 run kai_sonar_bridge read_sonar.py /bluerov2/sonar_forward/image
 ```
 
-`read_sonar.py`, in `kai_sonar_bridge/examples`, is a short ROS 2 consumer to start from: it unpacks each ping and prints what it holds.
+`read_sonar.py`, in `kai_sonar_bridge/examples`, is a short ROS 2 consumer to start from: it unpacks each ping and prints what it holds. The bridge subscribes to the sonar in Gazebo only while a ROS node subscribes to one of its topics, so the sonar starts pinging when `read_sonar.py` or RViz's view connects and stops when the last one leaves.
 
 ```text
 frame bluerov2/sonar_forward_acoustic: 256 beams x 768 samples, 0.21 to 14.99 m, uint8; brightest 255.0 at 6.67 m, 12.0 deg to starboard

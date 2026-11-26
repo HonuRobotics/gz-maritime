@@ -36,10 +36,22 @@ namespace kai_sonar_bridge
 ///               of an imaging sonar's fan or a sidescan's waterfall, and
 ///               <ros_topic>/points, a profiler's soundings as a
 ///               sensor_msgs/PointCloud2 in the soundings' frame.
+///   lazy        subscribe to a sonar's gz topic only while one of its ROS
+///               topics has a subscriber (default true, see below)
+///   subscription_heartbeat  period of that check, ms (default 200)
 ///
 /// Images and soundings share one frame convention, the `_acoustic` frame
-/// (see Conversions.hh). A ping is converted only when one of its topics
-/// has a subscriber, and a view drawn only when the view has one.
+/// (see Conversions.hh).
+///
+/// A sonar pings only while its gz topic has a subscriber, and a bridge
+/// that subscribed at startup would be one for ever. So the bridge is lazy,
+/// as ros_gz_bridge is with `lazy`: a timer reads the subscriber counts of
+/// each sonar's ROS publishers, joins the gz topic when a count is above
+/// zero and leaves it when all are zero. The counts are polled rather than
+/// taken from matched events, since a count is the state itself: a missed
+/// or unsupported event cannot leave a sonar pinging for nobody. While
+/// subscribed, a ping is converted only when one of its topics has a
+/// subscriber, and a view drawn only when the view has one.
 class SonarBridge : public rclcpp::Node
 {
   /// \brief Constructor.
