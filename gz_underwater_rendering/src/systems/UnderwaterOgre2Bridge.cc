@@ -32,6 +32,8 @@
 // major version. When it does not install, the plugin does not mark the
 // world, and the reference camera draws the water instead.
 
+#include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -44,7 +46,12 @@
 #include <vector>
 
 #include <gz/common/Console.hh>
+#include <gz/rendering/Light.hh>
+#include <gz/rendering/RenderEngine.hh>
+#include <gz/rendering/RenderingIface.hh>
+#include <gz/rendering/Scene.hh>
 #include <gz/rendering/config.hh>
+#include <gz/rendering/ogre2/Ogre2Light.hh>
 
 #include <OgreArchive.h>
 #include <OgreArchiveManager.h>
@@ -203,38 +210,85 @@ class UnderwaterListener : public Ogre::HlmsListener
   /// shader lights with them once, through the water.
   public: std::set<Ogre::Light *> hidden;
 
-  /// \brief Hide the scene's lamps from Ogre's lighting (the shader lights
-  /// with them), or give them back. Call before rendering.
-  public: void HideLamps(bool _hide)
+  /// \brief The scene's lamps: its spot and point lights whose own name,
+  /// after the model and link that scope it, contains "lamp" (any case).
+  /// Other lights are not lamps: Ogre lights with them as in air. At most
+  /// kMaxLamps, the first by name; a warning, once, for the others, which
+  /// are left to Ogre too.
+  /// \param[out] _alive Every light of the scenes, lamp or not.
+  /// \return The lamps.
+  private: std::set<Ogre::Light *> Lamps(std::set<Ogre::Light *> &_alive)
   {
-    Ogre::Root *root = Ogre::Root::getSingletonPtr();
-    if (!root)
-      return;
-    if (!_hide)
+    std::vector<std::pair<std::string, Ogre::Light *>> named;
+    if (!gz::rendering::isEngineLoaded("ogre2"))
+      return {};
+    gz::rendering::RenderEngine *engine = gz::rendering::engine("ogre2");
+    for (unsigned int s = 0; engine && s < engine->SceneCount(); ++s)
     {
-      for (auto *l : this->hidden)
-        l->setVisible(true);
-      this->hidden.clear();
-      return;
-    }
-    auto managers = root->getSceneManagerIterator();
-    while (managers.hasMoreElements())
-    {
-      Ogre::SceneManager *sm = managers.getNext();
-      auto it = sm->getMovableObjectIterator(
-          Ogre::LightFactory::FACTORY_TYPE_NAME);
-      while (it.hasMoreElements())
+      const auto scene = engine->SceneByIndex(s);
+      for (unsigned int i = 0; scene && i < scene->LightCount(); ++i)
       {
-        auto *l = static_cast<Ogre::Light *>(it.getNext());
-        if ((l->getType() == Ogre::Light::LT_SPOTLIGHT ||
-             l->getType() == Ogre::Light::LT_POINT) && l->isVisible())
+        const auto light = scene->LightByIndex(i);
+        const auto *ogre2 =
+            dynamic_cast<const gz::rendering::Ogre2Light *>(light.get());
+        if (!ogre2 || !ogre2->Light())
+          continue;
+        Ogre::Light *l = ogre2->Light();
+        _alive.insert(l);
+        if (l->getType() != Ogre::Light::LT_SPOTLIGHT &&
+            l->getType() != Ogre::Light::LT_POINT)
         {
-          l->setVisible(false);
-          this->hidden.insert(l);
+          continue;
         }
+        std::string own = light->Name();
+        const auto scope = own.rfind("::");
+        if (scope != std::string::npos)
+          own = own.substr(scope + 2);
+        std::transform(own.begin(), own.end(), own.begin(),
+                       [](unsigned char _c) { return std::tolower(_c); });
+        if (own.find("lamp") != std::string::npos)
+          named.emplace_back(light->Name(), l);
       }
     }
+    std::sort(named.begin(), named.end());
+    if (static_cast<int>(named.size()) > kMaxLamps && !this->warnedLamps)
+    {
+      gzwarn << "[underwater] " << named.size() << " lamps, more than "
+             << kMaxLamps << ": the lamps after " << named[kMaxLamps - 1].first
+             << " are lit by Ogre, as in air\n";
+      this->warnedLamps = true;
+    }
+    std::set<Ogre::Light *> lamps;
+    for (const auto &[name, l] : named)
+    {
+      if (static_cast<int>(lamps.size()) < kMaxLamps)
+        lamps.insert(l);
+    }
+    return lamps;
   }
+
+  /// \brief Hide the scene's lamps from Ogre's lighting (the shader lights
+  /// with them), or give them back. Call on the render thread before
+  /// rendering. Only lights still in a scene are touched: a lamp removed
+  /// with its vehicle is gone from Ogre, and from here.
+  public: void HideLamps(bool _hide)
+  {
+    std::set<Ogre::Light *> alive;
+    std::set<Ogre::Light *> lamps = this->Lamps(alive);
+    if (!_hide)
+      lamps.clear();
+    for (Ogre::Light *l : this->hidden)
+    {
+      if (alive.count(l) && !lamps.count(l))
+        l->setVisible(true);
+    }
+    for (Ogre::Light *l : lamps)
+      l->setVisible(false);
+    this->hidden = lamps;
+  }
+
+  /// \brief Whether there were more lamps than the shader takes, warned
+  private: bool warnedLamps{false};
 
   private: void CollectLamps(Ogre::SceneManager *_sm)
   {
