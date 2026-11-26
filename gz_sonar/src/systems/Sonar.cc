@@ -382,8 +382,10 @@ class SonarPrivate
   /// and they are not, every update asks the Sensors system for a frame,
   /// whose scene update joins them.
   public: std::atomic<bool> renderJoined{false};
-  /// \brief When the first sonar appeared, for the missing-Sensors warning.
-  public: nanoseconds firstSonarTime{-1};
+  /// \brief Since when the world has had sonars without the render events
+  /// joined, or -1 while that is not so; for the missing-Sensors warning,
+  /// given once.
+  public: nanoseconds waitingSince{-1};
   public: bool warnedNoRender{false};
 
   // ---- rendering thread
@@ -494,19 +496,27 @@ void Sonar::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
   d.FindVisuals(_ecm, all);
 
   // A sonar renders only through the Sensors system's rendering thread; if
-  // that has not started 5 s of sim time after the first sonar, the world
-  // probably does not load it. Say so once.
-  if (d.haveSonars && !d.renderJoined && !d.warnedNoRender)
+  // the world has had sonars for 5 s of sim time and that thread has not
+  // come by, the world probably does not load it. Say so once. The 5 s
+  // count from when this wait began, not from the world's first sonar: the
+  // render events are left when the last sonar goes, and a sonar spawned
+  // later starts a wait of its own.
+  if (d.haveSonars && !d.renderJoined)
   {
-    if (d.firstSonarTime.count() < 0)
-      d.firstSonarTime = d.now;
-    else if (d.now - d.firstSonarTime > std::chrono::seconds(5))
+    if (d.waitingSince.count() < 0)
+      d.waitingSince = d.now;
+    else if (!d.warnedNoRender &&
+             d.now - d.waitingSince > std::chrono::seconds(5))
     {
-      gzwarn << "Sonar: no frame rendered 5 s after the first sonar appeared; "
+      gzwarn << "Sonar: no frame rendered 5 s after a sonar appeared; "
              << "does the world load gz-sim-sensors-system (the Sensors "
              << "system)? Without it no sonar pings.\n";
       d.warnedNoRender = true;
     }
+  }
+  else
+  {
+    d.waitingSince = nanoseconds(-1);
   }
 
   // With no stock rendering sensor in the world, the Sensors system has no
@@ -567,6 +577,8 @@ void Sonar::Reset(const UpdateInfo &, EntityComponentManager &)
   d.removedSensors.clear();
   d.removedVisuals.clear();
   d.rescan = true;
+  // Sim time starts over, and so does the wait for a first frame.
+  d.waitingSince = nanoseconds(-1);
   for (auto &[entity, sonar] : d.sonars)
     sonar->ResetState();
 }

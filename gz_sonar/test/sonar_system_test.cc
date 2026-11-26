@@ -269,6 +269,32 @@ std::size_t Threads()
   return n;
 }
 
+//////////////////////////////////////////////////
+/// \brief Once per process, before the first node or server: a partition
+/// of this run's own, and the log sink.
+/// \return The sink.
+std::shared_ptr<Log> Prepare()
+{
+  static std::shared_ptr<Log> log;
+  if (log)
+    return log;
+  // A partition no other run has: two workspaces testing at once, or two
+  // runs in one, must not read each other's pings.
+  const std::string partition = "sonar_system_test_" +
+    std::to_string(getpid()) + "_" + std::to_string(
+      std::chrono::system_clock::now().time_since_epoch().count());
+  setenv("GZ_PARTITION", partition.c_str(), 1);
+
+  // Debug messages too, into a sink the tests read.
+  common::Console::SetVerbosity(4);
+  log = std::make_shared<Log>();
+  common::Console::Root().RawLogger().sinks().push_back(log);
+  return log;
+}
+
+/// \brief The text of the warning about a world without the Sensors system.
+const char *const kNoSensorsWarning = "no frame rendered";
+
 /// \brief Sim time as the server's last step saw it, read from inside the
 /// server so the test never has to keep its own count across a reset.
 class Clock : public sim::System, public sim::ISystemPostUpdate
@@ -364,18 +390,7 @@ class SonarSystem : public ::testing::Test
 {
   protected: static void SetUpTestSuite()
   {
-    // A partition no other run has: two workspaces testing at once, or two
-    // runs in one, must not read each other's pings. Set before the first
-    // node is made.
-    const std::string partition = "sonar_system_test_" +
-      std::to_string(getpid()) + "_" + std::to_string(
-        std::chrono::system_clock::now().time_since_epoch().count());
-    setenv("GZ_PARTITION", partition.c_str(), 1);
-
-    // Debug messages too, into a sink the tests read.
-    common::Console::SetVerbosity(4);
-    log = std::make_shared<Log>();
-    common::Console::Root().RawLogger().sinks().push_back(log);
+    log = Prepare();
 
     sim::ServerConfig config;
     config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, "scene_b.sdf"));
@@ -761,10 +776,12 @@ TEST_F(SonarSystem, RemoveThenSpawn)
   // joined, so nothing more can come from it.
   EXPECT_TRUE(StepUntil([]() { return !Advertised(kTopic); }));
   pings->Clear();
-  Step(1000);
+  // More than the 5 s after which a world with a sonar and no frame is
+  // warned about its missing Sensors system.
+  Step(5500);
   EXPECT_TRUE(pings->Images().empty());
   ASSERT_TRUE(iterations.has_value());
-  EXPECT_GE(*server->IterationCount(), *iterations + 1000);
+  EXPECT_GE(*server->IterationCount(), *iterations + 5500);
 
   msgs::EntityFactory factory;
   factory.set_sdf(Rov("rov2"));
@@ -797,6 +814,11 @@ TEST_F(SonarSystem, RemoveThenSpawn)
   }
   EXPECT_GT(boxCells, 0u);
   EXPECT_EQ(0u, hullCells);
+
+  // The Sensors system is here and rendering. The warning once counted its
+  // 5 s from the first sonar the world ever had, so a later one, spawned
+  // after the render events had been left, was warned about at once.
+  EXPECT_EQ(0u, log->Count({kNoSensorsWarning}));
 }
 
 //////////////////////////////////////////////////
@@ -880,4 +902,59 @@ TEST_F(SonarSystem, ARestoredSonarCanBeRemoved)
   EXPECT_TRUE(StepUntil([&]() {
     return log->Count({"left the render events"}) > left;
   }));
+  EXPECT_EQ(0u, log->Count({kNoSensorsWarning}));
+}
+
+//////////////////////////////////////////////////
+// Scene B without the Sensors system: no frame is ever rendered, and the
+// system says so, once, 5 s of sim time after the sonar appeared; not
+// before, and not again for a later sonar or after a reset. A server of its
+// own, after the other has gone; it renders nothing, so it runs anywhere.
+TEST(SonarSystemAlone, WarnsOnceWithoutTheSensorsSystem)
+{
+  const auto log = Prepare();
+  std::ifstream file(common::joinPaths(TEST_WORLD_DIR, "scene_b.sdf"));
+  std::string world((std::istreambuf_iterator<char>(file)),
+    std::istreambuf_iterator<char>());
+  const auto from = world.find("<plugin filename=\"gz-sim-sensors-system\"");
+  ASSERT_NE(std::string::npos, from);
+  const std::string close = "</plugin>";
+  const auto to = world.find(close, from);
+  ASSERT_NE(std::string::npos, to);
+  world.erase(from, to + close.size() - from);
+
+  sim::ServerConfig config;
+  config.SetSdfString(world);
+  sim::Server server(config);
+  transport::Node node;
+  auto call = [&](const std::string &_service, const auto &_req) {
+    msgs::Boolean rep;
+    bool result{false};
+    return node.Request(kWorld + _service, _req, 3000, rep, result) &&
+      result && rep.data();
+  };
+  const auto before = log->Count({kNoSensorsWarning});
+  auto warnings = [&]() { return log->Count({kNoSensorsWarning}) - before; };
+
+  ASSERT_TRUE(server.Run(true, 4900, false));
+  EXPECT_EQ(0u, warnings());
+  ASSERT_TRUE(server.Run(true, 200, false));
+  EXPECT_EQ(1u, warnings());
+
+  // The sonar removed and, 6 s later, another spawned, then 6 s more.
+  msgs::Entity rov;
+  rov.set_name("rov");
+  rov.set_type(msgs::Entity::MODEL);
+  ASSERT_TRUE(call("/remove", rov));
+  ASSERT_TRUE(server.Run(true, 6000, false));
+  msgs::EntityFactory factory;
+  factory.set_sdf(Rov("rov2"));
+  ASSERT_TRUE(call("/create", factory));
+  ASSERT_TRUE(server.Run(true, 6000, false));
+  // And a reset, which takes sim time back, then 6 s more.
+  msgs::WorldControl reset;
+  reset.mutable_reset()->set_all(true);
+  ASSERT_TRUE(call("/control", reset));
+  ASSERT_TRUE(server.Run(true, 6000, false));
+  EXPECT_EQ(1u, warnings());
 }
