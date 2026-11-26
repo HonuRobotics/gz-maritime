@@ -597,8 +597,6 @@ In the GPU path (`gz_underwater_rendering`), as the spike said it must be.
   1 ms.
 - **Limits**: diffuse only, no shadows; four lamps; the beam shows where
   something is drawn behind it; the reference camera has no lamps.
-- **Video**: *Lights on*: lamps off and on at 20 m at night in 1C, 3C and
-  7C, and a lamp swept across the view.
 
 ## Open questions
 
