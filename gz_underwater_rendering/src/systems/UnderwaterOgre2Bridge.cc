@@ -44,18 +44,23 @@
 #include <regex>
 #include <set>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 #include "UnderwaterOgre2Bridge.hh"
 
 #include <gz/common/Console.hh>
+#include <gz/rendering/BoundingBoxCamera.hh>
 #include <gz/rendering/Light.hh>
 #include <gz/rendering/RenderEngine.hh>
 #include <gz/rendering/RenderingIface.hh>
 #include <gz/rendering/Scene.hh>
+#include <gz/rendering/SegmentationCamera.hh>
+#include <gz/rendering/ThermalCamera.hh>
 #include <gz/rendering/config.hh>
 #include <gz/rendering/ogre2/Ogre2Light.hh>
+#include <gz/rendering/ogre2/Ogre2Scene.hh>
 
 #include <OgreArchive.h>
 #include <OgreArchiveManager.h>
@@ -272,11 +277,71 @@ class Surface
 /// water is; without it a camera under water would see the sky or the
 /// background colour past the last thing in view. The shader makes it
 /// clear (alpha 0) for cameras above the water.
-class Backdrop
+class Backdrop : public Ogre::Camera::Listener
 {
+  /// \brief Hidden while a camera that is not a colour camera renders
+  /// (bounding boxes, segmentation, thermal): those swap the materials of
+  /// gz-rendering's own items only, and would read the backdrop, which is
+  /// not one, as a thing filling the view. Before culling, as their own
+  /// material switchers work.
+  public: void cameraPreRenderScene(Ogre::Camera *_camera) override
+  {
+    const auto it = this->items.find(_camera->getSceneManager());
+    if (it == this->items.end())
+      return;
+    this->wasVisible = it->second->getVisible();
+    it->second->setVisible(false);
+  }
+
+  /// \brief Shown again as it was, after such a camera.
+  public: void cameraPostRenderScene(Ogre::Camera *_camera) override
+  {
+    const auto it = this->items.find(_camera->getSceneManager());
+    if (it != this->items.end())
+      it->second->setVisible(this->wasVisible);
+  }
+
+  /// \brief Listen to the cameras that must not see the backdrop: the
+  /// bounding box, segmentation and thermal cameras of every scene, whose
+  /// Ogre camera carries the sensor's name. New ones are found as they come.
+  private: void WatchCameras()
+  {
+    if (!gz::rendering::isEngineLoaded("ogre2"))
+      return;
+    gz::rendering::RenderEngine *engine = gz::rendering::engine("ogre2");
+    for (unsigned int s = 0; engine && s < engine->SceneCount(); ++s)
+    {
+      const auto scene = engine->SceneByIndex(s);
+      const auto *ogreScene =
+          dynamic_cast<const gz::rendering::Ogre2Scene *>(scene.get());
+      if (!ogreScene)
+        continue;
+      Ogre::SceneManager *sm = ogreScene->OgreSceneManager();
+      for (unsigned int i = 0; i < scene->SensorCount(); ++i)
+      {
+        const auto sensor = scene->SensorByIndex(i);
+        if (!std::dynamic_pointer_cast<gz::rendering::BoundingBoxCamera>(
+                sensor) &&
+            !std::dynamic_pointer_cast<gz::rendering::SegmentationCamera>(
+                sensor) &&
+            !std::dynamic_pointer_cast<gz::rendering::ThermalCamera>(sensor))
+        {
+          continue;
+        }
+        Ogre::Camera *camera = sm->findCameraNoThrow(sensor->Name());
+        if (camera && this->watched.insert({sm, sensor->Name(), camera})
+                          .second)
+        {
+          camera->addListener(this);
+        }
+      }
+    }
+  }
+
   /// \brief Show it in every scene, around the water level, or hide it.
   public: void Update(bool _show, float _level)
   {
+    this->WatchCameras();
     Ogre::Root *root = Ogre::Root::getSingletonPtr();
     if (!root)
       return;
@@ -336,6 +401,31 @@ class Backdrop
       }
     }
     this->items.clear();
+    // Stop listening to the cameras still there
+    if (gz::rendering::isEngineLoaded("ogre2"))
+    {
+      for (const auto &[sm, name, camera] : this->watched)
+      {
+        if (root && Alive(root, sm) &&
+            sm->findCameraNoThrow(name) == camera)
+        {
+          camera->removeListener(this);
+        }
+      }
+    }
+    this->watched.clear();
+  }
+
+  /// \brief Whether a scene manager is still Ogre's.
+  private: static bool Alive(Ogre::Root *_root, Ogre::SceneManager *_sm)
+  {
+    auto managers = _root->getSceneManagerIterator();
+    while (managers.hasMoreElements())
+    {
+      if (managers.getNext() == _sm)
+        return true;
+    }
+    return false;
   }
 
   /// \brief The box in one scene.
@@ -449,6 +539,13 @@ class Backdrop
   }
 
   private: std::map<Ogre::SceneManager *, Ogre::Item *> items;
+
+  /// \brief The cameras listened to: scene, name, camera.
+  private: std::set<std::tuple<Ogre::SceneManager *, std::string,
+                               Ogre::Camera *>> watched;
+
+  /// \brief The backdrop's visibility before a camera hid it.
+  private: bool wasVisible{false};
 
   /// \brief Set when the box could not be made: not tried again.
   private: bool failed{false};

@@ -19,9 +19,9 @@ For each patch of the chart, two numbers, in linear light:
 
 * the angle between the real and the simulated mean colour, as RGB vectors
   (OceanSim's metric, arXiv:2503.01074): hue and saturation, not brightness;
-* the ratio of their luminance, simulated over real: brightness. The same
-  ratio on every patch is an exposure difference between the two cameras;
-  a ratio that varies between patches is the water.
+* the ratio of their luminance, simulated over real: brightness. It is
+  reported, not used: an exposure difference gives the same ratio on every
+  patch, but so can another water, so it does not tell them apart.
 
     chart_validation.py --real dive.png --real-patches dive.json \
         --sim 3C=sim_3c.png --sim 5C=sim_5c.png --sim-patches chart.json \
@@ -41,11 +41,21 @@ With one simulated image or several, one per water (name=image), it prints
 each water's errors, closest first: the nearest water types. There is no
 pass or fail, unless --threshold is given: then it exits 1 if the closest
 water's mean error is not under it. A patch too dark to have a colour in
-either image is left out and counted; more than --max-dark of them, and it
-exits 1.
+either image (linear luminance under 0.001) is left out and counted; a
+water with more than --max-dark of them ranks after every other, and if it
+is the closest, it exits 1.
+
+An image whose patches differ from one another by less than --min-contrast
+degrees, at most, is refused (exit 1): the chart is lost in the water, and
+every water would look alike. Come closer, or into clearer water.
+
+Images are read at their own depth: 8 or 16 bit, or floating point in
+[0, 1]. The photo needs the white balance the simulation has (none, by
+default): a 10 % white balance error moves the ranking.
 """
 
 import argparse
+import itertools
 import json
 import math
 from pathlib import Path
@@ -56,12 +66,27 @@ import numpy as np
 # Rec. 709 luminance weights, for linear RGB.
 LUMINANCE = np.array([0.2126, 0.7152, 0.0722])
 
+# A patch darker than this, in linear luminance, has no colour to compare.
+DARK = 1e-3
+
+# The full scale of the integer types an image file holds.
+SCALES = {np.dtype(np.uint8): 255.0, np.dtype(np.uint16): 65535.0}
+
 
 def srgb_to_linear(image):
-    """Return an sRGB image in linear light, its scale from its data type."""
+    """
+    Return an sRGB image in linear light.
+
+    8 and 16 bit images are scaled by their full scale, floating point
+    images are taken as [0, 1]; any other type is refused, as its scale
+    cannot be known.
+    """
     image = np.asarray(image)
     if np.issubdtype(image.dtype, np.integer):
-        v = image.astype(float) / np.iinfo(image.dtype).max
+        if image.dtype not in SCALES:
+            raise ValueError(f'{image.dtype} images: give 8 or 16 bit, or '
+                             'floating point in [0, 1]')
+        v = image.astype(float) / SCALES[image.dtype]
     else:
         v = image.astype(float)
     return np.where(v <= 0.04045, v / 12.92, ((v + 0.055) / 1.055) ** 2.4)
@@ -80,7 +105,10 @@ def angular_error(a, b):
 
 def patch_means(image, boxes, shrink=0.2):
     """Return the mean linear colour of each box, shrunk by `shrink` per side."""
-    lin = srgb_to_linear(np.asarray(image)[..., :3])
+    image = np.asarray(image)
+    if image.ndim == 2:
+        image = np.repeat(image[..., None], 3, axis=2)
+    lin = srgb_to_linear(image[..., :3])
     out = []
     for x0, y0, x1, y1 in boxes:
         dx, dy = (x1 - x0) * shrink, (y1 - y0) * shrink
@@ -103,7 +131,8 @@ def compare(real, sim, real_boxes, sim_boxes=None):
                          'simulated: they must be the same, in order')
     r = patch_means(real, real_boxes)
     s = patch_means(sim, sim_boxes)
-    errors = [angular_error(a, b) for a, b in zip(r, s)]
+    errors = [angular_error(a, b) if min(a @ LUMINANCE, b @ LUMINANCE) >= DARK
+              else float('nan') for a, b in zip(r, s)]
     ratios = [float(b @ LUMINANCE / (a @ LUMINANCE)) if a @ LUMINANCE > 0
               else float('nan') for a, b in zip(r, s)]
     valid = [e for e in errors if not math.isnan(e)]
@@ -122,7 +151,16 @@ def compare(real, sim, real_boxes, sim_boxes=None):
         'luminance_spread': float(np.std(np.log(good))) if good else nan,
         'real': r.tolist(),
         'sim': s.tolist(),
+        'real_contrast': contrast(r),
+        'sim_contrast': contrast(s),
     }
+
+
+def contrast(means):
+    """Return the largest angle between two patches of one image, degrees."""
+    lit = [m for m in means if m @ LUMINANCE >= DARK]
+    angles = [angular_error(a, b) for a, b in itertools.combinations(lit, 2)]
+    return max(angles) if angles else 0.0
 
 
 def json_safe(value):
@@ -137,8 +175,16 @@ def json_safe(value):
 
 
 def load_image(path):
+    """Return an image file at its own depth: 8 or 16 bit, or float."""
     from PIL import Image
-    return np.asarray(Image.open(path).convert('RGB'))
+    image = Image.open(path)
+    if image.mode in ('I', 'I;16', 'I;16B', 'I;16L', 'I;16N'):
+        # 16 bit grey (Pillow holds it as 32 bit integers)
+        return np.asarray(image).astype(np.int64).clip(0, 65535).astype(
+            np.uint16)
+    if image.mode == 'F':
+        return np.asarray(image, dtype=np.float32)
+    return np.asarray(image.convert('RGB'))
 
 
 def load_boxes(path):
@@ -148,13 +194,14 @@ def load_boxes(path):
     return names, [pt['box'] for pt in spec['patches']]
 
 
-def report(path, real, real_boxes, sims, sim_boxes, names, results, threshold):
+def report(path, real, real_boxes, sims, sim_boxes, names, results, order,
+           threshold):
     """Draw a figure: the real and the closest simulated image, and the errors."""
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
-    best = min(results, key=lambda w: results[w]['mean'])
+    best = order[0]
     fig = plt.figure(figsize=(13, 7.5))
     for k, (img, boxes, title) in enumerate(
             ((real, real_boxes, 'real'), (sims[best], sim_boxes, f'simulated, {best}'))):
@@ -167,7 +214,7 @@ def report(path, real, real_boxes, sims, sim_boxes, names, results, threshold):
     ax = fig.add_subplot(2, 1, 2)
     x = np.arange(len(names))
     width = 0.8 / len(results)
-    for k, water in enumerate(sorted(results, key=lambda w: results[w]['mean'])):
+    for k, water in enumerate(order):
         r = results[water]
         ax.bar(x + k * width, [0 if math.isnan(e) else e for e in r['errors']], width,
                label=f"{water}: mean {r['mean']:.1f} degrees")
@@ -205,6 +252,9 @@ def main(argv=None):
                         'degrees; by default there is no pass or fail')
     p.add_argument('--max-dark', type=int, default=4,
                    help='patches too dark to compare, at most (default 4)')
+    p.add_argument('--min-contrast', type=float, default=3.0,
+                   help='refuse an image whose patches differ by less than '
+                        'this, at most, degrees (default 3)')
     a = p.parse_args(argv)
     real_path = a.real_patches or a.patches
     sim_path = a.sim_patches or a.patches
@@ -217,10 +267,28 @@ def main(argv=None):
     sims, results = {}, {}
     for text in a.sim:
         water, path = parse_sim(text)
+        if water in sims:
+            p.error(f'two simulated images named {water}: name them, '
+                    'as water=path')
         sims[water] = load_image(path)
         results[water] = compare(real, sims[water], real_boxes, sim_boxes)
 
-    order = sorted(results, key=lambda w: (math.isnan(results[w]['mean']),
+    # The patches of every image must differ, or every water looks alike
+    flat = []
+    first = next(iter(results.values()))
+    if first['real_contrast'] < a.min_contrast:
+        flat.append(f"the real image's ({first['real_contrast']:.1f})")
+    flat += [f"{w}'s ({r['sim_contrast']:.1f})" for w, r in results.items()
+             if r['sim_contrast'] < a.min_contrast]
+    if flat:
+        print(f'the patches differ by less than {a.min_contrast} degrees in '
+              f'{", ".join(flat)}: the chart is lost in the water; come '
+              'closer, or into clearer water', file=sys.stderr)
+        return 1
+
+    # Those with too many dark patches last: their few patches say little
+    order = sorted(results, key=lambda w: (results[w]['dark'] > a.max_dark,
+                                           math.isnan(results[w]['mean']),
                                            results[w]['mean']))
     for water in order:
         r = results[water]
@@ -235,7 +303,7 @@ def main(argv=None):
 
     if a.report:
         report(a.report, real, real_boxes, sims, sim_boxes, names, results,
-               a.threshold)
+               order, a.threshold)
     if a.json:
         json.dump(json_safe({'closest': order, 'waters': results}),
                   open(a.json, 'w'), indent=1, allow_nan=False)
