@@ -557,8 +557,6 @@ What it settled:
   background needs a compositor listener; the surface is §4.5. Depth is from
   the still water level, not the waves. No throughput benchmark in CI yet
   (the PBS change costs a few ALU instructions per fragment).
-- **Video**: *Same water, every camera*: the reference and the GPU images of
-  one scene side by side, with their difference, and the GUI.
 
 ## Open questions
 
