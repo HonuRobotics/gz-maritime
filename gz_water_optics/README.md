@@ -28,7 +28,7 @@ world system:
 | Element | Meaning |
 |---|---|
 | `<jerlov>` | The Jerlov water type: `I`, `IA`, `IB`, `II`, `III` (open ocean, clearest first) or `1C`, `3C`, `5C`, `7C`, `9C` (coastal). Default `II`. Case does not matter. |
-| `<visibility>` | How far a black target can be seen horizontally, m. It scales the type's murkiness and keeps its colour. Optional. |
+| `<visibility>` | How far a black target can be seen horizontally, m. It scales what the type has above pure water, up to about 100 m. Optional. |
 | `<attenuation>`, `<backscatter>`, `<diffuse_attenuation>` | Per red, green, blue, 1/m, as `r g b`: each replaces the value the type gives. Optional. |
 | `<veil>` | Per red, green, blue, the veil's colour just below the surface as a fraction of the daylight there. Optional. |
 | `<water_level>` | World z of the still water, m. Default 0. Under a wave field, depth is measured below the local wave surface. |
@@ -59,9 +59,10 @@ the four numbers a camera needs:
 
 People describe water as "5 m visibility". `<visibility>` uses the standard
 relation of Zaneveld and Pegau (2003), visibility = 4.8 / c in the green: it
-scales a, b and K_d of every channel by the same factor, so the water keeps
-its colour and only its murkiness changes. With no `<jerlov>`, it scales
-type `II`. An explicit `<attenuation>` wins over it, with a warning.
+scales what a, b and K_d have above pure water's (type `I`), every channel
+by the same factor. Clearer water turns bluer, as real water does, and none
+is clearer than pure water: a visibility beyond about 100 m is an error, and
+so is one for type `I` itself. With no `<jerlov>`, it scales type `1C`. An explicit `<attenuation>` wins over it, with a warning.
 
 ## Change it while running
 
