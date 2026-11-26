@@ -100,6 +100,20 @@ bool SonarSensor::Load(const sdf::Sensor &_sdf, const std::string &_type,
   this->config = *config;
   this->config.seed = _seed ^ Fnv1a(this->Name());
 
+  // Not the engine's business, so read here; as strictly as the rest.
+  if (block && block->HasElement("always_ping"))
+  {
+    const auto text = block->FindElement("always_ping")->Get<std::string>();
+    if (text == "true" || text == "1")
+      this->alwaysPing = true;
+    else if (text != "false" && text != "0")
+    {
+      gzerr << "Sonar [" << this->Name() << "]: <always_ping> must be true "
+            << "or false, not [" << text << "]\n";
+      return false;
+    }
+  }
+
   // The cameras and the ray fan this configuration asks for, checked before
   // anything is built: a fan too large to build, or a camera too large to
   // draw, refuses this sensor here rather than hang or abort the server
@@ -149,7 +163,8 @@ bool SonarSensor::Load(const sdf::Sensor &_sdf, const std::string &_type,
         << this->Topic() << "]: " << this->config.beams << " beams, "
         << this->config.samples << " samples to " << this->config.rangeMax
         << " m, " << l.yaws.size() << " camera(s) of " << l.width << "x"
-        << l.height << "\n";
+        << l.height << (this->alwaysPing ? ", pinging with no subscriber too" :
+          "") << "\n";
   if (this->UpdateRate() > this->Rate())
   {
     gzwarn << "Sonar [" << this->Name() << "]: <update_rate> "
@@ -207,6 +222,12 @@ bool SonarSensor::HasConnections() const
   return (this->imagePub && this->imagePub.HasConnections()) ||
     (this->labelsPub && this->labelsPub.HasConnections()) ||
     (this->waterColumnPub && this->waterColumnPub.HasConnections());
+}
+
+//////////////////////////////////////////////////
+bool SonarSensor::AlwaysPing() const
+{
+  return this->alwaysPing;
 }
 
 //////////////////////////////////////////////////

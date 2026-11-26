@@ -292,6 +292,12 @@ std::shared_ptr<Log> Prepare()
   return log;
 }
 
+/// \brief What the system says, at debug level, when a sonar starts to
+/// ping, stops for want of a subscriber, or is turned off.
+const char *const kPinging = "]: pinging";
+const char *const kUnwatched = "]: no subscriber, not pinging";
+const char *const kOff = "]: off, not pinging";
+
 /// \brief The text of the warning about a world without the Sensors system.
 const char *const kNoSensorsWarning = "no frame rendered";
 
@@ -338,8 +344,11 @@ std::string OnGrid(const std::vector<Ping> &_pings, double _rate)
 //////////////////////////////////////////////////
 /// \brief The sonar's model in SDF, as scene B has it, under another name.
 /// \param[in] _name The model's name.
+/// \param[in] _sonar What to put in its <gz:sonar> in place of scene B's
+/// range of 0.2 to 10 m.
 /// \return The model's SDF.
-std::string Rov(const std::string &_name)
+std::string Rov(const std::string &_name, const std::string &_sonar =
+  "<range><min>0.2</min><max>10</max></range>")
 {
   return
     "<sdf version='1.12' xmlns:gz='http://gazebosim.org/schema'>"
@@ -350,7 +359,7 @@ std::string Rov(const std::string &_name)
     "<sensor name='sonar_forward' type='custom' gz:type='imaging_sonar'>"
     "<pose>0 0 0 0 0.2618 0</pose><update_rate>25</update_rate>"
     "<topic>" + _name + "/sonar_forward/image</topic>"
-    "<gz:sonar><range><min>0.2</min><max>10</max></range>"
+    "<gz:sonar>" + _sonar +
     "<samples>512</samples><labels>true</labels></gz:sonar>"
     "</sensor></link></model></sdf>";
 }
@@ -750,6 +759,121 @@ TEST_F(SonarSystem, ResetStartsOverOnTheGrid)
   EXPECT_LT(got.front().ping, last);
   EXPECT_LT(got.front().stamp, Due(5, kRate));
   EXPECT_EQ("", OnGrid(got, kRate));
+}
+
+//////////////////////////////////////////////////
+// A sonar pings only while something subscribes to its image or its labels.
+// What it does with nobody listening shows only in what it logs at each
+// change, so that is what is read here; that it keeps to the rate grid
+// through the gap shows in the pings after it.
+TEST_F(SonarSystem, PingsOnlyWhileSubscribed)
+{
+  const std::string name = "rov::base_link::sonar_forward";
+  Step(100);
+  Settle(*pings);
+  // Counted from here: the tests before turned it off and on.
+  const auto quietBefore = log->Count({name, kUnwatched});
+  const auto pingingBefore = log->Count({name, kPinging});
+  auto quiet = [&]() { return log->Count({name, kUnwatched}) - quietBefore; };
+  auto pinging = [&]() {
+    return log->Count({name, kPinging}) - pingingBefore;
+  };
+
+  // The only subscriber goes.
+  pings.reset();
+  ASSERT_TRUE(StepUntil([&]() { return quiet() == 1; }));
+  Step(1000);
+  EXPECT_EQ(0u, pinging());
+
+  // One to the labels alone is a subscriber too.
+  {
+    transport::Node labels;
+    std::function<void(const gz::maritime::sonar::SonarLabels &)> ignore =
+      [](const gz::maritime::sonar::SonarLabels &) {};
+    ASSERT_TRUE(labels.Subscribe(kTopic + "/labels", ignore));
+    ASSERT_TRUE(StepUntil([&]() { return pinging() == 1; }));
+    Step(200);
+    EXPECT_EQ(1u, quiet());
+  }
+  ASSERT_TRUE(StepUntil([&]() { return quiet() == 2; }));
+
+  // A subscriber again: pings again, numbered as if they had never stopped.
+  pings = std::make_unique<Pings>(kTopic);
+  ASSERT_TRUE(StepUntil([&]() { return pings->Latest() >= 0; }));
+  EXPECT_EQ(2u, pinging());
+  const auto got = Window(*pings, 1000);
+  EXPECT_EQ(25u, got.size());
+  EXPECT_EQ("", OnGrid(got, kRate));
+  EXPECT_EQ(2u, quiet());
+}
+
+//////////////////////////////////////////////////
+// <always_ping> in <gz:sonar>: the sonar pings with no subscriber, for the
+// subscriber gz-transport does not report. Its enable service still turns
+// it off. A value that is neither true nor false refuses the sonar.
+TEST_F(SonarSystem, AlwaysPingNeedsNoSubscriber)
+{
+  const std::string name = "always::base_link::sonar_forward";
+  const std::string topic = "always/sonar_forward/image";
+  msgs::EntityFactory factory;
+  factory.set_sdf(Rov("always", "<range><min>0.2</min><max>10</max></range>"
+    "<always_ping>true</always_ping>"));
+  ASSERT_TRUE(Call(kWorld + "/create", factory));
+  ASSERT_TRUE(StepUntil([&]() {
+    return log->Count({name, kPinging}) == 1;
+  }));
+  Step(1000);
+  EXPECT_EQ(0u, log->Count({name, kUnwatched}));
+  EXPECT_EQ(0u, log->Count({"unknown element <always_ping>"}));
+
+  // A subscriber that comes later finds it on the grid, like any other.
+  {
+    Pings late(topic);
+    ASSERT_TRUE(StepUntil([&]() { return late.Latest() >= 0; }));
+    const auto got = Window(late, 400);
+    EXPECT_EQ(10u, got.size());
+    EXPECT_EQ("", OnGrid(got, kRate));
+  }
+  Step(400);
+  EXPECT_EQ(0u, log->Count({name, kUnwatched}));
+
+  msgs::Boolean request;
+  request.set_data(false);
+  ASSERT_TRUE(node->Request(topic + "/enable", request));
+  ASSERT_TRUE(StepUntil([&]() {
+    return log->Count({name, kOff}) == 1;
+  }));
+
+  msgs::Entity model;
+  model.set_name("always");
+  model.set_type(msgs::Entity::MODEL);
+  ASSERT_TRUE(Call(kWorld + "/remove", model));
+  EXPECT_TRUE(StepUntil([&]() { return !Advertised(topic); }));
+
+  // false is the default said aloud; anything else is refused.
+  factory.set_sdf(Rov("never", "<range><min>0.2</min><max>10</max></range>"
+    "<always_ping>false</always_ping>"));
+  ASSERT_TRUE(Call(kWorld + "/create", factory));
+  ASSERT_TRUE(StepUntil([&]() {
+    return log->Count({"never::base_link::sonar_forward", kUnwatched}) == 1;
+  }));
+  model.set_name("never");
+  ASSERT_TRUE(Call(kWorld + "/remove", model));
+  EXPECT_TRUE(StepUntil([&]() {
+    return !Advertised("never/sonar_forward/image");
+  }));
+
+  factory.set_sdf(Rov("maybe", "<range><min>0.2</min><max>10</max></range>"
+    "<always_ping>maybe</always_ping>"));
+  ASSERT_TRUE(Call(kWorld + "/create", factory));
+  ASSERT_TRUE(StepUntil([&]() {
+    return log->Count({"<always_ping> must be true or false"}) == 1;
+  }));
+  EXPECT_FALSE(Advertised("maybe/sonar_forward/image"));
+  model.set_name("maybe");
+  ASSERT_TRUE(Call(kWorld + "/remove", model));
+  Step(100);
+  Settle(*pings);
 }
 
 //////////////////////////////////////////////////

@@ -384,7 +384,7 @@ std::optional<sonar::SonarConfig> LoadSonarConfig(const std::string &_type,
   // which keeps a copy of this list to check a vehicle's `sonar:` settings
   // before they reach this reader.
   static const std::set<std::string> known = {
-    "angle_noise", "beam_width", "beams", "detection", "detection_threshold",
+    "always_ping", "angle_noise", "beam_width", "beams", "detection", "detection_threshold",
     "dynamic_range", "elevation_rays", "elevation_span", "frequency", "gain",
     "gain_time_constant", "horizontal_fov", "labels", "max_soundings",
     "noise_floor", "pulse_length", "range", "range_max", "range_min",

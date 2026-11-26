@@ -260,6 +260,9 @@ struct Rig
   /// changes (its set_rate service), next is recomputed on the new grid.
   double rate{0.0};
   nanoseconds lastStamp{-1};
+  /// \brief What the sonar did at its last due time, to say when it changes.
+  enum class State {kNew, kPinging, kUnwatched, kOff};
+  State state{State::kNew};
 };
 
 /// \brief A depth and segmentation camera pair no sonar is using, kept for
@@ -1217,7 +1220,23 @@ void SonarPrivate::OnRender()
       continue;
     // Off (its enable service) or nobody listening: skip this ping's render
     // and model, but keep to the rate grid so ping numbers stay tied to time.
-    if (!rig.request.sonar->IsActive() || !rig.request.sonar->HasConnections())
+    // HasConnections is gz-transport's word, and that can miss a subscriber;
+    // a sonar with <always_ping> does not ask. Each change is said at debug
+    // level, so a subscriber that gets nothing can be told from one that
+    // was not seen.
+    const auto &sonar = *rig.request.sonar;
+    const Rig::State state = !sonar.IsActive() ? Rig::State::kOff :
+      sonar.AlwaysPing() || sonar.HasConnections() ? Rig::State::kPinging :
+      Rig::State::kUnwatched;
+    if (state != rig.state)
+    {
+      rig.state = state;
+      gzdbg << "Sonar [" << sonar.Name() << "]: "
+            << (state == Rig::State::kPinging ? "pinging" :
+                state == Rig::State::kOff ? "off, not pinging" :
+                "no subscriber, not pinging") << "\n";
+    }
+    if (state != Rig::State::kPinging)
     {
       while (DueTime(rig.next, rate) <= t)
         ++rig.next;

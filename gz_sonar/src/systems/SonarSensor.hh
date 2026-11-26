@@ -128,6 +128,12 @@ class SonarSensor : public sensors::Sensor
   // does for its own rendering sensors.
   public: bool HasConnections() const override;
 
+  /// \brief Whether the sonar pings with no subscriber too, its
+  /// <always_ping>. HasConnections trusts gz-transport, which can miss a
+  /// subscriber; this is the way around it.
+  /// \return True if it pings regardless of subscribers.
+  public: bool AlwaysPing() const;
+
   /// \brief Start over after a world reset: the automatic gain forgets
   /// the pings it has seen.
   public: void ResetState();
@@ -143,6 +149,9 @@ class SonarSensor : public sensors::Sensor
   private: gz::maritime::sonar::SonarConfig config;
   private: gz::maritime::sonar::Water water;
   private: bool labels{false};
+
+  /// \brief Ping with no subscriber too (<always_ping>).
+  private: bool alwaysPing{false};
   private: std::unique_ptr<gz::maritime::sonar::Engine> engine;
   private: std::unique_ptr<gz::maritime::sonar::CameraSampler> sampler;
   private: gz::maritime::sonar::GainTracker gain;

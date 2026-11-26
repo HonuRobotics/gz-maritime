@@ -80,6 +80,16 @@ gz service -s /my_vehicle/sonar_forward/image/enable --reqtype gz.msgs.Boolean -
 
 `data: true` turns it back on; `<topic>/set_rate` (a `gz.msgs.Double`) changes its rate.
 
+Whether anyone subscribes is gz-transport's answer, and it can miss a subscriber: a process that subscribes to several sonar topics one after another may get nothing on some of them until another process subscribes to the same topic. If a subscriber gets no pings, run the server with `-v 4`, where each sonar logs when it starts and stops pinging and why; if it says `no subscriber, not pinging` while you are subscribed, make that sonar ping regardless:
+
+```xml
+<gz:sonar>
+  <always_ping>true</always_ping>
+</gz:sonar>
+```
+
+It then costs its full rate with nobody listening, so set it only where it is needed. The `enable` service still turns it off.
+
 ## Check
 
 ```bash
