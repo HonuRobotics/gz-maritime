@@ -21,13 +21,13 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <iostream>
 #include <memory>
 #include <mutex>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -71,14 +71,19 @@ constexpr double kHorizontalFov = 0.8;
 /// \brief Its image topic.
 constexpr char kDepthTopic[] = "/drawn_surface/depth";
 
-/// \brief The sea is compared at the first frame from this time on [s].
+/// \brief The sea is compared at the frames from this time on [s].
 constexpr double kCompareFrom = 2.0;
+
+/// \brief How many frames are compared: enough that a sea drawn a step late
+/// in some frames only is caught.
+constexpr std::size_t kFrames = 5;
 
 //////////////////////////////////////////////////
 /// \brief A wave field for the test, so the renderer is tested without any
 /// wave engine: two trains of sine waves that travel, with the sideways
 /// displacement of a choppy sea, sampled on a grid. Like the FFT engine, its
-/// elevation is the bilinear sample of that grid.
+/// elevation is the bilinear sample of that grid. The trains are fast, so a
+/// sea drawn one step of the simulation late is 7 mm off.
 class GridWaveField : public gsw::IWaveField
 {
   // Documentation inherited
@@ -146,7 +151,7 @@ class GridWaveField : public gsw::IWaveField
       public: int wavesAlongY;
       public: double omega;
     };
-    static const Train kTrains[] = {{0.35, 2, 0, 1.1}, {0.20, 1, 3, 1.7}};
+    static const Train kTrains[] = {{0.35, 2, 0, 2.2}, {0.20, 1, 3, 3.4}};
     const std::size_t n = this->field.n;
     const double step = 2.0 * M_PI / static_cast<double>(n);
     for (std::size_t j = 0; j < n; ++j)
@@ -199,40 +204,40 @@ class GridWaveField : public gsw::IWaveField
 struct Frame
 {
   /// \brief Simulation time of the frame [s].
-  double time{0.0};
+  public: double time{0.0};
 
   /// \brief Image width [px].
-  int width{0};
+  public: int width{0};
 
   /// \brief Image height [px].
-  int height{0};
+  public: int height{0};
 
   /// \brief Depth along the camera's axis per pixel, row by row [m].
-  std::vector<float> depth;
+  public: std::vector<float> depth;
 };
 
-/// \brief The frame the camera's callback keeps, shared with it: gz-transport
-/// may still deliver a message after an unsubscribe.
+/// \brief The frames the camera's callback keeps, shared with it:
+/// gz-transport may still deliver a message after an unsubscribe.
 struct Capture
 {
-  /// \brief Guards the frame.
-  std::mutex mutex;
+  /// \brief Guards the frames.
+  public: std::mutex mutex;
 
-  /// \brief The first frame of the risen sea, once it has come.
-  std::optional<Frame> frame;
+  /// \brief The first kFrames frames from kCompareFrom on.
+  public: std::vector<Frame> frames;
 };
 
 /// \brief What a frame says against the wave field.
 struct Comparison
 {
   /// \brief RMS height of the surface the camera saw [m].
-  double seaRms{0.0};
+  public: double seaRms{0.0};
 
   /// \brief RMS of that surface minus the field's drawn surface [m].
-  double differenceRms{0.0};
+  public: double differenceRms{0.0};
 
   /// \brief Pixels compared.
-  int pixels{0};
+  public: int pixels{0};
 };
 
 //////////////////////////////////////////////////
@@ -279,10 +284,12 @@ Comparison Compare(const Frame &_frame, const gsw::WavefieldData &_field,
 }  // namespace
 
 //////////////////////////////////////////////////
-/// The surface the renderer draws is the one the wave field says is drawn:
-/// what a boat floats on is what the camera sees. The shader samples the
-/// height texture at texel centres; half a texel off, the drawn sea sits
-/// half a grid cell from the field, which on this sea is 9 cm of height.
+/// The surface the renderer draws is the one the wave field says is drawn,
+/// at the time of the frame: what a boat floats on is what the camera sees.
+/// The shader samples the height texture at texel centres; half a texel off,
+/// the drawn sea sits half a grid cell from the field, which on this sea is
+/// 7 cm of height. The sea is drawn at the time of the scene; drawn at the
+/// simulation thread's time it can be a step late, 7 mm here.
 TEST(WaterVisual, DrawsTheSurfaceOfTheWaveField)
 {
   gsw::RegisterWaveEngineFactory(kEngine,
@@ -319,7 +326,7 @@ TEST(WaterVisual, DrawsTheSurfaceOfTheWaveField)
       const double time = static_cast<double>(_msg.header().stamp().sec()) +
           1e-9 * static_cast<double>(_msg.header().stamp().nsec());
       std::lock_guard<std::mutex> lock(capture->mutex);
-      if (capture->frame || time < kCompareFrom)
+      if (capture->frames.size() >= kFrames || time < kCompareFrom)
         return;
       Frame f;
       f.time = time;
@@ -328,58 +335,62 @@ TEST(WaterVisual, DrawsTheSurfaceOfTheWaveField)
       f.depth.resize(_msg.data().size() / sizeof(float));
       std::memcpy(f.depth.data(), _msg.data().data(),
                   f.depth.size() * sizeof(float));
-      capture->frame = std::move(f);
+      capture->frames.push_back(std::move(f));
     };
   ASSERT_TRUE(node.Subscribe(kDepthTopic, onImage));
-  const auto frameCame = [&capture]
+  const auto framesCame = [&capture]
   {
     std::lock_guard<std::mutex> lock(capture->mutex);
-    return capture->frame.has_value();
+    return capture->frames.size() >= kFrames;
   };
 
   // A second of simulation at a time, each run blocking. A server stopped
   // while it runs on a thread of its own hung about once in thirty runs,
   // with a PostUpdate of gz-sim's sensors system waiting on its render
   // thread.
-  for (int second = 0; second < 20 && !frameCame(); ++second)
+  for (int second = 0; second < 30 && !framesCame(); ++second)
     ASSERT_TRUE(fixture.Server()->Run(true, 100, false));
   // The frame of the last step may still be on its way.
   const auto deadline =
       std::chrono::steady_clock::now() + std::chrono::seconds(10);
-  while (!frameCame() && std::chrono::steady_clock::now() < deadline)
+  while (!framesCame() && std::chrono::steady_clock::now() < deadline)
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   node.Unsubscribe(kDepthTopic);
 
-  std::optional<Frame> frame;
+  std::vector<Frame> frames;
   {
     std::lock_guard<std::mutex> lock(capture->mutex);
-    frame = capture->frame;
+    frames = capture->frames;
   }
-  if (!frame)
+  if (frames.empty())
     GTEST_SKIP() << "no depth image: this machine cannot render";
+  ASSERT_EQ(frames.size(), kFrames);
 
-  // The engine the renderer builds from the same recipe, at the same time.
+  // The engine the renderer builds from the same recipe, at each frame's
+  // time.
   field.simulation = gsw::CreateWaveSimulation(field.algorithm, field.params);
   ASSERT_NE(field.simulation, nullptr);
-  gsw::Advance(field, frame->time);
+  for (const Frame &frame : frames)
+  {
+    SCOPED_TRACE(frame.time);
+    gsw::Advance(field, frame.time);
+    const Comparison same = Compare(frame, field, 0.0);
+    const Comparison halfCellOff =
+        Compare(frame, field, 0.5 * kTile / static_cast<double>(kCells));
+    std::cout << "t = " << frame.time << " s: sea rms " << same.seaRms
+              << " m over " << same.pixels << " pixels; drawn minus field rms "
+              << same.differenceRms << " m, against "
+              << halfCellOff.differenceRms
+              << " m for a field half a cell off\n";
 
-  const Comparison same = Compare(*frame, field, 0.0);
-  const Comparison halfCellOff =
-      Compare(*frame, field, 0.5 * kTile / static_cast<double>(kCells));
-  std::cout << "sea rms " << same.seaRms << " m over " << same.pixels
-            << " pixels at t = " << frame->time << " s; drawn minus field rms "
-            << same.differenceRms << " m, against " << halfCellOff.differenceRms
-            << " m for a field half a cell off\n";
-
-  ASSERT_GT(same.pixels, 1000);
-  // A sea, not flat water.
-  EXPECT_GT(same.seaRms, 0.15);
-  // Millimetres. The renderer may draw the sea of the step after the
-  // frame's: WaterVisual takes its time from the simulation thread, which
-  // can be a step ahead of a frame being rendered.
-  EXPECT_LT(same.differenceRms, 0.02);
-  // The comparison tells half a cell.
-  EXPECT_GT(halfCellOff.differenceRms, 3.0 * same.differenceRms);
+    ASSERT_GT(same.pixels, 1000);
+    // A sea, not flat water.
+    EXPECT_GT(same.seaRms, 0.15);
+    // About 0.1 mm here; 2 mm still tells a step late, 7 mm.
+    EXPECT_LT(same.differenceRms, 0.002);
+    // The comparison tells half a cell.
+    EXPECT_GT(halfCellOff.differenceRms, 3.0 * same.differenceRms);
+  }
 }
 
 //////////////////////////////////////////////////

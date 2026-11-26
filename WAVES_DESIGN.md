@@ -367,10 +367,14 @@ maps them so texture (u, v) = grid (x_u, y_v), preserving the physics
 orientation end to end. The shaders sample that texture at
 `worldXY / tileSize` plus half a texel, where the texel of a grid point has
 its centre, so the surface drawn over a world point is the one the field
-reports there (`SurfaceHeight`), not one half a cell beside it.
-`drawn_surface_test` holds the two together: a depth camera looks down on a
-choppy sea and what it sees is compared with the field. It needs a GPU, and
-is skipped when the camera gives no image.
+reports there (`SurfaceHeight`), not one half a cell beside it. The sea is
+drawn at the time of the scene being rendered (`Scene::Time`, which
+`RenderUtil` sets from the state it applies), not at the latest time the
+simulation thread has reached, so a camera frame shows the sea of its own
+stamp. `drawn_surface_test` holds the drawn surface to the field: a depth
+camera looks down on a choppy sea and what it sees, frame after frame, is
+compared with the field at each frame's time. It has to render, in software
+if there is no GPU, and is skipped when the camera gives no image.
 
 ### 5.2 Engine-agnostic, via per-engine GUI registrars
 
