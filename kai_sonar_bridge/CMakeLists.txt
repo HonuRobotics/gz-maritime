@@ -56,7 +56,10 @@ install(PROGRAMS examples/read_sonar.py DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  set(ament_cmake_copyright_FOUND TRUE)
+  # cpplint and uncrustify as ament configures them check ROS 2 style, and
+  # this code follows the Gazebo (Allman) style of AGENTS.md: uncrustify
+  # stops on the per-member access specifiers, and cpplint flags an else on
+  # its own line and the blank line after each public: member.
   set(ament_cmake_cpplint_FOUND TRUE)
   set(ament_cmake_uncrustify_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
