@@ -107,6 +107,22 @@ if(BUILD_TESTING)
       ENVIRONMENT
       "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};GZ_PARTITION=gz_underwater_camera_test")
   endif()
+
+  # The plugin fed frames by the test, in worlds with nothing rendered: no
+  # GPU needed.
+  ament_add_gtest(underwater_camera_frames_test
+    test/underwater_camera_frames_test.cc TIMEOUT 300)
+  if(TARGET underwater_camera_frames_test)
+    target_compile_definitions(underwater_camera_frames_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(underwater_camera_frames_test
+      gz-sim::core
+      gz-transport::core
+      gz-msgs::core)
+    set_tests_properties(underwater_camera_frames_test PROPERTIES
+      ENVIRONMENT
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};GZ_PARTITION=gz_underwater_camera_frames_test")
+  endif()
 endif()
 
 ament_environment_hooks("hooks/hook.dsv.in")

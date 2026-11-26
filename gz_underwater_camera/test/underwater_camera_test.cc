@@ -95,6 +95,7 @@ class UnderwaterCameraTest : public ::testing::Test
     config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, "camera.sdf"));
     this->server = std::make_unique<Server>(config);
     this->under.Listen(this->node, "/uwcam/under");
+    this->pitched.Listen(this->node, "/uwcam/pitched");
     this->above.Listen(this->node, "/uwcam/above");
     this->server->Run(false, 0, false);
   }
@@ -105,37 +106,46 @@ class UnderwaterCameraTest : public ::testing::Test
   }
 
   /// \brief Wait for a stamp with all three frames from a camera.
-  protected: std::int64_t WaitFor(Frames &_f)
+  /// \return The stamp; none if nothing came, and then `rendered` says
+  /// whether the camera rendered at all (no GPU, if not).
+  protected: std::optional<std::int64_t> WaitFor(Frames &_f)
   {
     for (int i = 0; i < 600; ++i)
     {
       if (auto s = _f.Matched())
-        return *s;
+        return s;
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      const std::lock_guard<std::mutex> lock(_f.mutex);
+      if (i == 200 && _f.image.empty())
+        break;
     }
-    ADD_FAILURE() << "no matched frames in 30 s: is there a GPU?";
-    return -1;
+    const std::lock_guard<std::mutex> lock(_f.mutex);
+    this->rendered = !_f.image.empty();
+    return std::nullopt;
   }
 
-  protected: transport::Node node;
   protected: std::unique_ptr<Server> server;
-  protected: Frames under, above;
+  protected: Frames under, pitched, above;
+  protected: bool rendered{true};
+  /// \brief Last, so it goes first: nothing is delivered into the frames
+  /// after they are gone.
+  protected: transport::Node node;
 };
 }  // namespace
 
 /////////////////////////////////////////////////
 // The published image, pixel by pixel, against the model computed here from
-// the in-air frame of the same stamp, its depth, and Jerlov 3C at 3 m.
-TEST_F(UnderwaterCameraTest, MatchesTheModelPerPixel)
+// the in-air frame of the same stamp, its depth, and Jerlov 3C at 3 m, for a
+// camera pitched up by _pitch rad.
+void CheckModel(Frames &_f, std::int64_t _stamp, double _pitch,
+                int &_hits, int &_misses)
 {
-  const auto stamp = this->WaitFor(this->under);
-  ASSERT_GE(stamp, 0);
-  const std::lock_guard<std::mutex> lock(this->under.mutex);
-  const auto &img = this->under.image.at(stamp);
-  const auto &dep = this->under.depth.at(stamp);
-  const auto &out = this->under.under.at(stamp);
-  ASSERT_TRUE(this->under.info);
-  const auto &K = this->under.info->intrinsics().k();
+  const std::lock_guard<std::mutex> lock(_f.mutex);
+  const auto &img = _f.image.at(_stamp);
+  const auto &dep = _f.depth.at(_stamp);
+  const auto &out = _f.under.at(_stamp);
+  ASSERT_TRUE(_f.info);
+  const auto &K = _f.info->intrinsics().k();
   const double fx = K[0], cx = K[2], fy = K[4], cy = K[5];
   ASSERT_EQ(out.width(), img.width());
   ASSERT_EQ(out.height(), img.height());
@@ -160,7 +170,9 @@ TEST_F(UnderwaterCameraTest, MatchesTheModelPerPixel)
       const double x = (u + 0.5 - cx) / fx;
       const double y = (v + 0.5 - cy) / fy;
       const double factor = std::sqrt(1 + x * x + y * y);
-      const double rayUp = -y / factor;
+      // The ray's climb in the world: the camera pitched up by _pitch
+      const double rayUp =
+          (std::sin(_pitch) - y * std::cos(_pitch)) / factor;
       const bool hit = std::isfinite(z[i]) && z[i] > 0;
       hit ? ++hits : ++misses;
       for (int c = 0; c < 3; ++c)
@@ -201,11 +213,40 @@ TEST_F(UnderwaterCameraTest, MatchesTheModelPerPixel)
     }
   }
   const double mean = sumAbs / (3.0 * img.width() * img.height());
-  std::cout << "hits " << hits << ", misses " << misses << "; mean |diff| "
-            << mean << ", worst " << worst << " steps\n";
-  EXPECT_GT(hits, 1000) << "the camera saw no wall or plate";
+  std::cout << "pitch " << _pitch << ": hits " << hits << ", misses "
+            << misses << "; mean |diff| " << mean << ", worst " << worst
+            << " steps\n";
   EXPECT_LE(mean, 0.05) << "mean difference, 8-bit steps";
   EXPECT_LE(worst, 1) << "worst pixel, 8-bit steps";
+  _hits = hits;
+  _misses = misses;
+}
+
+/////////////////////////////////////////////////
+TEST_F(UnderwaterCameraTest, MatchesTheModelPerPixel)
+{
+  const auto stamp = this->WaitFor(this->under);
+  if (!stamp && !this->rendered)
+    GTEST_SKIP() << "nothing rendered: no GPU?";
+  ASSERT_TRUE(stamp);
+  int hits = 0, misses = 0;
+  CheckModel(this->under, *stamp, 0.0, hits, misses);
+  EXPECT_GT(hits, 1000) << "the camera saw no wall or plate";
+}
+
+/////////////////////////////////////////////////
+// Pitched up, the camera sees the wall below and open water above it,
+// where nothing is hit: the model holds there too.
+TEST_F(UnderwaterCameraTest, PitchedUpOverOpenWater)
+{
+  const auto stamp = this->WaitFor(this->pitched);
+  if (!stamp && !this->rendered)
+    GTEST_SKIP() << "nothing rendered: no GPU?";
+  ASSERT_TRUE(stamp);
+  int hits = 0, misses = 0;
+  CheckModel(this->pitched, *stamp, 1.0, hits, misses);
+  EXPECT_GT(hits, 500) << "the camera saw no wall";
+  EXPECT_GT(misses, 500) << "the camera saw no open water";
 }
 
 /////////////////////////////////////////////////
@@ -213,8 +254,11 @@ TEST_F(UnderwaterCameraTest, MatchesTheModelPerPixel)
 // is from the veil's colour, under water, against in air, in linear light.
 TEST_F(UnderwaterCameraTest, FarFadesIntoTheVeil)
 {
-  const auto stamp = this->WaitFor(this->under);
-  ASSERT_GE(stamp, 0);
+  const auto found = this->WaitFor(this->under);
+  if (!found && !this->rendered)
+    GTEST_SKIP() << "nothing rendered: no GPU?";
+  ASSERT_TRUE(found);
+  const auto stamp = *found;
   const std::lock_guard<std::mutex> lock(this->under.mutex);
   const auto &img = this->under.image.at(stamp);
   const auto &out = this->under.under.at(stamp);
@@ -254,8 +298,11 @@ TEST_F(UnderwaterCameraTest, FarFadesIntoTheVeil)
 // Above the water the image is the plain camera's, byte for byte.
 TEST_F(UnderwaterCameraTest, AboveWaterUnchanged)
 {
-  const auto stamp = this->WaitFor(this->above);
-  ASSERT_GE(stamp, 0);
+  const auto found = this->WaitFor(this->above);
+  if (!found && !this->rendered)
+    GTEST_SKIP() << "nothing rendered: no GPU?";
+  ASSERT_TRUE(found);
+  const auto stamp = *found;
   const std::lock_guard<std::mutex> lock(this->above.mutex);
   EXPECT_EQ(this->above.under.at(stamp).data(),
             this->above.image.at(stamp).data());
@@ -266,8 +313,11 @@ TEST_F(UnderwaterCameraTest, AboveWaterUnchanged)
 // it, so a depth camera or a lidar sees what it saw.
 TEST_F(UnderwaterCameraTest, DepthUntouched)
 {
-  const auto stamp = this->WaitFor(this->under);
-  ASSERT_GE(stamp, 0);
+  const auto found = this->WaitFor(this->under);
+  if (!found && !this->rendered)
+    GTEST_SKIP() << "nothing rendered: no GPU?";
+  ASSERT_TRUE(found);
+  const auto stamp = *found;
   const std::lock_guard<std::mutex> lock(this->under.mutex);
   const auto &dep = this->under.depth.at(stamp);
   EXPECT_EQ(dep.pixel_format_type(), msgs::PixelFormatType::R_FLOAT32);

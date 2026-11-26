@@ -24,21 +24,15 @@ find_package(gz-common REQUIRED)
 find_package(gz_rendering_vendor REQUIRED)
 find_package(gz-rendering REQUIRED COMPONENTS ogre2)
 find_package(gz_water_optics REQUIRED)
+find_package(gz_transport_vendor REQUIRED)
+find_package(gz-transport REQUIRED)
+find_package(gz_msgs_vendor REQUIRED)
+find_package(gz-msgs REQUIRED)
 
-# OGRE-Next headers: the copy gz-rendering-ogre2 was built against first, as
-# gz_waves_rendering does.
-get_target_property(_ogre2_incs gz-rendering::ogre2 INTERFACE_INCLUDE_DIRECTORIES)
-find_path(OGRE_NEXT_INCLUDE_DIR
-  NAMES OgreRoot.h
-  HINTS ${_ogre2_incs}
-  PATHS /opt/ros/$ENV{ROS_DISTRO}/opt/gz_ogre_next_vendor/include
-  PATH_SUFFIXES OGRE-Next OGRE-2.4 OGRE-2.3
-  NO_DEFAULT_PATH)
-find_path(OGRE_NEXT_INCLUDE_DIR NAMES OgreRoot.h
-  PATH_SUFFIXES OGRE-Next OGRE-2.4 OGRE-2.3)
-if(NOT OGRE_NEXT_INCLUDE_DIR)
-  message(FATAL_ERROR "OGRE-Next headers (OgreRoot.h) not found")
-endif()
+# OGRE-Next headers: the copy gz-rendering-ogre2 was built against, found as
+# gz_waves_rendering finds them.
+find_package(gz_waves_rendering REQUIRED)
+gz_find_ogre_next()
 
 set(PIECES_DIR share/${PROJECT_NAME}/hlms/Underwater)
 
@@ -78,6 +72,8 @@ add_library(gz-maritime-underwater-rendering-system SHARED
 target_link_libraries(gz-maritime-underwater-rendering-system
   PRIVATE
     gz_water_optics::gz_water_optics
+    gz-transport::core
+    gz-msgs::core
     gz-sim::core
     gz-plugin::register
     gz-rendering::gz-rendering
@@ -101,10 +97,6 @@ if(BUILD_TESTING)
 
   find_package(ament_cmake_gtest REQUIRED)
   find_package(gz_underwater_camera REQUIRED)
-  find_package(gz_transport_vendor REQUIRED)
-  find_package(gz-transport REQUIRED)
-  find_package(gz_msgs_vendor REQUIRED)
-  find_package(gz-msgs REQUIRED)
 
   # The GPU path against the reference camera, and what it must leave alone.
   # Needs a GPU. Runs the same scene without and with the GPU path, in one
@@ -157,6 +149,21 @@ if(BUILD_TESTING)
     set_tests_properties(underwater_rendering_fallback_test PROPERTIES
       ENVIRONMENT
       "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_BINARY_DIR}/no_such_pieces;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH};GZ_PARTITION=gz_underwater_rendering_fallback_test")
+  endif()
+  # Turned off and on while running, and its model removed. A process of
+  # its own, so nothing is installed before.
+  ament_add_gtest(underwater_rendering_runtime_test
+    test/underwater_rendering_runtime_test.cc TIMEOUT 600)
+  if(TARGET underwater_rendering_runtime_test)
+    target_compile_definitions(underwater_rendering_runtime_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(underwater_rendering_runtime_test
+      gz-sim::core
+      gz-transport::core
+      gz-msgs::core)
+    set_tests_properties(underwater_rendering_runtime_test PROPERTIES
+      ENVIRONMENT
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH};GZ_PARTITION=gz_underwater_rendering_runtime_test")
   endif()
 endif()
 

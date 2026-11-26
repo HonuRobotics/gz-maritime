@@ -29,7 +29,14 @@ the world is rendered: in the server's sensors and in every GUI. Cameras
 above the water are untouched.
 
 With it, a reference underwater camera (`gz_underwater_camera`) in the same
-world passes its image through: the renderer has already drawn the water.
+world applies only its own response: the renderer has already drawn the
+water.
+
+To turn it off and on while running, publish a `gz.msgs.Boolean` on
+`/world/<world>/underwater_rendering/enable`; to start with it off, set
+`<enabled>false</enabled>` in the plugin (default true). Off, or with its
+model removed, the renderer draws nothing and the reference cameras draw the
+water again.
 
 ## What it computes
 
@@ -53,6 +60,9 @@ that scope it) contains `lamp`, in any case, is a lamp, up to four, the
 first by name; other lights are lit by Ogre as in air, with no beam, so a
 harbour light on a pier stays as it is. A lamp:
 
+- **It lights as Ogre would**: the diffuse term of Ogre's default BRDF,
+  with Ogre's attenuation, spot cone and range fade, so in air, or seen by a
+  camera above the water, a lamp looks as any other light.
 - **Its light fades both ways**: from the lamp to what it lights, and from
   there to the camera, `exp(−β^D (d_lamp + r))`.
 - **Its beam**: the light the water scatters back to the camera inside the
@@ -100,11 +110,22 @@ off, set its intensity to 0: it then costs nothing.
 - **Lamps.** The shader lights with them itself, so they, and only they,
   are hidden from Ogre's own lighting while the water is drawn (and given
   back when it is not). The set is rebuilt each frame from gz-rendering's
-  lights, so a lamp removed with its vehicle is simply gone. Turning Ogre's Forward+ off instead would change the pass buffer's
-  layout under the listener's data; hiding the lamps does not.
+  lights, so a lamp removed with its vehicle is simply gone. Turning Ogre's
+  Forward+ off instead would change the pass buffer's layout under the
+  listener's data; hiding the lamps does not. Hidden for every camera, they
+  are lit in the shader for every camera too, the same as Ogre lights them
+  in air: the hiding shows only under water.
 - **An Ogre bridge** (`libunderwater-ogre2-bridge.so`), loaded with dlopen,
   as `gz_waves_rendering` does: linking gz-rendering's ogre2 library into a
-  plugin stops gz-rendering loading its engine.
+  plugin stops gz-rendering loading its engine. Its C interface and the
+  water it takes are in `src/systems/UnderwaterOgre2Bridge.hh`, with a
+  version the plugin checks first. It finds the Ogre Next headers with
+  `gz_find_ogre_next()`, from `gz_waves_rendering`.
+- **The world's mark** names the plugin's entity, so it no longer holds
+  once that entity is gone: removing the model leaves no plugin to take it
+  off. The plugin, going, tells the bridge to draw nothing; it cannot
+  uninstall from outside the render thread, so the bridge stays, idle, until
+  a plugin sets the water again.
 
 ## Limits
 
@@ -117,7 +138,7 @@ off, set its intensity to 0: it then costs nothing.
 - **Depth from the still water level**, not the wave surface, unlike the
   reference camera.
 - **Lamps**: lights named `lamp` only, up to four (the others are lit by
-  Ogre, with a warning); lit by their diffuse term (no specular), with no
+  Ogre, with a warning); lit by Ogre's diffuse term (no specular), with no
   shadows; their beams show only where something is drawn behind them (the
   open water's background is not shaded). The reference camera has no
   lamps.
@@ -138,7 +159,10 @@ its clear-water colour faded both ways (worst 1 step); the beam along the
 centre row against a single-scatter integration in the test (within 2 % of
 its peak in IB, 3C and 7C water); clear water carrying the beam farther and
 murky water keeping it nearer the lamp; and the same scene with the light
-named `torch`, not a lamp: Ogre lights the plate, and no beam.
+named `torch`, not a lamp: Ogre lights the plate exactly as the lamp does
+(to 3 %; it is the same to the 8-bit step), and no beam. It waits for the
+water optics to publish each new water, not a fixed time, and skips
+without a GPU.
 
 `underwater_rendering_test`, rendered (needs a GPU): the same scene without
 and with the GPU path, in one process. The GPU image against the reference
@@ -148,4 +172,7 @@ the water byte for byte the same; segmentation labels byte for byte the
 same; the reference camera passing its image through.
 `underwater_rendering_fallback_test`, in a process of its own: with the
 pieces missing, nothing is installed and the reference camera draws the
-water, as without the GPU path.
+water, as without the GPU path. `underwater_rendering_runtime_test`, in a
+process of its own: turned off on its topic, then on again, then its model
+removed; off and removed look as without the GPU path. All three skip
+without a GPU.

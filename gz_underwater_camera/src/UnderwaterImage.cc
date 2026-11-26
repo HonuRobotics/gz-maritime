@@ -18,11 +18,19 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
+#include <cstdint>
+#include <exception>
 #include <functional>
 #include <limits>
+#include <mutex>
+#include <random>
+#include <system_error>
 #include <thread>
 #include <vector>
+
+#include <gz/math/Helpers.hh>
 
 namespace gz::sim::underwater_camera
 {
@@ -56,10 +64,15 @@ double Luminance(const Rgb &_c)
 /// \param[in] _n How many items.
 /// \param[in] _grain Fewest items worth a thread.
 /// \param[in] _work The work on a range of items.
+/// \brief SetMaxThreads's value
+std::atomic<unsigned int> gMaxThreads{0};
+
 void ParallelFor(std::size_t _n, std::size_t _grain,
                  const std::function<void(std::size_t, std::size_t)> &_work)
 {
-  const std::size_t cores = std::max(1u, std::thread::hardware_concurrency());
+  const unsigned int cap = gMaxThreads.load();
+  const std::size_t cores = cap > 0 ? cap :
+      std::max(1u, std::thread::hardware_concurrency());
   const std::size_t pieces = std::min<std::size_t>(
       std::min<std::size_t>(cores, 16), _n / std::max<std::size_t>(1, _grain));
   if (pieces < 2)
@@ -67,14 +80,75 @@ void ParallelFor(std::size_t _n, std::size_t _grain,
     _work(0, _n);
     return;
   }
+  // The first exception of any piece, rethrown once every thread is joined
+  std::mutex mutex;
+  std::exception_ptr error;
+  const auto run = [&](std::size_t _begin, std::size_t _end)
+  {
+    try
+    {
+      _work(_begin, _end);
+    }
+    catch (...)
+    {
+      const std::lock_guard<std::mutex> lock(mutex);
+      if (!error)
+        error = std::current_exception();
+    }
+  };
   std::vector<std::thread> threads;
   threads.reserve(pieces - 1);
   for (std::size_t p = 1; p < pieces; ++p)
-    threads.emplace_back(_work, _n * p / pieces, _n * (p + 1) / pieces);
-  _work(0, _n / pieces);
+  {
+    const std::size_t begin = _n * p / pieces, end = _n * (p + 1) / pieces;
+    try
+    {
+      threads.emplace_back(run, begin, end);
+    }
+    catch (const std::system_error &)
+    {
+      // No thread to be had: this piece here
+      run(begin, end);
+    }
+  }
+  run(0, _n / pieces);
   for (auto &t : threads)
     t.join();
+  if (error)
+    std::rethrow_exception(error);
 }
+
+/// \brief Standard normal numbers from a 32-bit generator, by Box-Muller:
+/// the same numbers with any standard library, where
+/// std::normal_distribution's are each library's own.
+class NormalSampler
+{
+  /// \brief The next number.
+  /// \param[in] _rng The generator.
+  /// \return A standard normal number.
+  public: double operator()(std::mt19937 &_rng)
+  {
+    if (this->haveSpare)
+    {
+      this->haveSpare = false;
+      return this->spare;
+    }
+    // In (0, 1): never 0, so the log is finite
+    const double u1 = (_rng() + 0.5) / 4294967296.0;
+    const double u2 = (_rng() + 0.5) / 4294967296.0;
+    const double r = std::sqrt(-2.0 * std::log(u1));
+    const double a = 2.0 * GZ_PI * u2;
+    this->spare = r * std::sin(a);
+    this->haveSpare = true;
+    return r * std::cos(a);
+  }
+
+  /// \brief The second number of the last pair.
+  private: double spare{0.0};
+
+  /// \brief Whether spare is still to be returned.
+  private: bool haveSpare{false};
+};
 
 /// \brief For each of the 255 steps between sRGB values, the linear light
 /// at which LinearToSrgb's rounding goes from one value to the next, found
@@ -173,6 +247,12 @@ std::uint8_t LinearToSrgb(double _v)
 }
 
 //////////////////////////////////////////////////
+void SetMaxThreads(unsigned int _n)
+{
+  gMaxThreads = _n;
+}
+
+//////////////////////////////////////////////////
 void GaussianBlur(std::vector<Rgb> &_img, std::uint32_t _w, std::uint32_t _h,
                   double _sigma)
 {
@@ -189,35 +269,44 @@ void GaussianBlur(std::vector<Rgb> &_img, std::uint32_t _w, std::uint32_t _h,
   const double b2 = (-1.4281 * q2 - 1.26661 * q3) / b0;
   const double b3 = 0.422205 * q3 / b0;
   const double B = 1.0 - (b1 + b2 + b3);
+  // Each line padded with 3 sigma of its edge value on both sides, so both
+  // passes start from their steady state for that value: the border is
+  // blurred as if the edge went on, not pulled towards the filter's start.
+  const std::size_t pad = static_cast<std::size_t>(std::ceil(3.0 * _sigma));
   const auto line = [&](std::size_t _start, std::size_t _stride,
                         std::size_t _n, std::vector<Rgb> &tmp)
   {
-    Rgb w1 = _img[_start], w2 = w1, w3 = w1;
-    for (std::size_t i = 0; i < _n; ++i)
+    const std::size_t m = _n + 2 * pad;
+    tmp.resize(m);
+    const Rgb first = _img[_start], last = _img[_start + (_n - 1) * _stride];
+    Rgb w1 = first, w2 = w1, w3 = w1;
+    for (std::size_t i = 0; i < m; ++i)
     {
-      const Rgb x = _img[_start + i * _stride];
+      const Rgb x = i < pad ? first : i >= pad + _n ? last :
+          _img[_start + (i - pad) * _stride];
       const Rgb y = x * B + w1 * b1 + w2 * b2 + w3 * b3;
       tmp[i] = y;
       w3 = w2; w2 = w1; w1 = y;
     }
-    w1 = w2 = w3 = tmp[_n - 1];
-    for (std::size_t i = _n; i-- > 0;)
+    w1 = w2 = w3 = last;
+    for (std::size_t i = m; i-- > 0;)
     {
       const Rgb y = tmp[i] * B + w1 * b1 + w2 * b2 + w3 * b3;
-      _img[_start + i * _stride] = y;
+      if (i >= pad && i < pad + _n)
+        _img[_start + (i - pad) * _stride] = y;
       w3 = w2; w2 = w1; w1 = y;
     }
   };
   // Rows, then columns: each line reads and writes only itself.
   ParallelFor(_h, 32, [&](std::size_t _begin, std::size_t _end)
   {
-    std::vector<Rgb> tmp(_w);
+    std::vector<Rgb> tmp;
     for (std::size_t v = _begin; v < _end; ++v)
       line(v * _w, 1, _w, tmp);
   });
   ParallelFor(_w, 32, [&](std::size_t _begin, std::size_t _end)
   {
-    std::vector<Rgb> tmp(_h);
+    std::vector<Rgb> tmp;
     for (std::size_t u = _begin; u < _end; ++u)
       line(u, _w, _h, tmp);
   });
@@ -246,46 +335,60 @@ void VariableBlur(std::vector<Rgb> &_img, std::uint32_t _w, std::uint32_t _h,
   std::vector<double> levels{0.0};
   for (double s = 0.5; s < maxSigma * 1.25; s *= 1.25)
     levels.push_back(s);
-  // The level under each pixel's sigma, and which levels any pixel reads
-  // (its own and the next): only those are blurred.
-  const auto under = [&levels](double _s)
+  // The level under each pixel's sigma: it reads that level and the next.
+  std::vector<std::uint16_t> under(_sigma.size());
+  std::vector<char> used(levels.size(), 0);
+  for (std::size_t i = 0; i < _sigma.size(); ++i)
   {
     std::size_t k = 0;
-    while (k + 1 < levels.size() && levels[k + 1] < _s)
+    while (k + 1 < levels.size() && levels[k + 1] < _sigma[i])
       ++k;
-    return k;
-  };
-  std::vector<char> used(levels.size() + 1, 0);
-  for (double s : _sigma)
-  {
-    const std::size_t k = under(s);
+    under[i] = static_cast<std::uint16_t>(k);
     used[k] = 1;
-    used[k + 1] = 1;
   }
-  std::vector<std::vector<Rgb>> blurred(levels.size());
+  // Two levels at a time, lowest first, from the image as it came: the
+  // pixels between them are done, then the upper level becomes the lower.
+  const std::vector<Rgb> src = _img;
+  const auto blur = [&](std::size_t _k)
+  {
+    std::vector<Rgb> b = src;
+    if (_k > 0)
+      GaussianBlur(b, _w, _h, levels[_k]);
+    return b;
+  };
+  std::vector<Rgb> lo, hi;
+  std::size_t loLevel = levels.size();
   for (std::size_t k = 0; k < levels.size(); ++k)
   {
     if (!used[k])
       continue;
-    blurred[k] = _img;
-    if (k > 0)
-      GaussianBlur(blurred[k], _w, _h, levels[k]);
-  }
-  ParallelFor(_img.size(), 1 << 14, [&](std::size_t _begin, std::size_t _end)
-  {
-    for (std::size_t i = _begin; i < _end; ++i)
+    if (loLevel != k)
+      lo = blur(k);
+    const bool top = k + 1 >= levels.size();
+    if (!top)
+      hi = blur(k + 1);
+    ParallelFor(_img.size(), 1 << 14,
+        [&](std::size_t _begin, std::size_t _end)
     {
-      const double s = _sigma[i];
-      const std::size_t k = under(s);
-      if (k + 1 >= levels.size())
+      for (std::size_t i = _begin; i < _end; ++i)
       {
-        _img[i] = blurred[k][i];
-        continue;
+        if (under[i] != k)
+          continue;
+        if (top)
+        {
+          _img[i] = lo[i];
+          continue;
+        }
+        const double t = (_sigma[i] - levels[k]) / (levels[k + 1] - levels[k]);
+        _img[i] = lo[i] * (1.0 - t) + hi[i] * t;
       }
-      const double t = (s - levels[k]) / (levels[k + 1] - levels[k]);
-      _img[i] = blurred[k][i] * (1.0 - t) + blurred[k + 1][i] * t;
+    });
+    if (!top)
+    {
+      lo.swap(hi);
+      loLevel = k + 1;
     }
-  });
+  }
 }
 
 /// \brief A flat port's refraction: each output pixel samples the image at
@@ -336,20 +439,32 @@ FrameStats MakeUnderwater(const std::vector<std::uint8_t> &_rgb,
   const auto &k = _rays.Camera();
   const std::size_t n = static_cast<std::size_t>(k.width) * k.height;
   _out.resize(n * 3);
-  if (_rgb.size() < n * 3 || _depth.size() < n || !(_water.cameraDepth > 0))
+  if (_rgb.size() < n * 3 || _depth.size() < n)
   {
-    // In air (or a frame that does not match the table): unchanged.
+    // A frame that does not match the table: unchanged.
     std::copy(_rgb.begin(), _rgb.begin() + std::min(_rgb.size(), n * 3),
               _out.begin());
     return stats;
   }
-  stats.underwater = true;
 
   const auto &lin = SrgbTable();
   const double inf = std::numeric_limits<double>::infinity();
   std::vector<Rgb> img(n);
   std::vector<double> ranges(n, 0.0);
+  // Two stages: the water, only under it; then the camera's own response,
+  // always, so its gain and noise do not switch off above the water, or
+  // when the renderer has drawn the water already.
+  stats.underwater = _water.cameraDepth > 0;
+  if (!stats.underwater)
+  {
+    for (std::size_t i = 0; i < n; ++i)
+    {
+      img[i].Set(lin[_rgb[3 * i]], lin[_rgb[3 * i + 1]],
+                 lin[_rgb[3 * i + 2]]);
+    }
+  }
   // Each pixel on its own: rows in parallel.
+  if (stats.underwater)
   ParallelFor(k.height, 16, [&](std::size_t _begin, std::size_t _end)
   {
   for (std::size_t v = _begin; v < _end; ++v)
@@ -394,21 +509,26 @@ FrameStats MakeUnderwater(const std::vector<std::uint8_t> &_rgb,
         out[c] = lit[c] * t + _water.veil[c] * b;
       }
       img[i] = out;
-      ranges[i] = std::isfinite(w) ? w : 1e3;
+      // Nothing hit and nothing behind: the veil, the same everywhere, is
+      // not blurred, so the objects around it do not bleed into it
+      ranges[i] = std::isfinite(w) ? w : 0.0;
     }
   }
   });
 
   // Forward scatter: a blur growing with the range through the water.
-  if (_optics.forwardScatter > 0.0)
+  if (stats.underwater && _optics.forwardScatter > 0.0)
   {
     std::vector<double> sigma(n);
+    // At most 40 pixels: wider costs more levels and changes little, the
+    // image being all veil by then
     for (std::size_t i = 0; i < n; ++i)
       sigma[i] = std::min(40.0, k.fx * _optics.forwardScatter * ranges[i]);
     VariableBlur(img, k.width, k.height, sigma);
   }
   // The port: a flat one refracts; a dome centred on the lens does not.
-  if (_optics.port == Optics::Port::kFlat)
+  // Out of the water there is air on both sides: nothing to refract.
+  if (stats.underwater && _optics.port == Optics::Port::kFlat)
     FlatPort(img, k, _optics.waterIndex);
 
   // Exposure.
@@ -441,30 +561,35 @@ FrameStats MakeUnderwater(const std::vector<std::uint8_t> &_rgb,
   stats.whiteBalance = wb;
 
   const bool noisy = _response.shotNoise > 0 || _response.readNoise > 0;
-  // The noise's random numbers, drawn in pixel order from the one
-  // generator, as a plain loop would draw them; the rest in parallel.
-  std::vector<double> draws;
+  // The noise: one draw from the camera's generator per frame seeds a
+  // generator per row, so the image is the same however many threads run,
+  // and the normal sampler is ours, so it is the same with any standard
+  // library.
+  std::uint32_t rowSeed = 0;
   if (noisy)
+    rowSeed = static_cast<std::uint32_t>(_rng());
+  ParallelFor(k.height, 16, [&](std::size_t _begin, std::size_t _end)
   {
-    std::normal_distribution<double> unit(0.0, 1.0);
-    draws.resize(3 * n);
-    for (auto &d : draws)
-      d = unit(_rng);
-  }
-  ParallelFor(n, 1 << 14, [&](std::size_t _begin, std::size_t _end)
-  {
-    for (std::size_t i = _begin; i < _end; ++i)
+    for (std::size_t v = _begin; v < _end; ++v)
     {
-      for (int c = 0; c < 3; ++c)
+      std::seed_seq seq{rowSeed, static_cast<std::uint32_t>(v)};
+      std::mt19937 rowRng(seq);
+      NormalSampler unit;
+      for (std::size_t i = v * k.width; i < (v + 1) * k.width; ++i)
       {
-        double s = img[i][c] * gain * wb[c];
-        if (noisy)
+        for (int c = 0; c < 3; ++c)
         {
-          const double var = _response.shotNoise * std::max(0.0, s) +
-                             _response.readNoise * _response.readNoise;
-          s += std::sqrt(var) * draws[3 * i + c];
+          // The noise is the sensor's, on the light it caught: the gain
+          // and the white balance amplify it, as in a real camera.
+          double s = img[i][c];
+          if (noisy)
+          {
+            const double var = _response.shotNoise * std::max(0.0, s) +
+                               _response.readNoise * _response.readNoise;
+            s += std::sqrt(var) * unit(rowRng);
+          }
+          _out[3 * i + c] = LinearToSrgb(s * gain * wb[c]);
         }
-        _out[3 * i + c] = LinearToSrgb(s);
       }
     }
   });

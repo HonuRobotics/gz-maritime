@@ -44,10 +44,22 @@ bool Resolve(const WaterOpticsSpec &_spec, WaterOpticsData &_out,
   _error.clear();
   _warning.clear();
 
+  // Every coefficient explicit: no type is used.
+  const bool explicitWater = _spec.attenuation && _spec.backscatter &&
+      _spec.veil && _spec.diffuseAttenuation;
   // The default is clear coastal water, the water of most worlds.
   const std::string name = _spec.jerlov.empty() ? "1C" : _spec.jerlov;
-  const auto type = Jerlov(name);
-  if (!type)
+  auto type = Jerlov(name);
+  if (explicitWater)
+  {
+    if (!_spec.jerlov.empty())
+    {
+      _warning = "<jerlov> is ignored: every coefficient is given "
+                 "explicitly";
+    }
+    type = Jerlov("1C");
+  }
+  else if (!type)
   {
     _error = "unknown Jerlov type '" + _spec.jerlov + "'";
     return false;
@@ -101,14 +113,15 @@ bool Resolve(const WaterOpticsSpec &_spec, WaterOpticsData &_out,
     kd = pure.diffuseAttenuation + (kd - pure.diffuseAttenuation) * s;
     if (_spec.attenuation)
     {
-      _warning = "<visibility> is ignored for <attenuation>, given "
-                 "explicitly; the visibility comes from it instead";
+      _warning += std::string(_warning.empty() ? "" : "; ") +
+          "<visibility> is ignored for <attenuation>, given explicitly; "
+          "the visibility comes from it instead";
     }
   }
 
   const Rgb c = a + b;
   WaterOpticsData out;
-  out.jerlov = type->name;
+  out.jerlov = explicitWater ? std::string() : type->name;
   out.attenuation = c;
   out.backscatter = c;
   out.veil = Rgb(c.X() > 0 ? b.X() / c.X() : 0.0,
@@ -146,4 +159,62 @@ bool Resolve(const WaterOpticsSpec &_spec, WaterOpticsData &_out,
   _out = out;
   return true;
 }
+//////////////////////////////////////////////////
+const std::vector<NumberParam> &NumberParams()
+{
+  static const std::vector<NumberParam> params{
+    {"visibility",
+     [](WaterOpticsSpec &_s, std::optional<double> _v) { _s.visibility = _v; },
+     true,
+     [](const WaterOpticsData &_d) { return _d.Visibility(); }},
+    {"water_level",
+     [](WaterOpticsSpec &_s, std::optional<double> _v)
+     { _s.waterLevel = _v.value_or(0.0); },
+     false,
+     [](const WaterOpticsData &_d) { return _d.waterLevel; }},
+    {"daylight",
+     [](WaterOpticsSpec &_s, std::optional<double> _v)
+     { _s.daylight = _v.value_or(1.0); },
+     false,
+     [](const WaterOpticsData &_d) { return _d.daylight; }},
+  };
+  return params;
+}
+
+//////////////////////////////////////////////////
+const std::vector<ColourParam> &ColourParams()
+{
+  static const std::vector<ColourParam> params{
+    {"attenuation", &WaterOpticsSpec::attenuation,
+     &WaterOpticsData::attenuation},
+    {"backscatter", &WaterOpticsSpec::backscatter,
+     &WaterOpticsData::backscatter},
+    {"veil", &WaterOpticsSpec::veil, &WaterOpticsData::veil},
+    {"diffuse_attenuation", &WaterOpticsSpec::diffuseAttenuation,
+     &WaterOpticsData::diffuseAttenuation},
+  };
+  return params;
+}
+
+//////////////////////////////////////////////////
+bool SameWater(const WaterOpticsData &_a, const WaterOpticsData &_b)
+{
+  if (_a.jerlov != _b.jerlov)
+    return false;
+  for (const auto &p : NumberParams())
+  {
+    const double x = p.get(_a), y = p.get(_b);
+    if (!(x == y || (std::isinf(x) && std::isinf(y))))
+      return false;
+  }
+  for (const auto &p : ColourParams())
+  {
+    // Exactly: math::Vector3's == allows a tolerance
+    const Rgb &x = _a.*p.data, &y = _b.*p.data;
+    if (x.X() != y.X() || x.Y() != y.Y() || x.Z() != y.Z())
+      return false;
+  }
+  return true;
+}
+
 }  // namespace gz::sim::water_optics

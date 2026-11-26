@@ -51,11 +51,19 @@ namespace gz::sim::maritime
   /// * `<white_balance>`: `none` (default) or `grey_world`.
   /// * `<shot_noise>`, `<read_noise>`: Gaussian noise on linear light, of
   ///   variance shot_noise * signal + read_noise^2; default 0.
-  /// * `<seed>`: of the noise, default 1.
+  /// * `<seed>`: of the noise, default 1, mixed with the sensor's scoped
+  ///   name, so each camera, say each of a stereo pair, gets its own noise.
   /// * `<forward_scatter>`: forward scatter, a blur growing with range,
   ///   radians per metre; default 0.
   /// * `<port>`: `none` (default), `flat` (refraction remap) or `dome`
-  ///   (centred on the lens: no remap); `<water_index>` default 1.333.
+  ///   (centred on the lens: no remap); `<water_index>` default 1.333, 1 or
+  ///   more.
+  ///
+  /// It works only while someone listens to its output: with nobody
+  /// subscribed it does not listen to the camera either, so the camera is
+  /// not rendered for it. Each frame is processed on a thread of the
+  /// plugin's own, with the water of the step it was rendered at; a frame
+  /// that comes while one is being processed replaces the one waiting.
   class UnderwaterCamera
     : public System,
       public ISystemConfigure,

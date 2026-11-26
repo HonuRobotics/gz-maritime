@@ -33,6 +33,7 @@
 // world, and the reference camera draws the water instead.
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
@@ -44,6 +45,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "UnderwaterOgre2Bridge.hh"
 
 #include <gz/common/Console.hh>
 #include <gz/rendering/Light.hh>
@@ -199,8 +202,11 @@ class UnderwaterListener : public Ogre::HlmsListener
   public: Ogre::HlmsListener *previous{nullptr};
   public: Water water;
 
+  /// \brief Set from any thread when the plugin is gone: draw nothing.
+  public: std::atomic<bool> released{false};
+
   private: bool On(bool _caster) const
-  { return this->water.active && !_caster; }
+  { return this->water.active && !this->released && !_caster; }
 
   /// \brief The scene's lamps (spot and point lights), as of the last
   /// preparePassHash.
@@ -715,21 +721,23 @@ catch (const std::exception &_e)
 }
 
 //////////////////////////////////////////////////
-/// \brief Set the water: 14 floats, beta^D, beta^B, the veil at the surface
-/// and K_d (each r g b), then the still water level and the daylight. A
-/// null pointer turns the water off.
-void uw_ogre2_set(const float *_v)
+int uw_ogre2_version()
+{
+  return UW_OGRE2_BRIDGE_VERSION;
+}
+
+//////////////////////////////////////////////////
+void uw_ogre2_release()
+{
+  State().listener.released = true;
+}
+
+//////////////////////////////////////////////////
+void uw_ogre2_set(const UwWater *_v)
 {
   auto &s = State();
-  // gz-rendering sets its own Hlms listener again when its scene changes
-  // (a light added, for one); wrap whichever is there now.
-  if (s.done && s.pbs && s.pbs->getListener() != &s.listener)
-  {
-    s.listener.previous = s.pbs->getListener();
-    s.pbs->setListener(&s.listener);
-    gzmsg << "[underwater] listener re-attached after gz-rendering replaced "
-          << "it\n";
-  }
+  // A plugin sets the water: drawn again, if it was released
+  s.listener.released = false;
   auto &w = s.listener.water;
   w.active = nullptr != _v;
   // Lamps that appear later (a vehicle spawned with its lights) are hidden
@@ -737,12 +745,12 @@ void uw_ogre2_set(const float *_v)
   s.listener.HideLamps(w.active);
   if (!_v)
     return;
-  std::memcpy(w.attenuation, _v, 3 * sizeof(float));
-  std::memcpy(w.backscatter, _v + 3, 3 * sizeof(float));
-  std::memcpy(w.veil, _v + 6, 3 * sizeof(float));
-  std::memcpy(w.diffuse, _v + 9, 3 * sizeof(float));
-  w.level = _v[12];
-  w.daylight = _v[13];
+  std::memcpy(w.attenuation, _v->attenuation, sizeof(w.attenuation));
+  std::memcpy(w.backscatter, _v->backscatter, sizeof(w.backscatter));
+  std::memcpy(w.veil, _v->veil, sizeof(w.veil));
+  std::memcpy(w.diffuse, _v->diffuse, sizeof(w.diffuse));
+  w.level = _v->level;
+  w.daylight = _v->daylight;
 }
 
 //////////////////////////////////////////////////

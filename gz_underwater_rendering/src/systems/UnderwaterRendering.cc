@@ -25,6 +25,8 @@
 #include <string>
 
 #include <gz/common/Console.hh>
+#include <gz/msgs/boolean.pb.h>
+#include <gz/transport/Node.hh>
 #include <gz/plugin/Register.hh>
 #include <gz/rendering/RenderEngine.hh>
 #include <gz/rendering/RenderingIface.hh>
@@ -34,6 +36,9 @@
 #include <gz/sim/Util.hh>
 #include <gz/sim/rendering/Events.hh>
 
+#include <gz/sim/components/Name.hh>
+
+#include "UnderwaterOgre2Bridge.hh"
 #include "gz/sim/components/UnderwaterRendering.hh"
 #include "gz/sim/water_optics/WaterOpticsSampler.hh"
 
@@ -56,9 +61,25 @@ class UnderwaterRendering
     public ISystemConfigure,
     public ISystemPreUpdate
 {
-  public: void Configure(const Entity &, const std::shared_ptr<const sdf::Element> &,
-                         EntityComponentManager &, EventManager &_eventMgr) override
+  public: void Configure(const Entity &_entity,
+                         const std::shared_ptr<const sdf::Element> &_sdf,
+                         EntityComponentManager &_ecm,
+                         EventManager &_eventMgr) override
   {
+    this->owner = _entity;
+    this->enabled = _sdf->Get<bool>("enabled", true).first;
+    // On and off while running, also where the model is included and its
+    // <enabled> cannot be set
+    std::string world = "default";
+    if (const auto *name =
+            _ecm.Component<components::Name>(worldEntity(_ecm)))
+    {
+      world = name->Data();
+    }
+    std::function<void(const msgs::Boolean &)> onEnable =
+        [this](const msgs::Boolean &_msg) { this->enabled = _msg.data(); };
+    this->node.Subscribe("/world/" + world + "/underwater_rendering/enable",
+                         onEnable);
     this->sceneUpdate = _eventMgr.Connect<events::SceneUpdate>(
         [this]() { this->OnSceneUpdate(); });
     this->teardown = _eventMgr.Connect<events::RenderTeardown>(
@@ -74,13 +95,18 @@ class UnderwaterRendering
     // otherwise the reference camera does. In the GUI's own entity manager
     // this is a no-op that nobody reads.
     const Entity world = worldEntity(_ecm);
-    const bool marked = world != kNullEntity &&
-        _ecm.Component<components::UnderwaterRendering>(world);
-    const bool drawing = this->installed.load();
-    if (world != kNullEntity && drawing && !marked)
-      _ecm.CreateComponent(world, components::UnderwaterRendering());
-    else if (marked && !drawing)
+    const auto *mark = world != kNullEntity ?
+        _ecm.Component<components::UnderwaterRendering>(world) : nullptr;
+    const bool drawing = this->installed.load() && this->enabled.load();
+    if (world != kNullEntity && drawing && !mark)
+    {
+      _ecm.CreateComponent(world,
+                           components::UnderwaterRendering(this->owner));
+    }
+    else if (mark && !drawing)
+    {
       _ecm.RemoveComponent<components::UnderwaterRendering>(world);
+    }
     const std::lock_guard<std::mutex> lock(this->mutex);
     if (!this->sampler.Valid())
     {
@@ -88,16 +114,16 @@ class UnderwaterRendering
       return;
     }
     const auto &o = this->sampler.Data();
-    std::array<float, 14> v{};
+    UwWater v{};
     for (int c = 0; c < 3; ++c)
     {
-      v[c] = static_cast<float>(o.attenuation[c]);
-      v[3 + c] = static_cast<float>(o.backscatter[c]);
-      v[6 + c] = static_cast<float>(o.veil[c]);
-      v[9 + c] = static_cast<float>(o.diffuseAttenuation[c]);
+      v.attenuation[c] = static_cast<float>(o.attenuation[c]);
+      v.backscatter[c] = static_cast<float>(o.backscatter[c]);
+      v.veil[c] = static_cast<float>(o.veil[c]);
+      v.diffuse[c] = static_cast<float>(o.diffuseAttenuation[c]);
     }
-    v[12] = static_cast<float>(o.waterLevel);
-    v[13] = static_cast<float>(o.daylight);
+    v.level = static_cast<float>(o.waterLevel);
+    v.daylight = static_cast<float>(o.daylight);
     this->water = v;
   }
 
@@ -125,13 +151,25 @@ class UnderwaterRendering
         this->failed = true;
         return;
       }
-      this->install = reinterpret_cast<int (*)(const char *)>(
+      const auto version = reinterpret_cast<UwVersionFn>(
+          dlsym(this->handle, "uw_ogre2_version"));
+      if (!version || version() != UW_OGRE2_BRIDGE_VERSION)
+      {
+        gzerr << "UnderwaterRendering: the Ogre bridge is not the version "
+              << "this plugin was built with; the reference camera draws "
+              << "the water instead\n";
+        this->failed = true;
+        return;
+      }
+      this->install = reinterpret_cast<UwInstallFn>(
           dlsym(this->handle, "uw_ogre2_install"));
-      this->set = reinterpret_cast<void (*)(const float *)>(
+      this->set = reinterpret_cast<UwSetFn>(
           dlsym(this->handle, "uw_ogre2_set"));
-      this->uninstall = reinterpret_cast<void (*)()>(
+      this->uninstall = reinterpret_cast<UwUninstallFn>(
           dlsym(this->handle, "uw_ogre2_uninstall"));
-      if (!this->install || !this->set || !this->uninstall ||
+      this->release = reinterpret_cast<UwReleaseFn>(
+          dlsym(this->handle, "uw_ogre2_release"));
+      if (!this->install || !this->set || !this->uninstall || !this->release ||
           !this->install(this->piecesDir.c_str()))
       {
         gzerr << "UnderwaterRendering: not installed; the reference camera "
@@ -142,7 +180,7 @@ class UnderwaterRendering
       this->installed = true;
     }
     const std::lock_guard<std::mutex> lock(this->mutex);
-    this->set(this->water ? this->water->data() : nullptr);
+    this->set(this->water && this->enabled ? &*this->water : nullptr);
     if (!this->announced || *this->announced != this->water.has_value())
     {
       gzmsg << "UnderwaterRendering: "
@@ -151,6 +189,14 @@ class UnderwaterRendering
             << "\n";
       this->announced = this->water.has_value();
     }
+  }
+
+  /// \brief Going, e.g. with its model: the bridge draws nothing more. It
+  /// cannot be uninstalled from here, off the render thread.
+  public: ~UnderwaterRendering() override
+  {
+    if (this->installed && this->release)
+      this->release();
   }
 
   private: void OnTeardown()
@@ -162,12 +208,22 @@ class UnderwaterRendering
 
   private: water_optics::WaterOpticsSampler sampler;
   private: std::mutex mutex;
-  private: std::optional<std::array<float, 14>> water;
+  private: std::optional<UwWater> water;
   private: std::string piecesDir;
   private: void *handle{nullptr};
-  private: int (*install)(const char *){nullptr};
-  private: void (*set)(const float *){nullptr};
-  private: void (*uninstall)(){nullptr};
+  private: UwInstallFn install{nullptr};
+  private: UwSetFn set{nullptr};
+  private: UwUninstallFn uninstall{nullptr};
+  private: UwReleaseFn release{nullptr};
+
+  /// \brief The entity this plugin is on, named by the world's mark
+  private: Entity owner{kNullEntity};
+
+  /// \brief Whether to draw the water: <enabled>, then the enable topic
+  private: std::atomic<bool> enabled{true};
+
+  /// \brief For the enable topic
+  private: transport::Node node;
   /// \brief Set on the render thread, read on the simulation thread
   private: std::atomic<bool> installed{false};
   private: bool failed{false};

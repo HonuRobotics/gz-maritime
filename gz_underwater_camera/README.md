@@ -33,7 +33,14 @@ depth in one pass, and give the sensor a `<topic>`:
 ```
 
 The world needs the water optics system for there to be any water; without
-it the image is the plain camera's.
+it the camera is in clear water, and only its own response (exposure, white
+balance, noise) applies.
+
+It works only while someone listens to its output: with nobody subscribed,
+it does not listen to the camera either, so the camera is not rendered for
+it. Each frame is processed on a thread of the plugin's own, with the water
+of the step the frame was rendered at, and the simulation does not wait for
+it; a frame that comes while another is processed replaces the one waiting.
 
 | Topic | Type | What |
 |---|---|---|
@@ -49,11 +56,11 @@ it the image is the plain camera's.
 | `<exposure>` | `1` | A gain on linear light, or `auto`: the mean luminance aimed at 0.18. |
 | `<max_gain>` | `16` | With `auto`, the gain stays within 1/max and max. |
 | `<white_balance>` | `none` | `none`, or `grey_world`: each channel's mean made the mean luminance, so the water's tint is taken out, as a camera's auto white balance does. |
-| `<shot_noise>`, `<read_noise>` | `0` | Gaussian noise on linear light, of variance shot_noise · signal + read_noise². |
-| `<seed>` | `1` | The noise's seed. |
-| `<forward_scatter>` | `0` | Forward scatter: a Gaussian blur whose width grows with the range through the water, sigma = forward_scatter · range radians. `0.005` to `0.02` looks like coastal water. |
+| `<shot_noise>`, `<read_noise>` | `0` | Gaussian noise on the linear light the sensor caught, of variance shot_noise · signal + read_noise², before the gain, which amplifies it as in a real camera. |
+| `<seed>` | `1` | The noise's seed, mixed with the sensor's scoped name: each camera, say each of a stereo pair, gets its own noise, the same every run. |
+| `<forward_scatter>` | `0` | Forward scatter: a Gaussian blur whose width grows with the range through the water, sigma = forward_scatter · range radians, at most 40 pixels. `0.005` to `0.02` looks like coastal water. |
 | `<port>` | `none` | The port in front of the lens: `flat` refracts (Snell's law: the image is magnified about 1.33 times at the centre, more at the edges), `dome` (centred on the lens) does not. |
-| `<water_index>` | `1.333` | The water's refractive index, for a flat port. |
+| `<water_index>` | `1.333` | The water's refractive index, for a flat port; 1 or more. |
 
 ## What it computes
 
@@ -80,10 +87,12 @@ For each pixel, from the in-air frame's colour J and z-depth:
 5. **Forward scatter**, a blur whose width grows with range (recursive
    Gaussian levels, each pixel between the two around its sigma), and the
    **port**: a flat one maps each output radius r to the rendered radius
-   f tan(asin(sin(atan(r / f)) / n)).
-6. **The camera.** Exposure, white balance, noise; back to sRGB.
+   f tan(asin(sin(atan(r / f)) / n)). Under water only.
+6. **The camera.** Noise on the light caught, then exposure and white
+   balance; back to sRGB.
 
-With the camera above the water, the image is copied unchanged. Depth comes
+With the camera above the water, only step 5 applies: with the default
+response, the image comes out unchanged. Depth comes
 from the world's water optics: below the wave field's local surface.
 
 ## Speed
@@ -118,12 +127,21 @@ colcon test --packages-select gz_underwater_camera
   trip for all 256 values, and its lookup against the formula; the model, every pixel against the closed form,
   at two ranges and with the object's depth; β^D ≠ β^B against the fog
   model; a climbing ray clipped at the surface; nothing hit is the veil; in
-  air and in clear water the image unchanged; fixed and auto exposure; grey
-  world neutralising a tint; the noise's mean and variance; 640×480 within a
-  15 Hz frame, and a parallel frame the same every time; forward scatter's edge width at 2, 4 and 8 m within 10 % of
-  the Gaussian's; a flat port's points within half a pixel of Snell's law,
-  a dome port unchanged; every parameter documented.
-- `underwater_camera_test`, rendered (needs a GPU): the published image
-  against the model computed in the test from the in-air frame, pixel by
-  pixel; the far wall fading into the veil more than the near plate; above
-  the water, byte for byte the plain image; the depth image untouched.
+  air and in clear water the image unchanged; the response in air too, its
+  gain amplifying the noise; fixed and auto exposure; grey world
+  neutralising a tint; the noise's mean and variance; a frame the same
+  however many threads run; forward scatter's edge width at 2, 4 and 8 m
+  within 10 % of the Gaussian's; a flat port's points within half a pixel
+  of Snell's law, a dome port unchanged; every parameter documented.
+- `underwater_camera_frames_test`, frames sent by the test, nothing
+  rendered: clear water without water optics; listening only while
+  listened to; each frame with the water of its own step; frames that do not
+  fit skipped; each camera of a stereo pair its own, repeatable noise; a
+  reset; the plugin where it does not belong, and parameters that make no
+  sense; the system destroyed while frames flow (under AddressSanitizer,
+  the use after free it used to have).
+- `underwater_camera_test`, rendered (skipped without a GPU): the published
+  image against the model computed in the test from the in-air frame, pixel
+  by pixel, looking ahead and pitched up over open water; the far wall
+  fading into the veil more than the near plate; above the water, byte for
+  byte the plain image; the depth image untouched.

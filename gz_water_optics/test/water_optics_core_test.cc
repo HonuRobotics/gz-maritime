@@ -20,13 +20,20 @@
 #include <cmath>
 #include <fstream>
 #include <limits>
+#include <memory>
 #include <sstream>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include <gz/sim/EntityComponentManager.hh>
 #include <gz/sim/components/World.hh>
 
+#include "gz/sim/components/Wavefield.hh"
 #include "gz/sim/components/WaterOptics.hh"
+#include "gz/sim/waves/Eval.hh"
+#include "gz/sim/waves/WaveSimulation.hh"
+#include "gz/sim/waves/Wavefield.hh"
 #include "gz/sim/water_optics/Jerlov.hh"
 #include "gz/sim/water_optics/WaterOptics.hh"
 #include "gz/sim/water_optics/WaterOpticsSampler.hh"
@@ -406,9 +413,8 @@ TEST(Sampler, ClearWithoutOptics)
   water_optics::WaterOpticsSampler sampler;
   EXPECT_FALSE(sampler.Sync(ecm));
   EXPECT_FALSE(sampler.Valid());
-  ExpectRgb(sampler.Transmittance(10.0), Rgb::One);
-  ExpectRgb(sampler.VeilBuildUp(10.0), Rgb::Zero);
-  ExpectRgb(sampler.Daylight(10.0), Rgb::One);
+  ExpectRgb(sampler.Veil(10.0), Rgb::Zero);
+  ExpectRgb(sampler.Data().attenuation, Rgb::Zero);
   EXPECT_DOUBLE_EQ(sampler.Depth({0, 0, -4}, std::chrono::seconds(1)), 4.0);
 }
 
@@ -441,19 +447,190 @@ TEST(Sampler, ClosedForms)
   };
   for (const double x : {0.0, 5.0, 20.0})
   {
-    ExpectRgb(sampler.Daylight(x), fade(optics.diffuseAttenuation, x));
     const Rgb light = fade(optics.diffuseAttenuation, x);
     ExpectRgb(sampler.Veil(x),
               Rgb(optics.veil.X() * light.X(), optics.veil.Y() * light.Y(),
                   optics.veil.Z() * light.Z()));
-    ExpectRgb(sampler.Transmittance(x), fade(optics.attenuation, x));
-    ExpectRgb(sampler.VeilBuildUp(x),
-              Rgb::One - fade(optics.backscatter, x));
   }
 
-  // Above the surface: all the daylight, and no veil.
-  ExpectRgb(sampler.Daylight(-1.0), Rgb::One);
+  // Above the surface: no veil.
   ExpectRgb(sampler.Veil(-1.0), Rgb::Zero);
+}
+
+/////////////////////////////////////////////////
+// The sampler copies the optics when their generation changes, not on
+// every Sync.
+TEST(Sampler, CopiesOnANewGeneration)
+{
+  WaterOpticsSpec spec;
+  spec.jerlov = "3C";
+  auto optics = MustResolve(spec);
+  optics.generation = 1;
+
+  EntityComponentManager ecm;
+  const Entity world = ecm.CreateEntity();
+  ecm.CreateComponent(world, components::World());
+  ecm.CreateComponent(world, components::WaterOptics(optics));
+  water_optics::WaterOpticsSampler sampler;
+  ASSERT_TRUE(sampler.Sync(ecm));
+
+  // Other water, the same generation: not read
+  auto other = optics;
+  other.waterLevel = 3.0;
+  ecm.SetComponentData<components::WaterOptics>(world, other);
+  sampler.Sync(ecm);
+  EXPECT_DOUBLE_EQ(sampler.Data().waterLevel, 0.0);
+
+  // A new generation: read
+  other.generation = 2;
+  ecm.SetComponentData<components::WaterOptics>(world, other);
+  sampler.Sync(ecm);
+  EXPECT_DOUBLE_EQ(sampler.Data().waterLevel, 3.0);
+
+  // The optics gone: clear water
+  ecm.RemoveComponent<components::WaterOptics>(world);
+  EXPECT_FALSE(sampler.Sync(ecm));
+  ExpectRgb(sampler.Data().attenuation, Rgb::Zero);
+}
+
+namespace
+{
+/// \brief The token of the test's wave engine.
+constexpr char kTestEngine[] = "water_optics_test_wave";
+
+/// \brief A wave engine for the test: a sine travelling along x, its
+/// amplitude the recipe's gain.
+class SineWave : public waves::IWaveField
+{
+  public: double Elevation(double _x, double, double) const override
+  {
+    return this->amplitude * std::sin(0.5 * _x - this->time);
+  }
+
+  public: math::Vector3d ParticleVelocity(double, double, double) const
+      override
+  {
+    return math::Vector3d::Zero;
+  }
+
+  public: math::Vector3d Normal(double, double, double) const override
+  {
+    return math::Vector3d::UnitZ;
+  }
+
+  public: double Jacobian(double, double, double) const override
+  {
+    return 1.0;
+  }
+
+  public: void SetParameters(const waves::WaveParameters &_params) override
+  {
+    this->amplitude = _params.gain;
+  }
+
+  public: void Update(double _simTime) override { this->time = _simTime; }
+
+  public: std::string_view Kind() const override { return kTestEngine; }
+
+  public: const waves::WaveField2D *Field() const override { return nullptr; }
+
+  private: double amplitude{0.0};
+  private: double time{0.0};
+};
+}  // namespace
+
+/////////////////////////////////////////////////
+// Where the wave field's recipe is replicated without its engine, as in
+// the GUI or a sensor process, the sampler builds an engine of its own:
+// depth below the wave, the same as with the source's engine.
+TEST(Sampler, DepthBelowTheWaveFromTheRecipeAlone)
+{
+  waves::RegisterWaveEngineFactory(kTestEngine,
+      [] { return std::make_shared<SineWave>(); });
+  waves::WavefieldData recipe;
+  recipe.algorithm = kTestEngine;
+  recipe.params.gain = 0.8;
+  recipe.generation = 1;
+
+  WaterOpticsSpec spec;
+  spec.jerlov = "3C";
+  spec.waterLevel = 1.0;
+  EntityComponentManager ecm;
+  const Entity world = ecm.CreateEntity();
+  ecm.CreateComponent(world, components::World());
+  ecm.CreateComponent(world, components::WaterOptics(MustResolve(spec)));
+  ecm.CreateComponent(world, components::Wavefield(recipe));
+
+  // The source's engine, as the server has it
+  waves::WavefieldData source = recipe;
+  source.simulation =
+      waves::CreateWaveSimulation(recipe.algorithm, recipe.params);
+  ASSERT_NE(nullptr, source.simulation);
+
+  water_optics::WaterOpticsSampler sampler;
+  ASSERT_TRUE(sampler.Sync(ecm));
+  for (const double t : {0.0, 1.5, 4.0})
+  {
+    waves::Advance(source, t);
+    const auto time = std::chrono::duration_cast<
+        std::chrono::steady_clock::duration>(std::chrono::duration<double>(t));
+    for (const double x : {0.0, 2.0, 5.0})
+    {
+      const double eta = waves::SurfaceElevation(source, x, 0.0, t);
+      EXPECT_NEAR(sampler.Depth({x, 0.0, -2.0}, time), 1.0 + eta + 2.0,
+                  1e-12) << "t " << t << ", x " << x;
+    }
+  }
+
+  // A new recipe: a new engine
+  recipe.params.gain = 0.2;
+  recipe.generation = 2;
+  ecm.SetComponentData<components::Wavefield>(world, recipe);
+  sampler.Sync(ecm);
+  const double eta = 0.2 * std::sin(0.5 * 2.0 - 1.5);
+  EXPECT_NEAR(sampler.Depth({2.0, 0.0, -2.0}, std::chrono::milliseconds(1500)),
+              1.0 + eta + 2.0, 1e-12);
+}
+
+/////////////////////////////////////////////////
+// All four coefficients explicit: no type is used, and none is reported.
+TEST(Resolve, FullyExplicitUsesNoType)
+{
+  WaterOpticsSpec spec;
+  spec.attenuation = Rgb(1.0, 0.5, 0.25);
+  spec.backscatter = Rgb(1.0, 0.5, 0.25);
+  spec.veil = Rgb(0.1, 0.2, 0.3);
+  spec.diffuseAttenuation = Rgb(0.2, 0.1, 0.05);
+  std::string warning;
+  auto out = MustResolve(spec, &warning);
+  EXPECT_EQ(out.jerlov, "");
+  EXPECT_TRUE(warning.empty()) << warning;
+
+  // A type asked for, even an unknown one, is ignored, with a warning
+  spec.jerlov = "4C";
+  out = MustResolve(spec, &warning);
+  EXPECT_EQ(out.jerlov, "");
+  ExpectRgb(out.attenuation, Rgb(1.0, 0.5, 0.25));
+  EXPECT_NE(warning.find("jerlov"), std::string::npos) << warning;
+}
+
+/////////////////////////////////////////////////
+TEST(Params, SameWater)
+{
+  WaterOpticsSpec spec;
+  spec.jerlov = "3C";
+  auto a = MustResolve(spec);
+  auto b = a;
+  b.generation = a.generation + 5;
+  EXPECT_TRUE(water_optics::SameWater(a, b));
+  for (const auto &param : water_optics::ColourParams())
+  {
+    auto c = a;
+    c.*param.data += Rgb(0.0, 1e-9, 0.0);
+    EXPECT_FALSE(water_optics::SameWater(a, c)) << param.name;
+  }
+  b.waterLevel += 0.1;
+  EXPECT_FALSE(water_optics::SameWater(a, b));
 }
 
 /////////////////////////////////////////////////
@@ -472,9 +649,26 @@ TEST(Docs, EveryElementAndPresetDocumented)
   const std::string readme = read(PACKAGE_README);
   ASSERT_FALSE(reference.empty()) << DOCS_REFERENCE;
   ASSERT_FALSE(readme.empty()) << PACKAGE_README;
-  for (const std::string tag : {"jerlov", "visibility", "attenuation",
-                                "backscatter", "veil", "diffuse_attenuation",
-                                "water_level", "publish_rate", "daylight"})
+  std::vector<std::string> tags{"jerlov", "publish_rate"};
+  for (const auto &param : water_optics::NumberParams())
+    tags.push_back(param.name);
+  for (const auto &param : water_optics::ColourParams())
+    tags.push_back(param.name);
+  // The set topic's keys, in the reference's "Water optics" section
+  const auto section = reference.find("## Water optics\n");
+  ASSERT_NE(section, std::string::npos);
+  const std::string topic = reference.substr(section,
+      reference.find("\n## ", section + 1) - section);
+  for (const auto &tag : tags)
+  {
+    if (tag != "publish_rate")
+    {
+      EXPECT_NE(topic.find("`" + tag + "`"), std::string::npos)
+          << "'" << tag << "' is not among the set topic's keys in "
+          << DOCS_REFERENCE;
+    }
+  }
+  for (const auto &tag : tags)
   {
     EXPECT_NE(reference.find("`<" + tag + ">`"), std::string::npos)
         << "<" << tag << "> is not in " << DOCS_REFERENCE;
@@ -509,15 +703,16 @@ TEST(Sampler, DaylightScalesTheVeil)
   ecm.CreateComponent(world, components::WaterOptics(optics));
   water_optics::WaterOpticsSampler sampler;
   ASSERT_TRUE(sampler.Sync(ecm));
-  const Rgb light = sampler.Daylight(5.0);
+  const Rgb &k = optics.diffuseAttenuation;
   ExpectRgb(sampler.Veil(5.0),
-            Rgb(optics.veil.X() * light.X() * 0.25,
-                optics.veil.Y() * light.Y() * 0.25,
-                optics.veil.Z() * light.Z() * 0.25));
-  ExpectRgb(sampler.Daylight(0.0), Rgb::One);
+            Rgb(optics.veil.X() * std::exp(-k.X() * 5.0) * 0.25,
+                optics.veil.Y() * std::exp(-k.Y() * 5.0) * 0.25,
+                optics.veil.Z() * std::exp(-k.Z() * 5.0) * 0.25));
 
   spec.daylight = 0.0;
-  ecm.SetComponentData<components::WaterOptics>(world, MustResolve(spec));
+  auto night = MustResolve(spec);
+  night.generation = optics.generation + 1;
+  ecm.SetComponentData<components::WaterOptics>(world, night);
   sampler.Sync(ecm);
   ExpectRgb(sampler.Veil(5.0), Rgb::Zero);
 
