@@ -20,10 +20,13 @@
   <depend>gz_waves</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
   <!-- The depth test floats on one long Gerstner wave. -->
   <test_depend>gz_waves_provider_gerstner</test_depend>
+  <test_depend>python3-matplotlib</test_depend>
+  <test_depend>python3-numpy</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
