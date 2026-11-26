@@ -260,11 +260,11 @@ Parameters shared by the three types. The defaults come from each type's exempla
 | `frequency` | Center frequency in Hz; sets absorption | 700 000 | 240 000 | 450 000 | 200 kHz to 2.25 MHz |
 | `horizontal_fov` | Width of the fan about the sensor's z axis, rad | 2.094 (120°) | 1.396 (80°) | 0.0087 (0.5°) | 0.5° to 140° |
 | `vertical_fov` | Thickness of the fan about the sensor's y axis, rad | 0.349 (20°) | 0.070 (4°) | 0.873 (50°) | 1° to 50° |
-| `beams` | Beams across the fan | 256 | 160 (the fan's intensity before detection; the soundings per ping are `max_soundings`) | 1 | 1 to about 1000 |
+| `beams` | Beams across the fan | 256 | 160 (the fan's intensity before detection; the soundings per ping are `max_soundings`) | 1 | 1 to about 1000; at most 2048 |
 | `beam_width` | Two-way −3 dB width of one beam across the fan, rad | 0.026 (1.5°) | 0.017 (1°, its angle-of-arrival resolution; 7° for `detection` `beamformed`) | the horizontal FOV | 0.25° to 3° |
 | `sidelobe_level` | First sidelobe relative to the main lobe, dB | −25 (chosen, typical of a shaded array) | −13 (chosen) | −13 (chosen) | −13 (unshaded array) to −40 (heavily shaded) |
-| `range/min`, `range/max` (or `range_min`, `range_max`) | Range window, m | 0.2, 30 | 2.5, 50 | 1 (chosen), 50 | min 0.1 to 5; max 5 to 300 |
-| `samples` | Range samples per beam per ping | 1024 (chosen) | 400 | 600 | 200 to 4000 |
+| `range/min`, `range/max` (or `range_min`, `range_max`) | Range window, m | 0.2, 30 | 2.5, 50 | 1 (chosen), 50 | min 0.1 to 5; max 5 to 300; 0 ≤ min < max |
+| `samples` | Range samples per beam per ping | 1024 (chosen) | 400 | 600 | 200 to 4000; at most 20 000 |
 | `pulse_length` | Transmit pulse, s; sets range resolution cτ/2 | 1e-5 (7.5 mm) | 1e-4 (chosen) | 1e-4 (chosen) | 10 to 200 µs |
 | `sound_speed` | Speed the device assumes when it converts time to range, m/s. The world's `<sound_speed>` is the truth; a difference between them biases every range, as a mis-set sonar does | the world's value | the world's value, reported in the message only, since soundings are travel times | the world's value | 1400 to 1550 |
 | `gain` | Receiver gain applied before the levels are published: a fixed value in dB, or `auto`, which puts each frame's median echo 24 dB below full scale but never clips more than its brightest 0.1 % of echoes | 52 (chosen) | 45 (chosen) | 45 (chosen) | auto, or 0 to 60 dB |
@@ -281,7 +281,7 @@ Output parameters that only one type uses:
 |---|---|---|---|---|
 | Imaging | `dynamic_range` | The levels below full scale that the published 8-bit image spans, dB | 60 | 40 to 80 |
 | Profiling | `detection` | How angles are found: `beamformed` (one sounding per beam) or `angle_of_arrival` (the strongest echoes, any angle) | angle_of_arrival | either |
-| Profiling | `max_soundings` | Angle-of-arrival detection: the fan's sectors, so the most soundings per ping | 20 | 10 to 40 |
+| Profiling | `max_soundings` | Angle-of-arrival detection: the fan's sectors, so the most soundings per ping | 20 | 10 to 40; at most 1024 |
 | Profiling | `detection_threshold` | Echo level above the noise at its range that counts as a sounding, dB; at 10, noise alone passes a few of the Surveyor's 64 000 samples a ping, at 15 practically none | 15 (chosen) | 12 to 20 |
 | Profiling | `range_noise` | Standard deviation of range at high signal-to-noise ratio, m; grows as the ratio falls | half a range step (chosen; the Surveyor's precision is not published) | 0.005 to 0.1 |
 | Profiling | `angle_noise` | Standard deviation of a sounding's angle, rad | 0.009 (0.5°, chosen) | 0.1° to 2° |
@@ -291,9 +291,11 @@ Advanced: geometry sampling. These set how finely the engine samples the scene, 
 
 | Parameter | Meaning | Imaging (ECHO) | Profiling (Surveyor 240-16) | Sidescan (Omniscan 450 SS) | Trade-off |
 |---|---|---|---|---|---|
-| `rays_per_beam` | Rays across one beam width | 4 | 4 | 8 | The largest lever: the cameras' width and the work per ping scale with it. Below 4, small targets and edges fall between rays and shadows lose detail; 2 is the practical minimum |
-| `elevation_rays` | Rays across the vertical field of view, counted at a span of 2 | 64 | 16 | 400 | Fewer rays leave gaps in range on surfaces seen at grazing angles, which the footprints from neighboring rays only partly fill |
-| `elevation_span` | How far the rays reach out of the fan, in half-widths of the vertical beam; the ray count scales with it | 3 | 2 | 2 | Wider shows more of the faint seabed below the beam; 3 costs about 50 % more rays than 2 |
+| `rays_per_beam` | Rays across one beam width; a whole number, at most 32 | 4 | 4 | 8 | The largest lever: the cameras' width and the work per ping scale with it. Below 4, small targets and edges fall between rays and shadows lose detail; 2 is the practical minimum |
+| `elevation_rays` | Rays across the vertical field of view, counted at a span of 2; a whole number, at most 2048 | 64 | 16 | 400 | Fewer rays leave gaps in range on surfaces seen at grazing angles, which the footprints from neighboring rays only partly fill |
+| `elevation_span` | How far the rays reach out of the fan, in half-widths of the vertical beam; the ray count scales with it. Positive, with `vertical_fov` times `elevation_span` under 170° | 3 | 2 | 2 | Wider shows more of the faint seabed below the beam; 3 costs about 50 % more rays than 2 |
+
+The reader is strict. It refuses the sensor, with an error that names the element, for a value that is not a finite number (or `true` or `false` for a flag), a count that is not a whole number from 1 to its limit above, a range window without 0 ≤ min < max, a field of view, beam width, frequency or pulse length that is not positive, or a `vertical_fov` times `elevation_span` of 170° or more, since the cameras that sample the fan cannot look past 90° to either side. An element it does not know is ignored with a warning, since it is most likely a misspelling.
 
 The imaging sonar always publishes an 8-bit beam-by-sample image, as the ECHO delivers it.
 
