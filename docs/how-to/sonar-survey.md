@@ -19,7 +19,7 @@ Run everything inside drydock, from `~/maritime_ws`, with the workspace sourced.
 ```{figure} images/sonar-survey-scene.svg
 :alt: Section and plan views of the survey: a BlueBoat on 8 m of water with a sidescan beam to each side and a downward profiler fan, and a steel drum under the track, a concrete block 12 m to port and a glass float 10 m to starboard
 
-The scene. (a) A section across the track: the sidescan's beam on each side (shaded, its axis dotted 15° down, its lower edge dashed) leaves a nadir gap under the boat, which the profiler's 80° fan of soundings covers; between the two, from about 6.7 to 9.5 m out, neither reaches the seabed within its −3 dB beam. (b) From above: the track, the sidescan swaths, the profiler's swath and the three targets.
+The scene. (a) A section across the track: the sidescan's beam on each side (shaded, its axis dotted 20° down, its lower edge dashed) leaves a nadir gap under the boat, which the profiler's 80° fan of soundings covers; between the two, from about 6.7 to 8 m out, neither reaches the seabed within its −3 dB beam. (b) From above: the track, the sidescan swaths, the profiler's swath and the three targets.
 ```
 
 ```{figure} images/sonar-survey-gazebo2.png
@@ -91,9 +91,9 @@ The sidescan, the whole pass. Nothing returns before the seabed, so the nadir ga
 ```
 
 ```{figure} images/sonar-survey-targets.png
-:alt: Two close-ups of the waterfall: on the port side a bright return at about 14 m slant range with a dark shadow beyond it, and on the starboard side a faint return at about 12.8 m with a small shadow
+:alt: Two close-ups of the waterfall: on the port side a bright return at about 14 m slant range with a dark shadow beyond it, and on the starboard side a bright return at about 12.5 m with a small shadow
 
-Close-ups. The concrete block, 12 m to port, returns brightly from the face toward the boat and casts a shadow beyond it. The glass float, 10 m to starboard, returns weakly: glass is smooth, and its glint is seen only head on, which a sidescan never sees. Its shadow shows where it is.
+Close-ups. The concrete block, 12 m to port, returns brightly from the face toward the boat and casts a shadow beyond it. The glass float, 10 m to starboard, returns about as brightly: glass is smooth, and its glint is seen only head on, but a sphere always turns part of its surface head on to the sonar. Its shadow is small.
 ```
 
 ```{figure} images/sonar-survey-soundings.png

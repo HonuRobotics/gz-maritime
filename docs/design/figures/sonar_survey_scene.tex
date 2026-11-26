@@ -2,9 +2,10 @@
 % World frame: x forward, y to port, z up, meters. Surface z = 0; seabed
 %   z(x,y) = -8 + 0.6 sin(2 pi x/25) cos(2 pi y/40) + 0.3 sin(2 pi (x+y)/13).
 % BlueBoat on the surface (hulls at y = +-0.36), running along +x on y = 0 from x = -15.
-% Sidescan (Omniscan 450 SS) at z = -0.08: a beam to each side, axis 15 deg down, 50 deg across track (-3 dB:
-% 10 deg above to 40 deg below horizontal), 0.5 deg along track, range 30 m. The upper edge meets the surface at once;
-% the lower edge meets the seabed about 9.5 m out, leaving the nadir gap; the 30 m range meets it about 28.9 m out.
+% Sidescan (Omniscan 450 SS) at z = -0.08: a beam to each side, axis 20 deg down, 50 deg across track (-3 dB:
+% 5 deg above to 45 deg below horizontal), 0.5 deg along track, range 30 m. The upper edge meets the surface 0.9 m out;
+% the lower edge meets the seabed about 8 m out (at x = 20: 7.9 m to port, 8.3 m to starboard; 7.4 to 8.4 m along the
+% pass), leaving the nadir gap; the 30 m range meets it about 28.9 m out (28.9 to port, 29.0 to starboard at x = 20).
 % Profiler (Surveyor 240-16) at z = -0.08, looking down, 80 deg across track: about +-6.7 m on 8 m of water.
 % Targets: steel drum 0.58 m dia x 0.88 m, across the track, at (10, 0); concrete block 0.5 m cube, yaw 0.3, at
 % (20, 12); glass float r 0.2 at (30, -10).
@@ -34,18 +35,19 @@
     \pgfmathsetmacro{\af}{asin(7.9/30)}
     \draw[thin] (33,0) -- (-33,0);
     % sidescan beams, one per side: surface, 30 m range, seabed, lower edge
-    % (the seabed runs 28.9 back to 9.5 as 38.4 - t)
-    \draw[beam] (0,-0.08) -- (0.45,0) -- (30,0)
+    % (the seabed runs back from the 30 m range to the lower edge: port 28.88 to 7.87 as 36.75 - t,
+    % starboard 29.03 to 8.25 as t - 37.28)
+    \draw[beam] (0,-0.08) -- (0.91,0) -- (30,0)
       -- plot[domain=0:\af,samples=12] ({30*cos(\x)},{-0.08-30*sin(\x)})
-      -- plot[domain=9.5:28.9,samples=30] ({38.4-\x},{zsb(\X,38.4-\x)}) -- cycle;
-    \draw[beam] (0,-0.08) -- (-0.45,0) -- (-30,0)
+      -- plot[domain=7.87:28.88,samples=30] ({36.75-\x},{zsb(\X,36.75-\x)}) -- cycle;
+    \draw[beam] (0,-0.08) -- (-0.91,0) -- (-30,0)
       -- plot[domain=0:\af,samples=12] ({-30*cos(\x)},{-0.08-30*sin(\x)})
-      -- plot[domain=9.5:28.9,samples=30] ({\x-38.4},{zsb(\X,\x-38.4)}) -- cycle;
-    % the sidescan's own lines: each beam's 30 m arc, its lower -3 dB edge, and its axis 15 deg down
-    \foreach \s in {1,-1} {
+      -- plot[domain=8.25:29.03,samples=30] ({\x-37.28},{zsb(\X,\x-37.28)}) -- cycle;
+    % the sidescan's own lines: each beam's 30 m arc, its lower -3 dB edge, and its axis 20 deg down
+    \foreach \s/\e in {1/7.87,-1/-8.25} {
       \draw[thin] plot[domain=0:\af,samples=12] ({\s*30*cos(\x)},{-0.08-30*sin(\x)});
-      \draw[ssedge] (0,-0.08) -- ({\s*9.5},{zsb(\X,\s*9.5)});
-      \draw[ssaxis] (0,-0.08) -- ({\s*13.52},-3.7);
+      \draw[ssedge] (0,-0.08) -- (\e,{zsb(\X,\e)});
+      \draw[ssaxis] (0,-0.08) -- ({\s*13.16},-4.87);
     }
     % profiler fan, 80 deg across track
     \foreach \t in {-40,-30,...,40} {
@@ -68,20 +70,20 @@
     \node[lbl,anchor=south] at (-28,0.2) {STARBOARD};
     \draw[lead] (0,0.3) -- (-3,3) node[lbl,anchor=south west] {BlueBoat};
     \node[lbl,align=center] at (22,-1.6) {sidescan,\\port beam};
-    \node[lbl,align=center] at (-22,-1.6) {sidescan, starboard beam,\\15$^\circ$ down, 50$^\circ$ wide};
+    \node[lbl,align=center] at (-22,-1.6) {sidescan, starboard beam,\\20$^\circ$ down, 50$^\circ$ wide};
     \draw[dim] (-34.5,0) -- (-34.5,-8) node[lbl,midway,right] {8 m};
-    \draw[dim] (9.5,-11.2) -- (-9.5,-11.2) node[lbl,midway,below] {nadir gap};
-    \draw (9.5,-9) -- (9.5,-11.5) (-9.5,-9) -- (-9.5,-11.5);
+    \draw[dim] (7.87,-11.2) -- (-8.25,-11.2) node[lbl,midway,below] {nadir gap};
+    \draw (7.87,-9) -- (7.87,-11.5) (-8.25,-9) -- (-8.25,-11.5);
     \draw[lead] (-5,-6.2) -- (-11,-5.6) node[lbl,anchor=west] {profiler, 80$^\circ$ fan straight down};
-    \draw[lead] (-8.3,-7.1) -- (-12,-10.2) node[lbl,anchor=north west] {sidescan beams' lower edges};
+    \draw[lead] (-7.0,-7.1) -- (-12,-10.2) node[lbl,anchor=north west] {sidescan beams' lower edges};
     \draw[lead] (12,{zsb(\X,12)+0.5}) -- (17,-10.2) node[lbl,anchor=north east] {block, 12 m to port};
     \node[lbl] at (0,-15.5) {(a) section across the track at $x$ = 20 m, looking forward};
   \end{scope}
 
   % ================================================ (b) plan view: forward up, starboard right
   \begin{scope}[shift={(0,-11.6)},x={(0cm,0.16cm)},y={(-0.16cm,0cm)}]
-    \fill[black!7] (-15,9.5) rectangle (40,28.9);
-    \fill[black!7] (-15,-9.5) rectangle (40,-28.9);
+    \fill[black!7] (-15,8) rectangle (40,28.9);
+    \fill[black!7] (-15,-8) rectangle (40,-28.9);
     \draw[dashed] (-15,-6.7) rectangle (40,6.7);
     \draw[thick,-{Latex[length=2.4mm]}] (-15,0) -- (42,0);
     % targets at true size
@@ -99,10 +101,10 @@
     \node[lbl,align=center] at (0,19.2) {sidescan\\swath};
     \node[lbl,align=center] at (0,-19.2) {sidescan\\swath};
     \draw[lead] (-8,-6.7) -- (-11,-11) node[lbl,anchor=north west] {profiler swath, $\pm$6.7 m};
-    \draw[lead] (25,-8.1) -- (21,-14) node[lbl,anchor=west] {covered by neither, 6.7 to 9.5 m};
+    \draw[lead] (25,-7.35) -- (21,-14) node[lbl,anchor=west] {covered by neither, 6.7 to 8 m};
     \node[lbl,anchor=south] at (40.5,28) {PORT};
     \node[lbl,anchor=south] at (40.5,-28) {STARBOARD};
-    \draw[dim] (-17.5,9.5) -- (-17.5,28.9) node[lbl,midway,below] {to 28.9 m};
+    \draw[dim] (-17.5,8) -- (-17.5,28.9) node[lbl,midway,below] {to 28.9 m};
     \node[lbl] at (-21.5,0) {(b) plan view of the pass};
   \end{scope}
 \end{tikzpicture}
