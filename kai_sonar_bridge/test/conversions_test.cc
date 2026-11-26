@@ -34,7 +34,10 @@ using ImageData = marine_acoustic_msgs::msg::SonarImageData;
 
 namespace
 {
+//////////////////////////////////////////////////
 /// \brief A gz header with a stamp and a frame id.
+/// \param[out] _h The header.
+/// \param[in] _frame The frame id.
 void SetHeader(gz::msgs::Header *_h, const std::string &_frame)
 {
   _h->mutable_stamp()->set_sec(12);
@@ -44,8 +47,10 @@ void SetHeader(gz::msgs::Header *_h, const std::string &_frame)
   d->add_value(_frame);
 }
 
+//////////////////////////////////////////////////
 /// \brief A 5 beam by 4 sample uint8 image whose sample k of beam j is
 /// 10 j + k, beam-major as the sensor writes it.
+/// \return The image.
 GzImage FiveByFour()
 {
   GzImage m;

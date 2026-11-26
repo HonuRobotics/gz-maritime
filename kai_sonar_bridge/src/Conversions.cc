@@ -28,7 +28,10 @@ namespace
 {
 using ImageData = marine_acoustic_msgs::msg::SonarImageData;
 
+//////////////////////////////////////////////////
 /// \brief A ROS stamp from a gz header's.
+/// \param[in] _h The gz header.
+/// \return The stamp.
 builtin_interfaces::msg::Time StampOf(const gz::msgs::Header &_h)
 {
   builtin_interfaces::msg::Time t;

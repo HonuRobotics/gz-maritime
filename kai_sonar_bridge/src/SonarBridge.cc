@@ -39,17 +39,22 @@ constexpr std::size_t kWaterfallLines = 400;
 /// \brief The longer side of a drawn fan, pixels.
 constexpr int kFanSide = 600;
 
+//////////////////////////////////////////////////
 /// \brief The QoS of every topic the bridge publishes. Reliable, because a
 /// reliable publisher serves both reliable subscribers (RViz's displays, by
 /// default) and best-effort ones (the sensor-data QoS), where a best-effort
 /// publisher serves only the second. Keep-last, so a slow subscriber drops
 /// old pings rather than holding up the bridge.
+/// \return The QoS.
 rclcpp::QoS PublisherQoS()
 {
   return rclcpp::QoS(rclcpp::KeepLast(5)).reliable();
 }
 
+//////////////////////////////////////////////////
 /// \brief Whether a publisher has anyone to publish to.
+/// \param[in] _pub The publisher.
+/// \return True if it has a subscriber.
 template <typename T>
 bool Wanted(const T &_pub)
 {
@@ -200,6 +205,8 @@ class SonarBridge : public rclcpp::Node
   }
 
   /// \brief An imaging sonar's frame drawn as the fan it covers, forward up.
+  /// \param[in,out] _s The sonar.
+  /// \param[in] _image Its frame.
   private: void DrawFan(Sonar &_s, const RosImage &_image)
   {
     std::lock_guard<std::mutex> lock(_s.mutex);
@@ -218,6 +225,8 @@ class SonarBridge : public rclcpp::Node
   }
 
   /// \brief A sidescan's recent lines, newest at the top, range across.
+  /// \param[in,out] _s The sonar.
+  /// \param[in] _image Its line.
   private: void DrawWaterfall(Sonar &_s, const RosImage &_image)
   {
     std::lock_guard<std::mutex> lock(_s.mutex);
@@ -243,6 +252,8 @@ class SonarBridge : public rclcpp::Node
 
   /// \brief A profiler's soundings: the detections message, and the same
   /// soundings as points in its frame.
+  /// \param[in,out] _s The sonar.
+  /// \param[in] _m The soundings.
   private: void OnSoundings(Sonar &_s, const GzDetections &_m)
   {
     const bool wantData = Wanted(_s.detPub);
