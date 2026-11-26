@@ -26,8 +26,9 @@ step can be checked against it:
 * the Jerlov presets themselves: attenuation per channel, veil, visibility.
 
 The waters are read from gz_water_optics' Jerlov table (src/Jerlov.cc) and
-resolved as the optics system resolves them, so the figures are the exact
-expected results for those presets.
+resolved as the optics system resolves them, so the figures are the expected
+results for those presets, as far as the table is right: it is not yet
+checked against the printed paper.
 
 Needs numpy and matplotlib.
 
@@ -48,7 +49,10 @@ from matplotlib.patches import FancyArrowPatch, Polygon, Rectangle  # noqa: E402
 
 import numpy as np  # noqa: E402,I100
 
-OUT = Path(__file__).resolve().parent.parent / 'design' / 'images'
+# Set UW_FIGURES_OUT to a directory to write the figures there instead, e.g.
+# to compare them with the committed ones.
+OUT = (Path(os.environ['UW_FIGURES_OUT']) if os.environ.get('UW_FIGURES_OUT')
+       else Path(__file__).resolve().parent.parent / 'design' / 'images')
 # Set UW_FIGURES_PREVIEW to a directory to also write PNG previews there.
 PREVIEW = Path(os.environ['UW_FIGURES_PREVIEW']) if os.environ.get('UW_FIGURES_PREVIEW') else None
 
