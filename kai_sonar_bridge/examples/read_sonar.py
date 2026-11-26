@@ -33,6 +33,10 @@ across-track angle, rx_angles, positive to starboard. Range is half the
 travel time times the sound speed in ping_info; for each ping it prints
 the good soundings' angle, range, across-track distance and depth below
 the sonar.
+
+It subscribes with the sensor-data QoS (best effort, keep the last few),
+the usual choice for sensor streams; the bridge publishes reliably, so a
+reliable subscriber receives the same messages.
 """
 
 import argparse

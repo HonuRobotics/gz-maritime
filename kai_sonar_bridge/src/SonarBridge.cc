@@ -62,6 +62,16 @@ constexpr std::size_t kWaterfallLines = 400;
 
 /// \brief Width of a drawn fan, pixels.
 constexpr int kFanWidth = 600;
+
+/// \brief The QoS of every topic the bridge publishes. Reliable, because a
+/// reliable publisher serves both reliable subscribers (RViz's displays, by
+/// default) and best-effort ones (the sensor-data QoS), where a best-effort
+/// publisher serves only the second. Keep-last, so a slow subscriber drops
+/// old pings rather than holding up the bridge.
+rclcpp::QoS PublisherQoS()
+{
+  return rclcpp::QoS(rclcpp::KeepLast(5)).reliable();
+}
 }  // namespace
 
 /// \brief Brings gz_sonar's sonars into ROS 2.
@@ -125,11 +135,11 @@ class SonarBridge : public rclcpp::Node
       if (i < kinds.size() && kinds[i] == "detections")
       {
         s->detPub = this->create_publisher<RosDetections>(rosTopics[i],
-          rclcpp::SensorDataQoS());
+          PublisherQoS());
         if (this->view)
         {
           s->cloudPub = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-            rosTopics[i] + "/points", rclcpp::SensorDataQoS());
+            rosTopics[i] + "/points", PublisherQoS());
         }
         std::function<void(const GzDetections &)> dcb =
           [this, s](const GzDetections &_msg) { this->OnSoundings(*s, _msg); };
@@ -145,11 +155,11 @@ class SonarBridge : public rclcpp::Node
         continue;
       }
       s->pub = this->create_publisher<RosImage>(rosTopics[i],
-        rclcpp::SensorDataQoS());
+        PublisherQoS());
       if (this->view)
       {
         s->viewPub = this->create_publisher<sensor_msgs::msg::Image>(
-          rosTopics[i] + "/view", rclcpp::SensorDataQoS());
+          rosTopics[i] + "/view", PublisherQoS());
       }
       std::function<void(const GzImage &)> cb =
         [this, s](const GzImage &_msg) { this->OnPing(*s, _msg); };
