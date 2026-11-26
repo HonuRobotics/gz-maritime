@@ -62,23 +62,31 @@ class Sonar
       public ISystemPostUpdate,
       public ISystemReset
 {
+  /// \brief Constructor.
   public: Sonar();
+
+  /// \brief Destructor.
   public: ~Sonar() override;
 
+  // Documentation inherited
   public: void Configure(const Entity &_entity,
               const std::shared_ptr<const sdf::Element> &_sdf,
               EntityComponentManager &_ecm,
               EventManager &_eventMgr) override;
 
+  // Documentation inherited
   public: void PreUpdate(const UpdateInfo &_info,
               EntityComponentManager &_ecm) override;
 
+  // Documentation inherited
   public: void PostUpdate(const UpdateInfo &_info,
               const EntityComponentManager &_ecm) override;
 
+  // Documentation inherited
   public: void Reset(const UpdateInfo &_info,
               EntityComponentManager &_ecm) override;
 
+  /// \brief Private data.
   private: std::unique_ptr<SonarPrivate> dataPtr;
 };
 }  // namespace gz::sim::maritime

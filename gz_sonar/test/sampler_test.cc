@@ -37,6 +37,7 @@ namespace
 {
 constexpr double kDeg = M_PI / 180.0;
 
+//////////////////////////////////////////////////
 sonar::AcousticProperties Lambert(double _db)
 {
   sonar::AcousticProperties p;
@@ -44,8 +45,14 @@ sonar::AcousticProperties Lambert(double _db)
   return p;
 }
 
+//////////////////////////////////////////////////
 /// \brief Draw what a renderer would: per pixel, depth along the camera's
 /// axis and the label of the surface hit.
+/// \param[in] _sampler The sampler, for its cameras.
+/// \param[in] _scene The scene.
+/// \param[in] _pose The sensor's pose.
+/// \param[out] _depth One depth image per camera.
+/// \param[out] _labels One label image per camera.
 void Draw(const sonar::CameraSampler &_sampler,
   const sonar::SyntheticScene &_scene, const Pose3d &_pose,
   std::vector<std::vector<float>> &_depth,
@@ -78,7 +85,7 @@ void Draw(const sonar::CameraSampler &_sampler,
 }
 }  // namespace
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The fan of the ECHO splits into cameras no wider than the limit, and
 // every ray lands inside its camera's image.
 TEST(CameraSampler, LayoutCoversTheFan)
@@ -96,7 +103,7 @@ TEST(CameraSampler, LayoutCoversTheFan)
   EXPECT_EQ(side.Layout().yaws.size(), 1u);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Scene B through synthetic images: ranges match casting the fan directly
 // to a millimeter on the seabed and the box, labels agree, and so does the
 // incidence angle from neighboring hits.
@@ -152,7 +159,13 @@ TEST(CameraSampler, MatchesDirectCastOnSceneB)
 
 namespace
 {
+//////////////////////////////////////////////////
 /// \brief Draw the scene and sample it, as the sonar system does.
+/// \param[in] _sampler The sampler.
+/// \param[in] _scene The scene.
+/// \param[in] _pose The sensor's pose.
+/// \param[in] _table Acoustic properties by label.
+/// \return The hits.
 std::vector<sonar::RayHit> DrawAndSample(const sonar::CameraSampler &_sampler,
   const sonar::SyntheticScene &_scene, const Pose3d &_pose,
   const std::vector<sonar::AcousticProperties> &_table)
@@ -170,6 +183,7 @@ std::vector<sonar::RayHit> DrawAndSample(const sonar::CameraSampler &_sampler,
   return _sampler.Sample(dp, lp, 1, _table);
 }
 
+//////////////////////////////////////////////////
 double Median(std::vector<double> _v)
 {
   if (_v.empty())
@@ -179,7 +193,7 @@ double Median(std::vector<double> _v)
 }
 }  // namespace
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A flat seabed seen at grazing angles out to the end of the ECHO's 30 m
 // window: depth changes by far more than 2 % from one pixel to the next,
 // yet the read is still exact, since 1/z stays planar. From 2 m and from
@@ -226,7 +240,7 @@ TEST(CameraSampler, ExactOnASeabedAtGrazingAngles)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Walls square to the camera, near and far, meeting along rows of pixels
 // and sharing a label, as two parts of one model would. Across a row the
 // four pixels around a ray differ in v only, so 1/z has no twist there;
@@ -284,7 +298,7 @@ TEST(CameraSampler, DoesNotBlendAStepAlongAPixelRow)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A pole one ray wide, facing the sonar, in front of a wall: its neighbors
 // in azimuth are on the wall, so they cannot give its normal, and it keeps
 // the 45 degree fallback, as the same pole does in open water. With the
@@ -342,7 +356,7 @@ TEST(CameraSampler, PoleOneRayWideBeforeAWallKeepsTheFallback)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A box face seen square on, with the box's top seen at a grazing angle
 // above it. A ray on the face just under the edge has a neighbor on the
 // face and one on the top, both the same surface by the jump between them;
@@ -380,7 +394,7 @@ TEST(CameraSampler, NormalOnAFaceStaysOnTheFaceAtItsEdge)
   EXPECT_EQ(miss, 0u);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The sampler reads hits past the end of the range window, to half as far
 // again: a sonar that assumes too slow a sound speed reads them inside it.
 // Every hit carries the footprint its neighbors give it.

@@ -75,7 +75,11 @@ constexpr const char *kWaterDatum = "gz-maritime-water";
 /// once a world has used up the rest.
 constexpr int kOtherLabel = 255;
 
+//////////////////////////////////////////////////
 /// \brief The outermost model an entity belongs to.
+/// \param[in] _ecm The entity component manager.
+/// \param[in] _e The entity.
+/// \return The model.
 Entity TopModel(const EntityComponentManager &_ecm, Entity _e)
 {
   const Entity world = worldEntity(_ecm);
@@ -90,7 +94,11 @@ Entity TopModel(const EntityComponentManager &_ecm, Entity _e)
   return top;
 }
 
+//////////////////////////////////////////////////
 /// \brief Models from the outermost down to the one that holds a link.
+/// \param[in] _ecm The entity component manager.
+/// \param[in] _e The link.
+/// \return The models, outermost first.
 std::vector<Entity> ModelChain(const EntityComponentManager &_ecm, Entity _e)
 {
   std::vector<Entity> chain;
@@ -105,7 +113,10 @@ std::vector<Entity> ModelChain(const EntityComponentManager &_ecm, Entity _e)
   return chain;
 }
 
+//////////////////////////////////////////////////
 /// \brief Every visual in a subtree of the scene.
+/// \param[in] _v The subtree's root.
+/// \param[in,out] _out The visuals, appended to.
 void CollectVisuals(const rendering::VisualPtr &_v,
   std::vector<rendering::VisualPtr> &_out)
 {
@@ -165,16 +176,24 @@ struct StampedRemoval
   std::chrono::nanoseconds stamp{0};
 };
 
+//////////////////////////////////////////////////
 /// \brief When ping _k is due on a sonar's rate grid, in whole nanoseconds
 /// of sim time. Every scheduling decision compares these, never products
 /// in doubles, so a ping is never due twice.
+/// \param[in] _k The ping number.
+/// \param[in] _rate Pings per second.
+/// \return The due time.
 nanoseconds DueTime(std::uint64_t _k, double _rate)
 {
   return nanoseconds(static_cast<std::int64_t>(
     std::llround(static_cast<double>(_k) * 1e9 / _rate)));
 }
 
+//////////////////////////////////////////////////
 /// \brief The first ping on a sonar's rate grid due at or after _t.
+/// \param[in] _t The sim time.
+/// \param[in] _rate Pings per second.
+/// \return The ping number.
 std::uint64_t FirstPingAt(nanoseconds _t, double _rate)
 {
   auto k = static_cast<std::uint64_t>(std::max(0.0,
@@ -259,9 +278,13 @@ class SonarPrivate
 {
   /// \brief Find sonars: all of them (at the first update, after a reset)
   /// or the ones noted since.
+  /// \param[in,out] _ecm The entity component manager.
+  /// \param[in] _all True to find all of them.
   public: void FindSonars(EntityComponentManager &_ecm, bool _all);
 
   /// \brief Resolve the marks of new visuals.
+  /// \param[in] _ecm The entity component manager.
+  /// \param[in] _all True to resolve all of them.
   public: void FindVisuals(const EntityComponentManager &_ecm, bool _all);
 
   /// \brief Rendering thread callbacks.
@@ -272,19 +295,28 @@ class SonarPrivate
 
   /// \brief Build the cameras of one sonar under its link visual, reusing
   /// parked ones where they match.
+  /// \param[in] _request The sonar and its link.
+  /// \param[out] _rig The rig.
+  /// \return True if the cameras were built.
   public: bool BuildRig(const RigRequest &_request, Rig &_rig);
 
   /// \brief Connect camera _c's frames to the rig's buffers and add the
   /// pair to the rig.
+  /// \param[in,out] _rig The rig.
+  /// \param[in] _c The camera's index in the layout.
+  /// \param[in] _depth The depth camera.
+  /// \param[in] _seg The segmentation camera.
   public: void Connect(Rig &_rig, std::size_t _c,
     const rendering::DepthCameraPtr &_depth,
     const rendering::SegmentationCameraPtr &_seg);
 
   /// \brief Disconnect a rig and park its cameras for reuse; see
   /// ParkedCameras.
+  /// \param[in,out] _rig The rig.
   public: void ParkRig(Rig &_rig);
 
   /// \brief Park one rig's cameras and drop the rig.
+  /// \param[in] _sensor The sonar's entity.
   public: void EraseRig(Entity _sensor);
 
   /// \brief At render teardown: destroy every rig's cameras and every
@@ -293,6 +325,8 @@ class SonarPrivate
 
   /// \brief Map of entity to rendering visual, rebuilt when the scene
   /// changes size.
+  /// \param[in] _e The entity.
+  /// \return Its visual, or null.
   public: rendering::VisualPtr VisualOf(Entity _e);
   public: void RefreshVisuals();
 

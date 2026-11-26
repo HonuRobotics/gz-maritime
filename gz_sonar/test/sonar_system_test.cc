@@ -88,6 +88,7 @@ class Pings
   }
 
   /// \brief What came since the last Clear, in arrival order.
+  /// \return The pings.
   public: std::vector<Ping> Images()
   {
     const std::lock_guard<std::mutex> lock(this->mutex);
@@ -95,6 +96,9 @@ class Pings
   }
 
   /// \brief The labels of a ping, if they came.
+  /// \param[in] _ping The ping number.
+  /// \param[out] _out The labels.
+  /// \return True if they came.
   public: bool LabelsOf(std::uint64_t _ping,
     gz::maritime::sonar::SonarLabels &_out)
   {
@@ -131,15 +135,22 @@ class Pings
   private: transport::Node node;
 };
 
+//////////////////////////////////////////////////
 /// \brief When ping _k is due on a _rate grid, in nanoseconds; the system's
 /// own rule (DueTime in Sonar.cc), restated so the test checks it.
+/// \param[in] _k The ping number.
+/// \param[in] _rate Pings per second.
+/// \return The due time, ns.
 std::int64_t Due(std::uint64_t _k, double _rate)
 {
   return std::llround(static_cast<double>(_k) * 1e9 / _rate);
 }
 
+//////////////////////////////////////////////////
 /// \brief Ping numbers that rise by one each time, on the _rate grid.
 /// \return An empty string, or what is wrong with the first bad ping.
+/// \param[in] _pings The pings, in arrival order.
+/// \param[in] _rate Pings per second.
 std::string OnGrid(const std::vector<Ping> &_pings, double _rate)
 {
   for (std::size_t i = 0; i < _pings.size(); ++i)
@@ -160,7 +171,10 @@ std::string OnGrid(const std::vector<Ping> &_pings, double _rate)
   return "";
 }
 
+//////////////////////////////////////////////////
 /// \brief The sonar's model in SDF, as scene B has it, under another name.
+/// \param[in] _name The model's name.
+/// \return The model's SDF.
 std::string Rov(const std::string &_name)
 {
   return
@@ -177,8 +191,12 @@ std::string Rov(const std::string &_name)
     "</sensor></link></model></sdf>";
 }
 
+//////////////////////////////////////////////////
 /// \brief Whether a label's scoped name, world prefix and all, is the
 /// top-level model _model's.
+/// \param[in] _scoped The label's scoped name.
+/// \param[in] _model The model's name.
+/// \return True if the label names the model.
 bool Names(const std::string &_scoped, const std::string &_model)
 {
   const std::string suffix = "::" + _model;
@@ -186,7 +204,10 @@ bool Names(const std::string &_scoped, const std::string &_model)
     _scoped.compare(_scoped.size() - suffix.size(), suffix.size(), suffix) == 0);
 }
 
+//////////////////////////////////////////////////
 /// \brief The path a loaded shared library came from, or empty.
+/// \param[in] _name Part of the library's file name.
+/// \return The path.
 std::string Loaded(const std::string &_name)
 {
   std::ifstream maps("/proc/self/maps");
@@ -234,6 +255,7 @@ class SonarSystem : public ::testing::Test
     pings.reset();
   }
 
+  // Documentation inherited
   protected: void SetUp() override
   {
     if (!rendering)
@@ -242,6 +264,7 @@ class SonarSystem : public ::testing::Test
 
   /// \brief Step the server _n times (ms of sim time), then let the
   /// worker's queue drain.
+  /// \param[in] _n The number of steps.
   protected: static void Step(std::uint64_t _n)
   {
     ASSERT_TRUE(server->Run(true, _n, false));
@@ -250,6 +273,10 @@ class SonarSystem : public ::testing::Test
 
   /// \brief Step _settle ms, forget what came, step _n ms more; what came
   /// in those.
+  /// \param[in,out] _p The subscriber.
+  /// \param[in] _n Steps to collect over.
+  /// \param[in] _settle Steps to settle first.
+  /// \return The pings.
   protected: static std::vector<Ping> Window(Pings &_p, std::uint64_t _n,
     std::uint64_t _settle = 100)
   {

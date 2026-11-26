@@ -71,10 +71,16 @@ struct BeamIntensity
 /// \brief Intensity weight of a beam at an angle from its axis: a sinc^2
 /// main lobe whose -3 dB width is the beam width, with its sidelobes set to
 /// the configured level.
+/// \param[in] _config The sonar.
+/// \param[in] _offset Angle from the beam's axis, rad.
+/// \return The weight, 1 on the axis.
 double HorizontalPattern(const SonarConfig &_config, double _offset);
 
 /// \brief Intensity weight of the vertical beam at an elevation: Gaussian,
 /// -3 dB at half the vertical field of view.
+/// \param[in] _config The sonar.
+/// \param[in] _elevation Elevation, rad.
+/// \return The weight, 1 on the axis.
 double VerticalPattern(const SonarConfig &_config, double _elevation);
 
 /// \brief The sonar-equation model: turns the ray hits of one ping into
@@ -96,6 +102,8 @@ double VerticalPattern(const SonarConfig &_config, double _elevation);
 class Engine
 {
   /// \brief An engine for one sonar in a body of water.
+  /// \param[in] _config The sonar.
+  /// \param[in] _water The water.
   public: Engine(const SonarConfig &_config, const Water &_water);
 
   /// \brief Joins the engine's threads.
@@ -111,19 +119,24 @@ class Engine
   /// \param[in] _hits What each ray of the fan found.
   /// \param[in] _ping The ping number. Unused since speckle moved to the
   /// readout; kept so callers need not change.
+  /// \return Echo intensity per beam and sample.
   public: BeamIntensity Ping(const std::vector<RayHit> &_hits,
               std::uint64_t _ping) const;
 
   /// \brief Threads a ping runs on, the caller's included.
+  /// \return The number of threads.
   public: std::size_t Threads() const;
 
   /// \brief The configuration.
+  /// \return The configuration.
   public: const SonarConfig &Config() const;
 
   /// \brief The water.
+  /// \return The water.
   public: const Water &WaterProperties() const;
 
   /// \brief Absorption at the sonar's frequency, dB per meter.
+  /// \return The absorption, dB/m.
   public: double Absorption() const;
 
   private: SonarConfig config;

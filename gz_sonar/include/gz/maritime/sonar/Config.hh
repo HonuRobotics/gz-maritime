@@ -27,7 +27,7 @@ namespace gz::maritime::sonar
 /// scattering plus an optional specular lobe for smooth surfaces.
 struct AcousticProperties
 {
-  /// \brief Lambert strength, 10 log10 mu, dB: 
+  /// \brief Lambert strength, 10 log10 mu, dB:
   /// The backscattering strength
   /// of a rough surface, mu being its backscattering cross section per unit
   /// area and per unit solid angle at normal incidence (APL-UW TR 9407,
@@ -35,7 +35,7 @@ struct AcousticProperties
   /// bottoms (TR 9407 Table 3, pp. IV-23 to IV-25, read at 30 kHz and 20
   /// degrees grazing): about +1 rough rock, -6 rock, -13 sandy gravel, -18
   /// sand, -23 to -28 silt; TR 9407 stops at 100 kHz, so above it these
-  /// are an extrapolation. 
+  /// are an extrapolation.
   double lambertDb{-20.0};
 
   /// \brief Specular strength, 10 log10 R^2, dB: the square of the
@@ -93,8 +93,8 @@ inline constexpr std::size_t kDefaultMaxEngineThreads = 8;
 /// exactly (the ECHO's, for one, shades its sidelobes to -25 dB and reaches
 /// three half-widths in elevation).
 ///
-/// Frames (coordinate systems): the sensor's x axis is the acoustic axis. 
-///Azimuth is the angle
+/// Frames (coordinate systems): the sensor's x axis is the acoustic axis.
+/// Azimuth is the angle
 /// about the sensor's z axis, positive toward +y; elevation is the angle out
 /// of the x-y plane, positive toward +z. The fan spans the horizontal field
 /// of view in azimuth and the vertical field of view in elevation.
@@ -146,8 +146,9 @@ struct SonarConfig
   ///
   /// Both are one constant, not a sound-speed profile. At the ranges these
   /// sonars work (tens of meters, in water a few to tens of meters deep)
-  /// refraction is negligible.A sound speed profile matters for deep, long-range 
-  /// bathymetric multibeams, whose ray tracing is out of scope here.
+  /// refraction is negligible. A sound speed profile matters for deep,
+  /// long-range bathymetric multibeams, whose ray tracing is out of scope
+  /// here.
   std::optional<double> soundSpeed;
 
   /// \brief Receiver gain, dB: published level = received level +
@@ -241,15 +242,22 @@ struct SonarConfig
   std::size_t threads{0};
 
   /// \brief The assumed sound speed, falling back to the water's.
+  /// \param[in] _trueSoundSpeed The water's sound speed, m/s.
+  /// \return The sound speed the sonar assumes, m/s.
   double AssumedSoundSpeed(double _trueSoundSpeed) const;
 
   /// \brief Spacing of the range samples, m.
+  /// \return The sample spacing, m.
   double SampleSpacing() const;
 
   /// \brief Range of the center of sample _k, m.
+  /// \param[in] _k The sample's index.
+  /// \return The sample's range, m.
   double SampleRange(std::size_t _k) const;
 
   /// \brief Azimuth of beam _j, rad.
+  /// \param[in] _j The beam's index.
+  /// \return The beam's azimuth, rad.
   double BeamAzimuth(std::size_t _j) const;
 };
 
@@ -257,12 +265,15 @@ struct SonarConfig
 // kind. Every value can be overridden in SDF; see Config.cc.
 
 /// \brief The Sonoptix ECHO imaging sonar at 700 kHz.
+/// \return The ECHO's configuration.
 SonarConfig EchoImaging();
 
 /// \brief One Cerulean Omniscan 450 SS sidescan transducer.
+/// \return The Omniscan's configuration.
 SonarConfig OmniscanSidescan();
 
 /// \brief The Cerulean Surveyor 240-16 profiling sonar.
+/// \return The Surveyor's configuration.
 SonarConfig SurveyorProfiling();
 }  // namespace gz::maritime::sonar
 

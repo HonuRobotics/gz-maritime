@@ -51,6 +51,10 @@ struct Levels
 };
 
 /// \brief Time-varied gain at a range, dB.
+/// \param[in] _config The sonar.
+/// \param[in] _alpha Absorption, dB/m.
+/// \param[in] _range The range, m.
+/// \return The gain, dB.
 double TimeVariedGain(const SonarConfig &_config, double _alpha,
   double _range);
 
@@ -64,6 +68,7 @@ class GainTracker
   /// ping alone (its median echo 24 dB below full scale), dB.
   /// \param[in] _dt Time since the previous ping, s.
   /// \param[in] _timeConstant Time constant, s; 0 follows each ping.
+  /// \return The gain to apply, dB.
   public: double Update(double _pingGain, double _dt, double _timeConstant);
 
   private: bool started{false};
@@ -75,12 +80,23 @@ class GainTracker
 /// then time-varied gain and gain. The noise rides up with both, so echoes
 /// that absorption and spreading weaken fall into it with range. With
 /// automatic gain and a tracker, the gain is smoothed across pings.
+/// \param[in] _intensity Echo intensity from the engine.
+/// \param[in] _config The sonar.
+/// \param[in] _alpha Absorption, dB/m.
+/// \param[in] _ping The ping number, which seeds speckle and noise.
+/// \param[in,out] _tracker The gain tracker, or null for each ping's own gain.
+/// \param[in] _dt Time since the previous ping, s.
+/// \return The levels.
 Levels ReadLevels(const BeamIntensity &_intensity, const SonarConfig &_config,
   double _alpha, std::uint64_t _ping, GainTracker *_tracker = nullptr,
   double _dt = 0.0);
 
 /// \brief The mean noise level at sample _sample of _levels, dB re full
 /// scale: the noise floor plus the time-varied gain and the gain there.
+/// \param[in] _levels The levels.
+/// \param[in] _config The sonar.
+/// \param[in] _sample The sample's index.
+/// \return The noise level, dB re full scale.
 double NoiseLevel(const Levels &_levels, const SonarConfig &_config,
   std::size_t _sample);
 
@@ -146,6 +162,11 @@ struct Sounding
 /// inconsistent with their neighbors flagged. Angle of arrival: the fan is
 /// split into maxSoundings equal sectors, and each sector that clears the
 /// threshold reports its strongest echo, with angle noise and no intensity.
+/// \param[in] _levels The levels.
+/// \param[in] _config The sonar.
+/// \param[in] _assumedSoundSpeed The sound speed the sonar assumes, m/s.
+/// \param[in] _ping The ping number, which seeds the angle noise.
+/// \return The soundings.
 std::vector<Sounding> ReadProfiling(const Levels &_levels,
   const SonarConfig &_config, double _assumedSoundSpeed, std::uint64_t _ping);
 }  // namespace gz::maritime::sonar

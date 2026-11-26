@@ -82,6 +82,7 @@ struct PingFrame
 /// reordering pings.
 class SonarSensor : public sensors::Sensor
 {
+  /// \brief Destructor: stops the worker.
   public: ~SonarSensor() override;
 
   /// \brief Load the sensor; Load(sdf::Sensor) is the base class's and
@@ -90,33 +91,41 @@ class SonarSensor : public sensors::Sensor
   /// \param[in] _type Its gz:type.
   /// \param[in] _water The world's water.
   /// \param[in] _seed The world's seed, mixed with the sensor's name.
+  /// \return True if the sensor loaded.
   public: bool Load(const sdf::Sensor &_sdf, const std::string &_type,
               const gz::maritime::sonar::Water &_water, std::uint64_t _seed);
 
   using sensors::Sensor::Load;
   using sensors::Sensor::Update;
 
-  /// \brief Unused: pings come from the rendering thread through Push.
+  // Documentation inherited
+  // Unused: pings come from the rendering thread through Push.
   public: bool Update(const std::chrono::steady_clock::duration &) override;
 
   /// \brief Hand over one capture; blocks while two are waiting.
+  /// \param[in] _frame The capture.
   public: void Push(PingFrame &&_frame);
 
   /// \brief The camera layout to draw.
+  /// \return The layout.
   public: const gz::maritime::sonar::CameraLayout &Layout() const;
 
   /// \brief Pings per second.
+  /// \return The rate, Hz.
   public: double Rate() const;
 
   /// \brief The sensor's gz:type.
+  /// \return The type.
   public: const std::string &Type() const;
 
   /// \brief Whether the ground-truth labels topic is on.
+  /// \return True if the labels topic is on.
   public: bool Labels() const;
 
-  /// \brief Whether anyone subscribes to this sonar's data, labels or
-  /// water column. With no one listening the world system skips the
-  /// sonar's pings, as gz-sim does for its own rendering sensors.
+  // Documentation inherited
+  // Anyone subscribed to this sonar's data, labels or water column. With
+  // no one listening the world system skips the sonar's pings, as gz-sim
+  // does for its own rendering sensors.
   public: bool HasConnections() const override;
 
   /// \brief Start over after a world reset: the automatic gain forgets
@@ -124,6 +133,7 @@ class SonarSensor : public sensors::Sensor
   public: void ResetState();
 
   /// \brief The <topic>/enable service: true turns the sonar on, false off.
+  /// \param[in] _enable The request.
   private: void OnEnable(const msgs::Boolean &_enable);
 
   private: void Work();

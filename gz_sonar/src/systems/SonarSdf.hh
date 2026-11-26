@@ -38,6 +38,8 @@ inline constexpr const char *kSidescanSonar = "sidescan_sonar";
 inline constexpr const char *kProfilingSonar = "profiling_sonar";
 
 /// \brief Whether a gz:type is one of the sonars.
+/// \param[in] _type The gz:type.
+/// \return True for a sonar's type.
 bool IsSonarType(const std::string &_type);
 
 /// \brief A sonar's configuration: its type's exemplar, with whatever its
@@ -46,6 +48,7 @@ bool IsSonarType(const std::string &_type);
 /// \param[in] _block The <gz:sonar> element; null for the exemplar as it is.
 /// \param[out] _labels Whether the ground-truth labels topic is on.
 /// \param[out] _error Why it failed, when it returns empty.
+/// \return The configuration, or empty if the block is invalid.
 std::optional<gz::maritime::sonar::SonarConfig> LoadSonarConfig(
   const std::string &_type, const sdf::ElementPtr &_block, bool &_labels,
   std::string &_error);
@@ -65,11 +68,15 @@ struct AcousticMarks
 /// (numbers) and gz:acoustic_transparent (true or false), as in
 /// <visual name="glass" gz:acoustic_lambert="-30">. A malformed value is
 /// reported and left unset.
+/// \param[in] _element The element.
+/// \return The marks it sets.
 AcousticMarks ReadAcousticMarks(const sdf::ElementPtr &_element);
 
 /// \brief Read a block of acoustic values written without the prefix, as in
 /// the world system's <seabed> and <default>: <lambert>, <specular>,
 /// <specular_width>.
+/// \param[in] _element The block.
+/// \return The values it sets.
 AcousticMarks ReadAcousticValues(const sdf::ElementPtr &_element);
 
 /// \brief Read the world system's water and seed: <temperature> (-2 to
@@ -85,6 +92,8 @@ bool ReadWater(const sdf::ElementPtr &_plugin,
   std::string &_error);
 
 /// \brief Apply marks on top of properties: what the marks set wins.
+/// \param[in,out] _properties The properties.
+/// \param[in] _marks The marks.
 void ApplyMarks(gz::maritime::sonar::AcousticProperties &_properties,
   const AcousticMarks &_marks);
 }  // namespace gz::sim::maritime

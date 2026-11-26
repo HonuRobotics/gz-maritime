@@ -50,7 +50,13 @@ namespace
 {
 constexpr double kDeg = M_PI / 180.0;
 
+//////////////////////////////////////////////////
 /// \brief Write a 2D array as a NumPy .npy file (format 1.0).
+/// \param[in] _path The file.
+/// \param[in] _data The array, row-major.
+/// \param[in] _rows The number of rows.
+/// \param[in] _cols The number of columns.
+/// \param[in] _dtype The NumPy type, such as "<f4".
 template<typename T>
 void WriteNpy(const std::string &_path, const std::vector<T> &_data,
   std::size_t _rows, std::size_t _cols, const char *_dtype)
@@ -73,6 +79,7 @@ void WriteNpy(const std::string &_path, const std::vector<T> &_data,
     static_cast<std::streamsize>(_data.size() * sizeof(T)));
 }
 
+//////////////////////////////////////////////////
 void WriteJsonArray(std::ofstream &_f, const char *_name,
   const std::vector<double> &_v, bool _last = false)
 {
@@ -82,6 +89,7 @@ void WriteJsonArray(std::ofstream &_f, const char *_name,
   _f << "]" << (_last ? "\n" : ",\n");
 }
 
+//////////////////////////////////////////////////
 sonar::AcousticProperties Lambert(double _db)
 {
   sonar::AcousticProperties p;
@@ -89,6 +97,7 @@ sonar::AcousticProperties Lambert(double _db)
   return p;
 }
 
+//////////////////////////////////////////////////
 sonar::Water HarborWater()
 {
   sonar::Water w;
@@ -97,8 +106,12 @@ sonar::Water HarborWater()
   return w;
 }
 
+//////////////////////////////////////////////////
 /// \brief Scenes A, B and C of spike/sonar_phase1/scenes.md, and the
 /// sensor pose for each.
+/// \param[in] _name The scene: A, B or C.
+/// \param[out] _pose The sensor's pose.
+/// \return The scene.
 sonar::SyntheticScene Scene(const std::string &_name, Pose3d &_pose)
 {
   sonar::SyntheticScene s;
@@ -124,7 +137,9 @@ sonar::SyntheticScene Scene(const std::string &_name, Pose3d &_pose)
   return s;
 }
 
+//////////////////////////////////////////////////
 /// \brief A seabed with a box and a glass float on it, for the passes.
+/// \return The scene.
 sonar::SyntheticScene PassScene()
 {
   sonar::SyntheticScene s;
@@ -136,6 +151,7 @@ sonar::SyntheticScene PassScene()
   return s;
 }
 
+//////////////////////////////////////////////////
 int Imaging(const std::string &_scene, const std::string &_out,
   const std::vector<std::string> &_options)
 {
@@ -185,6 +201,7 @@ int Imaging(const std::string &_scene, const std::string &_out,
   return 0;
 }
 
+//////////////////////////////////////////////////
 int Sidescan(const std::string &_out)
 {
   sonar::SonarConfig c = sonar::OmniscanSidescan();
@@ -230,6 +247,7 @@ int Sidescan(const std::string &_out)
   return 0;
 }
 
+//////////////////////////////////////////////////
 int Profiling(const std::string &_out)
 {
   sonar::SonarConfig c = sonar::SurveyorProfiling();
@@ -268,6 +286,7 @@ int Profiling(const std::string &_out)
 }
 }  // namespace
 
+//////////////////////////////////////////////////
 int main(int _argc, char **_argv)
 {
   const std::string usage =

@@ -76,13 +76,19 @@ class CameraSampler
               double _maxCameraWidth = 70.0 * M_PI / 180.0);
 
   /// \brief The cameras to draw.
+  /// \return The camera layout.
   public: const CameraLayout &Layout() const;
 
   /// \brief The fan, in RayFan order.
+  /// \return The rays.
   public: const std::vector<Ray> &Rays() const;
 
   /// \brief The ray through the center of a pixel, in the sensor frame, for
   /// drawing synthetic images in tests.
+  /// \param[in] _camera The camera's index in the layout.
+  /// \param[in] _u The pixel's column.
+  /// \param[in] _v The pixel's row.
+  /// \return The ray through the pixel's center.
   public: Ray PixelRay(std::size_t _camera, unsigned int _u,
               unsigned int _v) const;
 
@@ -96,6 +102,7 @@ class CameraSampler
   /// \param[in] _channels Bytes per label pixel.
   /// \param[in] _properties Acoustic properties by label; label 0, and any
   /// label past the end, take entry 0.
+  /// \return One hit per ray of the fan, in RayFan order.
   public: std::vector<RayHit> Sample(
               const std::vector<const float *> &_depth,
               const std::vector<const std::uint8_t *> &_labels,
@@ -105,6 +112,12 @@ class CameraSampler
   /// \brief Whether the four pixels from (_u0, _v0) to (_u0 + 1, _v0 + 1)
   /// lie on one plane: 1/z affine over them and one pixel beyond on each
   /// axis, and one label when labels are given.
+  /// \param[in] _depth The camera's depth image.
+  /// \param[in] _u0 The column of the first pixel.
+  /// \param[in] _v0 The row of the first pixel.
+  /// \param[in] _labels The camera's label image, or null.
+  /// \param[in] _channels Bytes per label pixel.
+  /// \return True if the four pixels lie on one plane.
   private: bool Planar(const float *_depth, long _u0, long _v0,
               const std::uint8_t *_labels, unsigned int _channels) const;
 

@@ -29,7 +29,11 @@ namespace sonar = gz::maritime::sonar;
 
 namespace
 {
+//////////////////////////////////////////////////
 /// \brief A child's text, trimmed, if the child is there.
+/// \param[in] _e The parent element.
+/// \param[in] _name The child's name.
+/// \return The text, or empty if the child is not there.
 std::optional<std::string> Text(const sdf::ElementPtr &_e,
   const std::string &_name)
 {
@@ -42,7 +46,10 @@ std::optional<std::string> Text(const sdf::ElementPtr &_e,
     t.substr(first, last - first + 1);
 }
 
+//////////////////////////////////////////////////
 /// \brief Parse a whole string as a finite number.
+/// \param[in] _text The string.
+/// \return The number, or empty.
 std::optional<double> ParseNumber(const std::string &_text)
 {
   try
@@ -58,7 +65,10 @@ std::optional<double> ParseNumber(const std::string &_text)
   return std::nullopt;
 }
 
+//////////////////////////////////////////////////
 /// \brief Parse a whole string as true or false (true, false, 1 or 0).
+/// \param[in] _text The string.
+/// \return The flag, or empty.
 std::optional<bool> ParseFlag(const std::string &_text)
 {
   if (_text == "true" || _text == "1")
@@ -77,6 +87,9 @@ class Reader
     : block(_block), error(_error) {}
 
   /// \brief A finite number, if the child is there.
+  /// \param[in] _name The child's name.
+  /// \param[out] _out The number, unchanged when the child is not there.
+  /// \return False if the child is there and is not a finite number.
   public: bool Number(const std::string &_name, double &_out)
   {
     return this->Number(this->block, _name, _out);
@@ -107,6 +120,10 @@ class Reader
   }
 
   /// \brief A whole number from 1 to _max, if the child is there.
+  /// \param[in] _name The child's name.
+  /// \param[in] _max The largest value allowed.
+  /// \param[out] _out The number, unchanged when the child is not there.
+  /// \return False if the child is there and out of range.
   public: bool Count(const std::string &_name, std::size_t _max,
     std::size_t &_out)
   {
@@ -126,6 +143,9 @@ class Reader
   }
 
   /// \brief true or false, if the child is there.
+  /// \param[in] _name The child's name.
+  /// \param[out] _out The flag, unchanged when the child is not there.
+  /// \return False if the child is there and is neither true nor false.
   public: bool Flag(const std::string &_name, bool &_out)
   {
     const auto t = Text(this->block, _name);
@@ -149,12 +169,14 @@ class Reader
 };
 }  // namespace
 
+//////////////////////////////////////////////////
 bool IsSonarType(const std::string &_type)
 {
   return _type == kImagingSonar || _type == kSidescanSonar ||
     _type == kProfilingSonar;
 }
 
+//////////////////////////////////////////////////
 std::optional<sonar::SonarConfig> LoadSonarConfig(const std::string &_type,
   const sdf::ElementPtr &_block, bool &_labels, std::string &_error)
 {
@@ -317,8 +339,12 @@ std::optional<sonar::SonarConfig> LoadSonarConfig(const std::string &_type,
 
 namespace
 {
+//////////////////////////////////////////////////
 /// \brief One acoustic value, strictly: a value that does not parse whole
 /// as a finite number is reported and left unset.
+/// \param[in] _e The block.
+/// \param[in] _name The value's child name.
+/// \return The value, or empty.
 std::optional<double> MarkValue(const sdf::ElementPtr &_e,
   const std::string &_name)
 {
@@ -335,7 +361,11 @@ std::optional<double> MarkValue(const sdf::ElementPtr &_e,
 }
 }  // namespace
 
+//////////////////////////////////////////////////
 /// \brief An attribute's value, if the element has it.
+/// \param[in] _e The element.
+/// \param[in] _name The attribute's name.
+/// \return The value, or empty.
 std::optional<std::string> Attribute(const sdf::ElementPtr &_e,
   const std::string &_name)
 {
@@ -344,8 +374,12 @@ std::optional<std::string> Attribute(const sdf::ElementPtr &_e,
   return _e->GetAttribute(_name)->GetAsString();
 }
 
+//////////////////////////////////////////////////
 /// \brief One acoustic mark, an attribute, strictly: a value that does not
 /// parse whole as a finite number is reported and left unset.
+/// \param[in] _e The element.
+/// \param[in] _name The attribute's name.
+/// \return The value, or empty.
 std::optional<double> MarkAttribute(const sdf::ElementPtr &_e,
   const std::string &_name)
 {
@@ -361,6 +395,7 @@ std::optional<double> MarkAttribute(const sdf::ElementPtr &_e,
   return v;
 }
 
+//////////////////////////////////////////////////
 AcousticMarks ReadAcousticMarks(const sdf::ElementPtr &_element)
 {
   AcousticMarks m;
@@ -394,6 +429,7 @@ AcousticMarks ReadAcousticMarks(const sdf::ElementPtr &_element)
   return m;
 }
 
+//////////////////////////////////////////////////
 AcousticMarks ReadAcousticValues(const sdf::ElementPtr &_element)
 {
   AcousticMarks m;
@@ -403,6 +439,7 @@ AcousticMarks ReadAcousticValues(const sdf::ElementPtr &_element)
   return m;
 }
 
+//////////////////////////////////////////////////
 bool ReadWater(const sdf::ElementPtr &_plugin, sonar::Water &_water,
   std::uint64_t &_seed, std::string &_error)
 {
@@ -443,6 +480,7 @@ bool ReadWater(const sdf::ElementPtr &_plugin, sonar::Water &_water,
   return true;
 }
 
+//////////////////////////////////////////////////
 void ApplyMarks(sonar::AcousticProperties &_properties,
   const AcousticMarks &_marks)
 {

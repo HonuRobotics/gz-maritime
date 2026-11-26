@@ -43,6 +43,7 @@ constexpr double kContinuous = 0.02;
 /// it is shallower than this, when blending it is harmless.
 constexpr double kPlanar = 1e-4;
 
+//////////////////////////////////////////////////
 math::Vector3d Rotate(double _yaw, const math::Vector3d &_v)
 {
   const double c = std::cos(_yaw);
@@ -51,6 +52,7 @@ math::Vector3d Rotate(double _yaw, const math::Vector3d &_v)
 }
 }  // namespace
 
+//////////////////////////////////////////////////
 CameraSampler::CameraSampler(const SonarConfig &_config,
   double _maxCameraWidth)
   : config(_config), rays(RayFan(_config)),
@@ -113,6 +115,7 @@ CameraSampler::CameraSampler(const SonarConfig &_config,
   }
 }
 
+//////////////////////////////////////////////////
 bool CameraSampler::Planar(const float *_depth, long _u0, long _v0,
   const std::uint8_t *_labels, unsigned int _channels) const
 {
@@ -164,16 +167,19 @@ bool CameraSampler::Planar(const float *_depth, long _u0, long _v0,
     std::abs(second(ve, _v0, q1v, q10, q11)) <= tol;
 }
 
+//////////////////////////////////////////////////
 const CameraLayout &CameraSampler::Layout() const
 {
   return this->layout;
 }
 
+//////////////////////////////////////////////////
 const std::vector<Ray> &CameraSampler::Rays() const
 {
   return this->rays;
 }
 
+//////////////////////////////////////////////////
 Ray CameraSampler::PixelRay(std::size_t _camera, unsigned int _u,
   unsigned int _v) const
 {
@@ -190,6 +196,7 @@ Ray CameraSampler::PixelRay(std::size_t _camera, unsigned int _u,
   return r;
 }
 
+//////////////////////////////////////////////////
 std::vector<RayHit> CameraSampler::Sample(
   const std::vector<const float *> &_depth,
   const std::vector<const std::uint8_t *> &_labels, unsigned int _channels,

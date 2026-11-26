@@ -45,6 +45,7 @@ constexpr double kAutoGainMedianDb = -24.0;
 constexpr double kAutoGainPeakQuantile = 0.999;
 }  // namespace
 
+//////////////////////////////////////////////////
 double TimeVariedGain(const SonarConfig &_config, double _alpha,
   double _range)
 {
@@ -56,6 +57,7 @@ double TimeVariedGain(const SonarConfig &_config, double _alpha,
   return g;
 }
 
+//////////////////////////////////////////////////
 double GainTracker::Update(double _pingGain, double _dt, double _timeConstant)
 {
   if (!this->started || _timeConstant <= 0.0)
@@ -69,6 +71,7 @@ double GainTracker::Update(double _pingGain, double _dt, double _timeConstant)
   return this->gain;
 }
 
+//////////////////////////////////////////////////
 Levels ReadLevels(const BeamIntensity &_intensity, const SonarConfig &_config,
   double _alpha, std::uint64_t _ping, GainTracker *_tracker, double _dt)
 {
@@ -141,12 +144,14 @@ Levels ReadLevels(const BeamIntensity &_intensity, const SonarConfig &_config,
   return out;
 }
 
+//////////////////////////////////////////////////
 double NoiseLevel(const Levels &_levels, const SonarConfig &_config,
   std::size_t _sample)
 {
   return _config.noiseFloorDb + _levels.tvgDb[_sample] + _levels.gainDb;
 }
 
+//////////////////////////////////////////////////
 ImagingFrame ReadImaging(const Levels &_levels, const SonarConfig &_config)
 {
   ImagingFrame out;
@@ -168,6 +173,7 @@ ImagingFrame ReadImaging(const Levels &_levels, const SonarConfig &_config)
   return out;
 }
 
+//////////////////////////////////////////////////
 SidescanLine ReadSidescan(const Levels &_levels)
 {
   SidescanLine out;
@@ -180,6 +186,7 @@ SidescanLine ReadSidescan(const Levels &_levels)
   return out;
 }
 
+//////////////////////////////////////////////////
 std::vector<Sounding> ReadProfiling(const Levels &_levels,
   const SonarConfig &_config, double _assumedSoundSpeed, std::uint64_t _ping)
 {

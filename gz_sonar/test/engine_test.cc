@@ -47,6 +47,7 @@ namespace
 {
 constexpr double kDeg = M_PI / 180.0;
 
+//////////////////////////////////////////////////
 sonar::Water HarborWater()
 {
   sonar::Water w;
@@ -56,8 +57,10 @@ sonar::Water HarborWater()
   return w;
 }
 
+//////////////////////////////////////////////////
 /// \brief The ECHO with a 10 m window, no speckle: the scenes of
 /// spike/sonar_phase1/scenes.md.
+/// \return The configuration.
 sonar::SonarConfig CleanEcho()
 {
   sonar::SonarConfig c = sonar::EchoImaging();
@@ -68,6 +71,7 @@ sonar::SonarConfig CleanEcho()
   return c;
 }
 
+//////////////////////////////////////////////////
 sonar::AcousticProperties Lambert(double _db)
 {
   sonar::AcousticProperties p;
@@ -75,6 +79,7 @@ sonar::AcousticProperties Lambert(double _db)
   return p;
 }
 
+//////////////////////////////////////////////////
 sonar::BeamIntensity Ping(const sonar::SonarConfig &_config,
   const sonar::SyntheticScene &_scene, const Pose3d &_pose,
   std::uint64_t _ping = 0)
@@ -86,13 +91,17 @@ sonar::BeamIntensity Ping(const sonar::SonarConfig &_config,
   return engine.Ping(hits, _ping);
 }
 
+//////////////////////////////////////////////////
 double TotalDb(const sonar::BeamIntensity &_b)
 {
   return 10.0 * std::log10(
     std::accumulate(_b.data.begin(), _b.data.end(), 0.0));
 }
 
+//////////////////////////////////////////////////
 /// \brief Beam and sample of the brightest cell.
+/// \param[in] _b The intensity.
+/// \return The beam and the sample.
 std::pair<std::size_t, std::size_t> Brightest(const sonar::BeamIntensity &_b)
 {
   const auto it = std::max_element(_b.data.begin(), _b.data.end());
@@ -101,7 +110,7 @@ std::pair<std::size_t, std::size_t> Brightest(const sonar::BeamIntensity &_b)
 }
 }  // namespace
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Francois and Garrison at 100 kHz, 10 C, 35 PSU, pH 8, the surface: about
 // 34 dB/km, worked by hand from the paper's equations.
 TEST(Water, AbsorptionMatchesFrancoisGarrison)
@@ -121,7 +130,7 @@ TEST(Water, AbsorptionMatchesFrancoisGarrison)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 TEST(Scattering, LambertAndSpecular)
 {
   sonar::AcousticProperties p = Lambert(-20.0);
@@ -138,7 +147,7 @@ TEST(Scattering, LambertAndSpecular)
     0.01 * std::pow(std::cos(30.0 * kDeg), 2), 1e-9);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 TEST(Pattern, HalfPowerWidthAndSidelobe)
 {
   const sonar::SonarConfig c = CleanEcho();
@@ -157,7 +166,7 @@ TEST(Pattern, HalfPowerWidthAndSidelobe)
   EXPECT_NEAR(sonar::VerticalPattern(c, 0.5 * c.verticalFov), 0.5, 1e-9);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Scene A: the sphere's near face, on the acoustic axis.
 TEST(Engine, SphereAtItsRangeAndBearing)
 {
@@ -173,7 +182,7 @@ TEST(Engine, SphereAtItsRangeAndBearing)
   EXPECT_EQ(b.labels[beam * b.samples + sample], 1u);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A sphere's echo falls as 40 log R plus two-way absorption.
 TEST(Engine, SpreadingAndAbsorption)
 {
@@ -190,7 +199,7 @@ TEST(Engine, SpreadingAndAbsorption)
   EXPECT_NEAR(total(4.0) - total(8.0), expected, 0.5);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The specular term is tied to the reflection coefficient: a sphere of
 // radius a with R^2 = 1 has the target strength of a rigid sphere, a^2 / 4,
 // whatever the width of its lobe. Measured against a Lambert sphere, whose
@@ -219,7 +228,7 @@ TEST(Engine, SpecularSphereIsARigidSphere)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A flat patch returns mu cos^2(theta) times its area: tilting it away by
 // theta costs cos^2(theta), doubling its side gains four times.
 TEST(Engine, LambertLawAndAreaDependence)
@@ -241,7 +250,7 @@ TEST(Engine, LambertLawAndAreaDependence)
   EXPECT_NEAR(total(0.0, 0.4) - flat, 10.0 * std::log10(4.0), 0.3);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Scene B: the box hides the seabed behind it.
 TEST(Engine, ShadowBehindABox)
 {
@@ -269,7 +278,7 @@ TEST(Engine, ShadowBehindABox)
   EXPECT_LT(after, 0.05 * before);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A small target off to one side: the beams around it follow the beam
 // pattern.
 TEST(Engine, CrossBeamProfileFollowsThePattern)
@@ -298,7 +307,7 @@ TEST(Engine, CrossBeamProfileFollowsThePattern)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Two targets at one range, above and below the axis, land in the same
 // beam and sample: the imaging sonar cannot tell elevation.
 TEST(Engine, ElevationAmbiguity)
@@ -316,8 +325,12 @@ TEST(Engine, ElevationAmbiguity)
 
 namespace
 {
+//////////////////////////////////////////////////
 /// \brief A uniform intensity over the sonar's beams and samples, for
 /// readout tests.
+/// \param[in] _config The sonar.
+/// \param[in] _value The intensity.
+/// \return The intensity.
 sonar::BeamIntensity Flat(const sonar::SonarConfig &_config, double _value)
 {
   sonar::BeamIntensity b;
@@ -332,7 +345,10 @@ sonar::BeamIntensity Flat(const sonar::SonarConfig &_config, double _value)
   return b;
 }
 
+//////////////////////////////////////////////////
 /// \brief Mean and standard deviation over a vector of powers.
+/// \param[in] _v The powers.
+/// \return The mean and the standard deviation.
 std::pair<double, double> MeanStd(const std::vector<double> &_v)
 {
   const double mean = std::accumulate(_v.begin(), _v.end(), 0.0) /
@@ -343,7 +359,11 @@ std::pair<double, double> MeanStd(const std::vector<double> &_v)
   return {mean, std::sqrt(var / static_cast<double>(_v.size()))};
 }
 
+//////////////////////////////////////////////////
 /// \brief The published levels as powers relative to _ref dB.
+/// \param[in] _l The levels.
+/// \param[in] _ref The reference, dB.
+/// \return The powers.
 std::vector<double> Powers(const sonar::Levels &_l, double _ref)
 {
   std::vector<double> p;
@@ -353,7 +373,7 @@ std::vector<double> Powers(const sonar::Levels &_l, double _ref)
 }
 }  // namespace
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Fully developed speckle: the ratio to the clean intensity is
 // exponential, mean 1 and standard deviation 1.
 TEST(Readout, SpeckleStatistics)
@@ -368,7 +388,7 @@ TEST(Readout, SpeckleStatistics)
   EXPECT_NEAR(std, 1.0, 0.05);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Echo and noise are one field: where they are equal, one exponential draw
 // on their sum keeps the contrast at 1, where two independent draws would
 // give 1 / sqrt(2).
@@ -385,7 +405,7 @@ TEST(Readout, OneDrawOnSignalPlusNoise)
   EXPECT_NEAR(std / mean, 1.0, 0.05);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The noise is a received level: in the published levels it rises with
 // range as the time-varied gain does, and moves with the gain.
 TEST(Readout, NoiseRidesWithTheGain)
@@ -408,7 +428,7 @@ TEST(Readout, NoiseRidesWithTheGain)
   EXPECT_GT(l.tvgDb[c.samples - 10] - l.tvgDb[10], 40.0);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 TEST(Engine, SameSeedSamePing)
 {
   sonar::SonarConfig c = CleanEcho();
@@ -428,7 +448,7 @@ TEST(Engine, SameSeedSamePing)
   EXPECT_NE(frame(7), frame(8));
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A sonar that assumes the wrong sound speed puts everything at the wrong
 // range, in proportion.
 TEST(Engine, AssumedSoundSpeedScalesRange)
@@ -444,7 +464,7 @@ TEST(Engine, AssumedSoundSpeedScalesRange)
     2.0 * c.SampleSpacing());
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The 8-bit mapping: full scale to 255, the bottom of the window to 1,
 // below it to 0.
 TEST(Readout, ImagingMapping)
@@ -461,7 +481,7 @@ TEST(Readout, ImagingMapping)
   EXPECT_EQ(f.data[3], 255);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Sidescan: taking out the documented time-varied gain and the gain gives
 // back the received level.
 TEST(Readout, SidescanTvgIsRemovable)
@@ -492,7 +512,7 @@ TEST(Readout, SidescanTvgIsRemovable)
   EXPECT_LE(b.At(0, 0), 0.0);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A profiler over a flat seabed: every sounding lies on it.
 TEST(Readout, ProfilingFlatSeabed)
 {
@@ -534,7 +554,7 @@ TEST(Readout, ProfilingFlatSeabed)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A profiler in empty water: the default threshold passes no noise, where
 // 10 dB passed a few samples a ping.
 TEST(Readout, ProfilingEmptyWaterIsQuiet)
@@ -560,7 +580,7 @@ TEST(Readout, ProfilingEmptyWaterIsQuiet)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Threads change how fast, never what: the same bits for 1, 3, 8 or 24
 // threads, at the imaging preset's full fan.
 TEST(Engine, SameResultForAnyThreadCount)
@@ -582,7 +602,7 @@ TEST(Engine, SameResultForAnyThreadCount)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // An engine reuses its buffers from ping to ping: a ping is the same as on
 // a fresh engine, whatever came before it.
 TEST(Engine, PingDoesNotDependOnThePrevious)
@@ -612,7 +632,7 @@ TEST(Engine, PingDoesNotDependOnThePrevious)
   EXPECT_EQ(expected.azimuths, after.azimuths);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // One per core by default, but no more than kDefaultMaxEngineThreads; an
 // explicit count is taken as given.
 TEST(Engine, ThreadCount)
@@ -630,7 +650,7 @@ TEST(Engine, ThreadCount)
 }
 
 #ifdef __linux__
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // An engine's threads go with it: making and dropping engines, as a world
 // does when sonars are removed and spawned again, leaves no threads behind.
 TEST(Engine, NoThreadsLeftBehind)
@@ -663,7 +683,7 @@ TEST(Engine, NoThreadsLeftBehind)
 }
 #endif
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Smoothed automatic gain: a sudden change moves the gain by 1 - e^(-dt/tau)
 // of the way per ping, and a zero time constant follows each ping.
 TEST(Readout, GainTrackerSmooths)
@@ -678,7 +698,7 @@ TEST(Readout, GainTrackerSmooths)
   EXPECT_DOUBLE_EQ(follow.Update(-60.0, 0.1, 0.0), -60.0);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A plate at 4 m in front of a wall at 8 m. Where a ray on the plate's
 // edge has a neighbor on the wall, the jump is not a slanted surface, so
 // the footprint must not spread the plate's echo across it, whether or not
@@ -717,7 +737,7 @@ TEST(Engine, FootprintDoesNotSpanAJump)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The bound on a jump between neighbors is loose enough for a flat seabed
 // seen at a grazing angle: from 1 m above it, out to the end of the ECHO's
 // 30 m window, every pair of neighboring rays on the seabed is one surface.
@@ -752,8 +772,11 @@ TEST(Rays, SeabedAtGrazingAnglesIsOneSurface)
 
 namespace
 {
+//////////////////////////////////////////////////
 /// \brief One ray straight ahead, hitting a Lambert patch head on: the
 /// sonar equation can be worked by hand for it.
+/// \param[in] _range The range, m.
+/// \return The hit.
 sonar::RayHit OneHit(double _range)
 {
   sonar::RayHit h;
@@ -766,12 +789,17 @@ sonar::RayHit OneHit(double _range)
   return h;
 }
 
+//////////////////////////////////////////////////
 double Total(const sonar::BeamIntensity &_b)
 {
   return std::accumulate(_b.data.begin(), _b.data.end(), 0.0);
 }
 
+//////////////////////////////////////////////////
 /// \brief The samples a beam's echo covers, first to last.
+/// \param[in] _b The intensity.
+/// \param[in] _beam The beam's index.
+/// \return The first and last samples.
 std::pair<std::size_t, std::size_t> Extent(const sonar::BeamIntensity &_b,
   std::size_t _beam)
 {
@@ -788,7 +816,7 @@ std::pair<std::size_t, std::size_t> Extent(const sonar::BeamIntensity &_b,
 }
 }  // namespace
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The sonar equation for one ray, term by term against the hand value:
 // the echo of a patch filling a fixed solid angle falls as 1 / R^2 and
 // two-way absorption, rises with the solid angle and the Lambert strength,
@@ -831,7 +859,7 @@ TEST(Engine, SonarEquationForOneRay)
   EXPECT_EQ(total(h), 0.0);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Sample k covers [rangeMin + k dr, rangeMin + (k + 1) dr) and is
 // published at its center: an echo 0.3 samples past a center is brightest
 // in that sample, and its published range is 0.3 samples short.
@@ -851,7 +879,7 @@ TEST(Engine, EchoInTheSampleThatHoldsItsRange)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The range window is [rangeMin, rangeMax) in apparent range: an echo
 // outside it is dropped whole, even where a long pulse would smear it
 // across the edge, and an echo just inside is kept. With a mis-set sound
@@ -876,7 +904,7 @@ TEST(Engine, RangeWindowIsHalfOpen)
   EXPECT_EQ(total(10.4), 0.0);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // An echo spreads uniformly over the wider of the pulse (c tau / 2) and its
 // footprint in range, given by the sampler or estimated from the incidence
 // and capped at 8 samples; spreading moves energy between samples but
@@ -924,7 +952,7 @@ TEST(Engine, PulseAndFootprintSpreadTheEcho)
   EXPECT_LE(span(capped), 10.0 * dr);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // One ray off to the side: across every beam, the echo follows the
 // horizontal pattern down to its -50 dB floor, sidelobes included, and is
 // zero beyond it.
@@ -971,7 +999,7 @@ TEST(Engine, BeamProfileFollowsThePatternToTheFloor)
   EXPECT_GT(sidelobes, 10u);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Without speckle the noise is still drawn: exponential, mean and standard
 // deviation both the noise floor.
 TEST(Readout, NoiseWithoutSpeckleIsExponential)
@@ -986,7 +1014,7 @@ TEST(Readout, NoiseWithoutSpeckleIsExponential)
   EXPECT_NEAR(std, 1.0, 0.03);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The time-varied gain by hand: the spreading law in dB per decade, plus
 // two-way absorption when asked for.
 TEST(Readout, TimeVariedGainByHand)
@@ -1002,7 +1030,7 @@ TEST(Readout, TimeVariedGainByHand)
   EXPECT_NEAR(sonar::TimeVariedGain(c, 0.05, 100.0), 90.0, 1e-12);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A ray's echo falls as 20 log R plus two-way absorption, so a time-varied
 // gain of 20 log R + 2 alpha R brings it to the same published level at
 // any range. One-way absorption in the gain would leave about 1 dB between
@@ -1026,7 +1054,7 @@ TEST(Readout, TvgFlattensOneRay)
   EXPECT_NEAR(published(3.0), published(8.0), 0.1);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Automatic gain by hand. A uniform frame: the median goes to -24 dB.
 // Unlit cells do not count. A sparse frame, where more than 0.1 % of the
 // lit cells are a strong target: the cap puts the target at full scale.
@@ -1068,8 +1096,13 @@ TEST(Readout, AutomaticGainByHand)
 
 namespace
 {
+//////////////////////////////////////////////////
 /// \brief Profiler levels by hand: noise everywhere, no gain, and in each
 /// beam one sample _snr dB above the noise at the given range.
+/// \param[in] _config The sonar.
+/// \param[in] _range The echo's range in each beam, m.
+/// \param[in] _snr The echo's level over the noise in each beam, dB.
+/// \return The levels.
 sonar::Levels ProfilerLevels(const sonar::SonarConfig &_config,
   const std::vector<double> &_range, const std::vector<double> &_snr)
 {
@@ -1094,6 +1127,7 @@ sonar::Levels ProfilerLevels(const sonar::SonarConfig &_config,
   return l;
 }
 
+//////////////////////////////////////////////////
 std::pair<double, double> RangeStats(const sonar::SonarConfig &_config,
   double _snr)
 {
@@ -1116,7 +1150,7 @@ std::pair<double, double> RangeStats(const sonar::SonarConfig &_config,
 }
 }  // namespace
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The detection threshold is a level above the noise: 13 dB does not pass
 // 15, 16 does.
 TEST(Readout, ProfilingThreshold)
@@ -1131,7 +1165,7 @@ TEST(Readout, ProfilingThreshold)
     std::vector<double>(40, 16.0)), c, 1500.0, 0).size(), 40u);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Range noise: unbiased, rangeNoise at high signal-to-noise and twice that
 // at the threshold, sigma = rangeNoise (1 + 10^(-margin / 20)); half a
 // sample by default.
@@ -1153,7 +1187,7 @@ TEST(Readout, ProfilingRangeNoise)
   EXPECT_NEAR(half, 0.5 * c.SampleSpacing(), 0.05 * c.SampleSpacing());
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Beamformed soundings far from the median of their neighbors are flagged,
 // at the edge of the fan as in the middle, and no others.
 TEST(Readout, OutlierFilterFlagsTheOddSounding)
@@ -1174,7 +1208,7 @@ TEST(Readout, OutlierFilterFlagsTheOddSounding)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Angle of arrival: each sector reports its strongest echo, at that beam's
 // angle plus angle noise of the configured standard deviation.
 TEST(Readout, AngleOfArrivalTakesEachSectorsStrongest)
@@ -1204,7 +1238,7 @@ TEST(Readout, AngleOfArrivalTakesEachSectorsStrongest)
   EXPECT_NEAR(std::sqrt(var), 0.01, 0.0005);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Every draw depends on the seed, the ping and the stream; the normal draw
 // is standard.
 TEST(Random, SeedPingAndStreamAllMatter)
@@ -1228,7 +1262,7 @@ TEST(Random, SeedPingAndStreamAllMatter)
   EXPECT_NEAR(std::sqrt(sum2 / n), 1.0, 0.01);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The seed changes the speckle of a frame.
 TEST(Readout, SeedChangesTheSpeckle)
 {
@@ -1242,7 +1276,7 @@ TEST(Readout, SeedChangesTheSpeckle)
   EXPECT_NE(frame(1), frame(2));
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Francois and Garrison, worked by hand from the paper's equations, where
 // one term dominates. In fresh water only pure-water viscosity is left,
 // A3 P3 f^2; the paper fits A3 with one polynomial up to 20 C and another
@@ -1303,7 +1337,7 @@ TEST(Water, AbsorptionTermByTerm)
     0.00015);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The fan reaches elevationSpan half-widths of the vertical beam, with
 // elevationRays rays per two half-widths; each ray stands for its share of
 // solid angle and is spaced by the coarser of its two steps.
@@ -1327,7 +1361,7 @@ TEST(Rays, FanGeometry)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Neighbors are one surface when they share a label and their ranges are
 // within what a surface at kMaxSlant gives; the footprint is half the
 // range between the two neighbors on the surface, the larger over the two
@@ -1357,7 +1391,7 @@ TEST(Rays, SameSurfaceAndFootprint)
   EXPECT_NEAR(hits[3].footprint, 0.01, 1e-12);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Each cell takes the label of its strongest contribution: two targets at
 // one range, three beams apart, each label wins in its own beams, whichever
 // way the beams are gathered.

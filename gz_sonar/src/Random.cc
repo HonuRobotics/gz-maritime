@@ -20,6 +20,7 @@
 
 namespace gz::maritime::sonar
 {
+//////////////////////////////////////////////////
 Random::Random(std::uint64_t _seed, std::uint64_t _ping,
   std::uint64_t _stream)
   : state(_seed * 0x9E3779B97F4A7C15ULL ^ (_ping + 0x632BE59BD9B4E019ULL) *
@@ -30,6 +31,7 @@ Random::Random(std::uint64_t _seed, std::uint64_t _ping,
   this->Next();
 }
 
+//////////////////////////////////////////////////
 std::uint64_t Random::Next()
 {
   std::uint64_t z = (this->state += 0x9E3779B97F4A7C15ULL);
@@ -38,6 +40,7 @@ std::uint64_t Random::Next()
   return z ^ (z >> 31);
 }
 
+//////////////////////////////////////////////////
 double Random::Uniform()
 {
   // 53 random bits, shifted off zero.
@@ -45,11 +48,13 @@ double Random::Uniform()
     (1.0 / 9007199254740992.0);
 }
 
+//////////////////////////////////////////////////
 double Random::Exponential()
 {
   return -std::log(this->Uniform());
 }
 
+//////////////////////////////////////////////////
 double Random::Normal()
 {
   // Box-Muller, one value per call.

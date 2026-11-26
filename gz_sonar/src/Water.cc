@@ -20,6 +20,7 @@
 
 namespace gz::maritime::sonar
 {
+//////////////////////////////////////////////////
 double AbsorptionDbPerMeter(double _frequency, const Water &_water)
 {
   const double t = _water.temperature;

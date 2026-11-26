@@ -29,16 +29,22 @@ class Random
 {
   /// \brief Seed from the sonar's seed, the ping number and a stream, so
   /// each stage of a ping draws its own sequence.
+  /// \param[in] _seed The sonar's seed.
+  /// \param[in] _ping The ping number.
+  /// \param[in] _stream The stage of the ping.
   public: Random(std::uint64_t _seed, std::uint64_t _ping,
               std::uint64_t _stream);
 
   /// \brief Uniform on (0, 1).
+  /// \return The draw.
   public: double Uniform();
 
   /// \brief Exponential with mean 1: fully developed speckle in intensity.
+  /// \return The draw.
   public: double Exponential();
 
   /// \brief Standard normal.
+  /// \return The draw.
   public: double Normal();
 
   private: std::uint64_t Next();

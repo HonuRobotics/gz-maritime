@@ -45,6 +45,7 @@ constexpr double kMinCos = 1e-3;
 /// a target's edge, where rays graze it, far in range.
 constexpr double kMaxFootprintSamples = 8.0;
 
+//////////////////////////////////////////////////
 double Sinc2(double _x)
 {
   if (std::abs(_x) < 1e-9)
@@ -61,6 +62,7 @@ double Sinc2(double _x)
 class Pool
 {
   /// \brief A pool that runs on _threads threads, the caller's included.
+  /// \param[in] _threads The number of threads.
   public: explicit Pool(std::size_t _threads)
   {
     for (std::size_t w = 1; w < _threads; ++w)
@@ -82,6 +84,7 @@ class Pool
   public: Pool &operator=(const Pool &) = delete;
 
   /// \brief Threads a job runs on, the caller's included.
+  /// \return The number of threads.
   public: std::size_t Size() const
   {
     return this->workers.size() + 1;
@@ -171,6 +174,7 @@ class Pool
 };
 }  // namespace
 
+//////////////////////////////////////////////////
 double HorizontalPattern(const SonarConfig &_config, double _offset)
 {
   const double theta0 = 0.5 * _config.beamWidth / kHalfPowerX;
@@ -182,6 +186,7 @@ double HorizontalPattern(const SonarConfig &_config, double _offset)
     (_config.sidelobeLevelDb - kSincSidelobeDb) / 10.0);
 }
 
+//////////////////////////////////////////////////
 double VerticalPattern(const SonarConfig &_config, double _elevation)
 {
   const double u = 2.0 * _elevation / _config.verticalFov;
@@ -241,6 +246,7 @@ struct Engine::Implementation
   Pool pool;
 };
 
+//////////////////////////////////////////////////
 Engine::Engine(const SonarConfig &_config, const Water &_water)
   : config(_config), water(_water),
     alpha(AbsorptionDbPerMeter(_config.frequency, _water))
@@ -313,32 +319,40 @@ Engine::Engine(const SonarConfig &_config, const Water &_water)
   d.best.assign(c.beams * c.samples, 0.0);
 }
 
+//////////////////////////////////////////////////
 Engine::~Engine() = default;
 
+//////////////////////////////////////////////////
 Engine::Engine(Engine &&) noexcept = default;
 
+//////////////////////////////////////////////////
 Engine &Engine::operator=(Engine &&) noexcept = default;
 
+//////////////////////////////////////////////////
 const SonarConfig &Engine::Config() const
 {
   return this->config;
 }
 
+//////////////////////////////////////////////////
 const Water &Engine::WaterProperties() const
 {
   return this->water;
 }
 
+//////////////////////////////////////////////////
 double Engine::Absorption() const
 {
   return this->alpha;
 }
 
+//////////////////////////////////////////////////
 std::size_t Engine::Threads() const
 {
   return this->impl->pool.Size();
 }
 
+//////////////////////////////////////////////////
 BeamIntensity Engine::Ping(const std::vector<RayHit> &_hits,
   std::uint64_t _ping) const
 {

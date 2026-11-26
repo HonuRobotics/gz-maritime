@@ -37,8 +37,11 @@ namespace
 /// \brief Queue depth between the rendering thread and the worker.
 constexpr std::size_t kQueueDepth = 2;
 
+//////////////////////////////////////////////////
 /// \brief FNV-1a: a hash of the sensor's name that is the same on every
 /// platform, unlike std::hash, so a seed means the same pings everywhere.
+/// \param[in] _s The string.
+/// \return The hash.
 std::uint64_t Fnv1a(const std::string &_s)
 {
   std::uint64_t h = 0xcbf29ce484222325ULL;
@@ -50,6 +53,7 @@ std::uint64_t Fnv1a(const std::string &_s)
   return h;
 }
 
+//////////////////////////////////////////////////
 void Stamp(msgs::Header *_header, std::chrono::nanoseconds _t,
   const std::string &_frame)
 {
@@ -62,6 +66,7 @@ void Stamp(msgs::Header *_header, std::chrono::nanoseconds _t,
 }
 }  // namespace
 
+//////////////////////////////////////////////////
 SonarSensor::~SonarSensor()
 {
   {
@@ -73,6 +78,7 @@ SonarSensor::~SonarSensor()
     this->worker.join();
 }
 
+//////////////////////////////////////////////////
 bool SonarSensor::Load(const sdf::Sensor &_sdf, const std::string &_type,
   const sonar::Water &_water, std::uint64_t _seed)
 {
@@ -144,11 +150,13 @@ bool SonarSensor::Load(const sdf::Sensor &_sdf, const std::string &_type,
   return true;
 }
 
+//////////////////////////////////////////////////
 bool SonarSensor::Update(const std::chrono::steady_clock::duration &)
 {
   return true;
 }
 
+//////////////////////////////////////////////////
 void SonarSensor::Push(PingFrame &&_frame)
 {
   std::unique_lock<std::mutex> lock(this->mutex);
@@ -162,11 +170,13 @@ void SonarSensor::Push(PingFrame &&_frame)
   this->cv.notify_all();
 }
 
+//////////////////////////////////////////////////
 const sonar::CameraLayout &SonarSensor::Layout() const
 {
   return this->sampler->Layout();
 }
 
+//////////////////////////////////////////////////
 double SonarSensor::Rate() const
 {
   const double asked = this->UpdateRate() > 0.0 ? this->UpdateRate() : 10.0;
@@ -175,11 +185,13 @@ double SonarSensor::Rate() const
   return std::min(asked, cap);
 }
 
+//////////////////////////////////////////////////
 const std::string &SonarSensor::Type() const
 {
   return this->type;
 }
 
+//////////////////////////////////////////////////
 bool SonarSensor::HasConnections() const
 {
   return (this->imagePub && this->imagePub.HasConnections()) ||
@@ -201,12 +213,14 @@ bool SonarSensor::Labels() const
   return this->labels;
 }
 
+//////////////////////////////////////////////////
 void SonarSensor::ResetState()
 {
   // The worker owns the gain tracker; it starts over at its next ping.
   this->resetGain = true;
 }
 
+//////////////////////////////////////////////////
 void SonarSensor::Work()
 {
   while (true)
@@ -232,6 +246,7 @@ void SonarSensor::Work()
   }
 }
 
+//////////////////////////////////////////////////
 void SonarSensor::Process(const PingFrame &_frame)
 {
   if (this->resetGain.exchange(false))

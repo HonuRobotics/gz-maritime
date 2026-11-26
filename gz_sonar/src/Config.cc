@@ -25,6 +25,7 @@ namespace
 constexpr double kDeg = M_PI / 180.0;
 }
 
+//////////////////////////////////////////////////
 double Backscatter(const AcousticProperties &_properties, double _incidence)
 {
   const double c = std::cos(_incidence);
@@ -44,23 +45,27 @@ double Backscatter(const AcousticProperties &_properties, double _incidence)
   return sigma;
 }
 
+//////////////////////////////////////////////////
 double SonarConfig::AssumedSoundSpeed(double _trueSoundSpeed) const
 {
   return this->soundSpeed ? *this->soundSpeed : _trueSoundSpeed;
 }
 
+//////////////////////////////////////////////////
 double SonarConfig::SampleSpacing() const
 {
   return (this->rangeMax - this->rangeMin) /
     static_cast<double>(this->samples);
 }
 
+//////////////////////////////////////////////////
 double SonarConfig::SampleRange(std::size_t _k) const
 {
   return this->rangeMin +
     (static_cast<double>(_k) + 0.5) * this->SampleSpacing();
 }
 
+//////////////////////////////////////////////////
 double SonarConfig::BeamAzimuth(std::size_t _j) const
 {
   const double spacing = this->horizontalFov /
@@ -75,6 +80,7 @@ double SonarConfig::BeamAzimuth(std::size_t _j) const
 // overridden in SDF (<gz:sonar>) or a vehicle's `sonar:` config without
 // recompiling, which is also how a different device is simulated.
 
+//////////////////////////////////////////////////
 SonarConfig EchoImaging()
 {
   // Sonoptix ECHO multibeam imaging sonar, datasheet: 700 kHz to 30 m, 120 x
@@ -104,6 +110,7 @@ SonarConfig EchoImaging()
   return c;
 }
 
+//////////////////////////////////////////////////
 SonarConfig OmniscanSidescan()
 {
   // Cerulean Sonar Omniscan 450 SS sidescan sonar, datasheet: 450 kHz, 0.5
@@ -132,6 +139,7 @@ SonarConfig OmniscanSidescan()
   return c;
 }
 
+//////////////////////////////////////////////////
 SonarConfig SurveyorProfiling()
 {
   // Cerulean Sonar Surveyor 240-16 multibeam echosounder, datasheet: 240 kHz,

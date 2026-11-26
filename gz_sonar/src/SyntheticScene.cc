@@ -28,6 +28,7 @@ namespace
 constexpr double kEps = 1e-9;
 }
 
+//////////////////////////////////////////////////
 void SyntheticScene::AddSphere(const math::Vector3d &_center, double _radius,
   const AcousticProperties &_properties, std::uint32_t _label)
 {
@@ -35,6 +36,7 @@ void SyntheticScene::AddSphere(const math::Vector3d &_center, double _radius,
   this->shapes.push_back(s);
 }
 
+//////////////////////////////////////////////////
 void SyntheticScene::AddPlane(const math::Vector3d &_point,
   const math::Vector3d &_normal, const AcousticProperties &_properties,
   std::uint32_t _label)
@@ -44,6 +46,7 @@ void SyntheticScene::AddPlane(const math::Vector3d &_point,
   this->shapes.push_back(s);
 }
 
+//////////////////////////////////////////////////
 void SyntheticScene::AddBox(const math::Vector3d &_min,
   const math::Vector3d &_max, const AcousticProperties &_properties,
   std::uint32_t _label)
@@ -52,6 +55,7 @@ void SyntheticScene::AddBox(const math::Vector3d &_min,
   this->shapes.push_back(s);
 }
 
+//////////////////////////////////////////////////
 void SyntheticScene::AddRectangle(const math::Vector3d &_center,
   const math::Vector3d &_normal, const math::Vector3d &_axis,
   double _halfLength, double _halfWidth,
@@ -65,6 +69,7 @@ void SyntheticScene::AddRectangle(const math::Vector3d &_center,
   this->shapes.push_back(s);
 }
 
+//////////////////////////////////////////////////
 bool SyntheticScene::Intersect(const Shape &_shape,
   const math::Vector3d &_origin, const math::Vector3d &_dir, double &_t,
   math::Vector3d &_normal)
@@ -160,6 +165,7 @@ bool SyntheticScene::Intersect(const Shape &_shape,
   return false;
 }
 
+//////////////////////////////////////////////////
 std::vector<RayHit> SyntheticScene::Cast(const math::Pose3d &_sensorPose,
   const std::vector<Ray> &_rays, double _maxRange) const
 {

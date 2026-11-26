@@ -45,6 +45,7 @@ struct Ray
   double spacing{0.0};
 
   /// \brief Unit direction in the sensor frame.
+  /// \return The direction.
   math::Vector3d Direction() const;
 };
 
@@ -81,9 +82,13 @@ struct RayHit
 /// of the vertical beam (by default the vertical field of view either
 /// side), and two beam widths beyond each edge of the fan, so the beam
 /// pattern's tapers and near sidelobes see the scene too.
+/// \param[in] _config The sonar.
+/// \return The rays, azimuth columns of RayFanElevationCount rays each.
 std::vector<Ray> RayFan(const SonarConfig &_config);
 
 /// \brief Number of elevation rays in each azimuth column of RayFan's grid.
+/// \param[in] _config The sonar.
+/// \return The number of elevation rays, at least 1.
 std::size_t RayFanElevationCount(const SonarConfig &_config);
 
 /// \brief The steepest slant a surface is taken to have: the tangent of its
@@ -98,6 +103,9 @@ constexpr double kMaxSlant = 50.0;
 /// apart parts of one model (a plate and a wall behind it) and, when no
 /// labels are drawn, everything; a flat seabed seen at a grazing angle out
 /// to a sonar's range stays within it.
+/// \param[in] _hit One ray's hit.
+/// \param[in] _neighbor Its neighbor's hit.
+/// \return True if they hit the same surface.
 bool SameSurface(const RayHit &_hit, const RayHit &_neighbor);
 
 /// \brief Set each hit's footprint from its neighbors on the ray grid:

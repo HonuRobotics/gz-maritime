@@ -37,7 +37,13 @@ namespace
 namespace sonar = gz::maritime::sonar;
 using gz::sim::maritime::LoadSonarConfig;
 
+//////////////////////////////////////////////////
 /// \brief Parse one sensor of the given type with the given <gz:sonar> body.
+/// \param[in] _type The sensor's gz:type.
+/// \param[in] _body The <gz:sonar> body.
+/// \param[out] _labels Whether the labels topic is on.
+/// \param[out] _error Why it failed.
+/// \return The configuration, or empty.
 std::optional<sonar::SonarConfig> Load(const std::string &_type,
   const std::string &_body, bool &_labels, std::string &_error)
 {
@@ -55,6 +61,7 @@ std::optional<sonar::SonarConfig> Load(const std::string &_type,
     _labels, _error);
 }
 
+//////////////////////////////////////////////////
 std::optional<sonar::SonarConfig> Load(const std::string &_type,
   const std::string &_body, std::string &_error)
 {
@@ -63,6 +70,7 @@ std::optional<sonar::SonarConfig> Load(const std::string &_type,
 }
 }  // namespace
 
+//////////////////////////////////////////////////
 TEST(SonarSdf, EmptyBlockGivesEachExemplar)
 {
   std::string error;
@@ -94,6 +102,7 @@ TEST(SonarSdf, EmptyBlockGivesEachExemplar)
   EXPECT_FALSE(automatic->gainDb);
 }
 
+//////////////////////////////////////////////////
 TEST(SonarSdf, ElementsOverrideTheDefaults)
 {
   std::string error;
@@ -123,6 +132,7 @@ TEST(SonarSdf, ElementsOverrideTheDefaults)
   EXPECT_TRUE(Load("imaging_sonar", "<multipath>true</multipath>", error));
 }
 
+//////////////////////////////////////////////////
 TEST(SonarSdf, BadValuesAreRefused)
 {
   const char *bad[] = {
@@ -147,6 +157,7 @@ TEST(SonarSdf, BadValuesAreRefused)
   }
 }
 
+//////////////////////////////////////////////////
 TEST(SonarSdf, ZeroSpecularWidthIsIgnored)
 {
   sonar::AcousticProperties p;
@@ -160,6 +171,7 @@ TEST(SonarSdf, ZeroSpecularWidthIsIgnored)
   EXPECT_DOUBLE_EQ(p.specularWidth, 0.1);
 }
 
+//////////////////////////////////////////////////
 TEST(SonarSdf, MalformedValuesAreRefused)
 {
   // Values that used to read as 0, as a prefix of themselves, or not at all.
@@ -190,7 +202,10 @@ TEST(SonarSdf, MalformedValuesAreRefused)
 
 namespace
 {
+//////////////////////////////////////////////////
 /// \brief One <visual> with the given acoustic mark attributes.
+/// \param[in] _attributes The attributes, as SDF text.
+/// \return The marks read from it.
 gz::sim::maritime::AcousticMarks Marks(const std::string &_attributes)
 {
   const std::string xml =
@@ -206,7 +221,10 @@ gz::sim::maritime::AcousticMarks Marks(const std::string &_attributes)
     root.Model()->LinkByIndex(0)->VisualByIndex(0)->Element());
 }
 
+//////////////////////////////////////////////////
 /// \brief The sonar system's <plugin> element with the given children.
+/// \param[in] _body The children, as SDF text.
+/// \return The element.
 sdf::ElementPtr Plugin(const std::string &_body)
 {
   const std::string xml =
@@ -221,6 +239,7 @@ sdf::ElementPtr Plugin(const std::string &_body)
 }
 }  // namespace
 
+//////////////////////////////////////////////////
 TEST(SonarSdf, TransparentTakesItsValue)
 {
   EXPECT_TRUE(Marks(R"(gz:acoustic_transparent="true")").transparent);
@@ -236,6 +255,7 @@ TEST(SonarSdf, TransparentTakesItsValue)
   EXPECT_DOUBLE_EQ(*m.specularWidth, 0.07);
 }
 
+//////////////////////////////////////////////////
 TEST(SonarSdf, WaterIsChecked)
 {
   sonar::Water water;

@@ -21,6 +21,7 @@
 
 namespace gz::maritime::sonar
 {
+//////////////////////////////////////////////////
 math::Vector3d Ray::Direction() const
 {
   const double ce = std::cos(this->elevation);
@@ -28,6 +29,7 @@ math::Vector3d Ray::Direction() const
     std::sin(this->elevation)};
 }
 
+//////////////////////////////////////////////////
 std::vector<Ray> RayFan(const SonarConfig &_config)
 {
   const double beamSpacing = _config.horizontalFov /
@@ -60,6 +62,7 @@ std::vector<Ray> RayFan(const SonarConfig &_config)
   return rays;
 }
 
+//////////////////////////////////////////////////
 std::size_t RayFanElevationCount(const SonarConfig &_config)
 {
   const double n = static_cast<double>(_config.elevationRays) *
@@ -67,6 +70,7 @@ std::size_t RayFanElevationCount(const SonarConfig &_config)
   return std::max<std::size_t>(static_cast<std::size_t>(std::lround(n)), 1);
 }
 
+//////////////////////////////////////////////////
 bool SameSurface(const RayHit &_hit, const RayHit &_neighbor)
 {
   if (!_hit.hit || !_neighbor.hit || _hit.label != _neighbor.label)
@@ -77,6 +81,7 @@ bool SameSurface(const RayHit &_hit, const RayHit &_neighbor)
   return std::abs(_hit.range - _neighbor.range) <= r * spacing * kMaxSlant;
 }
 
+//////////////////////////////////////////////////
 void AssignFootprints(std::vector<RayHit> &_hits, std::size_t _elevationCount)
 {
   if (_elevationCount == 0 || _hits.size() % _elevationCount != 0)
