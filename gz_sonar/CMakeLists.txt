@@ -162,6 +162,24 @@ if(BUILD_TESTING)
     target_include_directories(sdf_test PRIVATE src/systems)
     target_link_libraries(sdf_test ${PROJECT_NAME} gz-sim::gz-sim gz-common::gz-common)
   endif()
+
+  # The world system and the sensor in a headless server on scene B. Needs
+  # a GPU or llvmpipe; skips without one. The plugin and library paths put
+  # this build ahead of an installed copy the environment may also reach.
+  ament_add_gtest(sonar_system_test test/sonar_system_test.cc TIMEOUT 120)
+  if(TARGET sonar_system_test)
+    target_compile_definitions(sonar_system_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\""
+      "BUILD_DIR=\"${CMAKE_CURRENT_BINARY_DIR}/\""
+      "INSTALL_DIR=\"${CMAKE_INSTALL_PREFIX}/lib/\"")
+    target_link_libraries(sonar_system_test ${PROJECT_NAME}-msgs
+      gz-sim::gz-sim gz-common::gz-common gz-transport::core gz-msgs::core)
+    add_dependencies(sonar_system_test gz-maritime-sonar-system)
+    set_tests_properties(sonar_system_test PROPERTIES
+      ENVIRONMENT "GZ_PARTITION=gz_sonar_sonar_system_test"
+      ENVIRONMENT_MODIFICATION
+        "GZ_SIM_SYSTEM_PLUGIN_PATH=path_list_prepend:${CMAKE_CURRENT_BINARY_DIR};LD_LIBRARY_PATH=path_list_prepend:${CMAKE_CURRENT_BINARY_DIR}")
+  endif()
 endif()
 
 # GZ_SIM_SYSTEM_PLUGIN_PATH for the system, PYTHONPATH for the messages.

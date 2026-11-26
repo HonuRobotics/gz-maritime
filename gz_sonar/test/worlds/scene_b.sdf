@@ -2,6 +2,7 @@
 <!-- Scene B of the Phase 1 comparison: a 1 x 1 x 0.5 m box on a flat
      seabed, 5 m ahead of an imaging sonar 2 m up, pitched down 15 degrees.
      The sonar's own hull sits in front of it and must not be seen. -->
+<!-- sonar_system_test runs it headless. It pings at 25 Hz, whose period of 0.04 s is not exact in binary, and loads the user commands system for the remove and create services. -->
 <sdf version="1.12" xmlns:gz="http://gazebosim.org/schema">
   <world name="scene_b">
     <physics name="1ms" type="ignored">
@@ -11,10 +12,13 @@
     <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
     <plugin filename="gz-sim-scene-broadcaster-system"
             name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
     <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
       <render_engine>ogre2</render_engine>
     </plugin>
     <plugin filename="gz-maritime-sonar-system" name="gz::sim::maritime::Sonar">
+      <seed>7</seed>
       <temperature>29</temperature>
       <salinity>30</salinity>
       <sound_speed>1500</sound_speed>
@@ -56,7 +60,7 @@
         </visual>
         <sensor name="sonar_forward" type="custom" gz:type="imaging_sonar">
           <pose>0 0 0 0 0.2618 0</pose>
-          <update_rate>10</update_rate>
+          <update_rate>25</update_rate>
           <topic>rov/sonar_forward/image</topic>
           <gz:sonar>
             <range><min>0.2</min><max>10</max></range>
