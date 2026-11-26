@@ -67,9 +67,10 @@ namespace
 /// against.
 constexpr int kGzRenderingMajor = 10;
 
-/// \brief Ogre's customization hooks we add to: the pass buffer block and
-/// the final colour.
+/// \brief Ogre's customization hooks we add to: the pass buffer block, the
+/// functions the lamps use, and the final colour.
 const std::vector<std::string> kPbsHooks{"custom_passBuffer",
+                                         "custom_ps_functions",
                                          "custom_ps_posExecution"};
 
 /// \brief A read only Ogre archive of files kept in memory: the pieces we
