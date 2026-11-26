@@ -19,6 +19,7 @@
 
 #include <gz/sim/components/Component.hh>
 #include <gz/sim/components/Factory.hh>
+#include <gz/sim/Entity.hh>
 #include <gz/sim/config.hh>
 
 namespace gz::sim
@@ -29,9 +30,11 @@ namespace components
   /// \brief On the world entity when the renderer itself draws the water
   /// (gz_underwater_rendering): every camera's colour image is then already
   /// seen through the water, and a per-sensor underwater camera must not
-  /// apply it a second time.
+  /// apply it a second time. It holds the entity whose plugin draws it: once
+  /// that entity is gone (its model removed), the mark no longer holds,
+  /// even though no plugin was left to take it off.
   using UnderwaterRendering =
-      Component<NoData, class UnderwaterRenderingTag>;
+      Component<Entity, class UnderwaterRenderingTag>;
 
   GZ_SIM_REGISTER_COMPONENT("gz_maritime_components.UnderwaterRendering",
                             UnderwaterRendering)

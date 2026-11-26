@@ -467,8 +467,9 @@ void UnderwaterCamera::PostUpdate(const UpdateInfo &_info,
   d.sampler.Sync(_ecm);
   // The renderer already draws the water into every camera's image: do not
   // apply it twice.
-  const bool drawn = nullptr != _ecm.Component<components::UnderwaterRendering>(
+  const auto *mark = _ecm.Component<components::UnderwaterRendering>(
       worldEntity(_ecm));
+  const bool drawn = mark && _ecm.HasEntity(mark->Data());
   const auto pose = worldPose(d.sensor, _ecm);
   uc::Water water;
   if (d.sampler.Valid())

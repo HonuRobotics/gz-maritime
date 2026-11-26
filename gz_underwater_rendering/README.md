@@ -29,7 +29,14 @@ the world is rendered: in the server's sensors and in every GUI. Cameras
 above the water are untouched.
 
 With it, a reference underwater camera (`gz_underwater_camera`) in the same
-world passes its image through: the renderer has already drawn the water.
+world applies only its own response: the renderer has already drawn the
+water.
+
+To turn it off and on while running, publish a `gz.msgs.Boolean` on
+`/world/<world>/underwater_rendering/enable`; to start with it off, set
+`<enabled>false</enabled>` in the plugin (default true). Off, or with its
+model removed, the renderer draws nothing and the reference cameras draw the
+water again.
 
 ## What it computes
 
@@ -59,7 +66,15 @@ the camera's pose and the water come in the pass buffer.
   water appended after it.
 - **An Ogre bridge** (`libunderwater-ogre2-bridge.so`), loaded with dlopen,
   as `gz_waves_rendering` does: linking gz-rendering's ogre2 library into a
-  plugin stops gz-rendering loading its engine.
+  plugin stops gz-rendering loading its engine. Its C interface and the
+  water it takes are in `src/systems/UnderwaterOgre2Bridge.hh`, with a
+  version the plugin checks first. It finds the Ogre Next headers with
+  `gz_find_ogre_next()`, from `gz_waves_rendering`.
+- **The world's mark** names the plugin's entity, so it no longer holds
+  once that entity is gone: removing the model leaves no plugin to take it
+  off. The plugin, going, tells the bridge to draw nothing; it cannot
+  uninstall from outside the render thread, so the bridge stays, idle, until
+  a plugin sets the water again.
 
 ## Limits
 
@@ -91,4 +106,7 @@ the water byte for byte the same; segmentation labels byte for byte the
 same; the reference camera passing its image through.
 `underwater_rendering_fallback_test`, in a process of its own: with the
 pieces missing, nothing is installed and the reference camera draws the
-water, as without the GPU path.
+water, as without the GPU path. `underwater_rendering_runtime_test`, in a
+process of its own: turned off on its topic, then on again, then its model
+removed; off and removed look as without the GPU path. All three skip
+without a GPU.
