@@ -23,7 +23,6 @@
 #include <mutex>
 #include <thread>
 
-#include "gz/maritime/sonar/Random.hh"
 
 namespace gz::maritime::sonar
 {
@@ -170,9 +169,6 @@ class Pool
   private: std::size_t chunk{1};
   private: std::atomic<std::size_t> next{0};
 };
-
-/// \brief Stream numbers for the random draws of a ping.
-constexpr std::uint64_t kSpeckleStream = 1;
 }  // namespace
 
 double HorizontalPattern(const SonarConfig &_config, double _offset)
@@ -504,12 +500,8 @@ BeamIntensity Engine::Ping(const std::vector<RayHit> &_hits,
   };
   d.pool.For(cols, clear);
 
-  if (c.speckle)
-  {
-    Random rng(c.seed, _ping, kSpeckleStream);
-    for (double &v : out.data)
-      v *= rng.Exponential();
-  }
+  // Speckle is drawn in the readout, on the echo and the noise together.
+  (void)_ping;
   return out;
 }
 }  // namespace gz::maritime::sonar

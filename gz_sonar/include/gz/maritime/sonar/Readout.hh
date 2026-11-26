@@ -28,8 +28,8 @@ namespace gz::maritime::sonar
 {
 /// \brief The levels a sonar publishes, in dB relative to full scale (0 dB
 /// is the top of the published range, 255 in the imaging sonar's 8-bit
-/// image): level + time-varied gain + gain, with the
-/// noise floor added.
+/// image): the received level, echo plus noise and speckled, plus the
+/// time-varied gain and the gain.
 struct Levels
 {
   std::size_t beams{0};
@@ -70,14 +70,19 @@ class GainTracker
   private: double gain{0.0};
 };
 
-/// \brief Turn echo intensity into levels: time-varied gain, gain, and the
-/// noise floor (an exponential draw per cell, so noise speckles too). Noise
-/// is added after gain, so it sits at the noise floor below full scale at
-/// every range. With automatic gain and a tracker, the gain is smoothed
-/// across pings.
+/// \brief Turn echo intensity into levels: the noise floor, added as a
+/// received level, then speckle, one exponential draw on echo plus noise,
+/// then time-varied gain and gain. The noise rides up with both, so echoes
+/// that absorption and spreading weaken fall into it with range. With
+/// automatic gain and a tracker, the gain is smoothed across pings.
 Levels ReadLevels(const BeamIntensity &_intensity, const SonarConfig &_config,
   double _alpha, std::uint64_t _ping, GainTracker *_tracker = nullptr,
   double _dt = 0.0);
+
+/// \brief The mean noise level at sample _sample of _levels, dB re full
+/// scale: the noise floor plus the time-varied gain and the gain there.
+double NoiseLevel(const Levels &_levels, const SonarConfig &_config,
+  std::size_t _sample);
 
 /// \brief The imaging sonar's matrix: dynamicRangeDb below full scale maps
 /// to 1, full scale to 255, and anything below the window to 0. No
@@ -129,7 +134,7 @@ struct Sounding
   /// \brief Two-way travel time, s.
   double travelTime{0.0};
 
-  /// \brief Level above the noise floor, dB; NaN where the sonar reports
+  /// \brief Level above the noise at its range, dB; NaN where the sonar reports
   /// no intensity (angle of arrival).
   double levelDb{0.0};
 

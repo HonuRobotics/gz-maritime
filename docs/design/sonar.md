@@ -120,7 +120,7 @@ Each ray's contribution is added (not averaged) into the beams according to the 
 
 #### Fluctuations
 
-Each sample's intensity is multiplied by an exponentially distributed random factor, the statistics of fully developed speckle from many unresolved scatterers, and an additive noise floor is applied. Every random draw comes from a generator seeded from the sonar system's `<seed>`, the sensor's name and the ping number, so a run is reproducible.
+A noise floor is added to each sample's intensity as a received level, the receiver's ambient and electronic noise, and the sum is multiplied by one exponentially distributed random factor, the statistics of fully developed speckle from many unresolved scatterers: echo and noise add as one Gaussian field, so where they are equal the contrast stays at 1, where two independent draws would give 0.71. The noise enters before the time-varied gain and the gain, as in a real receiver, so in the published levels it rises with range as the time-varied gain does, and an echo that spreading and absorption have weakened below it is lost: range, frequency and salinity limit what the sonar sees. Every random draw comes from a generator seeded from the sonar system's `<seed>`, the sensor's name and the ping number, so a run is reproducible.
 
 #### Output
 
@@ -245,7 +245,7 @@ Each sonar is a gz-sensors custom sensor, the pattern `gz_wind`'s anemometer alr
     <beam_width>0.026</beam_width>
     <range><min>0.2</min><max>30</max></range>
     <samples>1024</samples>
-    <noise_floor>-50</noise_floor>
+    <noise_floor>-140</noise_floor>
   </gz:sonar>
 </sensor>
 ```
@@ -271,7 +271,7 @@ Parameters shared by the three types. The defaults come from each type's exempla
 | `gain_time_constant` | How quickly automatic gain follows the scene, s; 0 sets it from each ping alone | 0 | 0 | 1 | 0 to 5 |
 | `tvg` | Time-varied gain: `none`, `spreading` or `spreading_absorption` | spreading_absorption | none | spreading_absorption | one of the three |
 | `tvg_spreading` | The spreading term of the time-varied gain, dB per decade of range: `tvg_spreading`·log₁₀R | 30 | 30 | 30 | 20 to 40 |
-| `noise_floor` | Additive noise relative to full scale, the top of the published levels, dB; higher is harder | −50 | −50 | −50 | −80 (quiet) to −20 (noisy) |
+| `noise_floor` | Noise at the receiver, added before the time-varied gain and the gain, dB re the echo of a 1 m² target 1 m away on axis; higher is harder and shortens the useful range | −140 (chosen) | −150 (chosen) | −150 (chosen) | −160 (quiet) to −110 (noisy) |
 | `speckle` | Multiply each sample by the speckle factor | true | true | true | true or false |
 | `labels` | Publish the ground-truth labels topic, `<topic>/labels` | false | false | false | true or false |
 

@@ -166,13 +166,17 @@ struct SonarConfig
   /// ranges more; smaller values leave them darker than near ones.
   double tvgSpreading{30.0};
 
-  /// \brief Additive noise relative to full scale, the top of the published
-  /// levels (255 in the imaging sonar's 8-bit image, 0 dB in the sidescan's
-  /// levels), dB.
-  /// Typically -60 (a clean image) to -20 (a hard one). Larger values
-  /// (closer to 0) fill the shadows and lower the contrast; smaller values
-  /// leave faint echoes and shadows visible.
-  double noiseFloorDb{-50.0};
+  /// \brief Noise at the receiver, dB re the echo of a target of 1 m^2
+  /// backscattering cross section 1 m away on axis (the scale of
+  /// BeamIntensity): ambient and electronic noise as a received level. It
+  /// is added before the time-varied gain and the gain, so in the published
+  /// levels it rises with range as the time-varied gain does, and an echo
+  /// that spreading and absorption weaken below it is lost: frequency,
+  /// range and salinity limit what the sonar sees. Typically -150 (quiet)
+  /// to -110 (noisy). Larger values fill the shadows and the far range and
+  /// shorten the useful range; smaller values leave faint echoes and
+  /// shadows visible farther out.
+  double noiseFloorDb{-140.0};
 
   /// \brief Span of levels below full scale that the 8-bit imaging
   /// image the sonar plugin publishes maps onto 1 to 255, dB. Typically 40 to 80. Larger values

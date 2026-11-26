@@ -24,6 +24,7 @@
 #include <memory>
 #include <numeric>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <gz/math/Pose3.hh>
@@ -311,35 +312,98 @@ TEST(Engine, ElevationAmbiguity)
   EXPECT_EQ(brightest(5.0 * kDeg), brightest(-5.0 * kDeg));
 }
 
+namespace
+{
+/// \brief A uniform intensity over the sonar's beams and samples, for
+/// readout tests.
+sonar::BeamIntensity Flat(const sonar::SonarConfig &_config, double _value)
+{
+  sonar::BeamIntensity b;
+  b.beams = _config.beams;
+  b.samples = _config.samples;
+  b.data.assign(b.beams * b.samples, _value);
+  b.labels.assign(b.data.size(), 0);
+  for (std::size_t k = 0; k < b.samples; ++k)
+    b.ranges.push_back(_config.SampleRange(k));
+  for (std::size_t j = 0; j < b.beams; ++j)
+    b.azimuths.push_back(_config.BeamAzimuth(j));
+  return b;
+}
+
+/// \brief Mean and standard deviation over a vector of powers.
+std::pair<double, double> MeanStd(const std::vector<double> &_v)
+{
+  const double mean = std::accumulate(_v.begin(), _v.end(), 0.0) /
+    static_cast<double>(_v.size());
+  double var = 0.0;
+  for (double x : _v)
+    var += (x - mean) * (x - mean);
+  return {mean, std::sqrt(var / static_cast<double>(_v.size()))};
+}
+
+/// \brief The published levels as powers relative to _ref dB.
+std::vector<double> Powers(const sonar::Levels &_l, double _ref)
+{
+  std::vector<double> p;
+  for (double d : _l.db)
+    p.push_back(std::pow(10.0, (d - _ref) / 10.0));
+  return p;
+}
+}  // namespace
+
 /////////////////////////////////////////////////
 // Fully developed speckle: the ratio to the clean intensity is
 // exponential, mean 1 and standard deviation 1.
-TEST(Engine, SpeckleStatistics)
+TEST(Readout, SpeckleStatistics)
 {
   sonar::SonarConfig c = CleanEcho();
-  sonar::SyntheticScene scene;
-  scene.AddRectangle({5, 0, 0}, {-1, 0, 0}, {0, 0, 1}, 3.0, 3.0,
-    Lambert(-20.0), 1);
-  const auto clean = Ping(c, scene, Pose3d::Zero);
   c.speckle = true;
-  const auto speckled = Ping(c, scene, Pose3d::Zero);
+  c.tvg = sonar::Tvg::kNone;
+  c.gainDb = 0.0;
+  const auto l = sonar::ReadLevels(Flat(c, 1e-6), c, 0.0, 0);
+  const auto [mean, std] = MeanStd(Powers(l, -60.0));
+  EXPECT_NEAR(mean, 1.0, 0.05);
+  EXPECT_NEAR(std, 1.0, 0.05);
+}
 
-  const double top = *std::max_element(clean.data.begin(), clean.data.end());
-  std::vector<double> ratio;
-  for (std::size_t i = 0; i < clean.data.size(); ++i)
+/////////////////////////////////////////////////
+// Echo and noise are one field: where they are equal, one exponential draw
+// on their sum keeps the contrast at 1, where two independent draws would
+// give 1 / sqrt(2).
+TEST(Readout, OneDrawOnSignalPlusNoise)
+{
+  sonar::SonarConfig c = CleanEcho();
+  c.speckle = true;
+  c.tvg = sonar::Tvg::kNone;
+  c.gainDb = 0.0;
+  c.noiseFloorDb = -60.0;
+  const auto l = sonar::ReadLevels(Flat(c, 1e-6), c, 0.0, 0);
+  const auto [mean, std] = MeanStd(Powers(l, -60.0));
+  EXPECT_NEAR(mean, 2.0, 0.1);
+  EXPECT_NEAR(std / mean, 1.0, 0.05);
+}
+
+/////////////////////////////////////////////////
+// The noise is a received level: in the published levels it rises with
+// range as the time-varied gain does, and moves with the gain.
+TEST(Readout, NoiseRidesWithTheGain)
+{
+  sonar::SonarConfig c = sonar::EchoImaging();
+  c.gainDb = 40.0;
+  sonar::Engine engine(c, HarborWater());
+  const auto l = sonar::ReadLevels(Flat(c, 0.0), c, engine.Absorption(), 0);
+  for (std::size_t k : {std::size_t{10}, c.samples / 2, c.samples - 10})
   {
-    if (clean.data[i] > 1e-3 * top)
-      ratio.push_back(speckled.data[i] / clean.data[i]);
+    std::vector<double> column;
+    for (std::size_t j = 0; j < l.beams; ++j)
+      column.push_back(std::pow(10.0, l.db[j * l.samples + k] / 10.0));
+    const double meanDb = 10.0 * std::log10(MeanStd(column).first);
+    EXPECT_NEAR(meanDb, c.noiseFloorDb + l.tvgDb[k] + 40.0, 0.6)
+      << "sample " << k;
+    EXPECT_NEAR(sonar::NoiseLevel(l, c, k),
+      c.noiseFloorDb + l.tvgDb[k] + 40.0, 1e-9);
   }
-  ASSERT_GT(ratio.size(), 1000u);
-  const double mean = std::accumulate(ratio.begin(), ratio.end(), 0.0) /
-    static_cast<double>(ratio.size());
-  double var = 0.0;
-  for (double r : ratio)
-    var += (r - mean) * (r - mean);
-  var /= static_cast<double>(ratio.size());
-  EXPECT_NEAR(mean, 1.0, 0.1);
-  EXPECT_NEAR(std::sqrt(var), 1.0, 0.15);
+  EXPECT_GT(l.tvgDb[c.samples - 10] - l.tvgDb[10], 40.0);
 }
 
 /////////////////////////////////////////////////
@@ -347,7 +411,7 @@ TEST(Engine, SameSeedSamePing)
 {
   sonar::SonarConfig c = CleanEcho();
   c.speckle = true;
-  c.noiseFloorDb = -40.0;
+  c.noiseFloorDb = -120.0;
   sonar::SyntheticScene scene;
   scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), 1);
   const Pose3d pose(0, 0, 2, 0, 15.0 * kDeg, 0);

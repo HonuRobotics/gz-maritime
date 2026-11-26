@@ -58,14 +58,14 @@ A few of the sonar's own parameters make its image easier or harder to work with
 
 ```yaml
      sonar: {range_max: 15, samples: 768, labels: true,
-             noise_floor: -25,   # dB below full scale; -50 by default
+             noise_floor: -110,  # received noise, dB; -140 by default
              gain: auto,         # or a fixed gain in dB, such as 60
              speckle: true}      # false removes the grain
 ```
 
 | Parameter | Effect | Easier | Harder |
 |---|---|---|---|
-| `noise_floor` | Additive noise, dB re full scale | −60 | −20 |
+| `noise_floor` | Noise at the receiver, dB; it rises with range in the image, as the time-varied gain does | −150 | −110 |
 | `gain` | `auto`, or a fixed gain in dB | `auto` | a fixed gain too low or too high |
 | `speckle` | The grain of a real sonar image | `false` | `true` |
 | `range_max` | The range window, m | close to the targets | much longer |
@@ -73,7 +73,7 @@ A few of the sonar's own parameters make its image easier or harder to work with
 ```{figure} images/sonar-features-noise.png
 :alt: Two sonar fans of the same scene side by side: on the left the default, with dark shadows behind the targets and a dark zone close in; on the right the noise floor raised, with the shadows and the near zone filled with noise and less contrast overall
 
-The example: ping 100 of the imaging sonar world, at the default noise floor and with `noise_floor` raised to −25 dB. The noise fills the shadows and the empty water close in, and the whole image loses contrast; the brightest returns still stand out, the shadows that tell a detector an object's height are mostly gone.
+The example: ping 100 of the imaging sonar world, at the default noise floor and with the noise floor raised. The noise fills the shadows and the empty water close in, and the whole image loses contrast; the brightest returns still stand out, the shadows that tell a detector an object's height are mostly gone.
 ```
 
 ## Repeatable randomness: the seed

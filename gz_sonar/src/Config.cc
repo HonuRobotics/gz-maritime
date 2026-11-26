@@ -118,6 +118,9 @@ SonarConfig OmniscanSidescan()
   c.pulseLength = 1.0e-4;
   c.tvg = Tvg::kSpreadingAbsorption;
   c.gainTimeConstant = 1.0;
+  // A pulse ten times the imaging sonar's, so a band ten times narrower
+  // and 10 dB less noise.
+  c.noiseFloorDb = -150.0;
   c.raysPerBeam = 8;
   c.elevationRays = 400;
   return c;
@@ -140,6 +143,8 @@ SonarConfig SurveyorProfiling()
   c.samples = 400;
   c.pulseLength = 1.0e-4;
   c.tvg = Tvg::kNone;
+  // The sidescan's pulse, so its noise band.
+  c.noiseFloorDb = -150.0;
   c.detection = ProfilingDetection::kAngleOfArrival;
   c.maxSoundings = 20;
   c.elevationRays = 16;

@@ -26,6 +26,7 @@ namespace gz::maritime::sonar
 {
 namespace
 {
+constexpr std::uint64_t kSpeckleStream = 1;
 constexpr std::uint64_t kNoiseStream = 2;
 constexpr std::uint64_t kDetectionStream = 3;
 
@@ -79,20 +80,34 @@ Levels ReadLevels(const BeamIntensity &_intensity, const SonarConfig &_config,
   for (double r : out.ranges)
     out.tvgDb.push_back(TimeVariedGain(_config, _alpha, r));
 
-  // Level plus time-varied gain, before gain.
-  const double off = -std::numeric_limits<double>::infinity();
-  std::vector<double> raw(_intensity.data.size(), off);
+  // Speckle and noise. The noise is a received level, added before the
+  // time-varied gain and the gain, so it rides up with both as a real
+  // receiver's does and echoes that fade with range fall into it. With
+  // speckle, one exponential draw multiplies signal plus noise, the
+  // statistics of their sum as one Gaussian field; without, the echo is
+  // its mean and the noise alone is drawn.
+  const double noise = std::pow(10.0, _config.noiseFloorDb / 10.0);
+  Random speckleRng(_config.seed, _ping, kSpeckleStream);
+  Random noiseRng(_config.seed, _ping, kNoiseStream);
+  std::vector<double> received(_intensity.data.size(), 0.0);
   std::vector<double> lit;
-  for (std::size_t j = 0; j < out.beams; ++j)
+  for (std::size_t i = 0; i < received.size(); ++i)
   {
-    for (std::size_t k = 0; k < out.samples; ++k)
+    const double v = _intensity.data[i];
+    const std::size_t k = i % out.samples;
+    if (_config.speckle)
     {
-      const double v = _intensity.At(j, k);
-      if (v <= 0.0)
-        continue;
-      const double d = 10.0 * std::log10(v) + out.tvgDb[k];
-      raw[j * out.samples + k] = d;
-      lit.push_back(d);
+      const double x = speckleRng.Exponential();
+      received[i] = (v + noise) * x;
+      // Automatic gain looks at the echoes alone, speckled as they are.
+      if (v > 0.0)
+        lit.push_back(10.0 * std::log10(v * x) + out.tvgDb[k]);
+    }
+    else
+    {
+      received[i] = v + noise * noiseRng.Exponential();
+      if (v > 0.0)
+        lit.push_back(10.0 * std::log10(v) + out.tvgDb[k]);
     }
   }
 
@@ -115,17 +130,21 @@ Levels ReadLevels(const BeamIntensity &_intensity, const SonarConfig &_config,
       out.gainDb = _tracker->Update(out.gainDb, _dt, _config.gainTimeConstant);
   }
 
-  Random rng(_config.seed, _ping, kNoiseStream);
-  const double noise = std::pow(10.0, _config.noiseFloorDb / 10.0);
-  out.db.resize(raw.size());
-  for (std::size_t i = 0; i < raw.size(); ++i)
+  out.db.resize(received.size());
+  for (std::size_t i = 0; i < received.size(); ++i)
   {
-    double lin = std::isfinite(raw[i]) ?
-      std::pow(10.0, (raw[i] + out.gainDb) / 10.0) : 0.0;
-    lin += noise * rng.Exponential();
-    out.db[i] = 10.0 * std::log10(lin);
+    const double lin = std::max(received[i],
+      std::numeric_limits<double>::min());
+    out.db[i] = 10.0 * std::log10(lin) + out.tvgDb[i % out.samples] +
+      out.gainDb;
   }
   return out;
+}
+
+double NoiseLevel(const Levels &_levels, const SonarConfig &_config,
+  std::size_t _sample)
+{
+  return _config.noiseFloorDb + _levels.tvgDb[_sample] + _levels.gainDb;
 }
 
 ImagingFrame ReadImaging(const Levels &_levels, const SonarConfig &_config)
@@ -164,8 +183,6 @@ SidescanLine ReadSidescan(const Levels &_levels)
 std::vector<Sounding> ReadProfiling(const Levels &_levels,
   const SonarConfig &_config, double _assumedSoundSpeed, std::uint64_t _ping)
 {
-  const double threshold = _config.noiseFloorDb +
-    _config.detectionThresholdDb;
   const double dr = _levels.ranges.size() > 1 ?
     _levels.ranges[1] - _levels.ranges[0] : 0.0;
   const double rangeNoise = _config.rangeNoise ? *_config.rangeNoise :
@@ -177,34 +194,38 @@ std::vector<Sounding> ReadProfiling(const Levels &_levels,
   {
     std::size_t beam;
     std::size_t sample;
+    /// \brief Level above the noise, dB.
     double db;
   };
   std::vector<Peak> peaks;
   for (std::size_t j = 0; j < _levels.beams; ++j)
   {
+    // Strongest above the noise, which the time-varied gain may have
+    // lifted with range.
     std::size_t bestK = 0;
-    double bestDb = -std::numeric_limits<double>::infinity();
+    double bestSnr = -std::numeric_limits<double>::infinity();
     for (std::size_t k = 0; k < _levels.samples; ++k)
     {
-      const double d = _levels.db[j * _levels.samples + k];
-      if (d > bestDb)
+      const double snr = _levels.db[j * _levels.samples + k] -
+        NoiseLevel(_levels, _config, k);
+      if (snr > bestSnr)
       {
-        bestDb = d;
+        bestSnr = snr;
         bestK = k;
       }
     }
-    if (bestDb > threshold)
-      peaks.push_back({j, bestK, bestDb});
+    if (bestSnr > _config.detectionThresholdDb)
+      peaks.push_back({j, bestK, bestSnr});
   }
 
   auto makeSounding = [&](const Peak &_p) {
     Sounding s;
     s.angle = _levels.azimuths[_p.beam];
-    const double snr = _p.db - threshold;
-    const double sigma = rangeNoise * (1.0 + std::pow(10.0, -snr / 20.0));
+    const double margin = _p.db - _config.detectionThresholdDb;
+    const double sigma = rangeNoise * (1.0 + std::pow(10.0, -margin / 20.0));
     s.range = _levels.ranges[_p.sample] + sigma * rng.Normal();
     s.travelTime = 2.0 * s.range / _assumedSoundSpeed;
-    s.levelDb = _p.db - _config.noiseFloorDb;
+    s.levelDb = _p.db;
     return s;
   };
 

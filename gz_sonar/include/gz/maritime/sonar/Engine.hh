@@ -86,7 +86,8 @@ double VerticalPattern(const SonarConfig &_config, double _elevation);
 /// is added (not averaged) into every beam the horizontal pattern reaches,
 /// spread over the range samples that the patch's footprint and the pulse
 /// cover, at the range the sonar computes with its assumed sound speed.
-/// Speckle multiplies each cell by an exponential draw with mean 1.
+/// The result is the mean intensity: speckle is drawn in the readout
+/// (ReadLevels), on the echo and the noise together.
 ///
 /// The engine keeps its own worker threads, started at construction and
 /// joined when it is destroyed, and its per-ping buffers and beam weights,
@@ -108,8 +109,8 @@ class Engine
   /// \brief One ping. Safe to call from any thread; concurrent calls on
   /// one engine wait for each other.
   /// \param[in] _hits What each ray of the fan found.
-  /// \param[in] _ping The ping number, which with the seed fixes the
-  /// random draws.
+  /// \param[in] _ping The ping number. Unused since speckle moved to the
+  /// readout; kept so callers need not change.
   public: BeamIntensity Ping(const std::vector<RayHit> &_hits,
               std::uint64_t _ping) const;
 
