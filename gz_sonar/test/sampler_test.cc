@@ -16,7 +16,9 @@
  */
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstdint>
 #include <limits>
 #include <vector>
@@ -146,4 +148,130 @@ TEST(CameraSampler, MatchesDirectCastOnSceneB)
   EXPECT_LT(static_cast<double>(far) / compared, 0.01);
   EXPECT_LT(static_cast<double>(labelMiss) / compared, 0.01);
   EXPECT_LT(static_cast<double>(angleMiss) / compared, 0.02);
+}
+
+namespace
+{
+/// \brief Draw the scene and sample it, as the sonar system does.
+std::vector<sonar::RayHit> DrawAndSample(const sonar::CameraSampler &_sampler,
+  const sonar::SyntheticScene &_scene, const Pose3d &_pose,
+  const std::vector<sonar::AcousticProperties> &_table)
+{
+  std::vector<std::vector<float>> depth;
+  std::vector<std::vector<std::uint8_t>> labels;
+  Draw(_sampler, _scene, _pose, depth, labels);
+  std::vector<const float *> dp;
+  std::vector<const std::uint8_t *> lp;
+  for (std::size_t i = 0; i < depth.size(); ++i)
+  {
+    dp.push_back(depth[i].data());
+    lp.push_back(labels[i].data());
+  }
+  return _sampler.Sample(dp, lp, 1, _table);
+}
+
+double Median(std::vector<double> _v)
+{
+  if (_v.empty())
+    return 0.0;
+  std::nth_element(_v.begin(), _v.begin() + _v.size() / 2, _v.end());
+  return _v[_v.size() / 2];
+}
+}  // namespace
+
+/////////////////////////////////////////////////
+// A flat seabed seen at grazing angles out to the end of the ECHO's 30 m
+// window: depth changes by far more than 2 % from one pixel to the next,
+// yet the read is still exact, since 1/z stays planar. From 2 m and from
+// 1 m above the seabed, every ray's range is well under a sample (29 mm)
+// from the truth.
+TEST(CameraSampler, ExactOnASeabedAtGrazingAngles)
+{
+  const sonar::SonarConfig c = sonar::EchoImaging();
+  const double dr = (c.rangeMax - c.rangeMin) / static_cast<double>(c.samples);
+  const sonar::CameraSampler sampler(c);
+  sonar::SyntheticScene scene;
+  scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), 1);
+  const std::vector<sonar::AcousticProperties> table{
+    Lambert(-20.0), Lambert(-27.0)};
+
+  for (double height : {2.0, 1.0})
+  {
+    const Pose3d pose(0, 0, height, 0, 0, 0);
+    const auto sampled = DrawAndSample(sampler, scene, pose, table);
+    const auto truth = scene.Cast(pose, sampler.Rays(),
+      sampler.Layout().farClip);
+    ASSERT_EQ(sampled.size(), truth.size());
+    std::vector<double> nearErr, farErr;
+    for (std::size_t n = 0; n < truth.size(); ++n)
+    {
+      if (!truth[n].hit || truth[n].range > c.rangeMax)
+        continue;
+      ASSERT_TRUE(sampled[n].hit);
+      const double e = std::abs(sampled[n].range - truth[n].range);
+      if (truth[n].range <= 15.0)
+        nearErr.push_back(e);
+      else if (truth[n].range >= 22.0)
+        farErr.push_back(e);
+    }
+    ASSERT_FALSE(farErr.empty());
+    const double farMax = *std::max_element(farErr.begin(), farErr.end());
+    const double nearMax = *std::max_element(nearErr.begin(), nearErr.end());
+    std::printf("height %.0f m: 0-15 m median %.6f max %.6f m (%zu rays); "
+      "22-30 m median %.6f max %.6f m (%zu rays)\n", height,
+      Median(nearErr), nearMax, nearErr.size(), Median(farErr), farMax,
+      farErr.size());
+    EXPECT_LT(nearMax, 0.01 * dr);
+    EXPECT_LT(farMax, 0.1 * dr);
+  }
+}
+
+/////////////////////////////////////////////////
+// Two walls square to the camera, at 4 m and 8 m, meeting along a row of
+// pixels and sharing a label, as two parts of one model would. Across the
+// row the four pixels around a ray differ in v only, so 1/z has no twist
+// there; the step must still not be interpolated, or a ray would put an
+// echo in the empty water between the walls.
+TEST(CameraSampler, DoesNotBlendAStepAlongAPixelRow)
+{
+  const sonar::SonarConfig c = sonar::EchoImaging();
+  const sonar::CameraSampler sampler(c);
+  const auto &l = sampler.Layout();
+  const float zNear = 4.0f, zFar = 8.0f;
+  const std::size_t size = static_cast<std::size_t>(l.width) * l.height;
+  std::vector<std::vector<float>> depth(l.yaws.size());
+  std::vector<std::vector<std::uint8_t>> labels(l.yaws.size(),
+    std::vector<std::uint8_t>(size, 1));
+  for (auto &d : depth)
+  {
+    d.resize(size);
+    for (unsigned int v = 0; v < l.height; ++v)
+      for (unsigned int u = 0; u < l.width; ++u)
+        d[v * l.width + u] = v < l.height / 2 ? zFar : zNear;
+  }
+  std::vector<const float *> dp;
+  std::vector<const std::uint8_t *> lp;
+  for (std::size_t i = 0; i < depth.size(); ++i)
+  {
+    dp.push_back(depth[i].data());
+    lp.push_back(labels[i].data());
+  }
+  const auto hits = sampler.Sample(dp, lp, 1, {Lambert(-20.0)});
+
+  std::size_t between = 0, checked = 0;
+  for (const auto &h : hits)
+  {
+    ASSERT_TRUE(h.hit);
+    // Depth along the axis of the camera the ray falls in: the nearest one.
+    const auto d = h.ray.Direction();
+    double cosAxis = 0.0;
+    for (double yaw : l.yaws)
+      cosAxis = std::max(cosAxis, d.X() * std::cos(yaw) + d.Y() * std::sin(yaw));
+    const double z = h.range * cosAxis;
+    ++checked;
+    if (z > zNear + 1e-3 && z < zFar - 1e-3)
+      ++between;
+  }
+  EXPECT_GT(checked, 1000u);
+  EXPECT_EQ(between, 0u);
 }

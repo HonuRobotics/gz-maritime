@@ -33,6 +33,16 @@ namespace
 /// \brief Neighboring depths within this fraction are one surface.
 constexpr double kContinuous = 0.02;
 
+/// \brief How far 1/z may depart from a plane over the pixels around a ray,
+/// relative to 1/z there, for them to count as one plane: the read is then
+/// off by about this fraction of the depth at most, 3 mm at 30 m, a tenth
+/// of an ECHO sample. Float depth rounds to 6e-8 of its value, so rounding
+/// alone moves a second difference by a few 1e-7; a depth buffer whose
+/// precision falls off with distance can leave a few 1e-5 at the far end of
+/// the window, still well inside. A step between two surfaces fails unless
+/// it is shallower than this, when blending it is harmless.
+constexpr double kPlanar = 1e-4;
+
 math::Vector3d Rotate(double _yaw, const math::Vector3d &_v)
 {
   const double c = std::cos(_yaw);
@@ -103,6 +113,57 @@ CameraSampler::CameraSampler(const SonarConfig &_config,
   }
 }
 
+bool CameraSampler::Planar(const float *_depth, long _u0, long _v0,
+  const std::uint8_t *_labels, unsigned int _channels) const
+{
+  const auto w = static_cast<long>(this->layout.width);
+  const auto h = static_cast<long>(this->layout.height);
+  // The four pixels must show one surface, when labels are drawn.
+  if (_labels)
+  {
+    const std::uint8_t l00 = _labels[(_v0 * w + _u0) * _channels];
+    if (_labels[(_v0 * w + _u0 + 1) * _channels] != l00 ||
+        _labels[((_v0 + 1) * w + _u0) * _channels] != l00 ||
+        _labels[((_v0 + 1) * w + _u0 + 1) * _channels] != l00)
+    {
+      return false;
+    }
+  }
+  // 1/z over the quad and one pixel beyond it on each axis (on the other
+  // side at the image's edge). A plane has no twist over the quad and no
+  // second difference along either axis. The twist alone would pass a step
+  // along a row or column of pixels; the second differences catch it.
+  const long ue = _u0 > 0 ? _u0 - 1 : _u0 + 2;
+  const long ve = _v0 > 0 ? _v0 - 1 : _v0 + 2;
+  if (ue < 0 || ue >= w || ve < 0 || ve >= h)
+    return false;
+  auto inv = [&](long _u, long _v) {
+    const double z = _depth[_v * w + _u];
+    return std::isfinite(z) && z > 0.0 ? 1.0 / z : 0.0;
+  };
+  const double q00 = inv(_u0, _v0);
+  const double q10 = inv(_u0 + 1, _v0);
+  const double q01 = inv(_u0, _v0 + 1);
+  const double q11 = inv(_u0 + 1, _v0 + 1);
+  const double qu0 = inv(ue, _v0);
+  const double qu1 = inv(ue, _v0 + 1);
+  const double q0v = inv(_u0, ve);
+  const double q1v = inv(_u0 + 1, ve);
+  if (qu0 <= 0.0 || qu1 <= 0.0 || q0v <= 0.0 || q1v <= 0.0)
+    return false;
+  // Second difference along u through the extra column: its pixels sit at
+  // ue, u0, u0 + 1 in some order, evenly spaced.
+  auto second = [](long _e, long _a, double _qe, double _q0, double _q1) {
+    return _e < _a ? _qe - 2.0 * _q0 + _q1 : _q0 - 2.0 * _q1 + _qe;
+  };
+  const double tol = kPlanar * std::max({q00, q10, q01, q11});
+  return std::abs(q00 + q11 - q10 - q01) <= tol &&
+    std::abs(second(ue, _u0, qu0, q00, q10)) <= tol &&
+    std::abs(second(ue, _u0, qu1, q01, q11)) <= tol &&
+    std::abs(second(ve, _v0, q0v, q00, q01)) <= tol &&
+    std::abs(second(ve, _v0, q1v, q10, q11)) <= tol;
+}
+
 const CameraLayout &CameraSampler::Layout() const
 {
   return this->layout;
@@ -165,7 +226,14 @@ std::vector<RayHit> CameraSampler::Sample(
     const double z11 = dd[(v0 + 1) * w + u0 + 1];
     const double zMin = std::min({z00, z10, z01, z11});
     const double zMax = std::max({z00, z10, z01, z11});
-    if (std::isfinite(zMax) && zMin > 0.0 && zMax - zMin < kContinuous * zMin)
+    bool blend = std::isfinite(zMax) && zMin > 0.0;
+    // Close depths are one surface; that keeps curved surfaces seen near
+    // head on. On a plane seen at a grazing angle depth changes faster than
+    // that from pixel to pixel, but 1/z is still affine in screen space.
+    if (blend && zMax - zMin >= kContinuous * zMin)
+      blend = this->Planar(dd, u0, v0, _labels.size() > l.camera ?
+        _labels[l.camera] : nullptr, _channels);
+    if (blend)
     {
       z = 1.0 / ((1 - fx) * (1 - fy) / z00 + fx * (1 - fy) / z10 +
         (1 - fx) * fy / z01 + fx * fy / z11);

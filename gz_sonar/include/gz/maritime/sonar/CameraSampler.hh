@@ -57,9 +57,11 @@ struct CameraLayout
 ///
 /// For each ray of the fan (RayFan's grid), the depth is read at the ray's
 /// exact position in its camera by interpolating 1/z between the four
-/// neighboring pixels, which is exact on a plane, unless their depths differ
-/// by more than 2 %: at a silhouette the nearest pixel is kept, so a target
-/// and the background behind it are not blended. Depth is along the
+/// neighboring pixels, which is exact on a plane. It interpolates where
+/// their depths are within 2 % of each other, or where 1/z is planar over
+/// them and the next pixels and they share a label, as on a plane seen at a
+/// grazing angle; elsewhere, at a silhouette, the nearest pixel is kept, so
+/// a target and the background behind it are not blended. Depth is along the
 /// camera's optical axis and is converted to range along the ray. Normals
 /// come from neighboring hits on the ray grid (the one-sided difference with
 /// the smaller range jump), and footprints from AssignFootprints.
@@ -98,6 +100,12 @@ class CameraSampler
               const std::vector<const std::uint8_t *> &_labels,
               unsigned int _channels,
               const std::vector<AcousticProperties> &_properties) const;
+
+  /// \brief Whether the four pixels from (_u0, _v0) to (_u0 + 1, _v0 + 1)
+  /// lie on one plane: 1/z affine over them and one pixel beyond on each
+  /// axis, and one label when labels are given.
+  private: bool Planar(const float *_depth, long _u0, long _v0,
+              const std::uint8_t *_labels, unsigned int _channels) const;
 
   /// \brief Where each ray falls in its camera.
   private: struct Lookup
