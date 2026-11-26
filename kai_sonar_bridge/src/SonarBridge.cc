@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -25,6 +27,7 @@
 #include <rclcpp_components/register_node_macro.hpp>
 
 #include "kai_sonar_bridge/Conversions.hh"
+#include "kai_sonar_bridge/SonarBridge.hh"
 
 namespace kai_sonar_bridge
 {
@@ -60,223 +63,395 @@ bool Wanted(const T &_pub)
 {
   return _pub && _pub->get_subscription_count() > 0;
 }
+
+/// \brief What a gz callback holds to know the node is still there.
+///
+/// gz-transport runs a subscriber's callback on its own thread (or, for a
+/// publisher in the same process, on the publisher's), and Unsubscribe does
+/// not wait for a callback that has started. So a callback enters the gate
+/// before it touches the node and leaves when done, and the destructor
+/// closes it: closing turns every later callback away and waits for those
+/// inside. The callbacks own the gate, so it outlives the node for as long
+/// as gz-transport keeps one of them. A count rather than a shared mutex,
+/// so that a steady stream of pings cannot hold the destructor off.
+class Gate
+{
+  /// \brief Enter, if the gate is open. Each true return needs a Leave.
+  /// \return False if the node is going or gone.
+  public: bool Enter()
+  {
+    std::lock_guard<std::mutex> lock(this->mutex);
+    if (!this->open)
+      return false;
+    ++this->inside;
+    return true;
+  }
+
+  /// \brief Leave after a successful Enter.
+  public: void Leave()
+  {
+    std::lock_guard<std::mutex> lock(this->mutex);
+    if (--this->inside == 0)
+      this->empty.notify_all();
+  }
+
+  /// \brief Close the gate and wait until nobody is inside.
+  public: void Close()
+  {
+    std::unique_lock<std::mutex> lock(this->mutex);
+    this->open = false;
+    this->empty.wait(lock, [this]() { return this->inside == 0; });
+  }
+
+  /// \brief Protects the members below.
+  private: std::mutex mutex;
+
+  /// \brief Signaled when the last callback leaves.
+  private: std::condition_variable empty;
+
+  /// \brief False once the node is being destroyed.
+  private: bool open{true};
+
+  /// \brief Callbacks running now.
+  private: int inside{0};
+};
+
+/// \brief Leaves a gate when it goes out of scope.
+class Pass
+{
+  /// \brief Enter a gate.
+  /// \param[in] _gate The gate.
+  public: explicit Pass(Gate &_gate)
+    : gate(_gate), entered(_gate.Enter())
+  {
+  }
+
+  public: ~Pass()
+  {
+    if (this->entered)
+      this->gate.Leave();
+  }
+
+  /// \brief Whether the gate was open.
+  /// \return True if the node may be used.
+  public: explicit operator bool() const
+  {
+    return this->entered;
+  }
+
+  private: Gate &gate;
+  private: bool entered{false};
+};
+
+/// \brief One bridged sonar.
+struct Sonar
+{
+  /// \brief Its gz-transport topic.
+  public: std::string gzTopic;
+
+  /// \brief True for a profiler's soundings, false for an image.
+  public: bool detections{false};
+
+  /// \brief The frame to stamp; empty for the default.
+  public: std::string frame;
+
+  /// \brief The image's publisher; null for a profiler.
+  public: rclcpp::Publisher<RosImage>::SharedPtr pub;
+
+  /// \brief The view's publisher; null without a view or for a profiler.
+  public: rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr viewPub;
+
+  /// \brief The soundings' publisher; null for an image.
+  public: rclcpp::Publisher<RosDetections>::SharedPtr detPub;
+
+  /// \brief The soundings' cloud; null without a view or for an image.
+  public: rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloudPub;
+
+  /// \brief The gz subscription; not valid while there is none.
+  public: gz::transport::Node::Subscriber gzSub;
+
+  /// \brief Protects the view's state below.
+  public: std::mutex mutex;
+
+  /// \brief The fan's layout, kept while the geometry holds.
+  public: FanLayout fan;
+
+  /// \brief What the fan was laid out for: beams, ranges, first and last
+  /// azimuth.
+  public: std::vector<double> fanKey;
+
+  /// \brief A sidescan's recent lines, newest first.
+  public: std::vector<std::vector<std::uint8_t>> lines;
+};
 }  // namespace
 
-/// \brief Brings gz_sonar's sonars into ROS 2.
-///
-/// Parameters, as parallel lists, one entry per sonar:
-///   gz_topics   the sonar's gz-transport topic
-///   ros_topics  the ROS 2 topic for marine_acoustic_msgs/ProjectedSonarImage
-///               or SonarDetections
-///   frame_ids   the frame to stamp (optional; default: the sensor's frame
-///               with "_acoustic" appended)
-///   kinds       "image" (the default) for imaging and sidescan sonars, or
-///               "detections" for a profiling sonar's soundings
-/// and
-///   view        also publish a view: <ros_topic>/view, a sensor_msgs/Image
-///               of an imaging sonar's fan or a sidescan's waterfall, and
-///               <ros_topic>/points, a profiler's soundings as a
-///               sensor_msgs/PointCloud2 in the soundings' frame.
-///
-/// Images and soundings share one frame convention, the `_acoustic` frame
-/// (see Conversions.hh). A ping is converted only when one of its topics
-/// has a subscriber, and a view drawn only when the view has one.
-class SonarBridge : public rclcpp::Node
+/// \brief The node's private data.
+class SonarBridge::Implementation
 {
-  public: explicit SonarBridge(const rclcpp::NodeOptions &_options)
-    : rclcpp::Node("sonar_bridge", _options)
-  {
-    const auto gzTopics = this->declare_parameter<std::vector<std::string>>(
-      "gz_topics", std::vector<std::string>{});
-    const auto rosTopics = this->declare_parameter<std::vector<std::string>>(
-      "ros_topics", std::vector<std::string>{});
-    const auto frameIds = this->declare_parameter<std::vector<std::string>>(
-      "frame_ids", std::vector<std::string>{});
-    const auto kinds = this->declare_parameter<std::vector<std::string>>(
-      "kinds", std::vector<std::string>{});
-    this->view = this->declare_parameter<bool>("view", true);
+  /// \brief Subscribe to a sonar's gz topic, if not subscribed already.
+  /// \param[in,out] _s The sonar.
+  /// \return False if gz-transport refused.
+  public: bool Subscribe(Sonar &_s);
 
-    if (gzTopics.size() != rosTopics.size())
-    {
-      RCLCPP_ERROR(this->get_logger(),
-        "gz_topics and ros_topics must have the same length");
-      return;
-    }
-    for (std::size_t i = 0; i < gzTopics.size(); ++i)
-    {
-      auto s = std::make_shared<Sonar>();
-      s->frame = i < frameIds.size() ? frameIds[i] : "";
-      if (s->frame.empty() && !gzTopics[i].empty())
-      {
-        // The fallback is gz's scoped sensor name, which no TF publisher
-        // knows; a vehicle's generated parameters always give the frame.
-        RCLCPP_WARN(this->get_logger(),
-          "no frame_ids entry for %s: its messages are stamped with the gz "
-          "sensor name and _acoustic, which TF does not carry", gzTopics[i].c_str());
-      }
-      if (i < kinds.size() && kinds[i] == "detections")
-      {
-        s->detPub = this->create_publisher<RosDetections>(rosTopics[i],
-          PublisherQoS());
-        if (this->view)
-        {
-          s->cloudPub = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-            rosTopics[i] + "/points", PublisherQoS());
-        }
-        std::function<void(const GzDetections &)> dcb =
-          [this, s](const GzDetections &_msg) { this->OnSoundings(*s, _msg); };
-        if (!this->gzNode.Subscribe(gzTopics[i], dcb))
-        {
-          RCLCPP_ERROR(this->get_logger(), "cannot subscribe to [%s]",
-            gzTopics[i].c_str());
-          continue;
-        }
-        RCLCPP_INFO(this->get_logger(), "profiler [%s] -> [%s]",
-          gzTopics[i].c_str(), rosTopics[i].c_str());
-        this->sonars.push_back(s);
-        continue;
-      }
-      s->pub = this->create_publisher<RosImage>(rosTopics[i],
-        PublisherQoS());
-      if (this->view)
-      {
-        s->viewPub = this->create_publisher<sensor_msgs::msg::Image>(
-          rosTopics[i] + "/view", PublisherQoS());
-      }
-      std::function<void(const GzImage &)> cb =
-        [this, s](const GzImage &_msg) { this->OnPing(*s, _msg); };
-      if (!this->gzNode.Subscribe(gzTopics[i], cb))
-      {
-        RCLCPP_ERROR(this->get_logger(), "cannot subscribe to [%s]",
-          gzTopics[i].c_str());
-        continue;
-      }
-      RCLCPP_INFO(this->get_logger(), "sonar [%s] -> [%s]",
-        gzTopics[i].c_str(), rosTopics[i].c_str());
-      this->sonars.push_back(s);
-    }
-  }
+  /// \brief Leave a sonar's gz topic, if subscribed.
+  /// \param[in,out] _s The sonar.
+  public: void Unsubscribe(Sonar &_s);
 
-  private: struct Sonar
-  {
-    /// \brief The frame to stamp; empty for the default.
-    std::string frame;
-    rclcpp::Publisher<RosImage>::SharedPtr pub;
-    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr viewPub;
-    rclcpp::Publisher<RosDetections>::SharedPtr detPub;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloudPub;
-    std::mutex mutex;
-    /// \brief The fan's layout, kept while the geometry holds.
-    FanLayout fan;
-    /// \brief What the fan was laid out for: beams, ranges, first and last
-    /// azimuth.
-    std::vector<double> fanKey;
-    /// \brief A sidescan's recent lines, newest first.
-    std::vector<std::vector<std::uint8_t>> lines;
-  };
-
-  private: void OnPing(Sonar &_s, const GzImage &_m)
-  {
-    const bool wantData = Wanted(_s.pub);
-    const bool wantView = Wanted(_s.viewPub);
-    if (!wantData && !wantView)
-      return;
-    RosImage out;
-    if (!ToProjectedSonarImage(_m, _s.frame, out))
-    {
-      RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-        "malformed sonar message");
-      return;
-    }
-    if (wantView)
-    {
-      if (out.image.dtype ==
-          marine_acoustic_msgs::msg::SonarImageData::DTYPE_UINT8)
-      {
-        this->DrawFan(_s, out);
-      }
-      else
-      {
-        this->DrawWaterfall(_s, out);
-      }
-    }
-    if (wantData)
-      _s.pub->publish(std::move(out));
-  }
+  /// \brief Convert and publish an image, and draw its view.
+  /// \param[in,out] _s The sonar.
+  /// \param[in] _m Its ping.
+  public: void OnPing(Sonar &_s, const GzImage &_m);
 
   /// \brief An imaging sonar's frame drawn as the fan it covers, forward up.
   /// \param[in,out] _s The sonar.
   /// \param[in] _image Its frame.
-  private: void DrawFan(Sonar &_s, const RosImage &_image)
-  {
-    std::lock_guard<std::mutex> lock(_s.mutex);
-    const std::vector<double> key{
-      static_cast<double>(_image.beam_directions.size()),
-      static_cast<double>(_image.ranges.size()),
-      _image.ranges.front(), _image.ranges.back(),
-      BeamAzimuth(_image.beam_directions.front()),
-      BeamAzimuth(_image.beam_directions.back())};
-    if (key != _s.fanKey)
-    {
-      _s.fan = LayOutFan(_image, kFanSide);
-      _s.fanKey = key;
-    }
-    _s.viewPub->publish(kai_sonar_bridge::DrawFan(_image, _s.fan));
-  }
+  public: void DrawFan(Sonar &_s, const RosImage &_image);
 
   /// \brief A sidescan's recent lines, newest at the top, range across.
   /// \param[in,out] _s The sonar.
   /// \param[in] _image Its line.
-  private: void DrawWaterfall(Sonar &_s, const RosImage &_image)
-  {
-    std::lock_guard<std::mutex> lock(_s.mutex);
-    auto line = WaterfallLine(_image, kWaterfallSpan);
-    const std::size_t samples = line.size();
-    if (!_s.lines.empty() && _s.lines.front().size() != samples)
-      _s.lines.clear();
-    _s.lines.insert(_s.lines.begin(), std::move(line));
-    if (_s.lines.size() > kWaterfallLines)
-      _s.lines.pop_back();
-
-    sensor_msgs::msg::Image view;
-    view.header = _image.header;
-    view.width = static_cast<std::uint32_t>(samples);
-    view.height = static_cast<std::uint32_t>(_s.lines.size());
-    view.encoding = "mono8";
-    view.step = view.width;
-    view.data.reserve(samples * _s.lines.size());
-    for (const auto &l : _s.lines)
-      view.data.insert(view.data.end(), l.begin(), l.end());
-    _s.viewPub->publish(std::move(view));
-  }
+  public: void DrawWaterfall(Sonar &_s, const RosImage &_image);
 
   /// \brief A profiler's soundings: the detections message, and the same
   /// soundings as points in its frame.
   /// \param[in,out] _s The sonar.
   /// \param[in] _m The soundings.
-  private: void OnSoundings(Sonar &_s, const GzDetections &_m)
-  {
-    const bool wantData = Wanted(_s.detPub);
-    const bool wantCloud = Wanted(_s.cloudPub);
-    if (!wantData && !wantCloud)
-      return;
-    RosDetections out;
-    if (!ToSonarDetections(_m, _s.frame, out))
-    {
-      RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-        "malformed detections message");
-      return;
-    }
-    if (wantCloud)
-      _s.cloudPub->publish(SoundingsCloud(out));
-    if (wantData)
-      _s.detPub->publish(std::move(out));
-  }
+  public: void OnSoundings(Sonar &_s, const GzDetections &_m);
 
-  private: gz::transport::Node gzNode;
-  private: bool view{true};
-  private: std::vector<std::shared_ptr<Sonar>> sonars;
+  /// \brief The node, for its logger and clock.
+  public: rclcpp::Node *node{nullptr};
+
+  /// \brief The gz-transport node.
+  public: gz::transport::Node gzNode;
+
+  /// \brief Whether views are published.
+  public: bool view{true};
+
+  /// \brief The sonars.
+  public: std::vector<std::shared_ptr<Sonar>> sonars;
+
+  /// \brief Shared with every gz callback; see Gate.
+  public: std::shared_ptr<Gate> gate{std::make_shared<Gate>()};
 };
+
+//////////////////////////////////////////////////
+SonarBridge::SonarBridge(const rclcpp::NodeOptions &_options)
+  : rclcpp::Node("sonar_bridge", _options),
+    dataPtr(std::make_unique<Implementation>())
+{
+  this->dataPtr->node = this;
+  const auto gzTopics = this->declare_parameter<std::vector<std::string>>(
+    "gz_topics", std::vector<std::string>{});
+  const auto rosTopics = this->declare_parameter<std::vector<std::string>>(
+    "ros_topics", std::vector<std::string>{});
+  const auto frameIds = this->declare_parameter<std::vector<std::string>>(
+    "frame_ids", std::vector<std::string>{});
+  const auto kinds = this->declare_parameter<std::vector<std::string>>(
+    "kinds", std::vector<std::string>{});
+  this->dataPtr->view = this->declare_parameter<bool>("view", true);
+
+  if (gzTopics.size() != rosTopics.size())
+  {
+    RCLCPP_ERROR(this->get_logger(),
+      "gz_topics and ros_topics must have the same length");
+    return;
+  }
+  for (std::size_t i = 0; i < gzTopics.size(); ++i)
+  {
+    auto s = std::make_shared<Sonar>();
+    s->gzTopic = gzTopics[i];
+    s->detections = i < kinds.size() && kinds[i] == "detections";
+    s->frame = i < frameIds.size() ? frameIds[i] : "";
+    if (s->frame.empty() && !gzTopics[i].empty())
+    {
+      // The fallback is gz's scoped sensor name, which no TF publisher
+      // knows; a vehicle's generated parameters always give the frame.
+      RCLCPP_WARN(this->get_logger(),
+        "no frame_ids entry for %s: its messages are stamped with the gz "
+        "sensor name and _acoustic, which TF does not carry",
+        gzTopics[i].c_str());
+    }
+    if (s->detections)
+    {
+      s->detPub = this->create_publisher<RosDetections>(rosTopics[i],
+        PublisherQoS());
+      if (this->dataPtr->view)
+      {
+        s->cloudPub = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+          rosTopics[i] + "/points", PublisherQoS());
+      }
+    }
+    else
+    {
+      s->pub = this->create_publisher<RosImage>(rosTopics[i],
+        PublisherQoS());
+      if (this->dataPtr->view)
+      {
+        s->viewPub = this->create_publisher<sensor_msgs::msg::Image>(
+          rosTopics[i] + "/view", PublisherQoS());
+      }
+    }
+    if (!this->dataPtr->Subscribe(*s))
+      continue;
+    RCLCPP_INFO(this->get_logger(), "%s [%s] -> [%s]",
+      s->detections ? "profiler" : "sonar", gzTopics[i].c_str(),
+      rosTopics[i].c_str());
+    this->dataPtr->sonars.push_back(s);
+  }
+}
+
+//////////////////////////////////////////////////
+SonarBridge::~SonarBridge()
+{
+  // Leave gz first, so no new callback is handed out, then close the gate:
+  // that waits for the callbacks already running, and turns away any that
+  // gz-transport had already started. Only then do the publishers and the
+  // node go.
+  for (auto &s : this->dataPtr->sonars)
+    this->dataPtr->Unsubscribe(*s);
+  this->dataPtr->gate->Close();
+}
+
+//////////////////////////////////////////////////
+bool SonarBridge::Implementation::Subscribe(Sonar &_s)
+{
+  if (_s.gzSub.Valid())
+    return true;
+  // The callback owns the gate and the sonar, and reaches the node only
+  // through an open gate.
+  auto g = this->gate;
+  Sonar *s = &_s;
+  if (_s.detections)
+  {
+    std::function<void(const GzDetections &)> cb =
+      [this, g, s](const GzDetections &_msg)
+      {
+        const Pass pass(*g);
+        if (pass)
+          this->OnSoundings(*s, _msg);
+      };
+    _s.gzSub = this->gzNode.CreateSubscriber(_s.gzTopic, cb);
+  }
+  else
+  {
+    std::function<void(const GzImage &)> cb =
+      [this, g, s](const GzImage &_msg)
+      {
+        const Pass pass(*g);
+        if (pass)
+          this->OnPing(*s, _msg);
+      };
+    _s.gzSub = this->gzNode.CreateSubscriber(_s.gzTopic, cb);
+  }
+  if (!_s.gzSub.Valid())
+  {
+    RCLCPP_ERROR(this->node->get_logger(), "cannot subscribe to [%s]",
+      _s.gzTopic.c_str());
+    return false;
+  }
+  return true;
+}
+
+//////////////////////////////////////////////////
+void SonarBridge::Implementation::Unsubscribe(Sonar &_s)
+{
+  if (_s.gzSub.Valid())
+    _s.gzSub.Unsubscribe();
+  _s.gzSub = gz::transport::Node::Subscriber();
+}
+
+//////////////////////////////////////////////////
+void SonarBridge::Implementation::OnPing(Sonar &_s, const GzImage &_m)
+{
+  const bool wantData = Wanted(_s.pub);
+  const bool wantView = Wanted(_s.viewPub);
+  if (!wantData && !wantView)
+    return;
+  RosImage out;
+  if (!ToProjectedSonarImage(_m, _s.frame, out))
+  {
+    RCLCPP_WARN_THROTTLE(this->node->get_logger(),
+      *this->node->get_clock(), 5000, "malformed sonar message");
+    return;
+  }
+  if (wantView)
+  {
+    if (out.image.dtype ==
+        marine_acoustic_msgs::msg::SonarImageData::DTYPE_UINT8)
+    {
+      this->DrawFan(_s, out);
+    }
+    else
+    {
+      this->DrawWaterfall(_s, out);
+    }
+  }
+  if (wantData)
+    _s.pub->publish(std::move(out));
+}
+
+//////////////////////////////////////////////////
+void SonarBridge::Implementation::DrawFan(Sonar &_s, const RosImage &_image)
+{
+  std::lock_guard<std::mutex> lock(_s.mutex);
+  const std::vector<double> key{
+    static_cast<double>(_image.beam_directions.size()),
+    static_cast<double>(_image.ranges.size()),
+    _image.ranges.front(), _image.ranges.back(),
+    BeamAzimuth(_image.beam_directions.front()),
+    BeamAzimuth(_image.beam_directions.back())};
+  if (key != _s.fanKey)
+  {
+    _s.fan = LayOutFan(_image, kFanSide);
+    _s.fanKey = key;
+  }
+  _s.viewPub->publish(kai_sonar_bridge::DrawFan(_image, _s.fan));
+}
+
+//////////////////////////////////////////////////
+void SonarBridge::Implementation::DrawWaterfall(Sonar &_s,
+  const RosImage &_image)
+{
+  std::lock_guard<std::mutex> lock(_s.mutex);
+  auto line = WaterfallLine(_image, kWaterfallSpan);
+  const std::size_t samples = line.size();
+  if (!_s.lines.empty() && _s.lines.front().size() != samples)
+    _s.lines.clear();
+  _s.lines.insert(_s.lines.begin(), std::move(line));
+  if (_s.lines.size() > kWaterfallLines)
+    _s.lines.pop_back();
+
+  sensor_msgs::msg::Image view;
+  view.header = _image.header;
+  view.width = static_cast<std::uint32_t>(samples);
+  view.height = static_cast<std::uint32_t>(_s.lines.size());
+  view.encoding = "mono8";
+  view.step = view.width;
+  view.data.reserve(samples * _s.lines.size());
+  for (const auto &l : _s.lines)
+    view.data.insert(view.data.end(), l.begin(), l.end());
+  _s.viewPub->publish(std::move(view));
+}
+
+//////////////////////////////////////////////////
+void SonarBridge::Implementation::OnSoundings(Sonar &_s, const GzDetections &_m)
+{
+  const bool wantData = Wanted(_s.detPub);
+  const bool wantCloud = Wanted(_s.cloudPub);
+  if (!wantData && !wantCloud)
+    return;
+  RosDetections out;
+  if (!ToSonarDetections(_m, _s.frame, out))
+  {
+    RCLCPP_WARN_THROTTLE(this->node->get_logger(),
+      *this->node->get_clock(), 5000, "malformed detections message");
+    return;
+  }
+  if (wantCloud)
+    _s.cloudPub->publish(SoundingsCloud(out));
+  if (wantData)
+    _s.detPub->publish(std::move(out));
+}
 }  // namespace kai_sonar_bridge
 
 RCLCPP_COMPONENTS_REGISTER_NODE(kai_sonar_bridge::SonarBridge)

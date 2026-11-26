@@ -48,10 +48,11 @@ target_link_libraries(${PROJECT_NAME}_conversions PUBLIC
   ${sensor_msgs_TARGETS})
 
 add_library(${PROJECT_NAME} SHARED src/SonarBridge.cc)
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(${PROJECT_NAME} PUBLIC
   ${PROJECT_NAME}_conversions
+  rclcpp::rclcpp)
+target_link_libraries(${PROJECT_NAME} PRIVATE
   gz-transport::core
-  rclcpp::rclcpp
   rclcpp_components::component)
 rclcpp_components_register_node(${PROJECT_NAME}
   PLUGIN "kai_sonar_bridge::SonarBridge"
@@ -90,6 +91,15 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(conversions_test test/conversions_test.cc)
   target_link_libraries(conversions_test ${PROJECT_NAME}_conversions)
+
+  # The node in process, fed over gz-transport. Its own ROS domain, so the
+  # topics of anything else running on the machine stay out; the test sets
+  # its own gz partition.
+  find_package(ament_cmake_ros REQUIRED)
+  ament_add_ros_isolated_gtest(sonar_bridge_test test/sonar_bridge_test.cc
+    TIMEOUT 180)
+  target_link_libraries(sonar_bridge_test
+    ${PROJECT_NAME} gz-transport::core)
 endif()
 
 ament_package()
