@@ -165,11 +165,13 @@ struct FrameStats
 ///   lit = J exp(-K_d max(z, 0))
 ///   I   = lit exp(-attenuation w) + veil (1 - exp(-backscatter w))
 ///
-/// then the response: exposure, white balance, noise. A pixel with no
+/// then the camera's response, which always applies: noise on the light
+/// the sensor caught, then exposure and white balance. A pixel with no
 /// depth (nothing hit, or beyond the far clip) sees the open water: w is the
 /// distance to the surface for a climbing ray, otherwise infinite, so it is
-/// the veil. With the camera at or above the surface the image is copied
-/// unchanged.
+/// the veil. With the camera at or above the surface (a camera depth of 0,
+/// also when the renderer drew the water already) only the response
+/// applies: with the default response, the image comes out unchanged.
 /// \param[in] _rgb The in-air image, RGB, 8 bits per channel, row by row.
 /// \param[in] _depth The z-depth image, m, same size; not finite or not
 /// positive for "nothing hit".

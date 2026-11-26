@@ -280,7 +280,7 @@ What a world says to the water optics system,
 | `<diffuse_attenuation>` | K_d, how fast the daylight fades with depth, 1/m, as `r g b`. Replaces the type's K_d. |
 | `<water_level>` | World z of the still water, m, default 0. Under a wave field, depth is below the local wave surface. |
 | `<daylight>` | How strong the daylight is against the renderer's sun, default 1: it scales the veil. 0 at night, when only lamps light the water. |
-| `<publish_rate>` | Rate of the ground truth, 1 Hz by default. |
+| `<publish_rate>` | Rate of the ground truth in wall time, 1 Hz by default, so it keeps coming while paused; a change is published at once. 0 publishes on a change only. |
 
 Any other element is warned about and ignored. An unknown type, a visibility
 that is not positive or a negative value is one error, and the world has
@@ -325,20 +325,23 @@ publishes `<topic>/underwater/image` (`gz.msgs.Image`, RGB 8 bit) and
 | `<exposure>` | `1` | A gain on linear light, or `auto`, aiming the mean luminance at 0.18. |
 | `<max_gain>` | `16` | With `auto`, the gain stays within 1/max and max. |
 | `<white_balance>` | `none` | `none`, or `grey_world`, which takes the water's tint out. |
-| `<shot_noise>`, `<read_noise>` | `0` | Gaussian noise on linear light, variance shot_noise · signal + read_noise². |
-| `<seed>` | `1` | The noise's seed. |
+| `<shot_noise>`, `<read_noise>` | `0` | Gaussian noise on the light the sensor caught, variance shot_noise · signal + read_noise², before the gain. |
+| `<seed>` | `1` | The noise's seed, mixed with the sensor's scoped name, so each camera gets its own noise. |
 
-The water is the world's (`gz-maritime-water-optics-system`); without it the
-image is the plain camera's, and above the water it is copied unchanged.
+The water is the world's (`gz-maritime-water-optics-system`); without it, or
+above the water, only the camera's response applies, which by default
+changes nothing. The plugin works only while its output has a subscriber.
 
 ## Underwater rendering
 
 Include `model://underwater_optics` (from `gz_underwater_rendering`) in a
 world with water optics, and every ogre2 camera, and the GUI's 3D view, sees
 through the water: the same model as the underwater camera, per fragment, on
-the GPU. It takes no parameters; the water is the world's. Cameras above the
-water are untouched, and an underwater camera plugin in the same world passes
-its image through. Only surfaces Ogre's PBS shades are drawn through the
+the GPU. The water is the world's; `<enabled>false</enabled>` in its plugin
+starts it off, and a `gz.msgs.Boolean` on
+`/world/<world>/underwater_rendering/enable` turns it off and on. Cameras
+above the water are untouched, and an underwater camera plugin in the same
+world applies only its own response while it is on. Only surfaces Ogre's PBS shades are drawn through the
 water: the sky, the background, the water surface, markers and terrain are
 drawn as in air. A spot or point light with `lamp` in its own name (up to
 four, the first by name) is a lamp: its light fades both ways through the
@@ -490,14 +493,14 @@ gz topic -e -t /world/default/ocean_current_info -n 1
 
 The water is set in the world file and changes while the simulation runs on
 the topic `/world/<world>/water_optics/set`: a `gz.msgs.Param` whose keys are
-the elements above. `jerlov` takes a string; `visibility` and `water_level`
-a number (or a string holding one); `attenuation`, `backscatter`, `veil` and
+the elements above. `jerlov` takes a string; `visibility`, `water_level` and
+`daylight` a number (or a string holding one); `attenuation`, `backscatter`, `veil` and
 `diffuse_attenuation` a string `"r g b"`. An empty string removes a
 visibility or an explicit value, going back to what the type gives. A
 message is applied whole or not at all. The resolved optics are published on
 `/world/<world>/water_optics_info` as `gz.msgs.Param`: `jerlov`,
-`visibility`, the four per-channel values as strings, `water_level` and
-`generation`.
+`visibility`, the four per-channel values as strings, `water_level`,
+`daylight` and `generation`.
 
 ```bash
 gz topic -t /world/default/water_optics/set -m gz.msgs.Param \

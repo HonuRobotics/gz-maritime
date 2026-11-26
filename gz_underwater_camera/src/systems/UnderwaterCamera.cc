@@ -19,11 +19,22 @@
 #include <gz/msgs/camera_info.pb.h>
 #include <gz/msgs/image.pb.h>
 
+#include <chrono>
+#include <cmath>
+#include <condition_variable>
 #include <cstring>
+#include <deque>
+#include <functional>
+#include <limits>
+#include <locale>
+#include <map>
 #include <mutex>
 #include <optional>
 #include <random>
+#include <sstream>
 #include <string>
+#include <thread>
+#include <utility>
 #include <vector>
 
 #include <gz/common/Console.hh>
@@ -42,169 +53,308 @@ using namespace sim;
 using namespace maritime;
 namespace uc = underwater_camera;
 
+namespace
+{
+using Duration = std::chrono::steady_clock::duration;
+
+/// \brief A message's stamp as a duration.
+Duration Stamp(const msgs::Header &_h)
+{
+  return std::chrono::seconds(_h.stamp().sec()) +
+         std::chrono::nanoseconds(_h.stamp().nsec());
+}
+
+/// \brief How long the water of past steps is kept, for the frames still
+/// on their way.
+constexpr auto kWaterHistory = std::chrono::seconds(2);
+
+/// \brief What the camera's callbacks leave for the worker, shared with
+/// them: gz-transport may still be inside a callback after the plugin
+/// unsubscribed, so what it touches lives as long as the callback holds it.
+struct Mailbox
+{
+  /// \brief Guards everything here.
+  std::mutex mutex;
+
+  /// \brief Wakes the worker.
+  std::condition_variable cv;
+
+  /// \brief The newest colour and depth frames, by stamp.
+  std::map<Duration, msgs::Image> images, depths;
+
+  /// \brief The newest CameraInfo.
+  std::optional<msgs::CameraInfo> info;
+
+  /// \brief The water at the camera at each recent step.
+  std::deque<std::pair<Duration, uc::Water>> waters;
+
+  /// \brief Set to stop the worker.
+  bool stop{false};
+
+  /// \brief Keep a frame, dropping all but the newest few.
+  void Keep(std::map<Duration, msgs::Image> &_frames, const msgs::Image &_m)
+  {
+    {
+      const std::lock_guard<std::mutex> lock(this->mutex);
+      _frames[Stamp(_m.header())] = _m;
+      while (_frames.size() > 4)
+        _frames.erase(_frames.begin());
+    }
+    this->cv.notify_one();
+  }
+};
+
+/// \brief A gain from text: a positive number, read the same in any
+/// locale, with nothing after it.
+std::optional<double> ParseGain(const std::string &_text)
+{
+  std::istringstream is(_text);
+  is.imbue(std::locale::classic());
+  double v{0};
+  std::string rest;
+  if (!(is >> v) || (is >> rest) || !std::isfinite(v) || v <= 0.0)
+    return std::nullopt;
+  return v;
+}
+}  // namespace
+
 class gz::sim::maritime::UnderwaterCameraPrivate
 {
-  /// \brief A colour frame arrived.
-  public: void OnImage(const msgs::Image &_msg);
+  /// \brief Stop the worker and the callbacks. Before anything else goes.
+  public: ~UnderwaterCameraPrivate();
 
-  /// \brief A depth frame arrived.
-  public: void OnDepth(const msgs::Image &_msg);
+  /// \brief Listen to the camera, or stop.
+  /// \param[in] _listen True to listen.
+  public: void Listen(bool _listen);
 
-  /// \brief The camera's intrinsics arrived.
-  public: void OnInfo(const msgs::CameraInfo &_msg);
+  /// \brief The worker: process the newest pair of frames, one at a time.
+  public: void Run();
 
-  /// \brief If the colour and depth frames match, make and publish the
-  /// underwater image. Call with the mutex held.
-  public: void TryProcess();
+  /// \brief Check a pair of frames against the camera and make the
+  /// underwater image. Outside the lock.
+  /// \param[in] _img Colour.
+  /// \param[in] _dep Depth.
+  /// \param[in] _water The water at the camera at their step.
+  /// \param[out] _out The underwater image.
+  /// \return False, with a warning once, for frames that do not fit.
+  public: bool Make(const msgs::Image &_img, const msgs::Image &_dep,
+                    const uc::Water &_water, msgs::Image &_out);
+
+  /// \brief Whether Configure set the camera up.
+  public: bool active{false};
 
   /// \brief The sensor entity.
   public: Entity sensor{kNullEntity};
 
+  /// \brief The camera's topics, and the output's base.
+  public: std::string base;
+
   /// \brief The camera's response.
   public: uc::Response response;
 
-  /// \brief Noise.
+  /// \brief Noise. Worker only.
   public: std::mt19937 rng{1};
 
-  /// \brief Reads the world's water.
+  /// \brief Reads the world's water. Simulation thread only.
   public: water_optics::WaterOpticsSampler sampler;
 
-  /// \brief Guards everything below across transport and ECM threads.
-  public: std::mutex mutex;
+  /// \brief The callbacks' and the steps' mailbox.
+  public: std::shared_ptr<Mailbox> mailbox{std::make_shared<Mailbox>()};
 
-  /// \brief The water at the camera, from the last step.
-  public: uc::Water water;
-
-  /// \brief Whether a step has filled the water in yet.
-  public: bool haveWater{false};
-
-  /// \brief The latest frames, waiting for their partner.
-  public: std::optional<msgs::Image> image;
-  public: std::optional<msgs::Image> depth;
-
-  /// \brief The camera's ray table, rebuilt when its intrinsics change.
+  /// \brief The camera's ray table and the info it was built from. Worker
+  /// only.
   public: std::optional<uc::RayTable> rays;
-
-  /// \brief The last CameraInfo.
   public: std::optional<msgs::CameraInfo> info;
+
+  /// \brief Whether a frame that does not fit was warned about. Worker
+  /// only.
+  public: bool warnedFrame{false};
 
   /// \brief Transport.
   public: transport::Node node;
   public: transport::Node::Publisher imagePub;
   public: transport::Node::Publisher infoPub;
 
-  /// \brief Frames made.
-  public: std::uint64_t frames{0};
+  /// \brief Whether the camera's topics are subscribed.
+  public: bool listening{false};
+
+  /// \brief The worker.
+  public: std::thread worker;
 
   /// \brief Whether the pass-through was announced.
   public: bool warnedDrawn{false};
 };
 
-namespace
-{
-bool SameStamp(const msgs::Image &_a, const msgs::Image &_b)
-{
-  return _a.header().stamp().sec() == _b.header().stamp().sec() &&
-         _a.header().stamp().nsec() == _b.header().stamp().nsec();
-}
-}  // namespace
-
 //////////////////////////////////////////////////
-void UnderwaterCameraPrivate::OnImage(const msgs::Image &_msg)
+UnderwaterCameraPrivate::~UnderwaterCameraPrivate()
 {
-  const std::lock_guard<std::mutex> lock(this->mutex);
-  this->image = _msg;
-  this->TryProcess();
-}
-
-//////////////////////////////////////////////////
-void UnderwaterCameraPrivate::OnDepth(const msgs::Image &_msg)
-{
-  const std::lock_guard<std::mutex> lock(this->mutex);
-  this->depth = _msg;
-  this->TryProcess();
-}
-
-//////////////////////////////////////////////////
-void UnderwaterCameraPrivate::OnInfo(const msgs::CameraInfo &_msg)
-{
-  const std::lock_guard<std::mutex> lock(this->mutex);
-  uc::Intrinsics k;
-  k.width = _msg.width();
-  k.height = _msg.height();
-  if (_msg.intrinsics().k_size() >= 9)
+  this->Listen(false);
   {
-    k.fx = _msg.intrinsics().k(0);
-    k.cx = _msg.intrinsics().k(2);
-    k.fy = _msg.intrinsics().k(4);
-    k.cy = _msg.intrinsics().k(5);
+    const std::lock_guard<std::mutex> lock(this->mailbox->mutex);
+    this->mailbox->stop = true;
   }
-  if (!this->rays || this->rays->Camera().width != k.width ||
-      this->rays->Camera().height != k.height ||
-      this->rays->Camera().fx != k.fx || this->rays->Camera().fy != k.fy ||
-      this->rays->Camera().cx != k.cx || this->rays->Camera().cy != k.cy)
-  {
-    this->rays.emplace(k);
-  }
-  this->info = _msg;
+  this->mailbox->cv.notify_all();
+  if (this->worker.joinable())
+    this->worker.join();
 }
 
 //////////////////////////////////////////////////
-void UnderwaterCameraPrivate::TryProcess()
+void UnderwaterCameraPrivate::Listen(bool _listen)
 {
-  if (!this->image || !this->depth || !this->rays || !this->haveWater ||
-      !SameStamp(*this->image, *this->depth))
+  if (_listen == this->listening || this->base.empty())
+    return;
+  this->listening = _listen;
+  if (!_listen)
   {
+    for (const char *t : {"/image", "/depth_image", "/camera_info"})
+      this->node.Unsubscribe(this->base + t);
     return;
   }
-  const auto &img = *this->image;
-  const auto &dep = *this->depth;
+  // The callbacks hold the mailbox, not the plugin.
+  std::shared_ptr<Mailbox> box = this->mailbox;
+  std::function<void(const msgs::Image &)> onImage =
+      [box](const msgs::Image &_m) { box->Keep(box->images, _m); };
+  std::function<void(const msgs::Image &)> onDepth =
+      [box](const msgs::Image &_m) { box->Keep(box->depths, _m); };
+  std::function<void(const msgs::CameraInfo &)> onInfo =
+      [box](const msgs::CameraInfo &_m)
+      {
+        const std::lock_guard<std::mutex> lock(box->mutex);
+        box->info = _m;
+      };
+  this->node.Subscribe(this->base + "/image", onImage);
+  this->node.Subscribe(this->base + "/depth_image", onDepth);
+  this->node.Subscribe(this->base + "/camera_info", onInfo);
+}
+
+//////////////////////////////////////////////////
+void UnderwaterCameraPrivate::Run()
+{
+  auto &box = *this->mailbox;
+  while (true)
+  {
+    msgs::Image img, dep;
+    uc::Water water;
+    std::optional<msgs::CameraInfo> info;
+    {
+      std::unique_lock<std::mutex> lock(box.mutex);
+      // The newest stamp with both frames, and water for it
+      std::optional<Duration> stamp;
+      box.cv.wait(lock, [&]
+      {
+        if (box.stop)
+          return true;
+        stamp.reset();
+        for (auto it = box.images.rbegin(); it != box.images.rend(); ++it)
+        {
+          if (box.depths.count(it->first))
+          {
+            stamp = it->first;
+            break;
+          }
+        }
+        return stamp && box.info && !box.waters.empty();
+      });
+      if (box.stop)
+        return;
+      img = std::move(box.images[*stamp]);
+      dep = std::move(box.depths[*stamp]);
+      box.images.erase(box.images.begin(), box.images.upper_bound(*stamp));
+      box.depths.erase(box.depths.begin(), box.depths.upper_bound(*stamp));
+      // The water of the frame's own step, or the closest before it
+      water = box.waters.front().second;
+      for (const auto &[time, w] : box.waters)
+      {
+        if (time > *stamp)
+          break;
+        water = w;
+      }
+      info = box.info;
+    }
+
+    // The camera's rays, again when its intrinsics change
+    uc::Intrinsics k;
+    k.width = info->width();
+    k.height = info->height();
+    if (info->intrinsics().k_size() >= 9)
+    {
+      k.fx = info->intrinsics().k(0);
+      k.cx = info->intrinsics().k(2);
+      k.fy = info->intrinsics().k(4);
+      k.cy = info->intrinsics().k(5);
+    }
+    if (!this->rays || this->rays->Camera().width != k.width ||
+        this->rays->Camera().height != k.height ||
+        this->rays->Camera().fx != k.fx || this->rays->Camera().fy != k.fy ||
+        this->rays->Camera().cx != k.cx || this->rays->Camera().cy != k.cy)
+    {
+      this->rays.emplace(k);
+    }
+    this->info = info;
+
+    msgs::Image out;
+    if (!this->Make(img, dep, water, out))
+      continue;
+    this->imagePub.Publish(out);
+    msgs::CameraInfo outInfo = *info;
+    *outInfo.mutable_header() = img.header();
+    this->infoPub.Publish(outInfo);
+  }
+}
+
+//////////////////////////////////////////////////
+bool UnderwaterCameraPrivate::Make(const msgs::Image &_img,
+    const msgs::Image &_dep, const uc::Water &_water, msgs::Image &_out)
+{
   const auto &k = this->rays->Camera();
-  if (img.width() != k.width || img.height() != k.height ||
-      dep.width() != k.width || dep.height() != k.height ||
-      img.pixel_format_type() != msgs::PixelFormatType::RGB_INT8 ||
-      dep.pixel_format_type() != msgs::PixelFormatType::R_FLOAT32)
+  const std::size_t n = static_cast<std::size_t>(k.width) * k.height;
+  std::string problem;
+  if (_img.pixel_format_type() != msgs::PixelFormatType::RGB_INT8)
+    problem = "a colour image that is not RGB, 8 bits";
+  else if (_dep.pixel_format_type() != msgs::PixelFormatType::R_FLOAT32)
+    problem = "a depth image that is not float";
+  else if (_img.width() != k.width || _img.height() != k.height ||
+           _dep.width() != k.width || _dep.height() != k.height)
+    problem = "frames of another size than the camera's";
+  else if (k.height > 0 && (_img.step() < k.width * 3 ||
+           _img.data().size() < static_cast<std::size_t>(_img.step()) *
+           (k.height - 1) + k.width * 3))
+    problem = "a colour image shorter than its size";
+  else if (_dep.data().size() < n * sizeof(float))
+    problem = "a depth image shorter than its size";
+  if (!problem.empty())
   {
-    gzwarn << "UnderwaterCamera: frames of " << img.width() << "x"
-           << img.height() << " do not match the camera's " << k.width
-           << "x" << k.height << " RGB and float depth; skipped\n";
-    this->image.reset();
-    this->depth.reset();
-    return;
+    if (!this->warnedFrame)
+    {
+      gzwarn << "UnderwaterCamera: " << problem << " (" << _img.width()
+             << "x" << _img.height() << ", the camera is " << k.width << "x"
+             << k.height << "); such frames are skipped\n";
+      this->warnedFrame = true;
+    }
+    return false;
   }
 
-  const std::size_t n = static_cast<std::size_t>(k.width) * k.height;
   std::vector<std::uint8_t> rgb(n * 3);
   for (std::uint32_t v = 0; v < k.height; ++v)
   {
-    std::memcpy(rgb.data() + v * k.width * 3,
-                img.data().data() + v * img.step(), k.width * 3);
+    std::memcpy(rgb.data() + static_cast<std::size_t>(v) * k.width * 3,
+                _img.data().data() + static_cast<std::size_t>(v) * _img.step(),
+                k.width * 3);
   }
   std::vector<float> z(n);
-  std::memcpy(z.data(), dep.data().data(),
-              std::min(dep.data().size(), n * sizeof(float)));
+  std::memcpy(z.data(), _dep.data().data(), n * sizeof(float));
 
-  std::vector<std::uint8_t> out;
-  uc::MakeUnderwater(rgb, z, *this->rays, this->water, this->response,
-                     this->rng, out);
+  std::vector<std::uint8_t> pixels;
+  uc::MakeUnderwater(rgb, z, *this->rays, _water, this->response, this->rng,
+                     pixels);
 
-  msgs::Image msg;
-  *msg.mutable_header() = img.header();
-  msg.set_width(k.width);
-  msg.set_height(k.height);
-  msg.set_step(k.width * 3);
-  msg.set_pixel_format_type(msgs::PixelFormatType::RGB_INT8);
-  msg.set_data(out.data(), out.size());
-  this->imagePub.Publish(msg);
-  if (this->info)
-  {
-    msgs::CameraInfo info = *this->info;
-    *info.mutable_header() = img.header();
-    this->infoPub.Publish(info);
-  }
-  ++this->frames;
-  this->image.reset();
-  this->depth.reset();
+  *_out.mutable_header() = _img.header();
+  _out.set_width(k.width);
+  _out.set_height(k.height);
+  _out.set_step(k.width * 3);
+  _out.set_pixel_format_type(msgs::PixelFormatType::RGB_INT8);
+  _out.set_data(pixels.data(), pixels.size());
+  return true;
 }
 
 //////////////////////////////////////////////////
@@ -223,7 +373,6 @@ void UnderwaterCamera::Configure(const Entity &_entity,
     EventManager &/*_eventMgr*/)
 {
   auto &d = *this->dataPtr;
-  d.sensor = _entity;
   const auto *camera = _ecm.Component<components::RgbdCamera>(_entity);
   if (!camera)
   {
@@ -245,20 +394,24 @@ void UnderwaterCamera::Configure(const Entity &_entity,
   if (exposure == "auto")
   {
     d.response.exposure = uc::Response::Exposure::kAuto;
-    d.response.gain = _sdf->Get<double>("max_gain", 16.0).first;
+    const auto maxGain = ParseGain(
+        _sdf->Get<std::string>("max_gain", "16").first);
+    if (!maxGain || *maxGain < 1.0)
+    {
+      gzerr << "UnderwaterCamera: <max_gain> is a number of 1 or more; "
+            << "using 16\n";
+    }
+    d.response.gain = maxGain && *maxGain >= 1.0 ? *maxGain : 16.0;
   }
   else
   {
-    try
+    const auto gain = ParseGain(exposure);
+    if (!gain)
     {
-      d.response.gain = std::stod(exposure);
+      gzerr << "UnderwaterCamera: <exposure> is a positive gain or 'auto', "
+            << "not '" << exposure << "'; using 1\n";
     }
-    catch (...)
-    {
-      gzerr << "UnderwaterCamera: <exposure> is a gain or 'auto', not '"
-            << exposure << "'; using 1\n";
-      d.response.gain = 1.0;
-    }
+    d.response.gain = gain.value_or(1.0);
   }
   const std::string wb =
       _sdf->Get<std::string>("white_balance", "none").first;
@@ -267,11 +420,24 @@ void UnderwaterCamera::Configure(const Entity &_entity,
   else if (wb != "none")
     gzerr << "UnderwaterCamera: unknown <white_balance> '" << wb
           << "'; using none\n";
-  d.response.shotNoise = std::max(0.0, _sdf->Get<double>("shot_noise",
-                                                         0.0).first);
-  d.response.readNoise = std::max(0.0, _sdf->Get<double>("read_noise",
-                                                         0.0).first);
-  d.rng.seed(_sdf->Get<unsigned int>("seed", 1u).first);
+  for (const auto &[tag, value] :
+       {std::make_pair("shot_noise", &d.response.shotNoise),
+        std::make_pair("read_noise", &d.response.readNoise)})
+  {
+    const double v = _sdf->Get<double>(tag, 0.0).first;
+    if (!std::isfinite(v) || v < 0.0)
+    {
+      gzerr << "UnderwaterCamera: <" << tag << "> must not be negative; "
+            << "using 0\n";
+    }
+    *value = std::isfinite(v) && v > 0.0 ? v : 0.0;
+  }
+  // Each camera its own noise, and the same every run
+  const unsigned int seed = _sdf->Get<unsigned int>("seed", 1u).first;
+  const std::string name = scopedName(_entity, _ecm);
+  std::seed_seq seq{seed, static_cast<unsigned int>(
+      std::hash<std::string>{}(name) & 0xffffffffu)};
+  d.rng.seed(seq);
 
   std::string base = "/" + topic;
   while (base.size() > 1 && base[1] == '/')
@@ -280,11 +446,10 @@ void UnderwaterCamera::Configure(const Entity &_entity,
                                                  base + "/underwater").first;
   d.imagePub = d.node.Advertise<msgs::Image>(out + "/image");
   d.infoPub = d.node.Advertise<msgs::CameraInfo>(out + "/camera_info");
-  d.node.Subscribe(base + "/image", &UnderwaterCameraPrivate::OnImage, &d);
-  d.node.Subscribe(base + "/depth_image", &UnderwaterCameraPrivate::OnDepth,
-                   &d);
-  d.node.Subscribe(base + "/camera_info", &UnderwaterCameraPrivate::OnInfo,
-                   &d);
+  d.base = base;
+  d.sensor = _entity;
+  d.active = true;
+  d.worker = std::thread(&UnderwaterCameraPrivate::Run, &d);
   gzmsg << "UnderwaterCamera: " << base << " -> " << out << "/image\n";
 }
 
@@ -293,31 +458,60 @@ void UnderwaterCamera::PostUpdate(const UpdateInfo &_info,
     const EntityComponentManager &_ecm)
 {
   auto &d = *this->dataPtr;
-  if (d.sensor == kNullEntity)
+  if (!d.active)
     return;
-  d.sampler.Sync(_ecm);
-  // The renderer already draws the water into every camera's image: pass
-  // it through rather than apply the water twice.
-  const bool drawn = nullptr != _ecm.Component<components::UnderwaterRendering>(
-      worldEntity(_ecm));
-  const auto pose = worldPose(d.sensor, _ecm);
-  const double depth = d.sampler.Depth(pose.Pos(), _info.simTime);
-  const auto &optics = d.sampler.Data();
+  // Only while someone listens to the output: the camera is then not
+  // rendered for us alone.
+  d.Listen(d.imagePub.HasConnections() || d.infoPub.HasConnections());
 
-  const std::lock_guard<std::mutex> lock(d.mutex);
-  d.water.attenuation = optics.attenuation;
-  d.water.backscatter = optics.backscatter;
-  d.water.diffuseAttenuation = optics.diffuseAttenuation;
-  d.water.veil = d.sampler.Veil(depth);
-  d.water.cameraDepth = drawn ? 0.0 : depth;
-  if (drawn && !d.warnedDrawn)
+  d.sampler.Sync(_ecm);
+  // The renderer already draws the water into every camera's image: do not
+  // apply it twice.
+  const auto *mark = _ecm.Component<components::UnderwaterRendering>(
+      worldEntity(_ecm));
+  const bool drawn = mark && _ecm.HasEntity(mark->Data());
+  const auto pose = worldPose(d.sensor, _ecm);
+  uc::Water water;
+  if (d.sampler.Valid())
   {
-    gzmsg << "UnderwaterCamera: the renderer draws the water "
-          << "(gz_underwater_rendering); passing the image through\n";
-    d.warnedDrawn = true;
+    const double depth = d.sampler.Depth(pose.Pos(), _info.simTime);
+    const auto &optics = d.sampler.Data();
+    water.attenuation = optics.attenuation;
+    water.backscatter = optics.backscatter;
+    water.diffuseAttenuation = optics.diffuseAttenuation;
+    water.veil = d.sampler.Veil(depth);
+    water.cameraDepth = depth;
   }
-  d.water.cameraRotation = pose.Rot();
-  d.haveWater = true;
+  // Without water optics, the camera is in clear water: only its response
+  water.cameraRotation = pose.Rot();
+
+  if (drawn)
+  {
+    // The water is in the image already: only the camera's response
+    water.cameraDepth = 0.0;
+    if (!d.warnedDrawn)
+    {
+      gzmsg << "UnderwaterCamera: the renderer draws the water "
+            << "(gz_underwater_rendering); only the camera's response is "
+            << "applied\n";
+      d.warnedDrawn = true;
+    }
+  }
+
+  auto &box = *d.mailbox;
+  {
+    const std::lock_guard<std::mutex> lock(box.mutex);
+    // A reset goes back in time: the history after it is gone
+    while (!box.waters.empty() && box.waters.back().first >= _info.simTime)
+      box.waters.pop_back();
+    box.waters.emplace_back(_info.simTime, water);
+    while (box.waters.size() > 1 &&
+           box.waters.front().first < _info.simTime - kWaterHistory)
+    {
+      box.waters.pop_front();
+    }
+  }
+  box.cv.notify_one();
 }
 
 GZ_ADD_PLUGIN(UnderwaterCamera,

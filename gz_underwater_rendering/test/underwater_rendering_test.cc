@@ -56,6 +56,11 @@ class UnderwaterRenderingTest : public ::testing::Test
     off = CaptureWorld("gpu_off.sdf");
     on = CaptureWorld("gpu_on.sdf");
   }
+  protected: void SetUp() override
+  {
+    if (!off.rendered)
+      GTEST_SKIP() << "nothing rendered: no GPU?";
+  }
   protected: static Capture off, on;
 };
 Capture UnderwaterRenderingTest::off;
