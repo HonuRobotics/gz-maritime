@@ -75,6 +75,63 @@ GzImage FiveByFour()
   m.set_data(data);
   return m;
 }
+//////////////////////////////////////////////////
+/// \brief A uint8 ROS image for drawing: beam j holds the value 50 (j + 1)
+/// at every sample.
+/// \param[in] _azimuths The beams' azimuths, rad.
+/// \param[in] _samples Samples per beam, from 1 m to 15 m (one sample: 15 m).
+/// \return The image.
+RosImage FanOf(const std::vector<double> &_azimuths, std::size_t _samples)
+{
+  RosImage img;
+  for (const double a : _azimuths)
+    img.beam_directions.push_back(kai_sonar_bridge::BeamDirection(a));
+  for (std::size_t k = 0; k < _samples; ++k)
+  {
+    img.ranges.push_back(_samples > 1 ?
+      static_cast<float>(1.0 + 14.0 * k / (_samples - 1)) : 15.0f);
+  }
+  img.image.beam_count = static_cast<std::uint32_t>(_azimuths.size());
+  img.image.dtype = ImageData::DTYPE_UINT8;
+  for (std::size_t k = 0; k < _samples; ++k)
+  {
+    for (std::size_t j = 0; j < _azimuths.size(); ++j)
+      img.image.data.push_back(static_cast<std::uint8_t>(50 * (j + 1)));
+  }
+  return img;
+}
+
+//////////////////////////////////////////////////
+/// \brief What a drawn fan shows of one value: how many pixels, and their
+/// mean column.
+struct Drawn
+{
+  public: std::size_t count{0};
+  public: double column{0.0};
+};
+
+//////////////////////////////////////////////////
+/// \brief Draw an image and find a value in the view.
+/// \param[in] _img The image.
+/// \param[in] _side The view's longer side, pixels.
+/// \param[in] _value The value to look for; 0 for every lit pixel.
+/// \return The pixels with that value.
+Drawn Draw(const RosImage &_img, int _side, int _value)
+{
+  const auto layout = kai_sonar_bridge::LayOutFan(_img, _side);
+  const auto view = kai_sonar_bridge::DrawFan(_img, layout);
+  Drawn d;
+  for (std::size_t p = 0; p < view.data.size(); ++p)
+  {
+    if (view.data[p] == 0 || (_value != 0 && view.data[p] != _value))
+      continue;
+    ++d.count;
+    d.column += static_cast<double>(p % view.width);
+  }
+  if (d.count > 0)
+    d.column /= static_cast<double>(d.count);
+  return d;
+}
 }  // namespace
 
 //////////////////////////////////////////////////
@@ -286,6 +343,135 @@ TEST(Conversions, DrawsFiveByFourFan)
   EXPECT_EQ(view.data[v * 78 + u], 2);
   // Behind the sonar and outside the fan there is nothing.
   EXPECT_EQ(view.data[100 * 78 + 0], 0);
+}
+
+//////////////////////////////////////////////////
+TEST(Conversions, OneBeamFanIsDrawn)
+{
+  // One beam is one angle, which no pixel's center has: the view was black.
+  // It is drawn a degree either side, on the axis and off it, at the
+  // bridge's size and at smaller ones.
+  for (const double a : {0.0, 0.5, -0.5, 1.4, -1.4})
+  {
+    for (const int side : {600, 200, 100})
+    {
+      SCOPED_TRACE("azimuth " + std::to_string(a) + ", side " +
+        std::to_string(side));
+      const RosImage img = FanOf({a}, 64);
+      const Drawn lit = Draw(img, side, 0);
+      EXPECT_EQ(lit.count, Draw(img, side, 50).count);
+      // The wedge's area, in pixels: half the angle times r squared, less
+      // the part inside the first range; the scale is side / 15 m per m,
+      // or less when the box is wider than tall.
+      const auto layout = kai_sonar_bridge::LayOutFan(img, side);
+      const double scale = (layout.height - 1) / 15.0;
+      const double area = 0.5 * (2.0 * M_PI / 180.0) *
+        (15.0 * 15.0 - 1.0) * scale * scale;
+      EXPECT_GT(lit.count, 0.7 * area);
+      EXPECT_LT(lit.count, 1.3 * area);
+      // Port, a positive azimuth, is left of the center column.
+      const double center = 0.5 * layout.width;
+      if (a > 0.1)
+        EXPECT_LT(lit.column, center - 1.0);
+      else if (a < -0.1)
+        EXPECT_GT(lit.column, center + 1.0);
+      else
+        EXPECT_NEAR(lit.column, center, 1.0);
+    }
+  }
+}
+
+//////////////////////////////////////////////////
+TEST(Conversions, FewBeamFansDrawEveryBeam)
+{
+  // Two and three beams, from far narrower than a pixel to wide, on the
+  // axis and off it, first beam to port and first beam to starboard:
+  // every beam is drawn, in order, port on the left.
+  for (const std::size_t beams : {2u, 3u})
+  {
+    for (const double spacing : {1e-5, 0.001, 0.01, 0.2, -0.2, -0.001})
+    {
+      for (const double middle : {0.0, 0.6, -0.6})
+      {
+        SCOPED_TRACE(std::to_string(beams) + " beams, spacing " +
+          std::to_string(spacing) + ", middle " + std::to_string(middle));
+        std::vector<double> az;
+        for (std::size_t j = 0; j < beams; ++j)
+          az.push_back(middle + spacing * (j - 0.5 * (beams - 1)));
+        const RosImage img = FanOf(az, 64);
+        double last{0.0};
+        std::size_t total{0};
+        for (std::size_t j = 0; j < beams; ++j)
+        {
+          const Drawn d = Draw(img, 600, static_cast<int>(50 * (j + 1)));
+          EXPECT_GT(d.count, 20u) << "beam " << j;
+          // Increasing azimuth is to port, which is to the left.
+          if (j > 0 && spacing > 0.0)
+            EXPECT_LT(d.column, last);
+          else if (j > 0)
+            EXPECT_GT(d.column, last);
+          last = d.column;
+          total += d.count;
+        }
+        EXPECT_EQ(total, Draw(img, 600, 0).count);
+      }
+    }
+  }
+}
+
+//////////////////////////////////////////////////
+TEST(Conversions, NarrowAndOneSampleFansAreDrawn)
+{
+  // Many beams in a tenth of a degree: narrower than a pixel at any range.
+  std::vector<double> az;
+  for (int j = 0; j < 100; ++j)
+    az.push_back(0.3 + 1.7e-5 * j);
+  EXPECT_GT(Draw(FanOf(az, 64), 600, 0).count, 1000u);
+
+  // One sample is drawn from the sonar out to its range; with one beam
+  // too, the smallest image there is.
+  EXPECT_GT(Draw(FanOf({-0.4, -0.2, 0.0, 0.2, 0.4}, 1), 600, 0).count,
+    10000u);
+  EXPECT_GT(Draw(FanOf({0.0}, 1), 600, 0).count, 1000u);
+
+  // Nothing to draw is an empty view, not a crash: no beams, no ranges, a
+  // farthest range of zero, no side.
+  EXPECT_EQ(Draw(FanOf({}, 4), 600, 0).count, 0u);
+  EXPECT_EQ(Draw(FanOf({0.0}, 0), 600, 0).count, 0u);
+  RosImage zero = FanOf({0.0}, 1);
+  zero.ranges[0] = 0.0f;
+  EXPECT_TRUE(kai_sonar_bridge::LayOutFan(zero, 600).lookup.empty());
+  EXPECT_TRUE(kai_sonar_bridge::LayOutFan(FanOf({0.0}, 4), 0).lookup.empty());
+}
+
+//////////////////////////////////////////////////
+TEST(Conversions, WideFanDrawnAsBefore)
+{
+  // A fan wider than the least width is laid out as it always was: every
+  // pixel between the first and last beam and range takes its nearest.
+  const RosImage img = FanOf({0.5, 0.25, 0.0, -0.25, -0.5}, 8);
+  const auto layout = kai_sonar_bridge::LayOutFan(img, 300);
+  const double scale = 300.0 / 15.0;
+  ASSERT_EQ(layout.height, 301);
+  ASSERT_EQ(layout.width, 288);
+  for (int v = 0; v < layout.height; ++v)
+  {
+    for (int u = 0; u < layout.width; ++u)
+    {
+      const double fwd = (layout.height - 1 - v) / scale;
+      const double left = (0.5 * layout.width - u) / scale;
+      const double r = std::hypot(fwd, left);
+      const double a = std::atan2(left, fwd);
+      int expected{-1};
+      if (r >= 1.0 && r <= 15.0 && a >= -0.5 && a <= 0.5)
+      {
+        expected = static_cast<int>(std::lround((r - 1.0) / 2.0)) * 5 +
+          static_cast<int>(std::lround((0.5 - a) / 0.25));
+      }
+      ASSERT_EQ(layout.lookup[static_cast<std::size_t>(v) * layout.width + u],
+        expected) << u << ", " << v;
+    }
+  }
 }
 
 //////////////////////////////////////////////////

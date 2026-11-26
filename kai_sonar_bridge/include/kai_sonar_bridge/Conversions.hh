@@ -144,10 +144,15 @@ double FanSize(double _rMax, double _aMin, double _aMax, int _maxSide,
   int &_width, int &_height);
 
 /// \brief Lay out a ProjectedSonarImage's fan. The beams are taken as
-/// evenly spaced in azimuth, and the samples in range.
+/// evenly spaced in azimuth, and the samples in range. Each pixel takes
+/// the nearest beam and sample. A fan narrower than a degree either side
+/// of its middle (one beam is the extreme) is drawn that wide, its beams
+/// sharing the width equally, and one sample is drawn from the sonar out
+/// to its range, so neither comes out as an empty image.
 /// \param[in] _image The image; its data is not read.
 /// \param[in] _maxSide The longer side, pixels.
-/// \return The layout; empty for an image with no beams or ranges.
+/// \return The layout; empty for an image with no beams or ranges, or
+/// whose farthest range is not positive.
 FanLayout LayOutFan(const RosImage &_image, int _maxSide);
 
 /// \brief Draw an 8-bit ProjectedSonarImage as its fan, forward up and

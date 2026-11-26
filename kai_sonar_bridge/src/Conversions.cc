@@ -28,6 +28,10 @@ namespace
 {
 using ImageData = marine_acoustic_msgs::msg::SonarImageData;
 
+/// \brief The least half-width a fan is drawn with, rad: a degree, so one
+/// beam, or a fan narrower than a pixel, is still a visible wedge.
+constexpr double kMinHalfFan = M_PI / 180.0;
+
 //////////////////////////////////////////////////
 /// \brief A ROS stamp from a gz header's.
 /// \param[in] _h The gz header.
@@ -229,7 +233,7 @@ double FanSize(double _rMax, double _aMin, double _aMax, int _maxSide,
   // Symmetric about the axis, so the sonar sits at the bottom center; at
   // least a degree either side, so a one-beam fan still has a width.
   const double half = std::min(std::max({std::abs(_aMin), std::abs(_aMax),
-    M_PI / 180.0}), M_PI / 2.0);
+    kMinHalfFan}), M_PI / 2.0);
   const double boxWidth = 2.0 * _rMax * std::sin(half);
   const double scale = _maxSide / std::max(boxWidth, _rMax);
   _width = std::max(1, static_cast<int>(std::lround(boxWidth * scale)));
@@ -243,20 +247,31 @@ FanLayout LayOutFan(const RosImage &_image, int _maxSide)
   FanLayout layout;
   const std::size_t beams = _image.beam_directions.size();
   const std::size_t samples = _image.ranges.size();
-  if (beams == 0 || samples == 0)
+  if (beams == 0 || samples == 0 || _maxSide < 1)
     return layout;
-  const double rMin = _image.ranges.front();
-  const double rMax = _image.ranges.back();
+  const double rLast = _image.ranges.back();
+  if (!(rLast > 0.0) || !std::isfinite(rLast))
+    return layout;
+  // One sample has no extent in range: it is drawn from the sonar out.
+  const double rFirst = samples > 1 ? _image.ranges.front() : 0.0;
   const double aFirst = BeamAzimuth(_image.beam_directions.front());
   const double aLast = BeamAzimuth(_image.beam_directions.back());
-  const double aMin = std::min(aFirst, aLast);
-  const double aMax = std::max(aFirst, aLast);
-  const double scale = FanSize(rMax, aMin, aMax, _maxSide, layout.width,
+  // A fan narrower than kMinHalfFan either side of its middle is drawn
+  // that wide, the width FanSize gives its box, with its beams spread over
+  // the width. One beam's first and last azimuth are the same angle, which
+  // no pixel's center has, and beams closer than a pixel are skipped, so
+  // without this a one-beam fan was a black image and a very narrow one
+  // lost beams.
+  const double aMid = 0.5 * (aFirst + aLast);
+  const bool spread = std::abs(aLast - aFirst) < 2.0 * kMinHalfFan;
+  const double aMin = spread ? aMid - kMinHalfFan : std::min(aFirst, aLast);
+  const double aMax = spread ? aMid + kMinHalfFan : std::max(aFirst, aLast);
+  const double scale = FanSize(rLast, aMin, aMax, _maxSide, layout.width,
     layout.height);
   layout.lookup.assign(
     static_cast<std::size_t>(layout.width) * layout.height, -1);
-  const double dr = (rMax - rMin) / std::max<double>(samples - 1, 1.0);
-  const double da = beams > 1 ? (aLast - aFirst) / (beams - 1) : 1.0;
+  const double dr = samples > 1 ? (rLast - rFirst) / (samples - 1) : 0.0;
+  const double da = beams > 1 ? (aLast - aFirst) / (beams - 1) : 0.0;
   for (int v = 0; v < layout.height; ++v)
   {
     for (int u = 0; u < layout.width; ++u)
@@ -266,14 +281,27 @@ FanLayout LayOutFan(const RosImage &_image, int _maxSide)
       const double left = (0.5 * layout.width - u) / scale;
       const double r = std::hypot(fwd, left);
       const double a = std::atan2(left, fwd);
-      if (r < rMin || r > rMax || a < aMin || a > aMax)
+      if (r < rFirst || r > rLast || a < aMin || a > aMax)
         continue;
-      const auto j = beams > 1 ?
-        static_cast<std::size_t>(std::lround((a - aFirst) / da)) : 0u;
-      const auto k = static_cast<std::size_t>(std::lround((r - rMin) / dr));
+      // The nearest beam and sample; in a spread fan, each beam has an
+      // equal share of the width, the first beam at the first's side.
+      double jf{0.0};
+      if (spread)
+      {
+        const double t = (a - aMin) / (aMax - aMin);
+        jf = std::floor((aLast >= aFirst ? t : 1.0 - t) * beams);
+      }
+      else
+      {
+        jf = std::round((a - aFirst) / da);
+      }
+      const double kf = dr > 0.0 ? std::round((r - rFirst) / dr) : 0.0;
+      const auto j = static_cast<std::size_t>(
+        std::clamp(jf, 0.0, static_cast<double>(beams - 1)));
+      const auto k = static_cast<std::size_t>(
+        std::clamp(kf, 0.0, static_cast<double>(samples - 1)));
       layout.lookup[static_cast<std::size_t>(v) * layout.width + u] =
-        static_cast<int>(std::min(k, samples - 1) * beams +
-        std::min(j, beams - 1));
+        static_cast<int>(k * beams + j);
     }
   }
   return layout;
