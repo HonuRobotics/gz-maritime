@@ -165,11 +165,25 @@ struct StampedRemoval
   std::chrono::nanoseconds stamp{0};
 };
 
-/// \brief The first ping on a sonar's rate grid at or after _t.
+/// \brief When ping _k is due on a sonar's rate grid, in whole nanoseconds
+/// of sim time. Every scheduling decision compares these, never products
+/// in doubles, so a ping is never due twice.
+nanoseconds DueTime(std::uint64_t _k, double _rate)
+{
+  return nanoseconds(static_cast<std::int64_t>(
+    std::llround(static_cast<double>(_k) * 1e9 / _rate)));
+}
+
+/// \brief The first ping on a sonar's rate grid due at or after _t.
 std::uint64_t FirstPingAt(nanoseconds _t, double _rate)
 {
-  const double k = std::chrono::duration<double>(_t).count() * _rate;
-  return static_cast<std::uint64_t>(std::ceil(k - 1e-6));
+  auto k = static_cast<std::uint64_t>(std::max(0.0,
+    std::floor(std::chrono::duration<double>(_t).count() * _rate)));
+  while (k > 0 && DueTime(k - 1, _rate) >= _t)
+    --k;
+  while (DueTime(k, _rate) < _t)
+    ++k;
+  return k;
 }
 
 /// \brief Undoes what a sonar's render changed in the scene: shows the
@@ -1085,8 +1099,7 @@ void SonarPrivate::OnRender()
   for (auto &[entity, rig] : this->rigs)
   {
     const double rate = rig.request.sonar->Rate();
-    const auto due = nanoseconds(static_cast<std::int64_t>(
-      std::llround(static_cast<double>(rig.next) * 1e9 / rate)));
+    const auto due = DueTime(rig.next, rate);
     if (t < due)
       continue;
     // The vehicle was removed this step: gz-sim has destroyed its link visual,
@@ -1157,9 +1170,11 @@ void SonarPrivate::OnRender()
     rig.request.sonar->Push(std::move(frame));
     rig.lastStamp = t;
 
-    // The next ping: the first one due after this state.
-    rig.next = static_cast<std::uint64_t>(std::floor(
-      std::chrono::duration<double>(t).count() * rate)) + 1;
+    // The next ping: the first one due after this state, counted in whole
+    // nanoseconds so a ping is never sent twice.
+    rig.next = ping + 1;
+    while (DueTime(rig.next, rate) <= t)
+      ++rig.next;
   }
 }
 
