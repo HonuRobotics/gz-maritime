@@ -191,6 +191,15 @@
       <direction>0</direction>
     </plugin>
 
+    <!-- The water's optics (gz_water_optics): Jerlov 1C, a clear coast, about 10 m visibility.
+         Cameras with the underwater camera plugin see through it; add
+         model://underwater_optics to draw it in every camera. -->
+    <plugin
+      filename="gz-maritime-water-optics-system"
+      name="gz::sim::maritime::WaterOptics">
+      <jerlov>1C</jerlov>
+    </plugin>
+
     <!-- ==================================================================
          WAVE SOURCE — the engine is the plugin's identity. Keep exactly ONE of
          the two <plugin> blocks below active and comment the other out. Both
