@@ -86,7 +86,10 @@ the camera's pose and the water come in the pass buffer.
 ## The vehicle's lamps
 
 At depth, at night or in murky water, the vehicle's own lights are the only
-light. Every spot and point light in the world (up to four) is a lamp:
+light. A spot or point light whose own name (after the model and link
+that scope it) contains `lamp`, in any case, is a lamp, up to four, the
+first by name; other lights are lit by Ogre as in air, with no beam, so a
+harbour light on a pier stays as it is. A lamp:
 
 - **Its light fades both ways**: from the lamp to what it lights, and from
   there to the camera, `exp(−β^D (d_lamp + r))`.
@@ -124,8 +127,9 @@ off, set its intensity to 0: it then costs nothing.
 
 - **Caustics**: on what faces up under waves, a moving pattern of light
   focused by the surface, its contrast fading with depth as `exp(−K_d z)`.
-  Its strength is the water's `<caustics>`, scaled by how high the waves are
-  (estimated from the wave field at 64 points): none on flat water.
+  Its strength is the water's `<caustics>`, off by default, scaled by how
+  high the waves are (estimated from the wave field at 64 points): none on
+  flat water.
 - **Marine snow**: the water's `<marine_snow>` is the fraction of 25 cm
   cells near the camera holding a speck. Specks are fixed in the world
   (hashed per cell, found by walking the cells each view ray crosses, up to
@@ -158,9 +162,10 @@ off, set its intensity to 0: it then costs nothing.
   (`Hlms/Gz/Pbs`) are read at run time and copied with one more
   `@insertpiece` each; gz-rendering's Hlms listener is called first and the
   water appended after it.
-- **Lamps.** The shader lights with them itself, so they are hidden from
-  Ogre's own lighting while the water is drawn (and given back when it is
-  not). Turning Ogre's Forward+ off instead would change the pass buffer's
+- **Lamps.** The shader lights with them itself, so they, and only they,
+  are hidden from Ogre's own lighting while the water is drawn (and given
+  back when it is not). The set is rebuilt each frame from gz-rendering's
+  lights, so a lamp removed with its vehicle is simply gone. Turning Ogre's Forward+ off instead would change the pass buffer's
   layout under the listener's data; hiding the lamps does not.
 - **An Ogre bridge** (`libunderwater-ogre2-bridge.so`), loaded with dlopen,
   as `gz_waves_rendering` does: linking gz-rendering's ogre2 library into a
@@ -172,13 +177,17 @@ off, set its intensity to 0: it then costs nothing.
   Unlit materials (markers) and terrain are drawn as in air.
 - **Depth from the still water level**, not the wave surface, unlike the
   reference camera.
-- **Lamps**: up to four; lit by their diffuse term (no specular), with no
+- **Lamps**: lights named `lamp` only, up to four (the others are lit by
+  Ogre, with a warning); lit by their diffuse term (no specular), with no
   shadows. The reference camera has no lamps.
 - **ogre2 and GLSL only** (the pieces use GLSL's `fract`).
-- **`custom_ps_functions`** is defined by these pieces; gz-rendering does not
-  define it today. If it ever does, it must be chained like the others.
 - **Caustics** are a procedural pattern scaled by the wave height, not
   traced from the actual surface; the snow does not drift.
+- **ogre2 only, and gz-rendering 10.** The bridge chains its pieces into
+  the pieces that define Ogre's hooks, in a copy kept in memory. With
+  another render engine, another gz-rendering major version, its own pieces
+  missing, or gz-rendering's pieces not as expected, it does not install,
+  the world is not marked, and the reference camera draws the water.
 
 ## Tests
 
@@ -190,7 +199,8 @@ colcon test --packages-select gz_underwater_rendering
 its clear-water colour faded both ways (worst 1 step); the beam along the
 centre row against a single-scatter integration in the test (within 2 % of
 its peak in IB, 3C and 7C water); clear water carrying the beam farther and
-murky water keeping it nearer the lamp.
+murky water keeping it nearer the lamp; and the same scene with the light
+named `torch`, not a lamp: Ogre lights the plate, and no beam.
 
 `effects_test`, rendered: caustics' contrast at 8 m against 3 m deep is
 `exp(−K_d · 5)` within 6 % (time-averaged), none on flat water; marine snow
@@ -206,3 +216,6 @@ camera's: mean difference 0.01 of an 8-bit step, 99th percentile 1 (the
 criterion is 1 and 3). Depth images byte for byte the same; a camera above
 the water byte for byte the same; segmentation labels byte for byte the
 same; the reference camera passing its image through.
+`underwater_rendering_fallback_test`, in a process of its own: with the
+pieces missing, nothing is installed and the reference camera draws the
+water, as without the GPU path.

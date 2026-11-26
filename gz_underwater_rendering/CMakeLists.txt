@@ -166,6 +166,22 @@ if(BUILD_TESTING)
       ENVIRONMENT
       "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH};GZ_PARTITION=gz_underwater_effects_test")
   endif()
+
+  # The renderer cannot install (no pieces there): the reference camera
+  # draws the water. A process of its own, so nothing is installed before.
+  ament_add_gtest(underwater_rendering_fallback_test
+    test/underwater_rendering_fallback_test.cc TIMEOUT 300)
+  if(TARGET underwater_rendering_fallback_test)
+    target_compile_definitions(underwater_rendering_fallback_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(underwater_rendering_fallback_test
+      gz-sim::core
+      gz-transport::core
+      gz-msgs::core)
+    set_tests_properties(underwater_rendering_fallback_test PROPERTIES
+      ENVIRONMENT
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_BINARY_DIR}/no_such_pieces;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH};GZ_PARTITION=gz_underwater_rendering_fallback_test")
+  endif()
 endif()
 
 ament_environment_hooks("hooks/hook.dsv.in")

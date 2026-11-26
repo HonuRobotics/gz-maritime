@@ -147,9 +147,10 @@ the water too, and open water with nothing in view is the water's colour.
 
 At night, or deep, there is no daylight: set the world's water to
 `<daylight>0</daylight>` and give the vehicle spot lights. With the
-`underwater_optics` model in the world, every spot and point light is a lamp
-whose light fades through the water both ways, and whose beam the water
-scatters back to the camera:
+`underwater_optics` model in the world, a spot or point light with `lamp` in
+its name is a lamp, up to four: its light fades through the water both ways,
+and the water scatters its beam back to the camera. Other lights, a harbour
+light on a pier for one, are lit as in air:
 
 ```xml
 <light type="spot" name="lamp_port">
@@ -194,9 +195,9 @@ until the error is smallest: those are your water's optics.
   in the camera plugin.
 - **The camera's port**: `<port>flat</port>` refracts like a flat port
   (a narrower, magnified view); `<port>dome</port>` changes nothing.
-- **Caustics** dance on a shallow seabed under waves: on by default with the
-  `underwater_optics` model (`<caustics>` in the water optics, 0 to turn
-  them off). None on flat water.
+- **Caustics** dance on a shallow seabed under waves:
+  `<caustics>1</caustics>` in the water optics, with the `underwater_optics`
+  model in the world. Off by default; none on flat water.
 - **Marine snow**: `<marine_snow>0.2</marine_snow>` in the water optics;
   specks show in the lamps' light.
 - **The surface from below** shows Snell's window: the sky through a
