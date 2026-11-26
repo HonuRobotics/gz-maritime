@@ -73,7 +73,7 @@ A few of the sonar's own parameters make its image easier or harder to work with
 ```{figure} images/sonar-features-noise.png
 :alt: Two sonar fans of the same scene side by side: on the left the default, with dark shadows behind the targets and a dark zone close in; on the right the noise floor raised, with the shadows and the near zone filled with noise and less contrast overall
 
-The example: ping 100 of the imaging sonar world, at the default noise floor and with the noise floor raised. The noise fills the shadows and the empty water close in, and the whole image loses contrast; the brightest returns still stand out, the shadows that tell a detector an object's height are mostly gone.
+The example: ping 100 of the imaging sonar world, at the default noise floor and with the noise floor raised. The noise fills the shadows and, more faintly because it rises with range, the empty water close in, and the whole image loses contrast; the brightest returns still stand out, the shadows that tell a detector an object's height are mostly gone.
 ```
 
 ## Repeatable randomness: the seed

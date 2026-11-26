@@ -67,12 +67,12 @@ Scene A, side view. The sphere sits on the beam's axis, and the seabed, 7 m down
 ```
 
 ```{figure} images/gz_sonar_A.png
-:alt: Imaging sonar fan of scene A: a bright spot at 4.75 m on the axis and a faint arc close to it at the same range
+:alt: Imaging sonar fan of scene A: a bright spot at 4.75 m on the axis and an arc at the same range, dimming away from it and gone about 45° to either side
 
-Scene A. The sphere's near face, at 4.75 m on the axis, with a faint arc at the same range on either side of it.
+Scene A. The sphere's near face, at 4.75 m on the axis, with an arc at the same range on either side of it that dims away from the sphere.
 ```
 
-The arc is expected. A sonar forms each beam from an array of transducers, and every beam also hears a little from directions outside its main lobe, through its sidelobes. A strong, isolated target is therefore heard by every beam at its own range, and shows as an arc across the fan, brightest next to the target and fading away from it; real imaging sonars show the same arcs around strong targets in open water. How far the arc reaches depends on the array. Imaging sonars usually shade their arrays, weighting the elements to lower the sidelobes, and the default here is a shaded array (`sidelobe_level` −25 dB, `sidelobe=-25` on `gz_sonar_render_ping`'s command line), which keeps the arc close to the target. An unshaded array (`sidelobe=-13`) has sidelobes that fall off slowly and carry the arc across the whole fan:
+The arc is expected. A sonar forms each beam from an array of transducers, and every beam also hears a little from directions outside its main lobe, through its sidelobes. A strong, isolated target is therefore heard by every beam at its own range, and shows as an arc across the fan, brightest next to the target and fading away from it; real imaging sonars show the same arcs around strong targets in open water. How far the arc reaches depends on the array. Imaging sonars usually shade their arrays, weighting the elements to lower the sidelobes, and the default here is a shaded array (`sidelobe_level` −25 dB, `sidelobe=-25` on `gz_sonar_render_ping`'s command line), so the arc dims away from the target and is gone about 45° to either side. The sphere is a strong target at the default fixed gain, which is why its arc shows that far. An unshaded array (`sidelobe=-13`) has sidelobes that fall off slowly and carry the arc across the whole fan:
 
 ```{figure} images/gz_sonar_A_unshaded.png
 :alt: Imaging sonar fan of scene A with an unshaded array: the bright spot at 4.75 m and a bright arc at the same range across the whole fan

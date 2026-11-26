@@ -24,7 +24,7 @@ BOXES = {
     'trigger': (1.0, 2.9, 'sonar plugin\nping due: render', CPU),
     'draw': (1.0, 4.35, 'gz-rendering\ndraws depth and\nsegmentation,\ncopies to CPU', GPU),
     'hits': (0.0, 5.8, 'gz_sonar\nimages to hits\n1 core', CPU),
-    'engine': (0.0, 7.25, 'gz_sonar engine\nbeams, samples\nall cores', CPU),
+    'engine': (0.0, 7.25, 'gz_sonar engine\nbeams, samples\nup to 8 cores', CPU),
     'out': (0.0, 8.7, 'gz_sonar\nlevels, message\n1 core', CPU),
 }
 W, H = 1.2, 0.7
