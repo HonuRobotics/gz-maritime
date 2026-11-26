@@ -565,7 +565,9 @@ TEST(Unlit, FadesAndTakesTheVeil)
             << inWater << ", expected " << expected << "\n";
   ASSERT_GT(inAir, 0.1) << "no particles in view";
   EXPECT_NEAR(inWater, expected, 0.02);
+}
 
+/////////////////////////////////////////////////
 // Sensors that are not colour cameras do not see the water, nor the
 // backdrop drawn around the world: a lidar's scan (open water out of range),
 // a thermal image and a bounding box camera's boxes are the same with the
