@@ -40,7 +40,7 @@ ros2 launch kai_sonar_bridge sonar_bridge.launch.xml \
   frame_ids:="[my_vehicle/sonar_forward_acoustic]"
 ```
 
-`ros_gz_bridge` cannot convert the sonar's message; this bridge publishes `marine_acoustic_msgs/ProjectedSonarImage`, and a `/view` image beside it. Each image is stamped with the frame in `frame_ids`, which TF must carry: `ProjectedSonarImage` puts Z along the beam and X up, so give the vehicle's URDF a fixed frame on the sonar, rotated from the sensor's by roll 180°, pitch −90° (`rpy="3.14159 -1.5708 0"`). Without `frame_ids` the bridge warns and stamps the gz sensor's name, which TF does not know.
+`ros_gz_bridge` cannot convert the sonar's message; this bridge publishes `marine_acoustic_msgs/ProjectedSonarImage`, and a `/view` image beside it. Each image is stamped with the frame in `frame_ids`, which TF must carry: `ProjectedSonarImage` puts Z along the beam and X up, so give the vehicle's URDF a fixed frame on the sonar, rotated from the sensor's by roll 180°, pitch −90° (`rpy="3.14159 -1.5708 0"`). Without `frame_ids` the bridge warns and stamps the gz sensor's name with `_acoustic` appended, which TF does not know.
 
 ## Sidescan and profiler
 
@@ -51,10 +51,10 @@ ros2 launch kai_sonar_bridge sonar_bridge.launch.xml \
   gz_topics:="[/my_boat/sidescan/port/image,/my_boat/sidescan/stbd/image,/my_boat/profiler/detections]" \
   ros_topics:="[/my_boat/sidescan/port/image,/my_boat/sidescan/stbd/image,/my_boat/profiler/detections]" \
   kinds:="[image,image,detections]" \
-  frame_ids:="[my_boat/sidescan_port_acoustic,my_boat/sidescan_stbd_acoustic,my_boat/profiler_beam]"
+  frame_ids:="[my_boat/sidescan_port_acoustic,my_boat/sidescan_stbd_acoustic,my_boat/profiler_beam_acoustic]"
 ```
 
-The profiler's soundings arrive as `marine_acoustic_msgs/SonarDetections`, and as a point cloud on `/points` beside them for viewing; they are stamped in the profiler's own frame, not an `_acoustic` one.
+The profiler's soundings arrive as `marine_acoustic_msgs/SonarDetections`, and as a point cloud on `/points` beside them for viewing. They are stamped in an `_acoustic` frame too, the same fixed rotation from the sensor's: for a profiler looking down it is north-east-down, X forward, Y starboard, Z down, in which `rx_angles` count positive to starboard.
 
 ## On the Blue Robotics vehicles
 

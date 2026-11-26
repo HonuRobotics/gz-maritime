@@ -47,7 +47,7 @@ The world loads the sonar system and names its seabed; the config fits the sides
 | `/blueboat/sidescan/port/image`, `/blueboat/sidescan/stbd/image` | Each side's line per ping, `marine_acoustic_msgs/ProjectedSonarImage`, levels in dB with time-varied gain |
 | `/blueboat/sidescan/port/image/view`, `.../stbd/image/view` | Each side's waterfall, for looking at |
 | `/blueboat/profiler/detections` | The profiler's soundings, `marine_acoustic_msgs/SonarDetections`: a travel time and an angle each |
-| `/blueboat/profiler/detections/points` | The same soundings as a point cloud in the profiler's frame |
+| `/blueboat/profiler/detections/points` | The same soundings as a point cloud in the profiler's `_acoustic` frame |
 
 ```bash
 ros2 run rqt_image_view rqt_image_view /blueboat/sidescan/port/image/view
@@ -62,7 +62,7 @@ ros2 run kai_sonar_bridge read_sonar.py /blueboat/profiler/detections
 ```
 
 ```text
-frame blueboat/profiler_beam: 20 soundings, 20 good
+frame blueboat/profiler_beam_acoustic: 20 soundings, 20 good
     36.1 deg (+ starboard): range 10.46 m, across   6.16 m, depth  8.45 m
 ```
 

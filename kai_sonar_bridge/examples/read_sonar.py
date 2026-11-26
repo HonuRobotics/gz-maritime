@@ -29,7 +29,8 @@ span and the brightest echo with its range and bearing.
 
 A topic ending in `detections` (marine_acoustic_msgs/SonarDetections, from
 a profiler) is read as soundings: each has a two-way travel time and an
-across-track angle, rx_angles, positive to starboard. Range is half the
+across-track angle, rx_angles, positive to starboard, about the X axis of
+the message's frame (north-east-down for a profiler looking down). Range is half the
 travel time times the sound speed in ping_info; for each ping it prints
 the good soundings' angle, range, across-track distance and depth below
 the sonar.
