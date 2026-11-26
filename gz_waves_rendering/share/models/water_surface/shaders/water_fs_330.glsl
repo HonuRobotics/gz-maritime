@@ -77,7 +77,7 @@ float ComputeFoamMask()
     return 0.0;
   vec2 heightUV = fract(inPs.baseXY / tileSize);
 
-  // Precomputed analytic folding metric in alpha (Encino path): one sample,
+  // Precomputed analytic folding metric in alpha (Ehukai path): one sample,
   // no finite differencing, resolution-independent. 1 = flat, < 1 → folding.
   if (useFoamMap != 0)
   {

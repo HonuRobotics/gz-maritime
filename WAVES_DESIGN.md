@@ -183,7 +183,8 @@ struct WaveField2D {
 
 Arrays are **column-major N×N**, periodic over `tile`, owned by the engine, and
 valid until the next `SetParameters`; `Update` refreshes their contents in place.
-`TileSize` is `{double x, double y}` (a centred, periodic tile).
+`TileSize` is `{double x, double y}` (a periodic tile that starts at the world
+origin: element (i, j) is the water at (i·tile/N, j·tile/N)).
 
 ### 3.2 Engine registry — token → factory
 
@@ -432,6 +433,11 @@ as little of the generation as it likes.
   output is calibrated so the RMS matches the Pierson–Moskowitz `Hs`. Periodic
   over `tileSize`; `Elevation` bilinearly samples the grid; `Field()` exposes
   height + x/y displacement + a folding (foam) metric.
+- **Grid layout.** Ehukai pads each of its grids with a wrapped border, N + 1
+  cells per row, and runs x along a row. `TileView` reads the N×N tile with
+  Ehukai's own row length and transposes it, so cell (i, j) of our grids is
+  the water at (i·L/N, j·L/N) and the waves run along +x, Ehukai's wind.
+  Every copy out of Ehukai goes through it.
 - **Prepared ahead.** `Prepare` propagates the hinted time on a worker
   thread, in a TBB arena of at most four threads so the physics thread's core
   is left alone, into a working set of its own. `Update` takes that result
@@ -458,8 +464,11 @@ as little of the generation as it likes.
 - *Tests:* `fft_test.cc` covers finiteness/bounds, ramp-up, foam from the
   Jacobian, band-pass reshaping, spectrum selection, time evolution, `Field()`
   views, determinism vs. seed, periodicity, unit normals, particle velocity,
-  sea-state Hs, and that a prepared update is the synchronous one, whether the
-  hint was right, wrong, repeated, replaced or overtaken by a reconfigure.
+  sea-state Hs, the grid layout (the tile is not sheared, the waves travel
+  downwind, and the chop, the folding and the water's velocity sit where the
+  height puts them), and that a prepared update is the synchronous one,
+  whether the hint was right, wrong, repeated, replaced or overtaken by a
+  reconfigure.
 
 ### 6.2 GUI registrar pattern (per engine)
 
@@ -733,7 +742,12 @@ ros2 launch kai_bringup simulation.launch.xml
 ## 11. Status notes
 
 - `<direction>` is parsed by the FFT system but not yet applied (Ehukai
-  assumes wind along +X).
+  assumes wind along +X), so the FFT sea travels towards +x in every world.
+- The drawn FFT sea sits half a grid cell from the physics, towards +x and
+  +y: the shaders sample the height texture at `worldXY / tileSize`, without
+  the half texel that would put a texel's centre on its grid point. Measured
+  with a depth camera looking down: 1 m at a 256 m tile with 128 cells, which
+  on that sea is a few centimetres of height.
 - The FFT engine hands sim time to Ehukai in single precision (float
   API), so on multi-hour runs the float grid coarsens and gradually degrades
   the wave animation and the particle-velocity finite difference.
