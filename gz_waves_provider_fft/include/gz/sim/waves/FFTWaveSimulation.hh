@@ -109,13 +109,16 @@ class FFTWaveSimulation final : public IWaveField
   public: double TileSizeMeters() const { return this->tileSize; }
 
   /// \brief Surface elevation field η(x, y, t), refreshed by Update().
+  /// Element (i, j) is the water at world (i·L/N, j·L/N), L the tile size and
+  /// N the grid size; the waves travel towards +x.
   public: const Eigen::MatrixXd &HeightGrid() const
   {
     return this->heightGrid;
   }
-  /// \brief Horizontal x-displacement field Dx(x, y, t), refreshed by Update().
-  /// Multiplied by a "choppiness" factor in the visual shader to sharpen
-  /// crests (Tessendorf 2001, eq. 29). Same grid layout as `HeightGrid()`.
+  /// \brief Final horizontal x-displacement field Dx(x, y, t), refreshed by
+  /// Update(): Ehukai's displacement times the choppiness, which sharpens the
+  /// crests (Tessendorf 2001, eq. 29). The visual shader applies it as is.
+  /// Same grid layout as `HeightGrid()`.
   public: const Eigen::MatrixXd &DispXGrid() const
   {
     return this->dispXGrid;

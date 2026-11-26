@@ -188,7 +188,8 @@ valid until the next `SetParameters`; `Update` refreshes their contents in place
 folding metric only on request leaves it out of `Update`, so a consumer that
 reads the view for the heights (`Eval::SurfaceHeight`, on the server) never
 pays for it; the renderer asks `Foam()`.
-`TileSize` is `{double x, double y}` (a centred, periodic tile).
+`TileSize` is `{double x, double y}` (a periodic tile that starts at the world
+origin: element (i, j) is the water at (i·tile/N, j·tile/N)).
 
 ### 3.2 Engine registry — token → factory
 
@@ -368,12 +369,24 @@ It rebuilds the private engine when `data.generation` changes, and each render
 frame pulls the grid via `Field()` and uploads it. The column-major
 `WaveField2D` grids flow to the Ogre bridge unchanged; the bridge's texel pack
 maps them so texture (u, v) = grid (x_u, y_v), preserving the physics
-orientation end to end.
+orientation end to end. The shaders sample that texture at
+`worldXY / tileSize` plus half a texel, where the texel of a grid point has
+its centre, so the surface drawn over a world point is the one the field
+reports there (`SurfaceHeight`), not one half a cell beside it. The sea is
+drawn at the time of the scene being rendered (`Scene::Time`, which
+`RenderUtil` sets from the state it applies), not at the latest time the
+simulation thread has reached, so a camera frame shows the sea of its own
+stamp. `drawn_surface_test` holds the drawn surface to the field: a depth
+camera looks down on a choppy sea and what it sees, frame after frame, is
+compared with the field at each frame's time. It has to render, in software
+if there is no GPU, and is skipped when the camera gives no image.
 
 ### 5.2 Engine-agnostic, via per-engine GUI registrars
 
 `gz_waves_rendering` depends on **`gz_waves` only** — no engine `find_package`,
-no engine link, no engine `<depend>` (N1). The factory registration that lets
+no engine link, no engine `<depend>` (N1). Its test brings a small wave
+field of its own, registered in the test, so the package needs no engine to
+be tested either. The factory registration that lets
 `WaterVisual` rebuild an engine in the GUI lives in **per-engine GUI plugins**
 shipped by the provider packages. The `water_surface` model loads them in the
 **same `<visual>`** as `WaterVisual`:
@@ -437,6 +450,11 @@ as little of the generation as it likes.
   output is calibrated so the RMS matches the Pierson–Moskowitz `Hs`. Periodic
   over `tileSize`; `Elevation` bilinearly samples the grid; `Field()` exposes
   height + x/y displacement + a folding (foam) metric.
+- **Grid layout.** Ehukai pads each of its grids with a wrapped border, N + 1
+  cells per row, and runs x along a row. `TileView` reads the N×N tile with
+  Ehukai's own row length and transposes it, so cell (i, j) of our grids is
+  the water at (i·L/N, j·L/N) and the waves run along +x, Ehukai's wind.
+  Every copy out of Ehukai goes through it.
 - **Prepared ahead.** `Prepare` propagates the hinted time on a worker
   thread, in a TBB arena of at most four threads so the physics thread's core
   is left alone, into a working set of its own. `Update` takes that result
@@ -469,10 +487,13 @@ as little of the generation as it likes.
 - *Tests:* `fft_test.cc` covers finiteness/bounds, ramp-up, foam from the
   Jacobian, band-pass reshaping, spectrum selection, time evolution, `Field()`
   views, determinism vs. seed, periodicity, unit normals, particle velocity,
-  sea-state Hs, that a prepared update is the synchronous one, whether the
-  hint was right, wrong, repeated, replaced or overtaken by a reconfigure, and
-  that foam comes on request, once per update, the same through `Jacobian()`
-  and `Foam()`, after a prepared update and after a reconfigure.
+  sea-state Hs, the grid layout (the tile is not sheared, the waves travel
+  downwind, and the chop, the folding and the water's velocity sit where the
+  height puts them), that a prepared update is the synchronous one, whether
+  the hint was right, wrong, repeated, replaced or overtaken by a
+  reconfigure, and that foam comes on request, once per update, the same
+  through `Jacobian()` and `Foam()`, after a prepared update and after a
+  reconfigure.
 
 ### 6.2 GUI registrar pattern (per engine)
 
@@ -739,6 +760,8 @@ ros2 launch kai_bringup simulation.launch.xml
 ./build/gz_waves/wave_core_test
 ./build/gz_waves_provider_gerstner/gerstner_test
 ./build/gz_waves_provider_fft/fft_test
+# the drawn sea against the wave field, through a depth camera (needs a GPU):
+colcon test --packages-select gz_waves_rendering
 ```
 
 ---
@@ -746,7 +769,7 @@ ros2 launch kai_bringup simulation.launch.xml
 ## 11. Status notes
 
 - `<direction>` is parsed by the FFT system but not yet applied (Ehukai
-  assumes wind along +X).
+  assumes wind along +X), so the FFT sea travels towards +x in every world.
 - The FFT engine hands sim time to Ehukai in single precision (float
   API), so on multi-hour runs the float grid coarsens and gradually degrades
   the wave animation and the particle-velocity finite difference.

@@ -74,6 +74,8 @@ colcon test --packages-select <pkg> && colcon test-result --verbose
 ./build/gz_waves/wave_core_test
 ./build/gz_waves_provider_gerstner/gerstner_test
 ./build/gz_waves_provider_fft/fft_test
+# the drawn sea against the wave field, through a depth camera (needs a GPU):
+colcon test --packages-select gz_waves_rendering
 # marked-collision buoyancy, the normalized thruster, the spawn launch's
 # instance script, and the example vehicle end to end (generation for two
 # names, two boats through the launches, a command moves one only):
@@ -87,8 +89,10 @@ colcon test --packages-select gz_maritime_gui
 pip install -r docs/requirements.txt && sphinx-build -W docs docs/_build/html
 ```
 
-Render-path changes cannot be verified headless — they need a real `gz sim -r`
-on a GPU. State plainly when a change is build-only and GUI-unverified.
+Render-path changes cannot be verified without a GPU — they need a real
+`gz sim -r`. State plainly when a change is build-only and GUI-unverified. One
+part is covered by a test: `gz_waves_rendering`'s `drawn_surface_test` compares
+the surface a depth camera sees with the wave field (it has to render too).
 
 ## Code style (Gazebo house style)
 
