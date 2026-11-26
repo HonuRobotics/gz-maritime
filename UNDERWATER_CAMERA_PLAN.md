@@ -526,8 +526,6 @@ What it settled, beyond this plan:
   a neutral ambient, charts at 0.5–16 m, an image panel per camera), in the
   world tests. **The BlueROV2's own camera is not switched yet**: it lives in
   `bluerobotics_models`, a separate PR there.
-- **Video**: *Through the water*, 54 s: three waters side by side with the
-  plain camera, a dive from 0.5 to 40 m, the water changed live.
 
 ### Phase 3, the GPU path: done, on `ahcorde/uw_phase3_gpu_path`
 
@@ -559,8 +557,6 @@ What it settled:
   background needs a compositor listener; the surface is §4.5. Depth is from
   the still water level, not the waves. No throughput benchmark in CI yet
   (the PBS change costs a few ALU instructions per fragment).
-- **Video**: *Same water, every camera*: the reference and the GPU images of
-  one scene side by side, with their difference, and the GUI.
 
 ### Phase 4, vehicle lights and their beams: done, on `ahcorde/uw_phase4_lights`
 
@@ -601,8 +597,6 @@ In the GPU path (`gz_underwater_rendering`), as the spike said it must be.
   1 ms.
 - **Limits**: diffuse only, no shadows; four lamps; the beam shows where
   something is drawn behind it; the reference camera has no lamps.
-- **Video**: *Lights on*: lamps off and on at 20 m at night in 1C, 3C and
-  7C, and a lamp swept across the view.
 
 ## Open questions
 
