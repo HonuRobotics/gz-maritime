@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 project(kai_sonar_bridge)
 
 # The same default as gz_sonar: the conversions transpose and draw every
-# ping, which an unoptimised build does at about half the speed.
+# ping, which an unoptimized build does much more slowly.
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "No CMAKE_BUILD_TYPE given; defaulting to RelWithDebInfo")
   set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
