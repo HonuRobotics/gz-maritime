@@ -275,6 +275,42 @@ TEST(Model, InAirAndClearWaterUnchanged)
 }
 
 /////////////////////////////////////////////////
+// The camera's response applies above the water too: its gain, and the
+// noise on the light it caught, which the gain amplifies.
+TEST(Response, AppliesInAirAndAmplifiesTheNoise)
+{
+  const Intrinsics k = Camera(64, 48, 1.0);
+  const RayTable rays(k);
+  std::vector<std::uint8_t> rgb;
+  std::vector<float> z;
+  Uniform(k, 60, 60, 60, 2.0f, rgb, z);
+  Water air;
+  air.cameraDepth = -1.0;
+  std::mt19937 rng(3);
+  std::vector<std::uint8_t> out;
+
+  Response bright;
+  bright.gain = 2.0;
+  MakeUnderwater(rgb, z, rays, air, bright, rng, out);
+  EXPECT_EQ(out[0], LinearToSrgb(2.0 * SrgbToLinear(60)));
+
+  // Noise of sigma 0.002 on the sensor: 4 times that after a gain of 4
+  Response noisy;
+  noisy.readNoise = 0.002;
+  noisy.gain = 4.0;
+  MakeUnderwater(rgb, z, rays, air, noisy, rng, out);
+  double sum = 0, sum2 = 0;
+  const std::size_t n = out.size();
+  for (std::uint8_t v : out)
+  {
+    sum += SrgbToLinear(v);
+    sum2 += SrgbToLinear(v) * SrgbToLinear(v);
+  }
+  const double sigma = std::sqrt(sum2 / n - (sum / n) * (sum / n));
+  EXPECT_NEAR(sigma, 4.0 * 0.002, 0.25 * 4.0 * 0.002);
+}
+
+/////////////////////////////////////////////////
 TEST(Response, FixedAndAutoExposure)
 {
   const Intrinsics k = Camera(16, 16, 1.0);

@@ -279,7 +279,7 @@ What a world says to the water optics system,
 | `<veil>` | B∞, the veil just below the surface as a fraction of the daylight there, as `r g b`. Replaces b / c. |
 | `<diffuse_attenuation>` | K_d, how fast the daylight fades with depth, 1/m, as `r g b`. Replaces the type's K_d. |
 | `<water_level>` | World z of the still water, m, default 0. Under a wave field, depth is below the local wave surface. |
-| `<publish_rate>` | Rate of the ground truth, 1 Hz by default. |
+| `<publish_rate>` | Rate of the ground truth in wall time, 1 Hz by default, so it keeps coming while paused; a change is published at once. 0 publishes on a change only. |
 
 Any other element is warned about and ignored. An unknown type, a visibility
 that is not positive or a negative value is one error, and the world has
@@ -324,11 +324,12 @@ publishes `<topic>/underwater/image` (`gz.msgs.Image`, RGB 8 bit) and
 | `<exposure>` | `1` | A gain on linear light, or `auto`, aiming the mean luminance at 0.18. |
 | `<max_gain>` | `16` | With `auto`, the gain stays within 1/max and max. |
 | `<white_balance>` | `none` | `none`, or `grey_world`, which takes the water's tint out. |
-| `<shot_noise>`, `<read_noise>` | `0` | Gaussian noise on linear light, variance shot_noise · signal + read_noise². |
-| `<seed>` | `1` | The noise's seed. |
+| `<shot_noise>`, `<read_noise>` | `0` | Gaussian noise on the light the sensor caught, variance shot_noise · signal + read_noise², before the gain. |
+| `<seed>` | `1` | The noise's seed, mixed with the sensor's scoped name, so each camera gets its own noise. |
 
-The water is the world's (`gz-maritime-water-optics-system`); without it the
-image is the plain camera's, and above the water it is copied unchanged.
+The water is the world's (`gz-maritime-water-optics-system`); without it, or
+above the water, only the camera's response applies, which by default
+changes nothing. The plugin works only while its output has a subscriber.
 
 ## Underwater rendering
 

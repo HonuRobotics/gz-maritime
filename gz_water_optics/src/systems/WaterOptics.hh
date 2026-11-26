@@ -42,7 +42,9 @@ namespace gz::sim::maritime
   ///   1/m; `<veil>`: per R G B, a fraction of the daylight. Each replaces
   ///   the value derived from the type.
   /// * `<water_level>`: world z of the still water, m, default 0.
-  /// * `<publish_rate>`: ground truth rate, Hz, simulation time, default 1.
+  /// * `<publish_rate>`: ground truth rate, Hz of wall time (it keeps coming
+  ///   while paused), default 1; 0 for on a change only. A change is always
+  ///   published.
   ///
   /// Topics, on the world's name:
   ///
