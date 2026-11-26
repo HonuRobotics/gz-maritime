@@ -626,8 +626,6 @@ What changed from the plan:
   gives the formula's own answer, and forward scatter blurs only the
   levels a pixel reads. Same output, byte for byte: 1920x1080 in 24 ms for
   152 (the water alone), 320 for 1042 with forward scatter.
-- **Video**: *More of the water*: forward scatter and the port side by
-  side, caustics on sand, marine snow in the lamps, Snell's window.
 
 Found later with a demo, a two-minute BlueROV2 dive at Sand Island over the
 site's bathymetry, and fixed here:
