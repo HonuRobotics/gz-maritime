@@ -154,6 +154,9 @@ struct RigRequest
   std::shared_ptr<SonarSensor> sonar;
   /// \brief Sim time of the update that made it; see Stamped.
   std::chrono::nanoseconds stamp{0};
+  /// \brief Its place among the requests and removals, in the order the
+  /// simulation thread made them; see StampedRemoval.
+  std::uint64_t order{0};
 };
 
 /// \brief A label table, or a sonar to drop, with the sim time of the
@@ -174,6 +177,11 @@ struct StampedRemoval
 {
   Entity sensor{kNullEntity};
   std::chrono::nanoseconds stamp{0};
+  /// \brief Its place among the requests and removals. A removal takes
+  /// with it every request for its sonar made before it, built or still
+  /// waiting, and none made after: a reset can bring a removed sonar back
+  /// under the same entity, and that one is a new request.
+  std::uint64_t order{0};
 };
 
 //////////////////////////////////////////////////
@@ -346,6 +354,8 @@ class SonarPrivate
   public: std::vector<Entity> newVisuals;
   public: std::map<Entity, std::shared_ptr<SonarSensor>> sonars;
   public: std::chrono::nanoseconds now{0};
+  /// \brief Counts rig requests and removals; see StampedRemoval.
+  public: std::uint64_t order{0};
   public: std::vector<Entity> removedVisuals;
   /// \brief Labels: one per model and property set, held while any of its
   /// visuals exists and then free for the next one, so a world that spawns
@@ -592,7 +602,15 @@ void SonarPrivate::FindSonars(EntityComponentManager &_ecm, bool _all)
     if (this->sonars.erase(e))
     {
       std::lock_guard<std::mutex> lock(this->mutex);
-      this->rigRemovals.push_back({e, this->now});
+      // A request the rendering thread has not taken yet goes here, and its
+      // sonar with it; one it has taken, built or not, goes by a removal.
+      const auto taken = std::remove_if(this->rigRequests.begin(),
+        this->rigRequests.end(),
+        [e](const RigRequest &_r) { return _r.sensor == e; });
+      if (taken != this->rigRequests.end())
+        this->rigRequests.erase(taken, this->rigRequests.end());
+      else
+        this->rigRemovals.push_back({e, this->now, this->order++});
     }
   }
   this->removedSensors.clear();
@@ -629,6 +647,7 @@ void SonarPrivate::FindSonars(EntityComponentManager &_ecm, bool _all)
     r.pose = pose->Data();
     r.sonar = sensor;
     r.stamp = this->now;
+    r.order = this->order++;
     std::lock_guard<std::mutex> lock(this->mutex);
     this->rigRequests.push_back(r);
   }
@@ -821,6 +840,7 @@ void SonarPrivate::OnSceneUpdate()
     this->preRenderConn.reset();
     this->renderConn.reset();
     this->renderJoined = false;
+    gzdbg << "Sonar: no sonar left; left the render events\n";
     return;
   }
   if (!this->haveSonars)
@@ -832,6 +852,7 @@ void SonarPrivate::OnSceneUpdate()
   this->renderConn = this->events->Connect<events::Render>(
     [this]() { this->OnRender(); });
   this->renderJoined = true;
+  gzdbg << "Sonar: joined the render events\n";
 }
 
 //////////////////////////////////////////////////
@@ -1084,6 +1105,15 @@ void SonarPrivate::OnPreRender()
       continue;
     }
     this->EraseRig(it->sensor);
+    // And its request, if that is still waiting for a link visual: a sonar
+    // removed before its cameras were built, or one a reset restored (gz-sim
+    // gives a restored link no visual). The request holds the SonarSensor,
+    // with its topics and threads, and keeps the render events joined.
+    const StampedRemoval gone = *it;
+    this->waitingRigs.erase(std::remove_if(this->waitingRigs.begin(),
+      this->waitingRigs.end(), [&gone](const RigRequest &_r) {
+        return _r.sensor == gone.sensor && _r.order < gone.order;
+      }), this->waitingRigs.end());
     it = this->waitingRemovals.erase(it);
   }
   for (auto it = this->waitingTables.begin(); it != this->waitingTables.end();)
@@ -1111,7 +1141,12 @@ void SonarPrivate::OnPreRender()
     if (it->removed)
     {
       this->marks.erase(it->visual);
-      it = this->waitingMarks.erase(it);
+      // Its mark may still be waiting too, earlier in the queue, for a
+      // rendering visual that now never comes.
+      const Entity visual = it->visual;
+      const auto kept = std::remove_if(this->waitingMarks.begin(), it,
+        [visual](const VisualMark &_m) { return _m.visual == visual; });
+      it = this->waitingMarks.erase(kept, it + 1);
     }
     else if (this->VisualOf(it->visual))
     {

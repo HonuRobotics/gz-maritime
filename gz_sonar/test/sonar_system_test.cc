@@ -53,12 +53,14 @@
 #include <thread>
 #include <vector>
 
+#include <gz/common/Console.hh>
 #include <gz/common/Filesystem.hh>
 #include <gz/rendering/RenderingIface.hh>
 #include <gz/sim/Server.hh>
 #include <gz/sim/ServerConfig.hh>
 #include <gz/sim/System.hh>
 #include <gz/transport/Node.hh>
+#include <spdlog/sinks/base_sink.h>
 
 #include "gz/maritime/sonar/sonar_image.pb.h"
 #include "gz/maritime/sonar/sonar_labels.pb.h"
@@ -222,6 +224,51 @@ std::int64_t LastDue(std::int64_t _t, double _rate)
   return Due(k, _rate);
 }
 
+/// \brief What the server logs, kept for the tests to read: some of what
+/// the system does (a warning, a camera reused, a sonar left unwatched)
+/// shows nowhere else from outside.
+class Log : public spdlog::sinks::base_sink<std::mutex>
+{
+  /// \brief How many messages so far contain every one of _parts.
+  /// \param[in] _parts The texts to look for.
+  /// \return The count.
+  public: std::size_t Count(const std::vector<std::string> &_parts)
+  {
+    const std::lock_guard<std::mutex> lock(this->mutex_);
+    std::size_t n = 0;
+    for (const auto &line : this->lines)
+    {
+      bool all = true;
+      for (const auto &part : _parts)
+        all = all && line.find(part) != std::string::npos;
+      n += all;
+    }
+    return n;
+  }
+
+  // Documentation inherited
+  protected: void sink_it_(const spdlog::details::log_msg &_msg) override
+  {
+    this->lines.emplace_back(_msg.payload.data(), _msg.payload.size());
+  }
+
+  // Documentation inherited
+  protected: void flush_() override {}
+
+  private: std::vector<std::string> lines;
+};
+
+//////////////////////////////////////////////////
+/// \brief Threads in this process.
+/// \return The count.
+std::size_t Threads()
+{
+  std::size_t n = 0;
+  for (common::DirIter it("/proc/self/task"); it != common::DirIter(); ++it)
+    ++n;
+  return n;
+}
+
 /// \brief Sim time as the server's last step saw it, read from inside the
 /// server so the test never has to keep its own count across a reset.
 class Clock : public sim::System, public sim::ISystemPostUpdate
@@ -324,6 +371,11 @@ class SonarSystem : public ::testing::Test
       std::to_string(getpid()) + "_" + std::to_string(
         std::chrono::system_clock::now().time_since_epoch().count());
     setenv("GZ_PARTITION", partition.c_str(), 1);
+
+    // Debug messages too, into a sink the tests read.
+    common::Console::SetVerbosity(4);
+    log = std::make_shared<Log>();
+    common::Console::Root().RawLogger().sinks().push_back(log);
 
     sim::ServerConfig config;
     config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, "scene_b.sdf"));
@@ -479,6 +531,7 @@ class SonarSystem : public ::testing::Test
   protected: static std::unique_ptr<Pings> pings;
   protected: static std::unique_ptr<Pings> spawned;
   protected: static std::unique_ptr<transport::Node> node;
+  protected: static std::shared_ptr<Log> log;
   protected: static State state;
 };
 
@@ -487,6 +540,7 @@ std::shared_ptr<Clock> SonarSystem::clock;
 std::unique_ptr<Pings> SonarSystem::pings;
 std::unique_ptr<Pings> SonarSystem::spawned;
 std::unique_ptr<transport::Node> SonarSystem::node;
+std::shared_ptr<Log> SonarSystem::log;
 SonarSystem::State SonarSystem::state = SonarSystem::State::kNoPings;
 
 //////////////////////////////////////////////////
@@ -743,4 +797,87 @@ TEST_F(SonarSystem, RemoveThenSpawn)
   }
   EXPECT_GT(boxCells, 0u);
   EXPECT_EQ(0u, hullCells);
+}
+
+//////////////////////////////////////////////////
+// Vehicles spawned and removed a step or a few apart, before the scene has
+// their link visuals, so before their sonars' cameras are built: each sonar
+// goes all the same, with its topics and its threads. A removal once
+// dropped only the cameras, and a sonar still waiting for them stayed for
+// good.
+TEST_F(SonarSystem, QuickSpawnAndRemoveLeavesNothing)
+{
+  Step(100);
+  Settle(*spawned);
+  const auto threads = Threads();
+
+  const int count = 30;
+  auto topic = [](int _i) {
+    return "quick" + std::to_string(_i) + "/sonar_forward/image";
+  };
+  for (int i = 0; i < count; ++i)
+  {
+    const std::string name = "quick" + std::to_string(i);
+    msgs::EntityFactory factory;
+    factory.set_sdf(Rov(name));
+    ASSERT_TRUE(Call(kWorld + "/create", factory));
+    // One to three steps before the removal and after it, in every pairing.
+    Step(1 + i % 3);
+    msgs::Entity model;
+    model.set_name(name);
+    model.set_type(msgs::Entity::MODEL);
+    ASSERT_TRUE(Call(kWorld + "/remove", model));
+    Step(1 + (i / 3) % 3);
+  }
+
+  auto left = [&]() {
+    int n = 0;
+    for (int i = 0; i < count; ++i)
+      n += Advertised(topic(i));
+    return n;
+  };
+  EXPECT_TRUE(StepUntil([&]() { return left() == 0 && Threads() <= threads; }))
+    << left() << " sonar topics still advertised, " << Threads()
+    << " threads against " << threads << " before";
+
+  // The one that was there throughout still pings.
+  const auto got = Window(*spawned, 400);
+  EXPECT_EQ(10u, got.size());
+  EXPECT_EQ("", OnGrid(got, kRate));
+}
+
+//////////////////////////////////////////////////
+// A reset brings the removed rov back, and gz-sim gives its link no
+// rendering visual again (see RemoveThenSpawn), so its sonar waits for its
+// cameras for as long as it exists. Removed again, it goes like any other;
+// and with every sonar gone and none waiting, the system leaves the render
+// events, which it once could not while a request waited.
+//
+// This runs last: it leaves the world without a sonar.
+TEST_F(SonarSystem, ARestoredSonarCanBeRemoved)
+{
+  Step(100);
+  Settle(*spawned);
+  ASSERT_FALSE(Advertised(kTopic));
+  msgs::WorldControl reset;
+  reset.mutable_reset()->set_all(true);
+  ASSERT_TRUE(Call(kWorld + "/control", reset));
+  ASSERT_TRUE(StepUntil([]() { return Advertised(kTopic); }));
+  Step(200);
+
+  const auto left = log->Count({"left the render events"});
+  for (const std::string name : {"rov", "rov2"})
+  {
+    const std::string topic = name + "/sonar_forward/image";
+    if (!Advertised(topic))
+      continue;
+    msgs::Entity model;
+    model.set_name(name);
+    model.set_type(msgs::Entity::MODEL);
+    ASSERT_TRUE(Call(kWorld + "/remove", model));
+    EXPECT_TRUE(StepUntil([&]() { return !Advertised(topic); })) << topic;
+  }
+  EXPECT_TRUE(StepUntil([&]() {
+    return log->Count({"left the render events"}) > left;
+  }));
 }
