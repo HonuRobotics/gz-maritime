@@ -36,7 +36,7 @@ The shipwreck world's real time factor for each set of sonars, with a GPU and wi
 ## Why the GPU matters little
 
 ```{figure} images/sonar-ping-flow.svg
-:alt: Swimlane chart of one ping on three threads. Simulation thread: gz-sim steps the world. Rendering thread: the Sensors system updates the scene, the sonar plugin asks for a render, gz-rendering draws depth and segmentation and copies them to the CPU, the only step on the GPU. Sonar worker thread: gz_sonar turns the images into hits on one core, the engine computes beams and samples on all cores, and the levels and message are made on one core
+:alt: Swimlane chart of one ping on three threads. Simulation thread: gz-sim steps the world. Rendering thread: the Sensors system updates the scene, the sonar plugin asks for a render, gz-rendering draws depth and segmentation and copies them to the CPU, the only step on the GPU. Sonar worker thread: gz_sonar turns the images into hits on one core, the engine computes beams and samples on up to eight cores, and the levels and message are made on one core
 
 One ping. Only the shaded step uses the GPU; the simulation waits for the rendering thread, and the sonar's worker runs alongside it.
 ```
@@ -51,7 +51,7 @@ The software involved:
 
 ## Recommendations
 
-- All sonar sims are computational costsly, so only activate a sonar only where the scenario uses it. 
+- All sonar sims are computationally costly, so activate a sonar only where the scenario uses it.
 - Imaging sonar (wide beam) sim is more costly than the profiling and side scan (narrow beam).  A single imaging sonar costs about a fifth of real time, a sidescan about a tenth, a profiler less.
 - A GPU is not required for scenes of this size. Without one, expect about the same real time factor.
 - More CPU cores help more than a faster GPU: most of each ping's work is on the CPU. One sonar uses at most eight of them; more help a world with several sonars.
