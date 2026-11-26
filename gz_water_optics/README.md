@@ -80,6 +80,15 @@ gz topic -t /world/default/water_optics/set -m gz.msgs.Param \
 An empty string removes a visibility or an explicit value. A message
 applies whole or not at all: one bad key and nothing changes.
 
+With `kai_bringup`'s simulation launch, the topic is bridged to ROS as a
+`ros_gz_interfaces/msg/ParamVec`:
+
+```bash
+ros2 topic pub --once /world/default/water_optics/set \
+  ros_gz_interfaces/msg/ParamVec \
+  '{params: [{name: jerlov, value: {type: 4, string_value: "7C"}}]}'
+```
+
 ## Ground truth
 
 `/world/<world>/water_optics_info` (`gz.msgs.Param`): the water type, the
@@ -88,6 +97,7 @@ generation that goes up on every change.
 
 ```bash
 gz topic -e -t /world/default/water_optics_info -n 1
+ros2 topic echo --once /world/default/water_optics_info   # bridged, as a ParamVec
 ```
 
 ## For a system that sees through water

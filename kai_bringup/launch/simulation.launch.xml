@@ -1,7 +1,7 @@
 <!--
   The simulation part of a gz-maritime bring-up: the Gazebo server on the
-  ocean world, the GUI, and a bridge for /clock, the wind and the ocean
-  current. Nothing
+  ocean world, the GUI, and a bridge for /clock, the wind, the ocean
+  current and the water's optics. Nothing
   else, and no vehicle: this file names none, so one simulation can carry
   any number.
 

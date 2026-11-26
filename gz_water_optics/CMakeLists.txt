@@ -118,6 +118,11 @@ if(BUILD_TESTING)
       ENVIRONMENT
       "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};GZ_PARTITION=gz_water_optics_test")
   endif()
+
+  # The plan's figures, regenerated from the Jerlov table, are the committed
+  # ones (skipped with another matplotlib than the one they were drawn with).
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_figures test/test_figures.py TIMEOUT 120)
 endif()
 
 # GZ_SIM_SYSTEM_PLUGIN_PATH hook so gz-sim finds the system plugin library in
