@@ -44,7 +44,8 @@ bool Resolve(const WaterOpticsSpec &_spec, WaterOpticsData &_out,
   _error.clear();
   _warning.clear();
 
-  const std::string name = _spec.jerlov.empty() ? "II" : _spec.jerlov;
+  // The default is clear coastal water, the water of most worlds.
+  const std::string name = _spec.jerlov.empty() ? "1C" : _spec.jerlov;
   const auto type = Jerlov(name);
   if (!type)
   {

@@ -35,7 +35,7 @@ namespace gz::sim::maritime
   /// World plugin parameters, all optional:
   ///
   /// * `<jerlov>`: Jerlov water type, I, IA, IB, II, III, 1C, 3C, 5C, 7C,
-  ///   9C. Default II.
+  ///   9C. Default 1C.
   /// * `<visibility>`: horizontal visibility of a black target, m. Scales
   ///   the type's murkiness, keeping its colour.
   /// * `<attenuation>`, `<backscatter>`, `<diffuse_attenuation>`: per R G B,

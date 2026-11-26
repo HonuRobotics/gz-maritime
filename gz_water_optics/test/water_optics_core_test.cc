@@ -183,13 +183,13 @@ TEST(Resolve, HandComputed3C)
 }
 
 /////////////////////////////////////////////////
-TEST(Resolve, DefaultsToOceanicII)
+TEST(Resolve, DefaultsToCoastal1C)
 {
   const auto out = MustResolve(WaterOpticsSpec{});
-  EXPECT_EQ(out.jerlov, "II");
-  WaterOpticsSpec ii;
-  ii.jerlov = "II";
-  ExpectRgb(out.attenuation, MustResolve(ii).attenuation);
+  EXPECT_EQ(out.jerlov, "1C");
+  WaterOpticsSpec coastal;
+  coastal.jerlov = "1C";
+  ExpectRgb(out.attenuation, MustResolve(coastal).attenuation);
 }
 
 /////////////////////////////////////////////////
@@ -233,12 +233,12 @@ TEST(Resolve, VisibilityKeepsColour)
 }
 
 /////////////////////////////////////////////////
-TEST(Resolve, VisibilityAloneScalesII)
+TEST(Resolve, VisibilityAloneScales1C)
 {
   WaterOpticsSpec spec;
   spec.visibility = 8.0;
   const auto out = MustResolve(spec);
-  EXPECT_EQ(out.jerlov, "II");
+  EXPECT_EQ(out.jerlov, "1C");
   EXPECT_NEAR(out.Visibility(), 8.0, 1e-9);
 }
 

@@ -218,8 +218,8 @@ ground truth on `water_optics_info`, and a sampler any system asks.
   type gives the colour balance (the ratio between channels) and
   `<visibility>` scales its strength: every channel's a and b are scaled by
   `4.8 / (visibility · c_green)`, and so is K_d, so the colour of the water
-  is kept and only its murkiness changes. Alone, it scales the default type (oceanic
-  II). Explicit coefficients override it.
+  is kept and only its murkiness changes. Alone, it scales the default type (coastal
+  1C). Explicit coefficients override it.
 - **The water level comes from the wave field** when there is one (the
   `WaveCoupling` level, `SurfaceElevation` above the point), not a fixed
   z = 0.
@@ -235,7 +235,7 @@ ground truth on `water_optics_info`, and a sampler any system asks.
 | Explicit tags override a preset, tag by tag | unit | only the given tags change |
 | `<visibility>` sets the strength: `4.8 / c_green` of the result | unit | equals the given visibility to 1e-6, for 3 types and 1, 5, 20 m |
 | `<visibility>` keeps the type's colour balance | unit | the ratios c_red : c_green : c_blue and b : c per channel are unchanged |
-| `<visibility>` alone; with explicit coefficients | unit | alone, it scales oceanic II; explicit coefficients win, with a warning |
+| `<visibility>` alone; with explicit coefficients | unit | alone, it scales coastal 1C; explicit coefficients win, with a warning |
 | `<visibility>` zero, negative or missing | unit | an error naming the tag for zero or negative; missing leaves the type as it is |
 | Unknown type, negative or missing values | unit | an error naming the tag; the world keeps clear water |
 | `water_optics/set` changes the recipe while running; `water_optics_info` reports it | integration | the sampler returns the new values within one step |

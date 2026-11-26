@@ -61,7 +61,7 @@ People describe water as "5 m visibility". `<visibility>` uses the standard
 relation of Zaneveld and Pegau (2003), visibility = 4.8 / c in the green: it
 scales a, b and K_d of every channel by the same factor, so the water keeps
 its colour and only its murkiness changes. With no `<jerlov>`, it scales
-type `II`. An explicit `<attenuation>` wins over it, with a warning.
+type `1C`. An explicit `<attenuation>` wins over it, with a warning.
 
 ## Change it while running
 

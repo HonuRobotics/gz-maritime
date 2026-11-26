@@ -44,7 +44,7 @@ constexpr double kVisibilityConstant{4.8};
 struct WaterOpticsSpec
 {
   /// \brief Jerlov water type: I, IA, IB, II, III, 1C, 3C, 5C, 7C, 9C.
-  /// Empty: oceanic II.
+  /// Empty: coastal 1C.
   std::string jerlov;
 
   /// \brief Horizontal visibility of a black target, m. Scales the type's
@@ -112,7 +112,7 @@ struct WaterOpticsData
 
 /// \brief Turn what a world asks for into the water's optics.
 ///
-/// * The base is a Jerlov type (oceanic II if none is named), from its
+/// * The base is a Jerlov type (coastal 1C if none is named), from its
 ///   published absorption a, scattering b and diffuse attenuation K_d per
 ///   channel: attenuation = backscatter = c = a + b, veil = b / c (the
 ///   single-scattering albedo), diffuse attenuation = K_d.
