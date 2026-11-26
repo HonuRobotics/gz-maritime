@@ -28,6 +28,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <utility>
@@ -57,9 +58,10 @@ class Capture
       std::function<void(const msgs::Image &)> cb =
           [this, t](const msgs::Image &_m)
           {
+            const std::lock_guard<std::mutex> lock(this->mutex);
+            this->rendered = true;
             if (_m.header().stamp().sec() < 2)
               return;
-            const std::lock_guard<std::mutex> lock(this->mutex);
             this->frames[t].push_back(_m);
           };
       this->node.Subscribe(t, cb);
@@ -86,10 +88,13 @@ class Capture
         auto &f = this->frames[_topic];
         if (f.size() >= have + _n)
           return std::vector<msgs::Image>(f.end() - _n, f.end());
+        // Nothing at all in 10 s: nothing renders here; the test skips
+        if (i == 200 && !this->rendered)
+          return {};
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
-    ADD_FAILURE() << "no frames on " << _topic << ": is there a GPU?";
+    ADD_FAILURE() << "no frames on " << _topic;
     return {};
   }
 
@@ -103,10 +108,57 @@ class Capture
                                     f.end());
   }
 
+  /// \brief Whether any frame came: none means no GPU.
+  public: bool Rendered()
+  {
+    const std::lock_guard<std::mutex> lock(this->mutex);
+    return this->rendered;
+  }
+
+  /// \brief Set one number of the world's water, and wait until the water
+  /// optics system publishes it.
+  /// \return Whether it did, within 10 s.
+  public: bool SetNumber(const std::string &_world, const std::string &_key,
+                         double _value)
+  {
+    std::mutex m;
+    std::optional<double> now;
+    std::function<void(const msgs::Param &)> onInfo =
+        [&m, &now, _key](const msgs::Param &_msg)
+        {
+          const auto it = _msg.params().find(_key);
+          if (it == _msg.params().end())
+            return;
+          const std::lock_guard<std::mutex> lock(m);
+          now = it->second.double_value();
+        };
+    const std::string info = "/world/" + _world + "/water_optics_info";
+    this->node.Subscribe(info, onInfo);
+    msgs::Param msg;
+    auto &p = (*msg.mutable_params())[_key];
+    p.set_type(msgs::Any::DOUBLE);
+    p.set_double_value(_value);
+    auto pub = this->node.Advertise<msgs::Param>(
+        "/world/" + _world + "/water_optics/set");
+    for (int i = 0; i < 50 && !pub.HasConnections(); ++i)
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    pub.Publish(msg);
+    bool done = false;
+    for (int i = 0; i < 500 && !done; ++i)
+    {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      const std::lock_guard<std::mutex> lock(m);
+      done = now && *now == _value;
+    }
+    this->node.Unsubscribe(info);
+    return done;
+  }
+
   public: transport::Node node;
   public: std::unique_ptr<Server> server;
   private: std::mutex mutex;
   private: std::map<std::string, std::vector<msgs::Image>> frames;
+  private: bool rendered{false};
 };
 
 /// \brief Linear green of a pixel.
@@ -150,6 +202,8 @@ TEST(Caustics, FadeWithDepthAndNeedWaves)
     // only a few of its periods at once.
     const auto a = c.Next("/uwcaustics/a", 30);
     const auto b = c.Next("/uwcaustics/b", 30);
+    if (!c.Rendered())
+      GTEST_SKIP() << "nothing rendered: no GPU?";
     c.server.reset();
     ASSERT_EQ(a.size(), 30u);
     ASSERT_EQ(b.size(), 30u);
@@ -171,6 +225,8 @@ TEST(Caustics, FadeWithDepthAndNeedWaves)
     Capture c("caustics_flat.sdf", {"/uwflat/a"});
     c.Next("/uwflat/a", 20);
     const auto a = c.Next("/uwflat/a", 1);
+    if (!c.Rendered())
+      GTEST_SKIP() << "nothing rendered: no GPU?";
     c.server.reset();
     ASSERT_EQ(a.size(), 1u);
     std::cout << "flat water contrast " << Contrast(a[0]) << "\n";
@@ -197,17 +253,28 @@ TEST(Caustics, TheSurfaceDoesNotShadeTheSeabed)
        {std::pair<std::string, double *>{"caustics_waves.sdf", &open},
         {"caustics_surface.sdf", &covered}})
   {
+    // Without caustics: the two runs cannot be held to the same instant of
+    // the pattern, and what is checked is only that the surface drawn above
+    // does not darken the seabed
     Capture c(world, {"/uwcaustics/a"});
-    c.Next("/uwcaustics/a", 20);
-    const auto a = c.Next("/uwcaustics/a", 10);
+    c.Next("/uwcaustics/a", 1);
+    if (!c.Rendered())
+      GTEST_SKIP() << "nothing rendered: no GPU?";
+    ASSERT_TRUE(c.SetNumber("uwcaustics", "caustics", 0.0)) << world;
+    c.Next("/uwcaustics/a", 5);
+    // One whole period of the wave (4 s at 10 Hz): the camera's depth
+    // under it, and so the veil, rises and falls with the wave
+    const auto a = c.Next("/uwcaustics/a", 40);
+    if (!c.Rendered())
+      GTEST_SKIP() << "nothing rendered: no GPU?";
     c.server.reset();
-    ASSERT_EQ(a.size(), 10u);
+    ASSERT_EQ(a.size(), 40u);
     for (const auto &m : a)
-      *value += mean(m) / 10;
+      *value += mean(m) / 40;
   }
   std::cout << "seabed, linear green: " << open << " without the surface, "
             << covered << " under it\n";
-  EXPECT_NEAR(covered, open, 0.1 * open);
+  EXPECT_NEAR(covered, open, 0.02 * open);
 }
 
 /////////////////////////////////////////////////
@@ -220,6 +287,8 @@ TEST(OpenWater, TheWatersColourUnderItTheBackgroundAboveIt)
   Capture c("open_water.sdf", {"/uwopen/under", "/uwopen/above"});
   const auto under = c.Next("/uwopen/under", 10);
   const auto above = c.Next("/uwopen/above", 1);
+  if (!c.Rendered())
+    GTEST_SKIP() << "nothing rendered: no GPU?";
   c.server.reset();
   ASSERT_EQ(under.size(), 10u);
   ASSERT_EQ(above.size(), 1u);
@@ -294,6 +363,8 @@ TEST(MarineSnow, LitByLampsFixedInTheWorld)
   std::this_thread::sleep_for(std::chrono::milliseconds(1500));
   const auto off = c.Next("/uwsnow/cam/image", 1);
   const auto depthNone = c.Next("/uwsnow/cam/depth_image", 1);
+  if (!c.Rendered())
+    GTEST_SKIP() << "nothing rendered: no GPU?";
   c.server.reset();
   ASSERT_EQ(off.size(), 1u);
   EXPECT_LT(specks(off[0]).size(), s0.size() / 10) << "specks without snow";
@@ -311,6 +382,8 @@ TEST(Lamps, OneThatGivesNoLightIsLeftOut)
 {
   Capture c("flat_idle_lamp.sdf", {"/uwflat/a"});
   const auto a = c.Next("/uwflat/a", 1);
+  if (!c.Rendered())
+    GTEST_SKIP() << "nothing rendered: no GPU?";
   c.server.reset();
   ASSERT_EQ(a.size(), 1u);
   int brightest = 0;
@@ -336,6 +409,8 @@ TEST(Quality, LowIsCloseToMedium)
   {
     Capture c(world, {topic});
     const auto f = c.Next(topic, 1);
+    if (!c.Rendered())
+      GTEST_SKIP() << "nothing rendered: no GPU?";
     c.server.reset();
     ASSERT_EQ(f.size(), 1u);
     const auto &m = f[0];
@@ -363,6 +438,8 @@ TEST(MarineSnow, DarkWithoutLamps)
 {
   Capture c("snow_dark.sdf", {"/uwsnowdark/cam/image"});
   const auto f = c.Next("/uwsnowdark/cam/image", 1);
+  if (!c.Rendered())
+    GTEST_SKIP() << "nothing rendered: no GPU?";
   c.server.reset();
   ASSERT_EQ(f.size(), 1u);
   int bright = 0;

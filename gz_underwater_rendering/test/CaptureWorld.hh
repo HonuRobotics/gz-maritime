@@ -48,25 +48,37 @@ struct Capture
   std::string underImage, underWater, aboveImage, labels;
   std::vector<float> depth;
   std::uint32_t width{0}, height{0};
+
+  /// \brief Whether any frame came at all: none means no GPU.
+  bool rendered{false};
 };
 
 /// \brief Run a world until every topic has published past 1 s, and keep
 /// one frame of each.
-inline Capture CaptureWorld(const std::string &_world)
+/// \param[in] _world The world file, in the test worlds.
+/// \param[in] _action If given, called once every topic has published past
+/// 1 s; then only frames 1 s after the latest of those count.
+inline Capture CaptureWorld(const std::string &_world,
+    const std::function<void(transport::Node &)> &_action = {})
 {
   Capture c;
   std::mutex mutex;
   std::map<std::string, msgs::Image> latest;
+  // Frames before this sim time, in s, do not count
+  double from = 1.0;
+  bool any = false;
   transport::Node node;
   const auto keep = [&](const std::string &_topic)
   {
     std::function<void(const msgs::Image &)> cb =
-        [&mutex, &latest, _topic](const msgs::Image &_m)
+        [&mutex, &latest, &from, &any, _topic](const msgs::Image &_m)
         {
-          if (_m.header().stamp().sec() < 1)
-            return;
+          const double t = _m.header().stamp().sec() +
+                           1e-9 * _m.header().stamp().nsec();
           const std::lock_guard<std::mutex> lock(mutex);
-          latest[_topic] = _m;
+          any = true;
+          if (t >= from)
+            latest[_topic] = _m;
         };
     node.Subscribe(_topic, cb);
   };
@@ -81,17 +93,43 @@ inline Capture CaptureWorld(const std::string &_world)
   config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, _world));
   auto server = std::make_unique<Server>(config);
   server->Run(false, 0, false);
-  for (int i = 0; i < 600; ++i)
+  // Until every topic has a frame that counts; true if they all do
+  const auto wait = [&]()
   {
+    for (int i = 0; i < 600; ++i)
     {
-      const std::lock_guard<std::mutex> lock(mutex);
-      if (latest.size() == topics.size())
-        break;
+      {
+        const std::lock_guard<std::mutex> lock(mutex);
+        if (latest.size() == topics.size())
+          return true;
+        // Nothing at all in 10 s: nothing renders here
+        if (i == 200 && !any)
+          return false;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    return false;
+  };
+  if (wait() && _action)
+  {
+    _action(node);
+    const std::lock_guard<std::mutex> lock(mutex);
+    double last = 0.0;
+    for (const auto &[topic, m] : latest)
+    {
+      last = std::max(last, m.header().stamp().sec() +
+                            1e-9 * m.header().stamp().nsec());
+    }
+    from = last + 1.0;
+    latest.clear();
   }
+  if (_action)
+    wait();
   server.reset();
   const std::lock_guard<std::mutex> lock(mutex);
+  c.rendered = any;
+  if (!any)
+    return c;
   EXPECT_EQ(latest.size(), topics.size()) << _world << ": topics missing";
   if (latest.size() != topics.size())
     return c;
