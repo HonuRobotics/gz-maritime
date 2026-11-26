@@ -426,7 +426,7 @@ BeamIntensity Engine::Ping(const std::vector<RayHit> &_hits,
       double footprint = h.footprint * rangeScale;
       if (footprint <= 0.0)
       {
-        const double tanInc = std::min(std::tan(h.incidence), 50.0);
+        const double tanInc = std::min(std::tan(h.incidence), kMaxSlant);
         footprint = std::min(apparent * h.ray.spacing * tanInc,
           kMaxFootprintSamples * dr);
       }

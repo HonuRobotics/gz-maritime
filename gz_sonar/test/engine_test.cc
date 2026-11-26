@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
 #include <memory>
 #include <numeric>
@@ -552,4 +553,76 @@ TEST(Readout, GainTrackerSmooths)
   sonar::GainTracker follow;
   follow.Update(-40.0, 0.1, 0.0);
   EXPECT_DOUBLE_EQ(follow.Update(-60.0, 0.1, 0.0), -60.0);
+}
+
+/////////////////////////////////////////////////
+// A plate at 4 m in front of a wall at 8 m. Where a ray on the plate's
+// edge has a neighbor on the wall, the jump is not a slanted surface, so
+// the footprint must not spread the plate's echo across it, whether or not
+// the two share a label (parts of one model do). The water between them
+// stays empty.
+TEST(Engine, FootprintDoesNotSpanAJump)
+{
+  const sonar::SonarConfig c = CleanEcho();
+  for (std::uint32_t wallLabel : {3u, 2u})
+  {
+    sonar::SyntheticScene scene;
+    scene.AddRectangle({4, 0, 2}, {-1, 0, 0}, {0, 1, 0}, 0.5, 0.5,
+      Lambert(-15.0), 2);
+    scene.AddPlane({8, 0, 0}, {-1, 0, 0}, Lambert(-20.0), wallLabel);
+    const auto b = Ping(c, scene, Pose3d(0, 0, 2, 0, 0, 0));
+
+    double plate = 0.0, gap = 0.0;
+    for (std::size_t i = 0; i < b.beams; ++i)
+    {
+      if (std::abs(b.azimuths[i]) > std::atan(0.4 / 4.0))
+        continue;
+      for (std::size_t k = 0; k < b.samples; ++k)
+      {
+        const double r = b.ranges[k];
+        const double v = b.data[i * b.samples + k];
+        if (r > 3.5 && r < 4.5)
+          plate = std::max(plate, v);
+        else if (r > 4.5 && r < 7.5)
+          gap = std::max(gap, v);
+      }
+    }
+    ASSERT_GT(plate, 0.0);
+    std::printf("wall label %u: gap %.1f dB relative to the plate\n",
+      wallLabel, gap > 0.0 ? 10.0 * std::log10(gap / plate) : -999.0);
+    EXPECT_EQ(gap, 0.0) << "wall label " << wallLabel;
+  }
+}
+
+/////////////////////////////////////////////////
+// The bound on a jump between neighbors is loose enough for a flat seabed
+// seen at a grazing angle: from 1 m above it, out to the end of the ECHO's
+// 30 m window, every pair of neighboring rays on the seabed is one surface.
+TEST(Rays, SeabedAtGrazingAnglesIsOneSurface)
+{
+  const sonar::SonarConfig c = sonar::EchoImaging();
+  sonar::SyntheticScene scene;
+  scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), 1);
+  const auto rays = sonar::RayFan(c);
+  const auto hits = scene.Cast(Pose3d(0, 0, 1, 0, 0, 0), rays, 1.5 * c.rangeMax);
+  const std::size_t ne = sonar::RayFanElevationCount(c);
+  std::size_t pairs = 0, split = 0;
+  for (std::size_t n = 0; n + 1 < hits.size(); ++n)
+  {
+    for (std::size_t m : {n + 1, n + ne})
+    {
+      if (m >= hits.size() || (m == n + 1 && m % ne == 0))
+        continue;
+      if (!hits[n].hit || !hits[m].hit || hits[n].range > c.rangeMax ||
+          hits[m].range > c.rangeMax)
+      {
+        continue;
+      }
+      ++pairs;
+      if (!sonar::SameSurface(hits[n], hits[m]))
+        ++split;
+    }
+  }
+  EXPECT_GT(pairs, 10000u);
+  EXPECT_EQ(split, 0u);
 }

@@ -67,6 +67,16 @@ std::size_t RayFanElevationCount(const SonarConfig &_config)
   return std::max<std::size_t>(static_cast<std::size_t>(std::lround(n)), 1);
 }
 
+bool SameSurface(const RayHit &_hit, const RayHit &_neighbor)
+{
+  if (!_hit.hit || !_neighbor.hit || _hit.label != _neighbor.label)
+    return false;
+  // From the nearer of the two, so the test is the same both ways.
+  const double r = std::min(_hit.range, _neighbor.range);
+  const double spacing = std::max(_hit.ray.spacing, _neighbor.ray.spacing);
+  return std::abs(_hit.range - _neighbor.range) <= r * spacing * kMaxSlant;
+}
+
 void AssignFootprints(std::vector<RayHit> &_hits, std::size_t _elevationCount)
 {
   if (_elevationCount == 0 || _hits.size() % _elevationCount != 0)
@@ -84,8 +94,8 @@ void AssignFootprints(std::vector<RayHit> &_hits, std::size_t _elevationCount)
   // The spread toward one pair of neighbors: half the distance between
   // their ranges, or the distance to the one that shares the surface.
   auto spread = [](const RayHit &_h, const RayHit *_a, const RayHit *_b) {
-    const bool okA = _a && _a->hit && _a->label == _h.label;
-    const bool okB = _b && _b->hit && _b->label == _h.label;
+    const bool okA = _a && SameSurface(_h, *_a);
+    const bool okB = _b && SameSurface(_h, *_b);
     if (okA && okB)
       return 0.5 * std::abs(_a->range - _b->range);
     if (okA)

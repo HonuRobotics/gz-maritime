@@ -86,10 +86,25 @@ std::vector<Ray> RayFan(const SonarConfig &_config);
 /// \brief Number of elevation rays in each azimuth column of RayFan's grid.
 std::size_t RayFanElevationCount(const SonarConfig &_config);
 
+/// \brief The steepest slant a surface is taken to have: the tangent of its
+/// largest incidence angle, 50 (88.9 degrees). Past it a lone ray's
+/// footprint stops growing, and a jump in range between neighboring rays is
+/// taken for two surfaces rather than one seen at a grazing angle.
+constexpr double kMaxSlant = 50.0;
+
+/// \brief Whether two neighboring rays on the grid hit the same surface:
+/// both hit, with the same label, and their ranges differ by no more than a
+/// surface at kMaxSlant would give across the ray spacing. The bound tells
+/// apart parts of one model (a plate and a wall behind it) and, when no
+/// labels are drawn, everything; a flat seabed seen at a grazing angle out
+/// to a sonar's range stays within it.
+bool SameSurface(const RayHit &_hit, const RayHit &_neighbor);
+
 /// \brief Set each hit's footprint from its neighbors on the ray grid:
 /// RayFan's order, azimuth columns of _elevationCount rays each. Only
-/// neighbors that hit the same surface (the same label) count, so a ray at
-/// the edge of a target does not take the jump to the background behind it.
+/// neighbors on the same surface (SameSurface) count, so a ray at the edge
+/// of a target does not take the jump to the background behind it, and the
+/// footprint is no larger than one on a surface at kMaxSlant.
 /// \param[in,out] _hits Hits in RayFan order.
 /// \param[in] _elevationCount Rays per azimuth column.
 void AssignFootprints(std::vector<RayHit> &_hits, std::size_t _elevationCount);
