@@ -16,7 +16,7 @@
 // Not in shadow-caster or depth-only passes, and not on gz's solid colours
 // (segmentation and the like), which must keep their exact values.
 @property( gz_underwater )
-@piece( custom_ps_functions )
+@piece( custom_ps_functions_underwater )
 	// A hash of a cell, in [0, 1).
 	float uwHash( float3 p )
 	{
