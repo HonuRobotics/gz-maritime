@@ -19,9 +19,15 @@
 // of it) rendered headless and stepped from here. One server serves every
 // test, in the order written, because each one leaves the world as the next
 // expects it and a rendering server is slow to start. It needs a GPU or
-// llvmpipe; where rendering starts but no ping comes within 30 s, every
-// test skips. Where ogre2 itself fails to start, gz-rendering can crash the
-// process before then; that is outside what a test here can catch.
+// llvmpipe. Every test skips only where the render engine cannot load; where
+// it loads and no ping comes, every test fails. Where ogre2 itself fails to
+// start, gz-rendering can crash the process before then; that is outside
+// what a test here can catch.
+//
+// Nothing here waits a fixed time for the sonar's worker: a wait is for the
+// ping stamped at a known sim time, or for a topic to appear or go, each
+// with a generous limit that only a failure reaches. The test runs in a
+// gz-transport partition of its own, made up per run.
 
 #include <gtest/gtest.h>
 
@@ -31,9 +37,14 @@
 #include <gz/msgs/entity_factory.pb.h>
 #include <gz/msgs/world_control.pb.h>
 
+#include <unistd.h>
+
+#include <atomic>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstdint>
+#include <cstdlib>
 #include <fstream>
 #include <map>
 #include <memory>
@@ -43,8 +54,10 @@
 #include <vector>
 
 #include <gz/common/Filesystem.hh>
+#include <gz/rendering/RenderingIface.hh>
 #include <gz/sim/Server.hh>
 #include <gz/sim/ServerConfig.hh>
+#include <gz/sim/System.hh>
 #include <gz/transport/Node.hh>
 
 #include "gz/maritime/sonar/sonar_image.pb.h"
@@ -59,6 +72,10 @@ const std::string kWorld = "/world/scene_b";
 const std::string kTopic = "rov/sonar_forward/image";
 const std::string kSpawnTopic = "rov2/sonar_forward/image";
 constexpr double kRate = 25.0;
+
+/// \brief The longest any wait may take. Only a failure reaches it, so it
+/// is set for a slow build on a busy machine, not for this one.
+constexpr auto kLimit = 120s;
 
 /// \brief One ping as it arrived: the image and, matched by ping number,
 /// its labels.
@@ -85,6 +102,36 @@ class Pings
     const std::lock_guard<std::mutex> lock(this->mutex);
     this->images.clear();
     this->labels.clear();
+  }
+
+  /// \brief Forget what came so far and the latest stamp too: after a world
+  /// reset, when sim time starts over.
+  public: void Restart()
+  {
+    const std::lock_guard<std::mutex> lock(this->mutex);
+    this->images.clear();
+    this->labels.clear();
+    this->latest = -1;
+  }
+
+  /// \brief Wait for a ping stamped _stamp or later, with its labels. A
+  /// sonar's pings arrive in order, so every earlier one has come by then.
+  /// \param[in] _stamp The stamp, ns of sim time.
+  /// \return False if none came within kLimit.
+  public: bool WaitFor(std::int64_t _stamp)
+  {
+    std::unique_lock<std::mutex> lock(this->mutex);
+    return this->cv.wait_for(lock, kLimit, [&]() {
+      return this->latest >= _stamp && this->latestLabels >= this->latest;
+    });
+  }
+
+  /// \brief The stamp of the latest ping, or -1.
+  /// \return The stamp, ns of sim time.
+  public: std::int64_t Latest()
+  {
+    const std::lock_guard<std::mutex> lock(this->mutex);
+    return this->latest;
   }
 
   /// \brief What came since the last Clear, in arrival order.
@@ -117,17 +164,30 @@ class Pings
     p.stamp = static_cast<std::int64_t>(_msg.header().stamp().sec()) *
       1000000000 + _msg.header().stamp().nsec();
     p.image = _msg;
-    const std::lock_guard<std::mutex> lock(this->mutex);
-    this->images.push_back(std::move(p));
+    {
+      const std::lock_guard<std::mutex> lock(this->mutex);
+      this->latest = p.stamp;
+      this->images.push_back(std::move(p));
+    }
+    this->cv.notify_all();
   }
 
   private: void OnLabels(const gz::maritime::sonar::SonarLabels &_msg)
   {
-    const std::lock_guard<std::mutex> lock(this->mutex);
-    this->labels[_msg.ping()] = _msg;
+    {
+      const std::lock_guard<std::mutex> lock(this->mutex);
+      this->latestLabels =
+        static_cast<std::int64_t>(_msg.header().stamp().sec()) * 1000000000 +
+        _msg.header().stamp().nsec();
+      this->labels[_msg.ping()] = _msg;
+    }
+    this->cv.notify_all();
   }
 
   private: std::mutex mutex;
+  private: std::condition_variable cv;
+  private: std::int64_t latest{-1};
+  private: std::int64_t latestLabels{-1};
   private: std::vector<Ping> images;
   private: std::map<std::uint64_t, gz::maritime::sonar::SonarLabels> labels;
 
@@ -145,6 +205,37 @@ std::int64_t Due(std::uint64_t _k, double _rate)
 {
   return std::llround(static_cast<double>(_k) * 1e9 / _rate);
 }
+
+//////////////////////////////////////////////////
+/// \brief The last due time on a _rate grid at or before _t.
+/// \param[in] _t The sim time, ns.
+/// \param[in] _rate Pings per second.
+/// \return The due time, ns.
+std::int64_t LastDue(std::int64_t _t, double _rate)
+{
+  auto k = static_cast<std::uint64_t>(
+    std::max(0.0, std::floor(static_cast<double>(_t) * 1e-9 * _rate)));
+  while (Due(k + 1, _rate) <= _t)
+    ++k;
+  while (k > 0 && Due(k, _rate) > _t)
+    --k;
+  return Due(k, _rate);
+}
+
+/// \brief Sim time as the server's last step saw it, read from inside the
+/// server so the test never has to keep its own count across a reset.
+class Clock : public sim::System, public sim::ISystemPostUpdate
+{
+  // Documentation inherited
+  public: void PostUpdate(const sim::UpdateInfo &_info,
+    const sim::EntityComponentManager &) override
+  {
+    this->now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+      _info.simTime).count();
+  }
+
+  public: std::atomic<std::int64_t> now{0};
+};
 
 //////////////////////////////////////////////////
 /// \brief Ping numbers that rise by one each time, on the _rate grid.
@@ -226,64 +317,149 @@ class SonarSystem : public ::testing::Test
 {
   protected: static void SetUpTestSuite()
   {
+    // A partition no other run has: two workspaces testing at once, or two
+    // runs in one, must not read each other's pings. Set before the first
+    // node is made.
+    const std::string partition = "sonar_system_test_" +
+      std::to_string(getpid()) + "_" + std::to_string(
+        std::chrono::system_clock::now().time_since_epoch().count());
+    setenv("GZ_PARTITION", partition.c_str(), 1);
+
     sim::ServerConfig config;
     config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, "scene_b.sdf"));
     config.SetHeadlessRendering(true);
     config.SetSeed(7);
+    node = std::make_unique<transport::Node>();
     pings = std::make_unique<Pings>(kTopic);
     spawned = std::make_unique<Pings>(kSpawnTopic);
     server = std::make_unique<sim::Server>(config);
+    clock = std::make_shared<Clock>();
+    server->AddSystem(clock);
 
-    // Rendering starts on its own thread; step until the first ping, or
-    // give up: this machine cannot render.
-    const auto end = std::chrono::steady_clock::now() + 30s;
+    // Rendering starts on its own thread; step until the first ping.
+    const auto end = std::chrono::steady_clock::now() + kLimit;
     while (std::chrono::steady_clock::now() < end)
     {
       server->Run(true, 100, false);
-      if (!pings->Images().empty())
+      if (pings->Latest() >= 0)
       {
-        rendering = true;
-        break;
+        state = State::kPings;
+        return;
       }
     }
+
+    // No ping. That excuses the tests only on a machine that cannot render
+    // at all, so find out: if the server loaded no engine, try here. An
+    // engine that loads, in the server or here, makes the missing ping the
+    // system's fault (it never asked for a frame, say), and every test
+    // fails.
+    bool renders = !rendering::loadedEngines().empty();
+    if (!renders)
+    {
+      server.reset();
+      try
+      {
+        renders = rendering::engine("ogre2",
+          std::map<std::string, std::string>{{"headless", "1"}}) != nullptr;
+      }
+      catch (...)
+      {
+        renders = false;
+      }
+    }
+    state = renders ? State::kNoPings : State::kNoEngine;
   }
 
   protected: static void TearDownTestSuite()
   {
     server.reset();
+    clock.reset();
     spawned.reset();
     pings.reset();
+    node.reset();
   }
 
   // Documentation inherited
   protected: void SetUp() override
   {
-    if (!rendering)
-      GTEST_SKIP() << "no ping: this machine cannot render";
+    if (state == State::kNoEngine)
+      GTEST_SKIP() << "the render engine does not load on this machine";
+    ASSERT_EQ(State::kPings, state)
+      << "the render engine loads, but no ping came in "
+      << kLimit.count() << " s";
   }
 
-  /// \brief Step the server _n times (ms of sim time), then let the
-  /// worker's queue drain.
+  /// \brief Step the server _n times (ms of sim time).
   /// \param[in] _n The number of steps.
   protected: static void Step(std::uint64_t _n)
   {
     ASSERT_TRUE(server->Run(true, _n, false));
-    std::this_thread::sleep_for(300ms);
   }
 
-  /// \brief Step _settle ms, forget what came, step _n ms more; what came
-  /// in those.
+  /// \brief Sim time now.
+  /// \return The time, ns.
+  protected: static std::int64_t Now()
+  {
+    return clock->now;
+  }
+
+  /// \brief Wait until a pinging sonar's worker has caught up with the
+  /// server: until the ping stamped at the last due time has arrived.
+  /// \param[in,out] _p The subscriber.
+  /// \param[in] _rate The sonar's rate.
+  protected: static void Settle(Pings &_p, double _rate = kRate)
+  {
+    const auto due = LastDue(Now(), _rate);
+    ASSERT_TRUE(_p.WaitFor(due))
+      << "no ping stamped " << due << " ns; the latest is " << _p.Latest();
+  }
+
+  /// \brief Step _settle ms and catch up, forget what came, step _n ms more
+  /// and catch up; what came in those: every ping stamped after the first
+  /// catch-up, to the last due time.
   /// \param[in,out] _p The subscriber.
   /// \param[in] _n Steps to collect over.
   /// \param[in] _settle Steps to settle first.
+  /// \param[in] _rate The sonar's rate.
   /// \return The pings.
   protected: static std::vector<Ping> Window(Pings &_p, std::uint64_t _n,
-    std::uint64_t _settle = 100)
+    std::uint64_t _settle = 100, double _rate = kRate)
   {
     Step(_settle);
+    Settle(_p, _rate);
     _p.Clear();
     Step(_n);
+    Settle(_p, _rate);
     return _p.Images();
+  }
+
+  /// \brief Whether anything advertises a topic.
+  /// \param[in] _topic The topic, without the leading slash.
+  /// \return True if it has a publisher.
+  protected: static bool Advertised(const std::string &_topic)
+  {
+    std::vector<transport::MessagePublisher> publishers;
+    std::vector<transport::MessagePublisher> subscribers;
+    node->TopicInfo("/" + _topic, publishers, subscribers);
+    return !publishers.empty();
+  }
+
+  /// \brief Step, _chunk ms at a time, until _done or the limit.
+  /// \param[in] _done The condition.
+  /// \param[in] _chunk Steps between checks.
+  /// \return What _done returned last.
+  protected: template <typename F>
+  static bool StepUntil(F _done, std::uint64_t _chunk = 20)
+  {
+    const auto end = std::chrono::steady_clock::now() + kLimit;
+    while (!_done() && std::chrono::steady_clock::now() < end)
+    {
+      if (!server->Run(true, _chunk, false))
+        break;
+      // Let the rendering thread and the workers have the processor.
+      std::this_thread::yield();
+    }
+    return _done();
   }
 
   protected: template <typename Req>
@@ -295,19 +471,23 @@ class SonarSystem : public ::testing::Test
       rep.data();
   }
 
+  /// \brief Whether the first ping came, and if not, why.
+  protected: enum class State {kPings, kNoEngine, kNoPings};
+
   protected: static std::unique_ptr<sim::Server> server;
+  protected: static std::shared_ptr<Clock> clock;
   protected: static std::unique_ptr<Pings> pings;
   protected: static std::unique_ptr<Pings> spawned;
   protected: static std::unique_ptr<transport::Node> node;
-  protected: static bool rendering;
+  protected: static State state;
 };
 
 std::unique_ptr<sim::Server> SonarSystem::server;
+std::shared_ptr<Clock> SonarSystem::clock;
 std::unique_ptr<Pings> SonarSystem::pings;
 std::unique_ptr<Pings> SonarSystem::spawned;
-std::unique_ptr<transport::Node> SonarSystem::node =
-  std::make_unique<transport::Node>();
-bool SonarSystem::rendering = false;
+std::unique_ptr<transport::Node> SonarSystem::node;
+SonarSystem::State SonarSystem::state = SonarSystem::State::kNoPings;
 
 //////////////////////////////////////////////////
 // The system under test is this build's, in its build tree or where it
@@ -330,9 +510,10 @@ TEST_F(SonarSystem, LoadsTheBuiltSystem)
 // cannot hold, never makes a ping due twice or skips one.
 TEST_F(SonarSystem, PingsOnTheRateGrid)
 {
+  // Exactly the 50 due in 2 s, since the window is cut at pings, not at
+  // whatever had arrived when a sleep ran out.
   const auto got = Window(*pings, 2000);
-  ASSERT_GE(got.size(), 49u);
-  EXPECT_LE(got.size(), 51u);
+  EXPECT_EQ(50u, got.size());
   EXPECT_EQ("", OnGrid(got, kRate));
 }
 
@@ -425,18 +606,33 @@ TEST_F(SonarSystem, SeesTheBoxNotItsHull)
 //////////////////////////////////////////////////
 // Off through <topic>/enable, no pings; on again, they resume on the grid,
 // where they would have been had it never been off.
+//
+// The service is one way, and gz-transport runs a one-way request to a
+// responder in the same process before Request returns, so the sonar is off
+// (or at its new rate, below) from the next frame. The server has caught up
+// when the request is made, so no earlier ping is still on its way; and a
+// ping made while off would arrive before the first one after, so none is
+// missed by looking too soon.
 TEST_F(SonarSystem, EnableStopsAndResumes)
 {
-  msgs::Boolean off;
-  off.set_data(false);
-  ASSERT_TRUE(node->Request(kTopic + "/enable", off));
-  EXPECT_TRUE(Window(*pings, 1000).empty());
+  Step(100);
+  Settle(*pings);
+  pings->Clear();
+  const auto off = Now();
+  msgs::Boolean request;
+  request.set_data(false);
+  ASSERT_TRUE(node->Request(kTopic + "/enable", request));
+  Step(1000);
+  const auto on = Now();
+  request.set_data(true);
+  ASSERT_TRUE(node->Request(kTopic + "/enable", request));
+  Step(1000);
+  Settle(*pings);
 
-  msgs::Boolean on;
-  on.set_data(true);
-  ASSERT_TRUE(node->Request(kTopic + "/enable", on));
-  const auto got = Window(*pings, 1000);
-  EXPECT_GE(got.size(), 24u);
+  const auto got = pings->Images();
+  ASSERT_EQ(25u, got.size());
+  EXPECT_GT(got.front().stamp, on) << "a ping while off, " << off << " to "
+                                   << on << " ns";
   EXPECT_EQ("", OnGrid(got, kRate));
 }
 
@@ -445,18 +641,19 @@ TEST_F(SonarSystem, EnableStopsAndResumes)
 // grid in sim time; set back, it returns to the first.
 TEST_F(SonarSystem, SetRateChangesTheRate)
 {
+  Step(100);
+  Settle(*pings);
   msgs::Double rate;
   rate.set_data(5.0);
   ASSERT_TRUE(node->Request(kTopic + "/set_rate", rate));
-  auto got = Window(*pings, 2000);
-  EXPECT_GE(got.size(), 9u);
-  EXPECT_LE(got.size(), 11u);
+  auto got = Window(*pings, 2000, 100, 5.0);
+  EXPECT_EQ(10u, got.size());
   EXPECT_EQ("", OnGrid(got, 5.0));
 
   rate.set_data(kRate);
   ASSERT_TRUE(node->Request(kTopic + "/set_rate", rate));
   got = Window(*pings, 1000);
-  EXPECT_GE(got.size(), 24u);
+  EXPECT_EQ(25u, got.size());
   EXPECT_EQ("", OnGrid(got, kRate));
 }
 
@@ -466,15 +663,19 @@ TEST_F(SonarSystem, SetRateChangesTheRate)
 TEST_F(SonarSystem, ResetStartsOverOnTheGrid)
 {
   Step(500);
+  Settle(*pings);
   const auto before = pings->Images();
   ASSERT_FALSE(before.empty());
   const auto last = before.back().ping;
 
+  // Nothing from before the reset is still on its way, so what comes now
+  // is from after it.
   msgs::WorldControl reset;
   reset.mutable_reset()->set_all(true);
   ASSERT_TRUE(Call(kWorld + "/control", reset));
-  pings->Clear();
+  pings->Restart();
   Step(1000);
+  Settle(*pings);
   const auto got = pings->Images();
   ASSERT_GE(got.size(), 20u);
   EXPECT_LT(got.front().ping, last);
@@ -497,18 +698,27 @@ TEST_F(SonarSystem, RemoveThenSpawn)
   msgs::Entity rov;
   rov.set_name("rov");
   rov.set_type(msgs::Entity::MODEL);
+  Step(100);
+  Settle(*pings);
+  ASSERT_TRUE(Advertised(kTopic));
   ASSERT_TRUE(Call(kWorld + "/remove", rov));
   const auto iterations = server->IterationCount();
-  EXPECT_TRUE(Window(*pings, 1000, 200).empty());
+  // The sonar goes with its topic; once that is gone its worker has been
+  // joined, so nothing more can come from it.
+  EXPECT_TRUE(StepUntil([]() { return !Advertised(kTopic); }));
+  pings->Clear();
+  Step(1000);
+  EXPECT_TRUE(pings->Images().empty());
   ASSERT_TRUE(iterations.has_value());
-  EXPECT_GE(*server->IterationCount(), *iterations + 1200);
+  EXPECT_GE(*server->IterationCount(), *iterations + 1000);
 
   msgs::EntityFactory factory;
   factory.set_sdf(Rov("rov2"));
   ASSERT_TRUE(Call(kWorld + "/create", factory));
   // Its cameras take a few frames to build.
-  const auto got = Window(*spawned, 1000, 500);
-  ASSERT_GE(got.size(), 20u);
+  ASSERT_TRUE(StepUntil([]() { return spawned->Latest() >= 0; }));
+  const auto got = Window(*spawned, 1000);
+  EXPECT_EQ(25u, got.size());
   EXPECT_EQ("", OnGrid(got, kRate));
 
   gz::maritime::sonar::SonarLabels labels;
