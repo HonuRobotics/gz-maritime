@@ -71,7 +71,11 @@ the camera's pose and the water come in the pass buffer.
   and the background through a compositor listener.
 - **Depth from the still water level**, not the wave surface, unlike the
   reference camera.
-- **ogre2 only.**
+- **ogre2 only, and gz-rendering 10.** The bridge chains its pieces into
+  the pieces that define Ogre's hooks, in a copy kept in memory. With
+  another render engine, another gz-rendering major version, its own pieces
+  missing, or gz-rendering's pieces not as expected, it does not install,
+  the world is not marked, and the reference camera draws the water.
 
 ## Tests
 
@@ -85,3 +89,6 @@ camera's: mean difference 0.01 of an 8-bit step, 99th percentile 1 (the
 criterion is 1 and 3). Depth images byte for byte the same; a camera above
 the water byte for byte the same; segmentation labels byte for byte the
 same; the reference camera passing its image through.
+`underwater_rendering_fallback_test`, in a process of its own: with the
+pieces missing, nothing is installed and the reference camera draws the
+water, as without the GPU path.

@@ -21,23 +21,32 @@
 // engine; see gz_waves_rendering's CMakeLists.txt).
 //
 // Two things are chained, never replaced:
-// * gz-rendering's own composite pieces (Hlms/Gz/Pbs): its
-//   custom_passBuffer and custom_ps_posExecution get one more insertpiece
-//   each, ours, written into a copy of that folder read at run time, so the
-//   rest is always the installed gz-rendering's own;
+// * the pieces that define Ogre's customization hooks we use: each gets
+//   one more insertpiece, ours, in a copy of its archive kept in memory, so
+//   the rest is always the installed gz-rendering's own. A hook nothing
+//   defines is defined by us. Anything else, e.g. a hook defined twice or
+//   a piece that does more than insert others, and nothing is installed;
 // * gz-rendering's Hlms listener: ours calls it first, then appends.
+//
+// It is written against gz-rendering 10's pieces and refuses any other
+// major version. When it does not install, the plugin does not mark the
+// world, and the reference camera draws the water instead.
 
 #include <cmath>
 #include <cstring>
-#include <filesystem>
-#include <fstream>
+#include <map>
+#include <memory>
+#include <regex>
 #include <string>
-#include <unistd.h>
+#include <utility>
+#include <vector>
 
 #include <gz/common/Console.hh>
+#include <gz/rendering/config.hh>
 
 #include <OgreArchive.h>
 #include <OgreArchiveManager.h>
+#include <OgreDataStream.h>
 #include <OgreCamera.h>
 #include <OgreHlms.h>
 #include <OgreHlmsListener.h>
@@ -45,9 +54,97 @@
 #include <OgreRoot.h>
 #include <OgreSceneManager.h>
 #include <OgreHlmsPbs.h>
+#include <OgreString.h>
 
 namespace
 {
+/// \brief The gz-rendering major version whose pieces this was written
+/// against.
+constexpr int kGzRenderingMajor = 10;
+
+/// \brief Ogre's customization hooks we add to: the pass buffer block and
+/// the final colour.
+const std::vector<std::string> kPbsHooks{"custom_passBuffer",
+                                         "custom_ps_posExecution"};
+
+/// \brief A read only Ogre archive of files kept in memory: the pieces we
+/// change, with nothing written to disk.
+class MemoryArchive : public Ogre::Archive
+{
+  public: explicit MemoryArchive(const std::string &_name)
+    : Ogre::Archive(_name, "UnderwaterMemory") {}
+
+  public: std::map<std::string, std::string> files;
+
+  public: bool isCaseSensitive() const override { return true; }
+  public: void load() override {}
+  public: void unload() override {}
+
+  public: Ogre::DataStreamPtr open(const Ogre::String &_name,
+                                   bool) override
+  {
+    const auto it = this->files.find(_name);
+    if (it == this->files.end())
+      return Ogre::DataStreamPtr();
+    auto *stream = OGRE_NEW Ogre::MemoryDataStream(_name, it->second.size(),
+                                                   true, true);
+    std::memcpy(stream->getPtr(), it->second.data(), it->second.size());
+    return Ogre::DataStreamPtr(stream);
+  }
+
+  public: Ogre::StringVectorPtr list(bool, bool _dirs) override
+  {
+    return this->find("*", true, _dirs);
+  }
+
+  public: Ogre::FileInfoListPtr listFileInfo(bool, bool _dirs) override
+  {
+    return this->findFileInfo("*", true, _dirs);
+  }
+
+  public: Ogre::StringVectorPtr find(const Ogre::String &_pattern, bool,
+                                     bool _dirs) override
+  {
+    Ogre::StringVectorPtr names(OGRE_NEW_T(Ogre::StringVector,
+        Ogre::MEMCATEGORY_GENERAL)(), Ogre::SPFM_DELETE_T);
+    for (const auto &file : this->files)
+    {
+      if (!_dirs && Ogre::StringUtil::match(file.first, _pattern, true))
+        names->push_back(file.first);
+    }
+    return names;
+  }
+
+  public: bool exists(const Ogre::String &_name) override
+  {
+    return this->files.count(_name) > 0;
+  }
+
+  public: time_t getModifiedTime(const Ogre::String &) override
+  {
+    return 0;
+  }
+
+  public: Ogre::FileInfoListPtr findFileInfo(const Ogre::String &_pattern,
+                                             bool, bool _dirs) override
+  {
+    Ogre::FileInfoListPtr infos(OGRE_NEW_T(Ogre::FileInfoList,
+        Ogre::MEMCATEGORY_GENERAL)(), Ogre::SPFM_DELETE_T);
+    for (const auto &file : this->files)
+    {
+      if (_dirs || !Ogre::StringUtil::match(file.first, _pattern, true))
+        continue;
+      Ogre::FileInfo info;
+      info.archive = this;
+      info.filename = file.first;
+      info.basename = file.first;
+      info.compressedSize = file.second.size();
+      info.uncompressedSize = file.second.size();
+      infos->push_back(info);
+    }
+    return infos;
+  }
+};
 /// \brief The water, as the plugin last set it.
 struct Water
 {
@@ -183,7 +280,8 @@ struct Installed
   Ogre::HlmsPbs *pbs{nullptr};
   UnderwaterListener listener;
   Ogre::ArchiveVec originalLibrary;
-  std::filesystem::path workDir;
+  /// \brief The pieces we changed or added, read by the Hlms
+  std::vector<std::unique_ptr<MemoryArchive>> archives;
   bool done{false};
 };
 Installed &State()
@@ -192,18 +290,161 @@ Installed &State()
   return installed;
 }
 
-/// \brief Insert a line before the @end that closes a piece.
-bool InsertIntoPiece(std::string &_text, const std::string &_piece,
-                     const std::string &_line)
+/// \brief Where a piece is defined: "@piece( name )", any spacing.
+/// \param[in] _text A pieces file.
+/// \param[in] _piece The piece.
+/// \return Each definition's start and the length of its opening tag.
+std::vector<std::pair<std::size_t, std::size_t>> Definitions(
+    const std::string &_text, const std::string &_piece)
 {
-  const std::string open = "@piece( " + _piece + " )";
-  const auto start = _text.find(open);
-  if (start == std::string::npos)
-    return false;
-  const auto end = _text.find("@end", start + open.size());
+  std::vector<std::pair<std::size_t, std::size_t>> out;
+  const std::regex open("@piece\\(\\s*" + _piece + "\\s*\\)");
+  for (auto it = std::sregex_iterator(_text.begin(), _text.end(), open);
+       it != std::sregex_iterator(); ++it)
+  {
+    out.emplace_back(it->position(), it->length());
+  }
+  return out;
+}
+
+/// \brief Whether an archive defines `<hook>_<suffix>` for every hook.
+/// \param[in] _archive The archive.
+/// \param[in] _hooks The hooks.
+/// \param[in] _suffix The suffix.
+/// \return True if it defines all of them.
+bool Defines(Ogre::Archive *_archive, const std::vector<std::string> &_hooks,
+             const std::string &_suffix)
+{
+  std::string text;
+  const Ogre::StringVectorPtr names = _archive->list(false, false);
+  for (const auto &name : *names)
+    text += _archive->open(name)->getAsString();
+  for (const auto &hook : _hooks)
+  {
+    if (Definitions(text, hook + "_" + _suffix).empty())
+      return false;
+  }
+  return true;
+}
+
+/// \brief Insert a line in a piece that only inserts other pieces.
+/// \param[in,out] _text The pieces file.
+/// \param[in] _start Where the piece's opening tag starts.
+/// \param[in] _openLength Length of that tag.
+/// \param[in] _line The line to add before its @end.
+/// \return False if the piece holds anything but insertpieces, blank lines
+/// and comments: we would not know where our line goes.
+bool InsertIntoComposite(std::string &_text, std::size_t _start,
+                         std::size_t _openLength, const std::string &_line)
+{
+  const std::size_t bodyStart = _start + _openLength;
+  const std::size_t end = _text.find("@end", bodyStart);
   if (end == std::string::npos)
     return false;
+  static const std::regex allowed(
+      "^\\s*(@insertpiece\\(\\s*\\w+\\s*\\)\\s*)?(//.*)?$");
+  std::size_t lineStart = bodyStart;
+  while (lineStart < end)
+  {
+    std::size_t lineEnd = _text.find('\n', lineStart);
+    if (lineEnd == std::string::npos || lineEnd > end)
+      lineEnd = end;
+    if (!std::regex_match(_text.substr(lineStart, lineEnd - lineStart),
+                          allowed))
+    {
+      return false;
+    }
+    lineStart = lineEnd + 1;
+  }
   _text.insert(end, "  " + _line + "\n");
+  return true;
+}
+
+/// \brief Chain our pieces into an Hlms' pieces library: for each hook,
+/// insert `<hook>_<suffix>` where the hook is defined, or define it.
+/// \param[in,out] _library The library; a changed archive is replaced by
+/// its copy in memory, and the definitions we add come last.
+/// \param[in] _hooks The hooks.
+/// \param[in] _suffix Suffix of our pieces, e.g. "underwater".
+/// \param[out] _archives Owns the archives in memory.
+/// \return False, with an error, if a hook is defined more than once or in
+/// a piece we do not understand.
+bool Chain(Ogre::ArchiveVec &_library, const std::vector<std::string> &_hooks,
+           const std::string &_suffix,
+           std::vector<std::unique_ptr<MemoryArchive>> &_archives)
+{
+  // Every file of the library, to find the hooks in
+  struct File
+  {
+    std::size_t archive;
+    std::string name;
+    std::string text;
+  };
+  std::vector<File> files;
+  for (std::size_t i = 0; i < _library.size(); ++i)
+  {
+    const Ogre::StringVectorPtr names = _library[i]->list(false, false);
+    for (const auto &name : *names)
+      files.push_back({i, name, _library[i]->open(name)->getAsString()});
+  }
+
+  std::map<std::size_t, bool> changed;
+  std::string ours;
+  for (const auto &hook : _hooks)
+  {
+    const std::string line = "@insertpiece( " + hook + "_" + _suffix + " )";
+    File *where = nullptr;
+    std::pair<std::size_t, std::size_t> at;
+    int count = 0;
+    for (auto &file : files)
+    {
+      const auto found = Definitions(file.text, hook);
+      count += static_cast<int>(found.size());
+      if (!found.empty())
+      {
+        where = &file;
+        at = found.front();
+      }
+    }
+    if (count > 1)
+    {
+      gzerr << "[underwater] " << hook << " is defined " << count
+            << " times in the pieces library; not installed\n";
+      return false;
+    }
+    if (!where)
+    {
+      ours += "@piece( " + hook + " )\n  " + line + "\n@end\n";
+      continue;
+    }
+    if (!InsertIntoComposite(where->text, at.first, at.second, line))
+    {
+      gzerr << "[underwater] " << hook << " in " << where->name
+            << " does more than insert pieces; not installed\n";
+      return false;
+    }
+    changed[where->archive] = true;
+  }
+
+  for (const auto &[index, unused] : changed)
+  {
+    auto copy = std::make_unique<MemoryArchive>(
+        _library[index]->getName() + " (underwater)");
+    for (const auto &file : files)
+    {
+      if (file.archive == index)
+        copy->files[file.name] = file.text;
+    }
+    _library[index] = copy.get();
+    _archives.push_back(std::move(copy));
+  }
+  if (!ours.empty())
+  {
+    auto defined = std::make_unique<MemoryArchive>("Underwater hooks");
+    defined->files["500.UnderwaterHooks_piece_all.any"] = ours;
+    _library.push_back(defined.get());
+    _archives.push_back(std::move(defined));
+  }
   return true;
 }
 }  // namespace
@@ -232,55 +473,34 @@ try
     return 0;
   }
 
+  if (GZ_RENDERING_MAJOR_VERSION != kGzRenderingMajor)
+  {
+    gzerr << "[underwater] written against gz-rendering "
+          << kGzRenderingMajor << ", not " << GZ_RENDERING_MAJOR_VERSION
+          << "; not installed\n";
+    return 0;
+  }
+
+  // Our pieces: each hook's must be there, or the shaders would insert
+  // nothing while the world is marked as drawn. Ogre reads a folder that is
+  // not there as an empty one.
+  Ogre::Archive *ours = Ogre::ArchiveManager::getSingleton().load(
+      _piecesDir, "FileSystem", true);
+  if (!Defines(ours, kPbsHooks, "underwater"))
+  {
+    gzerr << "[underwater] the underwater pieces are not in [" << _piecesDir
+          << "]; not installed\n";
+    return 0;
+  }
+
   Ogre::ArchiveVec library = pbs->getPiecesLibraryAsArchiveVec();
-  s.originalLibrary = library;
-  Ogre::Archive *gzPbs = nullptr;
-  std::size_t gzPbsIndex = 0;
-  for (std::size_t i = 0; i < library.size(); ++i)
-  {
-    const std::string name = library[i]->getName();
-    if (name.size() >= 7 && name.compare(name.size() - 7, 7, "/Gz/Pbs") == 0)
-    {
-      gzPbs = library[i];
-      gzPbsIndex = i;
-    }
-  }
-  if (!gzPbs)
-  {
-    gzerr << "[underwater] gz-rendering's Hlms/Gz/Pbs pieces not found; "
-          << "this gz-rendering is not supported\n";
+  std::vector<std::unique_ptr<MemoryArchive>> archives;
+  if (!Chain(library, kPbsHooks, "underwater", archives))
     return 0;
-  }
+  library.push_back(ours);
 
-  // A copy of gz's composite pieces, with ours inserted.
-  s.workDir = std::filesystem::temp_directory_path() /
-      ("gz_underwater_" + std::to_string(::getpid())) / "GzPbs";
-  std::filesystem::create_directories(s.workDir);
-  bool passBuffer = false, posExecution = false;
-  // Keep the list alive: the range-for would only extend the vector's
-  // reference, not the shared pointer that owns it.
-  const Ogre::StringVectorPtr files = gzPbs->list(false, false);
-  for (const auto &file : *files)
-  {
-    std::string text = gzPbs->open(file)->getAsString();
-    passBuffer |= InsertIntoPiece(text, "custom_passBuffer",
-        "@insertpiece( custom_passBuffer_underwater )");
-    posExecution |= InsertIntoPiece(text, "custom_ps_posExecution",
-        "@insertpiece( custom_ps_posExecution_underwater )");
-    std::ofstream(s.workDir / file) << text;
-  }
-  if (!passBuffer || !posExecution)
-  {
-    gzerr << "[underwater] gz-rendering's custom_passBuffer or "
-          << "custom_ps_posExecution piece not found; not installed\n";
-    std::filesystem::remove_all(s.workDir.parent_path());
-    return 0;
-  }
-
-  auto &archives = Ogre::ArchiveManager::getSingleton();
-  library[gzPbsIndex] = archives.load(s.workDir.string(), "FileSystem", true);
-  library.push_back(archives.load(_piecesDir, "FileSystem", true));
-
+  s.originalLibrary = pbs->getPiecesLibraryAsArchiveVec();
+  s.archives = std::move(archives);
   s.pbs = pbs;
   s.listener.previous = pbs->getListener();
   pbs->setListener(&s.listener);
@@ -325,8 +545,7 @@ try
     s.pbs->setListener(s.listener.previous);
     s.pbs->reloadFrom(s.pbs->getDataFolder(), &s.originalLibrary);
   }
-  std::error_code ec;
-  std::filesystem::remove_all(s.workDir.parent_path(), ec);
+  s.archives.clear();
   s.done = false;
   s.pbs = nullptr;
 }
