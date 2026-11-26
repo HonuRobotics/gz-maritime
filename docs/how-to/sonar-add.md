@@ -31,6 +31,8 @@ Put it in a `<link>`; the sensor looks along its own x axis, so the pose points 
 
 The sonar draws its view on the Sensors system's rendering thread, and the sonar system owns the water; a world with no sonar pays nothing for it.
 
+The `kai_gazebo` worlds do not load the sonar system yet, and `kai_bringup`'s `spawn_vehicle.launch.xml` does not bridge a sonar: add the plugin above to the world and run the bridge below.
+
 ## The bridge
 
 ```bash
