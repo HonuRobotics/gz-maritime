@@ -6,10 +6,10 @@
 //   I   = lit exp(-beta^D w) + B-inf(z_camera) (1 - exp(-beta^B w)) + beams
 //
 // J is the fragment lit by daylight; L_i is lamp i's light on it, which this
-// piece computes itself, its diffuse term with Ogre's spot cone and
-// attenuation (Forward+ is off for these passes, so it is not counted twice),
-// faded over the lamp's distance
-// d_i. w is the range through the water: up to where a climbing ray leaves
+// piece computes itself: the diffuse term of Ogre's default BRDF, with its
+// spot cone and attenuation, so a lamp lights as Ogre would in air. The
+// lamps are hidden from Ogre's own lighting (the bridge's HideLamps), so
+// they count once. Faded over the lamp's distance d_i. w is the range through the water: up to where a climbing ray leaves
 // it. The beams are each lamp's light scattered back to the camera by the
 // water inside its cone, ray-marched along the view ray (single scatter,
 // Henyey-Greenstein phase function).
@@ -32,10 +32,11 @@
 	}
 	// Caustics: two crossing families of moving ridges, as light focused by
 	// the waves draws on a seabed.
-	float uwCaustic( float2 p, float t )
+	// ph: the phases 0.8 t, t, 0.9 t and 1.1 t, each wrapped to 2 pi.
+	float uwCaustic( float2 p, float4 ph )
 	{
-		float a = sin( p.x * 0.9 + 1.7 * sin( p.y * 1.3 + t * 0.8 ) + t );
-		float b = sin( p.y * 1.1 + 1.5 * sin( p.x * 0.7 - t * 0.9 ) - t * 1.1 );
+		float a = sin( p.x * 0.9 + 1.7 * sin( p.y * 1.3 + ph.x ) + ph.y );
+		float b = sin( p.y * 1.1 + 1.5 * sin( p.x * 0.7 - ph.z ) - ph.w );
 		return pow( max( 0.0, 1.0 - 0.6 * abs( a + b ) ), 6.0 );
 	}
 	// Whether a point at f from a spot lamp is inside its cone (its axis,
@@ -43,6 +44,27 @@
 	bool uwInCone( float3 f, float3 axis, float cosOuter )
 	{
 		return dot( f, axis ) >= cosOuter * length( f );
+	}
+	// The diffuse part of Ogre's default BRDF (normalised Disney, times one
+	// minus the Fresnel), as it lights a fragment from lightDir: what Ogre
+	// itself would give the lamp. Ogre does not declare its BRDF in a pass
+	// without lights of its own, so it is written out here.
+	float3 uwDiffuseBrdf( float3 lightDir, PixelData pixelData )
+	{
+		float3 halfWay = normalize( lightDir + pixelData.viewDir );
+		float NdotL = saturate( dot( pixelData.normal, lightDir ) );
+		float VdotH = saturate( dot( pixelData.viewDir, halfWay ) );
+		float pr = pixelData.perceptualRoughness;
+		float energyBias = pr * 0.5;
+		float energyFactor = lerp( 1.0, 1.0 / 1.51, pr );
+		float fd90 = energyBias + 2.0 * VdotH * VdotH * pr;
+		float lightScatter = 1.0 + ( fd90 - 1.0 ) * pow( 1.0 - NdotL, 5.0 );
+		float viewScatter = 1.0 + ( fd90 - 1.0 ) * pow( 1.0 - pixelData.NdotV, 5.0 );
+		float3 F0 = float3( 1.0, 1.0, 1.0 ) * pixelData.F0;
+		float3 fresnelS = F0 + pow( 1.0 - VdotH, 5.0 ) * ( float3( 1.0, 1.0, 1.0 ) - F0 );
+		float fresnelD = 1.0 - max( fresnelS.x, max( fresnelS.y, fresnelS.z ) );
+		return NdotL * ( lightScatter * viewScatter * energyFactor * fresnelD ) *
+		       pixelData.diffuse.xyz;
 	}
 @end
 @piece( custom_ps_posExecution_underwater )
@@ -100,11 +122,12 @@
 			}
 			if( dist <= ld.w && spotAtten > 0.0 )
 			{
-				float atten = 1.0 / ( 0.5 + ( lc.w + ls.w * dist ) * dist );
-				// The diffuse term: Ogre does not declare its BRDF when it has no
-				// lights of its own in the pass.
-				float3 light = pixelData.diffuse.xyz * lc.xyz *
-				               ( saturate( dot( pixelData.normal, lightDir ) ) * atten * spotAtten );
+				// Ogre's attenuation, faded to nothing at the lamp's range as
+				// Forward+ does
+				float atten = 1.0 / ( 0.5 + ( lc.w + ls.w * dist ) * dist ) *
+				              max( ( ld.w - dist ) / ld.w, 0.0 );
+				float3 light = uwDiffuseBrdf( lightDir, pixelData ) * lc.xyz *
+				               ( atten * spotAtten );
 				if( uwFragUnder )
 					light *= exp( -passBuf.uwAttenuation.xyz * dist );
 				uwLamps += light;
@@ -127,7 +150,7 @@
 				                         pixelData.normal.z * passBuf.uwViewZ.xyz );
 				if( uwNW.z > 0.2 )
 				{
-					float uwC = uwCaustic( uwWorld.xy * 3.0, passBuf.uwEffects.z );
+					float uwC = uwCaustic( uwWorld.xy * 3.0, passBuf.uwCausticPhase );
 					uwJ *= 1.0 + 2.0 * passBuf.uwEffects.x * uwNW.z * ( uwC - 0.18 ) *
 					       exp( -passBuf.uwDiffuse.y * uwObjDepth );
 				}
@@ -161,6 +184,10 @@
 					float uwSq = sqrt( uwDisc );
 					float tA = max( 0.0, uwB - uwSq );
 					float tB = min( tMax, uwB + uwSq );
+					// The sphere is behind the camera or beyond the march: nothing
+					// to march, and a reversed interval must not make a beam.
+					if( tB <= tA )
+						continue;
 					if( lp.w > 0.5 )
 					{
 						// Where the ray crosses the cone's surface (a quadratic;

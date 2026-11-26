@@ -126,27 +126,67 @@ class LampsTest : public ::testing::Test
     node->Subscribe("/uwlamps/cam/depth_image", onDepth);
     server->Run(false, 0, false);
 
-    // Clear water, then the three waters, each after it has settled.
+    // Clear water, then the three waters, each once the world has it.
     frames["clear"] = Wait();
+    if (frames["clear"].rgb.empty())
+      return;
     for (const std::string type : {"3C", "IB", "7C"})
     {
-      msgs::Param msg;
-      auto &p = *msg.mutable_params();
-      for (const char *k : {"attenuation", "backscatter", "veil",
-                            "diffuse_attenuation"})
-      {
-        p[k].set_type(msgs::Any::STRING);
-        p[k].set_string_value("");
-      }
-      p["jerlov"].set_type(msgs::Any::STRING);
-      p["jerlov"].set_string_value(type);
-      auto pub = node->Advertise<msgs::Param>("/world/uwlamps/water_optics/set");
-      for (int i = 0; i < 50 && !pub.HasConnections(); ++i)
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
-      pub.Publish(msg);
-      std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+      SetWater(*node, "uwlamps", type);
       frames[type] = Wait();
     }
+  }
+
+  /// \brief Set a Jerlov type, and return once the water optics system
+  /// publishes it as the world's water.
+  protected: static void SetWater(transport::Node &_node,
+      const std::string &_world, const std::string &_type)
+  {
+    std::mutex m;
+    std::string now;
+    std::function<void(const msgs::Param &)> onInfo =
+        [&m, &now](const msgs::Param &_msg)
+        {
+          const auto it = _msg.params().find("jerlov");
+          if (it == _msg.params().end())
+            return;
+          const std::lock_guard<std::mutex> lock(m);
+          now = it->second.string_value();
+        };
+    const std::string info = "/world/" + _world + "/water_optics_info";
+    _node.Subscribe(info, onInfo);
+
+    msgs::Param msg;
+    auto &p = *msg.mutable_params();
+    for (const char *k : {"attenuation", "backscatter", "veil",
+                          "diffuse_attenuation"})
+    {
+      p[k].set_type(msgs::Any::STRING);
+      p[k].set_string_value("");
+    }
+    p["jerlov"].set_type(msgs::Any::STRING);
+    p["jerlov"].set_string_value(_type);
+    auto pub = _node.Advertise<msgs::Param>(
+        "/world/" + _world + "/water_optics/set");
+    for (int i = 0; i < 50 && !pub.HasConnections(); ++i)
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    pub.Publish(msg);
+    bool done = false;
+    for (int i = 0; i < 500 && !done; ++i)
+    {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      const std::lock_guard<std::mutex> lock(m);
+      done = now == _type;
+    }
+    _node.Unsubscribe(info);
+    EXPECT_TRUE(done) << "the world never had " << _type << " water";
+  }
+
+  protected: void SetUp() override
+  {
+    const std::lock_guard<std::mutex> lock(mutex);
+    if (images.empty())
+      GTEST_SKIP() << "nothing rendered: no GPU?";
   }
 
   protected: static void TearDownTestSuite()
@@ -196,7 +236,8 @@ class LampsTest : public ::testing::Test
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
-    ADD_FAILURE() << "no frames: is there a GPU?";
+    // A test that finds no frame fails; with nothing rendered at all, the
+    // tests skip
     return {};
   }
 
@@ -424,22 +465,7 @@ TEST_F(LampsTest, OnlyLightsNamedLampAreLamps)
   ASSERT_FALSE(clear.rgb.empty()) << "no frames: is there a GPU?";
 
   // 3C: no beam
-  msgs::Param msg;
-  auto &p = *msg.mutable_params();
-  for (const char *k : {"attenuation", "backscatter", "veil",
-                        "diffuse_attenuation"})
-  {
-    p[k].set_type(msgs::Any::STRING);
-    p[k].set_string_value("");
-  }
-  p["jerlov"].set_type(msgs::Any::STRING);
-  p["jerlov"].set_string_value("3C");
-  auto pub = torchNode.Advertise<msgs::Param>(
-      "/world/uwtorch/water_optics/set");
-  for (int i = 0; i < 50 && !pub.HasConnections(); ++i)
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
-  pub.Publish(msg);
-  std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+  SetWater(torchNode, "uwtorch", "3C");
   const Frame murky = wait(latest() + 300000000LL);
   torch.reset();
   ASSERT_FALSE(murky.rgb.empty());
@@ -449,7 +475,10 @@ TEST_F(LampsTest, OnlyLightsNamedLampAreLamps)
   measure(frames["clear"], lampPlate, lampBackdrop);
   std::cout << "torch in clear water: plate " << plate << " (the lamp's "
             << lampPlate << ")\n";
-  EXPECT_GT(plate, 0.3 * lampPlate) << "Ogre did not light the plate";
+  // The lamp lights as Ogre lights the same light in air: the shader's
+  // lamp term is Ogre's diffuse BRDF, attenuation and range fade
+  EXPECT_NEAR(lampPlate, plate, 0.03 * plate)
+      << "a lamp does not light as Ogre would in clear water";
 
   measure(murky, plate, backdrop);
   measure(frames["3C"], lampPlate, lampBackdrop);

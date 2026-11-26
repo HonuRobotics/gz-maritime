@@ -15,6 +15,11 @@
   <depend>gz_rendering_vendor</depend>
   <depend>gz_ogre_next_vendor</depend>
   <depend>gz_water_optics</depend>
+  <depend>gz_waves</depend>
+  <depend>gz_transport_vendor</depend>
+  <depend>gz_msgs_vendor</depend>
+  <!-- The Ogre Next headers, found the way it finds them. -->
+  <build_depend>gz_waves_rendering</build_depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
@@ -22,8 +27,6 @@
   <!-- The GPU image is checked against the reference camera's model. -->
   <test_depend>gz_underwater_camera</test_depend>
   <test_depend>gz_waves_rendering</test_depend>
-  <test_depend>gz_transport_vendor</test_depend>
-  <test_depend>gz_msgs_vendor</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

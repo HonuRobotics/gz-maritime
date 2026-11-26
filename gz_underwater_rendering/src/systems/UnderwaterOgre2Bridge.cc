@@ -33,6 +33,7 @@
 // world, and the reference camera draws the water instead.
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
@@ -44,6 +45,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "UnderwaterOgre2Bridge.hh"
 
 #include <gz/common/Console.hh>
 #include <gz/rendering/Light.hh>
@@ -177,7 +180,7 @@ struct Water
   float daylight{1};
   float caustics{0};
   float snow{0};
-  float time{0};
+  double time{0};
   int quality{1};
   bool active{false};
 };
@@ -191,9 +194,9 @@ constexpr int kMaxLamps = 4;
 constexpr int kLampFloat4 = 5;
 
 /// \brief Bytes the underwater block adds: the water (8 float4), the beam
-/// (2) and the lamps.
+/// (2), the effects (2) and the lamps.
 constexpr Ogre::uint32 kBlockBytes =
-    (11u + kMaxLamps * kLampFloat4) * 4u * sizeof(float);
+    (12u + kMaxLamps * kLampFloat4) * 4u * sizeof(float);
 
 /// \brief Henyey-Greenstein asymmetry of the water's scattering, and the
 /// beam's ray march.
@@ -328,9 +331,13 @@ class Backdrop
     Ogre::Item *item = _sm->createItem(mesh, Ogre::SCENE_DYNAMIC);
     item->setDatablock(datablock);
     item->setCastShadows(false);
-    // After the sky, which gz-rendering draws between its queues 1 and 2
-    // wherever the depth is still the far plane's.
-    item->setRenderQueueGroup(2u);
+    // gz-rendering's own queue (10), after the sky, which it draws between
+    // its queues 1 and 2 wherever the depth is still the far plane's. Being
+    // blended, Ogre draws it after the queue's opaque items, so the depth
+    // test rejects the pixels they cover and the beams and the snow are not
+    // run there twice; and, the farthest, first of the blended ones, which
+    // still blend over it.
+    item->setRenderQueueGroup(10u);
     _sm->getRootSceneNode()->createChildSceneNode()->attachObject(item);
     this->items[_sm] = item;
     return true;
@@ -412,8 +419,11 @@ class UnderwaterListener : public Ogre::HlmsListener
   public: Water water;
   public: Backdrop backdrop;
 
+  /// \brief Set from any thread when the plugin is gone: draw nothing.
+  public: std::atomic<bool> released{false};
+
   private: bool On(bool _caster) const
-  { return this->water.active && !_caster; }
+  { return this->water.active && !this->released && !_caster; }
 
   /// \brief The scene's lamps (spot and point lights), as of the last
   /// preparePassHash.
@@ -644,7 +654,12 @@ class UnderwaterListener : public Ogre::HlmsListener
          w.veil[2] * w.attenuation[2], kPhaseG);
     put4(static_cast<float>(this->lamps.size()), kBeamSteps[w.quality],
          kBeamRange, 1.0f);
-    put4(w.caustics, w.snow, w.time, kSnowRange[w.quality]);
+    put4(w.caustics, w.snow, 0.0f, kSnowRange[w.quality]);
+    const auto phase = [&w](double _rate)
+    {
+      return static_cast<float>(std::fmod(_rate * w.time, 6.283185307179586));
+    };
+    put4(phase(0.8), phase(1.0), phase(0.9), phase(1.1));
     // The lamps, in view space, as Ogre's own light buffer has them.
     Ogre::Matrix4 view = Ogre::Matrix4::IDENTITY;
     if (camera)
@@ -931,41 +946,41 @@ catch (const std::exception &_e)
 }
 
 //////////////////////////////////////////////////
-/// \brief Set the water: 18 floats, beta^D, beta^B, the veil at the surface
-/// and K_d (each r g b), then the still water level, the daylight, the
-/// caustics' strength (already scaled by the waves), the marine snow's
-/// density, the time, s, and the quality (0 low, 1 medium, 2 high). A null
-/// pointer turns the water off.
-void uw_ogre2_set(const float *_v)
+int uw_ogre2_version()
+{
+  return UW_OGRE2_BRIDGE_VERSION;
+}
+
+//////////////////////////////////////////////////
+void uw_ogre2_release()
+{
+  State().listener.released = true;
+}
+
+//////////////////////////////////////////////////
+void uw_ogre2_set(const UwWater *_v)
 {
   auto &s = State();
-  // gz-rendering sets its own Hlms listener again when its scene changes
-  // (a light added, for one); wrap whichever is there now.
-  if (s.done && s.pbs && s.pbs->getListener() != &s.listener)
-  {
-    s.listener.previous = s.pbs->getListener();
-    s.pbs->setListener(&s.listener);
-    gzmsg << "[underwater] listener re-attached after gz-rendering replaced "
-          << "it\n";
-  }
+  // A plugin sets the water: drawn again, if it was released
+  s.listener.released = false;
   auto &w = s.listener.water;
   w.active = nullptr != _v;
   // Lamps that appear later (a vehicle spawned with its lights) are hidden
   // on the frame they appear.
   s.listener.HideLamps(w.active);
-  s.listener.backdrop.Update(s.done && w.active, _v ? _v[12] : 0.0f);
+  s.listener.backdrop.Update(s.done && w.active, _v ? _v->level : 0.0f);
   if (!_v)
     return;
-  std::memcpy(w.attenuation, _v, 3 * sizeof(float));
-  std::memcpy(w.backscatter, _v + 3, 3 * sizeof(float));
-  std::memcpy(w.veil, _v + 6, 3 * sizeof(float));
-  std::memcpy(w.diffuse, _v + 9, 3 * sizeof(float));
-  w.level = _v[12];
-  w.daylight = _v[13];
-  w.caustics = _v[14];
-  w.snow = _v[15];
-  w.time = _v[16];
-  w.quality = std::clamp(static_cast<int>(std::lround(_v[17])), 0, 2);
+  std::memcpy(w.attenuation, _v->attenuation, sizeof(w.attenuation));
+  std::memcpy(w.backscatter, _v->backscatter, sizeof(w.backscatter));
+  std::memcpy(w.veil, _v->veil, sizeof(w.veil));
+  std::memcpy(w.diffuse, _v->diffuse, sizeof(w.diffuse));
+  w.level = _v->level;
+  w.daylight = _v->daylight;
+  w.caustics = _v->caustics;
+  w.snow = _v->snow;
+  w.time = _v->time;
+  w.quality = std::clamp(_v->quality, 0, 2);
 }
 
 //////////////////////////////////////////////////

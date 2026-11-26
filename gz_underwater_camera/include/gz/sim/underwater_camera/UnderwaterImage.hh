@@ -159,6 +159,12 @@ struct Optics
   double waterIndex{1.333};
 };
 
+/// \brief At most how many threads the image functions use, 16 at most;
+/// 0, the default, for as many as there are cores. The result does not
+/// depend on it: noise is drawn per row, and every pixel's sum is the same.
+/// \param[in] _n Threads.
+void SetMaxThreads(unsigned int _n);
+
 /// \brief A Gaussian blur of a linear image, in place, by a recursive
 /// filter (Young and van Vliet 1995): its cost does not depend on sigma.
 /// \param[in,out] _img Image, row by row.
@@ -201,13 +207,15 @@ struct FrameStats
 ///   lit = J exp(-K_d max(z, 0))
 ///   I   = lit exp(-attenuation w) + veil (1 - exp(-backscatter w))
 ///
-/// then forward scatter (a blur growing with range) and the port (a flat
-/// port's refraction remap), then the response: exposure, white balance,
-/// noise. A pixel with no
+/// then, under water, forward scatter (a blur growing with range) and the
+/// port (a flat port's refraction remap); then the camera's response, which
+/// always applies: noise on the light the sensor caught, then exposure and
+/// white balance. A pixel with no
 /// depth (nothing hit, or beyond the far clip) sees the open water: w is the
 /// distance to the surface for a climbing ray, otherwise infinite, so it is
-/// the veil. With the camera at or above the surface the image is copied
-/// unchanged.
+/// the veil. With the camera at or above the surface (a camera depth of 0,
+/// also when the renderer drew the water already) only the response
+/// applies: with the default response, the image comes out unchanged.
 /// \param[in] _rgb The in-air image, RGB, 8 bits per channel, row by row.
 /// \param[in] _depth The z-depth image, m, same size; not finite or not
 /// positive for "nothing hit".
