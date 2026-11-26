@@ -526,8 +526,6 @@ What it settled, beyond this plan:
   a neutral ambient, charts at 0.5–16 m, an image panel per camera), in the
   world tests. **The BlueROV2's own camera is not switched yet**: it lives in
   `bluerobotics_models`, a separate PR there.
-- **Video**: *Through the water*, 54 s: three waters side by side with the
-  plain camera, a dive from 0.5 to 40 m, the water changed live.
 
 ### Phase 3, the GPU path: done, on `ahcorde/uw_phase3_gpu_path`
 
@@ -560,8 +558,6 @@ What it settled:
   the still water level, not the waves, until the fix below. No throughput
   benchmark in CI yet
   (the PBS change costs a few ALU instructions per fragment).
-- **Video**: *Same water, every camera*: the reference and the GPU images of
-  one scene side by side, with their difference, and the GUI.
 
 ### Phase 4, vehicle lights and their beams: done, on `ahcorde/uw_phase4_lights`
 
@@ -603,8 +599,6 @@ In the GPU path (`gz_underwater_rendering`), as the spike said it must be.
 - **Limits**: diffuse only, no shadows; four lamps; the reference camera
   has no lamps. (The beam used to show only where something was drawn
   behind it; the backdrop of the fixes below ended that.)
-- **Video**: *Lights on*: lamps off and on at 20 m at night in 1C, 3C and
-  7C, and a lamp swept across the view.
 
 ### Phase 5, what makes it look real: done, on `ahcorde/uw_phase5a_scatter_and_port` and `ahcorde/uw_phase5b_caustics_snow_snell`
 
@@ -633,8 +627,6 @@ What changed from the plan:
   gives the formula's own answer, and forward scatter blurs only the
   levels a pixel reads. Same output, byte for byte: 1920x1080 in 24 ms for
   152 (the water alone), 320 for 1042 with forward scatter.
-- **Video**: *More of the water*: forward scatter and the port side by
-  side, caustics on sand, marine snow in the lamps, Snell's window.
 
 Found later with a demo, a two-minute BlueROV2 dive at Sand Island over the
 site's bathymetry, and fixed here:
