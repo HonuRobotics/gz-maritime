@@ -279,7 +279,7 @@ What a world says to the water optics system,
 | `<veil>` | B∞, the veil just below the surface as a fraction of the daylight there, as `r g b`. Replaces b / c. |
 | `<diffuse_attenuation>` | K_d, how fast the daylight fades with depth, 1/m, as `r g b`. Replaces the type's K_d. |
 | `<water_level>` | World z of the still water, m, default 0. Under a wave field, depth is below the local wave surface. |
-| `<publish_rate>` | Rate of the ground truth, 1 Hz by default. |
+| `<publish_rate>` | Rate of the ground truth in wall time, 1 Hz by default, so it keeps coming while paused; a change is published at once. 0 publishes on a change only. |
 
 Any other element is warned about and ignored. An unknown type, a visibility
 that is not positive or a negative value is one error, and the world has

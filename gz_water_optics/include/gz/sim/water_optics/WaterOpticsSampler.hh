@@ -32,11 +32,14 @@ class WaterOpticsSamplerPrivate;
 /// \brief Asks the world's water what it does to light, at any point.
 ///
 /// A system keeps one sampler, calls Sync once per step (or per frame),
-/// then asks as often as it likes. Sync reads the WaterOptics recipe and,
-/// when the world has one, the wave field, so depth is measured below the
-/// local wave surface, not below a flat level. A world without the water
-/// optics system has clear water: nothing attenuates, there is no veil, and
-/// the daylight does not fade.
+/// then asks as often as it likes, from any thread. Sync reads the
+/// WaterOptics recipe and, when the world has one, the wave field, so depth
+/// is measured below the local wave surface, not below a flat level. It
+/// means the same in every process: where the wave field's own engine is
+/// not there (a GUI, or a sensor process, receives the recipe only), the
+/// sampler builds one of its own from the recipe, as the water's visual
+/// does. A world without the water optics system has clear water: nothing
+/// attenuates, there is no veil, and the daylight does not fade.
 class WaterOpticsSampler
 {
   /// \brief Constructor.
@@ -45,7 +48,8 @@ class WaterOpticsSampler
   /// \brief Destructor.
   public: ~WaterOpticsSampler();
 
-  /// \brief Catch up with the world.
+  /// \brief Catch up with the world. Copies the optics and the wave
+  /// recipe only when they changed.
   /// \param[in] _ecm The entity component manager.
   /// \return True if the world has water optics.
   public: bool Sync(const EntityComponentManager &_ecm);
@@ -67,29 +71,11 @@ class WaterOpticsSampler
   public: double Depth(const math::Vector3d &_position,
                        const std::chrono::steady_clock::duration &_time) const;
 
-  /// \brief The fraction of the surface daylight left at a depth, per
-  /// channel: exp(-K_d depth). One at or above the surface.
-  /// \param[in] _depth Depth, m.
-  /// \return The fraction.
-  public: Rgb Daylight(double _depth) const;
-
   /// \brief The veil, B-infinity, at a depth, per channel, as a fraction of
   /// the surface daylight: veil exp(-K_d depth). Zero above the surface.
   /// \param[in] _depth Depth, m.
   /// \return The veil.
   public: Rgb Veil(double _depth) const;
-
-  /// \brief The fraction of an object's light that crosses a range of
-  /// water, per channel: exp(-beta^D range).
-  /// \param[in] _range Range, m.
-  /// \return The fraction.
-  public: Rgb Transmittance(double _range) const;
-
-  /// \brief How much of the veil has built up over a range, per channel:
-  /// 1 - exp(-beta^B range).
-  /// \param[in] _range Range, m.
-  /// \return The fraction.
-  public: Rgb VeilBuildUp(double _range) const;
 
   /// \brief Private data.
   private: std::unique_ptr<WaterOpticsSamplerPrivate> dataPtr;

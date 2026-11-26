@@ -16,7 +16,9 @@
  */
 #include <gtest/gtest.h>
 
+#include <gz/msgs/boolean.pb.h>
 #include <gz/msgs/param.pb.h>
+#include <gz/msgs/world_control.pb.h>
 
 #include <atomic>
 #include <chrono>
@@ -24,6 +26,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <gz/common/Filesystem.hh>
 #include <gz/sim/EntityComponentManager.hh>
@@ -103,6 +106,15 @@ msgs::Param SetNumber(const std::string &_key, double _value)
   return msg;
 }
 
+msgs::Param SetInt(const std::string &_key, int _value)
+{
+  msgs::Param msg;
+  auto &v = (*msg.mutable_params())[_key];
+  v.set_type(msgs::Any::INT32);
+  v.set_int_value(_value);
+  return msg;
+}
+
 /// \brief Publish until the subscriber is there, then let it arrive.
 void Send(transport::Node &_node, const std::string &_topic,
           const msgs::Param &_msg)
@@ -114,6 +126,81 @@ void Send(transport::Node &_node, const std::string &_topic,
   pub.Publish(_msg);
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
 }
+
+/// \brief Step until the optics' generation passes one.
+/// \return False if it did not within a few seconds.
+bool StepPast(Sim &_run, std::uint64_t _generation)
+{
+  for (int i = 0; i < 200; ++i)
+  {
+    _run.Steps(1);
+    {
+      const std::lock_guard<std::mutex> lock(_run.mutex);
+      if (_run.valid && _run.optics.generation > _generation)
+        return true;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  return false;
+}
+
+/// \brief Send a message and then a marker, a new water level, on the same
+/// topic, and step until the marker is applied: the message was handled
+/// before it. Messages from one publisher arrive in order.
+/// \return The generation before the marker, as the message left it.
+std::uint64_t SendThenMark(Sim &_run, transport::Node &_node,
+                           const std::string &_topic, const msgs::Param &_msg)
+{
+  auto pub = _node.Advertise<msgs::Param>(_topic);
+  for (int i = 0; i < 50 && !pub.HasConnections(); ++i)
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  EXPECT_TRUE(pub.HasConnections()) << "nobody listens on " << _topic;
+  std::uint64_t before{0};
+  double level{0.0};
+  {
+    const std::lock_guard<std::mutex> lock(_run.mutex);
+    before = _run.optics.generation;
+    level = _run.optics.waterLevel;
+  }
+  pub.Publish(_msg);
+  pub.Publish(SetNumber("water_level", level + 0.25));
+  for (int i = 0; i < 200; ++i)
+  {
+    _run.Steps(1);
+    {
+      const std::lock_guard<std::mutex> lock(_run.mutex);
+      if (_run.optics.waterLevel == level + 0.25)
+        return _run.optics.generation - 1;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  ADD_FAILURE() << "the marker never came";
+  return before;
+}
+
+/// \brief The ground truth messages a world publishes, as they come.
+struct Truth
+{
+  explicit Truth(transport::Node &_node, const std::string &_topic)
+  {
+    std::function<void(const msgs::Param &)> cb =
+        [this](const msgs::Param &_msg)
+        {
+          const std::lock_guard<std::mutex> lock(this->mutex);
+          this->messages.push_back(_msg);
+        };
+    _node.Subscribe(_topic, cb);
+  }
+
+  std::size_t Count()
+  {
+    const std::lock_guard<std::mutex> lock(this->mutex);
+    return this->messages.size();
+  }
+
+  std::mutex mutex;
+  std::vector<msgs::Param> messages;
+};
 }  // namespace
 
 /////////////////////////////////////////////////
@@ -200,24 +287,121 @@ TEST(WaterOpticsSystem, SetTopicAndGroundTruth)
   run.Steps(2);
   EXPECT_NE(run.optics.veil, Rgb(0.1, 0.2, 0.3));
 
-  // Bad messages, each whole: nothing changes.
-  const auto good = run.optics;
-  for (const auto &bad : {Set("jerlov", "4C"), SetNumber("visibility", -2),
-                          Set("attenuation", "1 2"), Set("colour", "red")})
-  {
-    Send(node, "/world/optics/water_optics/set", bad);
-    run.Steps(2);
-    EXPECT_EQ(run.optics.generation, good.generation);
-    EXPECT_EQ(run.optics.attenuation, good.attenuation);
-  }
-
-  // A message with one good key and one bad: nothing changes either.
+  // Bad messages, each whole: nothing changes. A marker sent after each
+  // shows it was handled.
+  const std::string topic = "/world/optics/water_optics/set";
   msgs::Param mixed = SetNumber("visibility", 2.0);
   (*mixed.mutable_params())["jerlov"].set_type(msgs::Any::STRING);
   (*mixed.mutable_params())["jerlov"].set_string_value("XX");
-  Send(node, "/world/optics/water_optics/set", mixed);
+  for (const auto &bad : {Set("jerlov", "4C"), SetNumber("visibility", -2),
+                          Set("attenuation", "1 2"), Set("colour", "red"),
+                          mixed})
+  {
+    const auto good = run.optics;
+    EXPECT_EQ(SendThenMark(run, node, topic, bad), good.generation);
+    EXPECT_EQ(run.optics.attenuation, good.attenuation);
+  }
+}
+
+/////////////////////////////////////////////////
+// Numbers come as doubles, integers or strings; a message that leaves the
+// water as it is changes nothing, so nothing replicates.
+TEST(WaterOpticsSystem, NumbersAndMessagesThatChangeNothing)
+{
+  Sim run("optics.sdf");
   run.Steps(2);
-  EXPECT_EQ(run.optics.generation, good.generation);
+  ASSERT_TRUE(run.valid);
+  transport::Node node;
+  const std::string topic = "/world/optics/water_optics/set";
+
+  Send(node, topic, SetInt("water_level", 2));
+  ASSERT_TRUE(StepPast(run, run.optics.generation));
+  EXPECT_DOUBLE_EQ(run.optics.waterLevel, 2.0);
+  Send(node, topic, Set("visibility", "3"));
+  ASSERT_TRUE(StepPast(run, run.optics.generation));
+  EXPECT_NEAR(run.optics.Visibility(), 3.0, 1e-9);
+
+  // The same values again, and an empty message: no new generation
+  const auto generation = run.optics.generation;
+  EXPECT_EQ(SendThenMark(run, node, topic, Set("visibility", "3")),
+            generation);
+  const auto afterMarker = run.optics.generation;
+  EXPECT_EQ(SendThenMark(run, node, topic, msgs::Param()), afterMarker);
+}
+
+/////////////////////////////////////////////////
+// A reset brings back the world file's water.
+TEST(WaterOpticsSystem, ResetBringsBackTheWorldFile)
+{
+  Sim run("optics.sdf");
+  run.Steps(2);
+  ASSERT_TRUE(run.valid);
+  const auto initial = run.optics;
+  transport::Node node;
+  Send(node, "/world/optics/water_optics/set", Set("jerlov", "9C"));
+  ASSERT_TRUE(StepPast(run, initial.generation));
+  ASSERT_EQ(run.optics.jerlov, "9C");
+
+  msgs::WorldControl control;
+  control.mutable_reset()->set_all(true);
+  msgs::Boolean reply;
+  bool result{false};
+  std::thread request([&]
+  {
+    node.Request("/world/optics/control", control, 5000, reply, result);
+  });
+  for (int i = 0; i < 100 && run.optics.jerlov != "3C"; ++i)
+  {
+    run.Steps(1);
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  request.join();
+  EXPECT_TRUE(result);
+  EXPECT_EQ(run.optics.jerlov, "3C");
+  EXPECT_EQ(run.optics.attenuation, initial.attenuation);
+  EXPECT_DOUBLE_EQ(run.optics.waterLevel, 0.5);
+}
+
+/////////////////////////////////////////////////
+// The ground truth keeps coming while the world is paused.
+TEST(WaterOpticsSystem, GroundTruthWhilePaused)
+{
+  TestFixture fixture(World("optics.sdf"));
+  fixture.Finalize();
+  transport::Node node;
+  Truth truth(node, "/world/optics/water_optics_info");
+  ASSERT_TRUE(fixture.Server()->Run(false, 0, true));
+  std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+  // 10 Hz of wall time: over a dozen in 1.5 s, paused
+  EXPECT_GT(truth.Count(), 5u);
+}
+
+/////////////////////////////////////////////////
+// With a publish rate of 0, the ground truth comes on a change only. The
+// world's unknown element is warned about and does not stop the water.
+TEST(WaterOpticsSystem, PublishRateZeroPublishesOnAChange)
+{
+  Sim run("optics_rate0.sdf");
+  transport::Node node;
+  Truth truth(node, "/world/optics_rate0/water_optics_info");
+  run.Steps(2);
+  ASSERT_TRUE(run.valid);
+  EXPECT_EQ(run.optics.jerlov, "3C");
+  std::this_thread::sleep_for(std::chrono::milliseconds(300));
+  run.Steps(50);
+  std::this_thread::sleep_for(std::chrono::milliseconds(300));
+  const auto atStart = truth.Count();
+  EXPECT_LE(atStart, 1u);
+  run.Steps(50);
+  std::this_thread::sleep_for(std::chrono::milliseconds(300));
+  EXPECT_EQ(truth.Count(), atStart) << "published without a change";
+
+  Send(node, "/world/optics_rate0/water_optics/set", Set("jerlov", "7C"));
+  ASSERT_TRUE(StepPast(run, run.optics.generation));
+  run.Steps(2);
+  for (int i = 0; i < 50 && truth.Count() == atStart; ++i)
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  EXPECT_EQ(truth.Count(), atStart + 1);
 }
 
 /////////////////////////////////////////////////
@@ -226,16 +410,26 @@ TEST(WaterOpticsSystem, ClearWithoutTheSystem)
   Sim run("optics_none.sdf");
   run.Steps(2);
   EXPECT_FALSE(run.valid);
-  EXPECT_EQ(run.sampler.Transmittance(50.0), Rgb::One);
+  EXPECT_EQ(run.sampler.Data().attenuation, Rgb::Zero);
   EXPECT_EQ(run.sampler.Veil(5.0), Rgb::Zero);
 }
 
 /////////////////////////////////////////////////
-TEST(WaterOpticsSystem, BadWorldFileGivesClearWater)
+// A bad world file gives clear water, and the set topic is still there:
+// a good message brings the water. A reset goes back to clear water.
+TEST(WaterOpticsSystem, BadWorldFileGivesClearWaterUntilAGoodMessage)
 {
-  Sim run("optics_bad.sdf");
-  run.Steps(2);
-  EXPECT_FALSE(run.valid);
+  for (const std::string world : {"optics_bad", "optics_badvec"})
+  {
+    SCOPED_TRACE(world);
+    Sim run(world + ".sdf");
+    run.Steps(2);
+    EXPECT_FALSE(run.valid);
+    transport::Node node;
+    Send(node, "/world/" + world + "/water_optics/set", Set("jerlov", "5C"));
+    ASSERT_TRUE(StepPast(run, 0));
+    EXPECT_EQ(run.optics.jerlov, "5C");
+  }
 }
 
 /////////////////////////////////////////////////
