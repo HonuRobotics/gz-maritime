@@ -364,12 +364,20 @@ It rebuilds the private engine when `data.generation` changes, and each render
 frame pulls the grid via `Field()` and uploads it. The column-major
 `WaveField2D` grids flow to the Ogre bridge unchanged; the bridge's texel pack
 maps them so texture (u, v) = grid (x_u, y_v), preserving the physics
-orientation end to end.
+orientation end to end. The shaders sample that texture at
+`worldXY / tileSize` plus half a texel, where the texel of a grid point has
+its centre, so the surface drawn over a world point is the one the field
+reports there (`SurfaceHeight`), not one half a cell beside it.
+`drawn_surface_test` holds the two together: a depth camera looks down on a
+choppy sea and what it sees is compared with the field. It needs a GPU, and
+is skipped when the camera gives no image.
 
 ### 5.2 Engine-agnostic, via per-engine GUI registrars
 
 `gz_waves_rendering` depends on **`gz_waves` only** — no engine `find_package`,
-no engine link, no engine `<depend>` (N1). The factory registration that lets
+no engine link, no engine `<depend>` (N1). Its test brings a small wave
+field of its own, registered in the test, so the package needs no engine to
+be tested either. The factory registration that lets
 `WaterVisual` rebuild an engine in the GUI lives in **per-engine GUI plugins**
 shipped by the provider packages. The `water_surface` model loads them in the
 **same `<visual>`** as `WaterVisual`:
@@ -735,6 +743,8 @@ ros2 launch kai_bringup simulation.launch.xml
 ./build/gz_waves/wave_core_test
 ./build/gz_waves_provider_gerstner/gerstner_test
 ./build/gz_waves_provider_fft/fft_test
+# the drawn sea against the wave field, through a depth camera (needs a GPU):
+colcon test --packages-select gz_waves_rendering
 ```
 
 ---
@@ -743,11 +753,6 @@ ros2 launch kai_bringup simulation.launch.xml
 
 - `<direction>` is parsed by the FFT system but not yet applied (Ehukai
   assumes wind along +X), so the FFT sea travels towards +x in every world.
-- The drawn FFT sea sits half a grid cell from the physics, towards +x and
-  +y: the shaders sample the height texture at `worldXY / tileSize`, without
-  the half texel that would put a texel's centre on its grid point. Measured
-  with a depth camera looking down: 1 m at a 256 m tile with 128 cells, which
-  on that sea is a few centimetres of height.
 - The FFT engine hands sim time to Ehukai in single precision (float
   API), so on multi-hour runs the float grid coarsens and gradually degrades
   the wave animation and the particle-velocity finite difference.
