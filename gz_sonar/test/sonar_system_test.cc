@@ -56,6 +56,7 @@
 #include <gz/common/Console.hh>
 #include <gz/common/Filesystem.hh>
 #include <gz/rendering/RenderingIface.hh>
+#include <gz/rendering/Scene.hh>
 #include <gz/sim/Server.hh>
 #include <gz/sim/ServerConfig.hh>
 #include <gz/sim/System.hh>
@@ -346,13 +347,16 @@ std::string OnGrid(const std::vector<Ping> &_pings, double _rate)
 /// \param[in] _name The model's name.
 /// \param[in] _sonar What to put in its <gz:sonar> in place of scene B's
 /// range of 0.2 to 10 m.
+/// \param[in] _pose Where, in place of scene B's 2 m above the origin.
 /// \return The model's SDF.
 std::string Rov(const std::string &_name, const std::string &_sonar =
-  "<range><min>0.2</min><max>10</max></range>")
+  "<range><min>0.2</min><max>10</max></range>",
+  const std::string &_pose = "0 0 2 0 0 0")
 {
   return
     "<sdf version='1.12' xmlns:gz='http://gazebosim.org/schema'>"
-    "<model name='" + _name + "'><static>true</static><pose>0 0 2 0 0 0</pose>"
+    "<model name='" + _name + "'><static>true</static><pose>" + _pose +
+    "</pose>"
     "<link name='base_link'>"
     "<visual name='hull'><pose>0.3 0 0 0 0 0</pose>"
     "<geometry><box><size>0.05 0.6 0.6</size></box></geometry></visual>"
@@ -545,6 +549,64 @@ class SonarSystem : public ::testing::Test
     bool result{false};
     return node->Request(_service, _req, 3000, rep, result) && result &&
       rep.data();
+  }
+
+  /// \brief Cameras in the scene: two for each camera pair the system has
+  /// made, since it destroys none while the scene runs.
+  /// \return The count.
+  protected: static std::size_t Cameras()
+  {
+    const auto scene = rendering::sceneFromFirstRenderEngine();
+    return scene ? scene->SensorCount() : 0;
+  }
+
+  /// \brief Spawn a vehicle and wait for its sonar's first ping.
+  /// \param[in] _name The model's name.
+  /// \param[in] _sonar Its <gz:sonar>; see Rov.
+  /// \param[in] _pose Its pose; see Rov.
+  /// \return The labels of that ping, empty if something failed.
+  protected: static std::string SpawnAndPing(const std::string &_name,
+    const std::string &_sonar, const std::string &_pose = "0 0 2 0 0 0")
+  {
+    Pings sub(_name + "/sonar_forward/image");
+    msgs::EntityFactory factory;
+    factory.set_sdf(Rov(_name, _sonar, _pose));
+    if (!Call(kWorld + "/create", factory) ||
+        !StepUntil([&]() { return sub.Latest() >= 0; }) ||
+        !sub.WaitFor(sub.Latest()))
+    {
+      return "";
+    }
+    const auto got = sub.Images();
+    gz::maritime::sonar::SonarLabels labels;
+    if (got.empty() || !sub.LabelsOf(got.back().ping, labels))
+      return "";
+    return labels.labels();
+  }
+
+  /// \brief Remove a vehicle and wait until its sonar is gone, so its
+  /// cameras are parked.
+  /// \param[in] _name The model's name.
+  /// \return False if something failed.
+  protected: static bool Remove(const std::string &_name)
+  {
+    msgs::Entity model;
+    model.set_name(_name);
+    model.set_type(msgs::Entity::MODEL);
+    return Call(kWorld + "/remove", model) && StepUntil([&]() {
+      return !Advertised(_name + "/sonar_forward/image");
+    });
+  }
+
+  /// \brief SpawnAndPing, then Remove.
+  /// \param[in] _name The model's name.
+  /// \param[in] _sonar Its <gz:sonar>; see Rov.
+  /// \return The ping's labels, empty if something failed.
+  protected: static std::string SpawnPingRemove(const std::string &_name,
+    const std::string &_sonar)
+  {
+    const auto labels = SpawnAndPing(_name, _sonar);
+    return Remove(_name) ? labels : "";
   }
 
   /// \brief Whether the first ping came, and if not, why.
@@ -943,6 +1005,146 @@ TEST_F(SonarSystem, RemoveThenSpawn)
   // 5 s from the first sonar the world ever had, so a later one, spawned
   // after the render events had been left, was warned about at once.
   EXPECT_EQ(0u, log->Count({kNoSensorsWarning}));
+}
+
+//////////////////////////////////////////////////
+// A removed sonar's cameras cannot be destroyed while the scene runs, so
+// they are kept for the next sonar. They are matched on image size and far
+// class (the far plane, a power of two meters), which a camera keeps for
+// life, and take the new sonar's field of view and far clip at each use.
+// So vehicles that come and go with ranges a little apart share cameras,
+// where once each took a new set and the GPU memory with it.
+TEST_F(SonarSystem, ParkedCamerasServeOtherRanges)
+{
+  Step(100);
+  Settle(*spawned);
+  const auto reusedBefore = log->Count({"camera pair(s)", ", 2 reused"});
+  auto reused = [&]() {
+    return log->Count({"camera pair(s)", ", 2 reused"}) - reusedBefore;
+  };
+  auto range = [](double _max) {
+    return "<range><min>0.2</min><max>" + std::to_string(_max) +
+      "</max></range>";
+  };
+
+  // rov2 has the two pairs the world started with, and the vehicle of an
+  // earlier test left two more idle. Twenty vehicles in turn, their ranges
+  // 2 cm apart, make do with those: far clips of 13.5 to 14.07 m, all in
+  // the 16 m class.
+  const auto cameras = Cameras();
+  for (int i = 0; i < 20; ++i)
+  {
+    ASSERT_FALSE(SpawnPingRemove("near" + std::to_string(i),
+      range(9.0 + 0.02 * i)).empty()) << i;
+  }
+  EXPECT_EQ(cameras, Cameras());
+  EXPECT_EQ(20u, reused());
+
+  // The ends of the class, 8 m and 16 m of far clip, still share them...
+  ASSERT_FALSE(SpawnPingRemove("low", range(5.34)).empty());
+  ASSERT_FALSE(SpawnPingRemove("high", range(10.66)).empty());
+  EXPECT_EQ(cameras, Cameras());
+  // ...and the next class takes a set of its own, once.
+  for (int i = 0; i < 3; ++i)
+  {
+    ASSERT_FALSE(SpawnPingRemove("far" + std::to_string(i),
+      range(10.7 + 5.0 * i)).empty()) << i;
+  }
+  EXPECT_EQ(cameras + 4, Cameras());
+  EXPECT_EQ(24u, reused());
+}
+
+//////////////////////////////////////////////////
+// A reused camera gives what a new one would. Two sonars with images of
+// one size and fields of view well apart share cameras: scene B's, two
+// cameras 63.4 degrees wide, and a narrower fan whose one camera has the
+// same 604 by 675 pixels at 44.2 degrees. In a far class of their own, so
+// that every camera is new: the first holds its cameras (from behind the
+// other, out of its view) while the second gets new ones and its labels,
+// which are free of noise, are taken. Both removed, the first before the
+// second, the second spawned again gets a camera the first had, and must
+// see what it saw on its own. Then the other way around in another class.
+TEST_F(SonarSystem, AReusedCameraSeesAsANewOne)
+{
+  const std::string narrow = "<horizontal_fov>0.661</horizontal_fov>"
+    "<vertical_fov>0.261</vertical_fov><beams>123</beams>";
+  const auto sizesBefore = log->Count({"camera pair(s) of 604x675"});
+  for (const double max : {40.0, 80.0})
+  {
+    const std::string range = "<range><min>0.2</min><max>" +
+      std::to_string(max) + "</max></range>";
+    const std::string holder = max < 50.0 ? range + narrow : range;
+    const std::string sonar = max < 50.0 ? range : range + narrow;
+    const std::string tag = std::to_string(static_cast<int>(max));
+    const auto reusedBefore = log->Count({"c" + tag, " 0 reused"});
+
+    ASSERT_FALSE(SpawnAndPing("a" + tag, holder, "-20 0 2 0 0 0").empty());
+    const auto fresh = SpawnAndPing("b" + tag, sonar);
+    ASSERT_FALSE(fresh.empty());
+    const auto made = Cameras();
+    ASSERT_TRUE(Remove("a" + tag));
+    ASSERT_TRUE(Remove("b" + tag));
+    const auto again = SpawnPingRemove("c" + tag, sonar);
+    EXPECT_EQ(made, Cameras());
+    EXPECT_EQ(reusedBefore, log->Count({"c" + tag, " 0 reused"}));
+    EXPECT_TRUE(fresh == again) << "labels differ on a reused camera";
+  }
+  // All six had images of the one size, or the above showed nothing.
+  EXPECT_EQ(sizesBefore + 6, log->Count({"camera pair(s) of 604x675"}));
+}
+
+//////////////////////////////////////////////////
+// What bounds the pool: the most sonars of one size and far class there
+// have been at once. 33 small sonars together make 33 pairs; removed, the
+// pairs are idle, which the system warns about once, past 32, since their
+// memory stays taken; 33 more then make none.
+TEST_F(SonarSystem, ThePoolGrowsToTheMostAtOnce)
+{
+  const std::string small = "<range><min>0.2</min><max>10</max></range>"
+    "<horizontal_fov>0.5</horizontal_fov><beams>16</beams>"
+    "<rays_per_beam>2</rays_per_beam><elevation_rays>8</elevation_rays>";
+  const int count = 33;
+  const char *const kIdle = "camera pairs of removed sonars are idle";
+  const auto warned = log->Count({kIdle});
+  std::size_t cameras = Cameras();
+  for (const std::string round : {"first", "second"})
+  {
+    const auto built = log->Count({round, "camera pair(s)"});
+    for (int i = 0; i < count; ++i)
+    {
+      msgs::EntityFactory factory;
+      factory.set_sdf(Rov(round + std::to_string(i), small));
+      ASSERT_TRUE(Call(kWorld + "/create", factory));
+    }
+    ASSERT_TRUE(StepUntil([&]() {
+      return log->Count({round, "camera pair(s)"}) == built + count;
+    }));
+    if (round == "first")
+    {
+      EXPECT_EQ(cameras + 2 * count, Cameras());
+      cameras = Cameras();
+      EXPECT_EQ(warned, log->Count({kIdle}));
+    }
+    else
+    {
+      EXPECT_EQ(cameras, Cameras());
+    }
+    for (int i = 0; i < count; ++i)
+    {
+      msgs::Entity model;
+      model.set_name(round + std::to_string(i));
+      model.set_type(msgs::Entity::MODEL);
+      ASSERT_TRUE(Call(kWorld + "/remove", model));
+    }
+    ASSERT_TRUE(StepUntil([&]() {
+      return !Advertised(round + std::to_string(count - 1) +
+        "/sonar_forward/image") && !Advertised(round +
+        "0/sonar_forward/image");
+    }));
+    EXPECT_EQ(warned + 1, log->Count({kIdle}));
+  }
+  Step(100);
+  Settle(*spawned);
 }
 
 //////////////////////////////////////////////////

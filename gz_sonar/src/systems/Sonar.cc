@@ -20,6 +20,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <mutex>
 #include <set>
@@ -254,6 +255,11 @@ struct Rig
   std::vector<std::vector<float>> depthBuffers;
   std::vector<std::vector<std::uint8_t>> segBuffers;
   unsigned int channels{3};
+  /// \brief For the far cut in Connect: the sonar's far clip squared, and for each
+  /// column and row of the image the square of its tangent off the axis.
+  float farSquared{0.0f};
+  std::vector<float> columnTan2;
+  std::vector<float> rowTan2;
   /// \brief The next ping and the time it is due.
   std::uint64_t next{0};
   /// \brief The rate whose grid `next` counts on; when the sonar's rate
@@ -266,23 +272,68 @@ struct Rig
 };
 
 /// \brief A depth and segmentation camera pair no sonar is using, kept for
-/// the next sonar whose cameras have the same size, field of view and clip
-/// planes.
+/// the next sonar whose cameras have the same image size and far class.
 ///
 /// Destroying a depth camera while the scene runs crashes Ogre (its full
 /// screen quad keeps pointing at the camera's materials), so a removed
 /// sonar's cameras are parked here instead and destroyed only at render
-/// teardown, with the scene.
+/// teardown, with the scene. The pool therefore cannot be trimmed, only
+/// kept from growing: a pair is matched on what cannot be changed after it
+/// is made, and the rest is set again at each use (see SetView). That
+/// bounds the pool by the most sonars of one image size and far class the
+/// world has had at once, whatever their ranges and fields of view.
 struct ParkedCameras
 {
   rendering::DepthCameraPtr depth;
   rendering::SegmentationCameraPtr seg;
   unsigned int width{0};
   unsigned int height{0};
-  double hfov{0.0};
-  double nearClip{0.0};
-  double farClip{0.0};
+  /// \brief The far plane the pair was made with; see FarClass.
+  double farClass{0.0};
 };
+
+/// \brief Parked pairs past which the system warns, once, that their
+/// memory stays taken.
+constexpr std::size_t kParkedWarn = 32;
+
+//////////////////////////////////////////////////
+/// \brief The far plane to make a camera with for a sonar whose far clip is
+/// _far: the next power of two meters.
+///
+/// ogre2 fixes a depth camera's clip planes when its texture is made (they
+/// go into its shaders then; the setters only store them), so they cannot
+/// follow the sonar at reuse. Rounded up like this, sonars whose ranges
+/// differ a little share cameras, and nothing is drawn past twice the
+/// distance asked for. What lies between the sonar's far clip and the
+/// camera's is cut after the frame; see Connect.
+/// \param[in] _far The sonar's far clip, m.
+/// \return The camera's far plane, m.
+double FarClass(double _far)
+{
+  return std::exp2(std::ceil(std::log2(std::max(_far, 1.0))));
+}
+
+//////////////////////////////////////////////////
+/// \brief Give a camera a sonar's field of view.
+///
+/// ogre2 also fixes the field of view when the texture is made, but takes a
+/// projection matrix at any time. This is the camera's own matrix, its clip
+/// planes and depth convention as they are, with the two focal terms set.
+/// It is done for a new camera as for a reused one, so what a sonar sees
+/// does not depend on which camera it got.
+/// \param[in,out] _camera The camera.
+/// \param[in] _hfov Horizontal field of view, rad.
+/// \param[in] _aspect Width over height.
+void SetView(rendering::Camera &_camera, double _hfov, double _aspect)
+{
+  _camera.SetHFOV(math::Angle(_hfov));
+  _camera.SetAspectRatio(_aspect);
+  math::Matrix4d m = _camera.ProjectionMatrix();
+  const double focal = 1.0 / std::tan(0.5 * _hfov);
+  m(0, 0) = focal;
+  m(1, 1) = focal * _aspect;
+  _camera.SetProjectionMatrix(m);
+}
 }  // namespace
 
 class SonarPrivate
@@ -411,6 +462,7 @@ class SonarPrivate
   public: std::vector<rendering::VisualPtr> waterVisuals;
   public: std::vector<unsigned int> knownVisualIds;
   public: std::vector<ParkedCameras> parked;
+  public: bool warnedParked{false};
 
   /// \brief Cameras built so far, to give each a name never used before:
   /// gz-rendering refuses a name that is taken.
@@ -924,11 +976,20 @@ void SonarPrivate::ParkRig(Rig &_rig)
     if (layout)
     {
       this->parked.push_back({_rig.depth[c], _rig.seg[c], layout->width,
-        layout->height, layout->hfov, layout->nearClip, layout->farClip});
+        layout->height, FarClass(layout->farClip)});
     }
   }
   _rig.depth.clear();
   _rig.seg.clear();
+  if (this->parked.size() > kParkedWarn && !this->warnedParked)
+  {
+    gzwarn << "Sonar: " << this->parked.size() << " camera pairs of removed "
+           << "sonars are idle. They cannot be destroyed while the scene "
+           << "runs, and are reused only by a sonar with the same image size "
+           << "and far class, so their GPU memory stays taken until the "
+           << "server stops.\n";
+    this->warnedParked = true;
+  }
 }
 
 //////////////////////////////////////////////////
@@ -969,74 +1030,101 @@ bool SonarPrivate::BuildRig(const RigRequest &_request, Rig &_rig)
   const auto &layout = _request.sonar->Layout();
   const std::string base = _request.sonar->Name();
   const std::size_t n = layout.yaws.size();
+  const double aspect = static_cast<double>(layout.width) / layout.height;
+  const double farClass = FarClass(layout.farClip);
   _rig.depthBuffers.resize(n);
   _rig.segBuffers.resize(n);
+
+  // For the far cut in Connect. A pixel's center is half a pixel past its index, and
+  // the axis is at the middle of the image.
+  const double focal = 0.5 * layout.width / std::tan(0.5 * layout.hfov);
+  _rig.farSquared = static_cast<float>(layout.farClip * layout.farClip);
+  _rig.columnTan2.resize(layout.width);
+  _rig.rowTan2.resize(layout.height);
+  for (unsigned int u = 0; u < layout.width; ++u)
+  {
+    const double x = (u + 0.5 - 0.5 * layout.width) / focal;
+    _rig.columnTan2[u] = static_cast<float>(x * x);
+  }
+  for (unsigned int v = 0; v < layout.height; ++v)
+  {
+    const double y = (v + 0.5 - 0.5 * layout.height) / focal;
+    _rig.rowTan2[v] = static_cast<float>(y * y);
+  }
+
+  std::size_t reused = 0;
   for (std::size_t c = 0; c < n; ++c)
   {
     const math::Pose3d local = _request.pose *
       math::Pose3d(0, 0, 0, 0, 0, layout.yaws[c]);
     const std::string tag = base + "_sonar_" + std::to_string(c) + "_" +
-      std::to_string(this->camerasBuilt++);
+      std::to_string(this->camerasBuilt);
 
-    // A parked pair of the same size and view is ready as it is.
+    // A parked pair of the same size and far class will do: its view is
+    // set below, as a new pair's is.
+    rendering::DepthCameraPtr depth;
+    rendering::SegmentationCameraPtr seg;
     auto match = std::find_if(this->parked.begin(), this->parked.end(),
-      [&layout](const ParkedCameras &_p) {
+      [&](const ParkedCameras &_p) {
         return _p.width == layout.width && _p.height == layout.height &&
-          _p.hfov == layout.hfov && _p.nearClip == layout.nearClip &&
-          _p.farClip == layout.farClip;
+          _p.farClass == farClass;
       });
     if (match != this->parked.end())
     {
-      auto depth = match->depth;
-      auto seg = match->seg;
+      depth = match->depth;
+      seg = match->seg;
       this->parked.erase(match);
-      gzdbg << "Sonar [" << base << "]: reusing parked cameras\n";
-      depth->SetLocalPose(local);
-      seg->SetLocalPose(local);
-      linkVisual->AddChild(depth);
-      linkVisual->AddChild(seg);
-      this->Connect(_rig, c, depth, seg);
-      continue;
+      ++reused;
     }
-
-    auto depth = this->scene->CreateDepthCamera(tag + "_depth");
-    auto seg = this->scene->CreateSegmentationCamera(tag + "_seg");
-    if (!depth || !seg)
+    else
     {
-      gzerr << "Sonar [" << base << "]: cannot create its cameras\n";
-      if (depth)
-        this->scene->DestroySensor(depth);
-      if (seg)
-        this->scene->DestroySensor(seg);
-      this->ParkRig(_rig);
-      return false;
-    }
-    depth->SetImageWidth(layout.width);
-    depth->SetImageHeight(layout.height);
-    depth->SetImageFormat(rendering::PF_FLOAT32_R);
-    depth->SetHFOV(math::Angle(layout.hfov));
-    depth->SetAspectRatio(static_cast<double>(layout.width) / layout.height);
-    depth->SetNearClipPlane(layout.nearClip);
-    depth->SetFarClipPlane(layout.farClip);
-    depth->SetAntiAliasing(0);
-    depth->CreateDepthTexture();
-    depth->SetLocalPose(local);
-    linkVisual->AddChild(depth);
+      depth = this->scene->CreateDepthCamera(tag + "_depth");
+      seg = this->scene->CreateSegmentationCamera(tag + "_seg");
+      if (!depth || !seg)
+      {
+        gzerr << "Sonar [" << base << "]: cannot create its cameras\n";
+        if (depth)
+          this->scene->DestroySensor(depth);
+        if (seg)
+          this->scene->DestroySensor(seg);
+        this->ParkRig(_rig);
+        return false;
+      }
+      ++this->camerasBuilt;
+      depth->SetImageWidth(layout.width);
+      depth->SetImageHeight(layout.height);
+      depth->SetImageFormat(rendering::PF_FLOAT32_R);
+      depth->SetHFOV(math::Angle(layout.hfov));
+      depth->SetAspectRatio(aspect);
+      depth->SetNearClipPlane(layout.nearClip);
+      depth->SetFarClipPlane(farClass);
+      depth->SetAntiAliasing(0);
+      depth->CreateDepthTexture();
 
-    seg->SetImageWidth(layout.width);
-    seg->SetImageHeight(layout.height);
-    seg->SetHFOV(math::Angle(layout.hfov));
-    seg->SetAspectRatio(static_cast<double>(layout.width) / layout.height);
-    seg->SetNearClipPlane(layout.nearClip);
-    seg->SetFarClipPlane(layout.farClip);
-    seg->SetSegmentationType(rendering::SegmentationType::ST_SEMANTIC);
-    seg->EnableColoredMap(false);
-    seg->SetBackgroundLabel(0);
-    seg->CreateSegmentationTexture();
+      seg->SetImageWidth(layout.width);
+      seg->SetImageHeight(layout.height);
+      seg->SetHFOV(math::Angle(layout.hfov));
+      seg->SetAspectRatio(aspect);
+      seg->SetNearClipPlane(layout.nearClip);
+      seg->SetFarClipPlane(farClass);
+      seg->SetSegmentationType(rendering::SegmentationType::ST_SEMANTIC);
+      seg->EnableColoredMap(false);
+      seg->SetBackgroundLabel(0);
+      seg->CreateSegmentationTexture();
+    }
+    SetView(*depth, layout.hfov, aspect);
+    SetView(*seg, layout.hfov, aspect);
+    depth->SetLocalPose(local);
     seg->SetLocalPose(local);
+    linkVisual->AddChild(depth);
     linkVisual->AddChild(seg);
     this->Connect(_rig, c, depth, seg);
   }
+  // Read by sonar_system_test, which has no other way to see a reuse.
+  gzdbg << "Sonar [" << base << "]: " << n << " camera pair(s) of "
+        << layout.width << "x" << layout.height << " to " << farClass
+        << " m, " << reused << " reused; " << this->camerasBuilt
+        << " made so far, " << this->parked.size() << " idle\n";
   return true;
 }
 
@@ -1046,11 +1134,31 @@ void SonarPrivate::Connect(Rig &_rig, std::size_t _c,
   const rendering::SegmentationCameraPtr &_seg)
 {
   auto *buf = &_rig.depthBuffers[_c];
+  const Rig *rig = &_rig;
   _rig.connections.push_back(_depth->ConnectNewDepthFrame(
-    [buf](const float *_d, unsigned int _w, unsigned int _h, unsigned int,
-          const std::string &)
+    [buf, rig](const float *_d, unsigned int _w, unsigned int _h,
+               unsigned int, const std::string &)
     {
-      buf->assign(_d, _d + static_cast<std::size_t>(_w) * _h);
+      // The frame, cut at the sonar's far clip. The camera's far plane is
+      // the far class, at or past it, and its shader gives +inf to a point
+      // whose distance from the camera is past that plane; this does the
+      // same at the sonar's own far clip, so the sonar gets what a camera
+      // made for it alone would have given.
+      buf->resize(static_cast<std::size_t>(_w) * _h);
+      const bool clamp = rig->columnTan2.size() == _w &&
+        rig->rowTan2.size() == _h;
+      float *out = buf->data();
+      for (unsigned int v = 0; v < _h; ++v)
+      {
+        const float row = clamp ? 1.0f + rig->rowTan2[v] : 0.0f;
+        for (unsigned int u = 0; u < _w; ++u, ++_d, ++out)
+        {
+          const float d = *_d;
+          *out = clamp && d > 0.0f &&
+            d * d * (row + rig->columnTan2[u]) > rig->farSquared ?
+            std::numeric_limits<float>::infinity() : d;
+        }
+      }
     }));
   _rig.depth.push_back(_depth);
   auto *sbuf = &_rig.segBuffers[_c];
