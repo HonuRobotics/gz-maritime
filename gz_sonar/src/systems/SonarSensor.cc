@@ -100,6 +100,16 @@ bool SonarSensor::Load(const sdf::Sensor &_sdf, const std::string &_type,
   this->config = *config;
   this->config.seed = _seed ^ Fnv1a(this->Name());
 
+  // The cameras and the ray fan this configuration asks for, checked before
+  // anything is built: a fan too large to build, or a camera too large to
+  // draw, refuses this sensor here rather than hang or abort the server
+  // later. LoadSonarConfig checks it too; this guards the build itself.
+  std::string why;
+  if (!sonar::PlanCameraLayout(this->config, why))
+  {
+    gzerr << "Sonar [" << this->Name() << "]: " << why << "\n";
+    return false;
+  }
   this->engine = std::make_unique<sonar::Engine>(this->config, this->water);
   this->sampler = std::make_unique<sonar::CameraSampler>(this->config);
   if (this->type == kProfilingSonar)

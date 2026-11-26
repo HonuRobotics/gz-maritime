@@ -159,8 +159,16 @@ if(BUILD_TESTING)
     target_link_libraries(sampler_test ${PROJECT_NAME})
   endif()
 
-  # The <gz:sonar> parser and its validation.
-  ament_add_gtest(sdf_test test/sdf_test.cc src/systems/SonarSdf.cc)
+  # The camera layout: its limits, and what it refuses before building.
+  ament_add_gtest(layout_test test/layout_test.cc)
+  if(TARGET layout_test)
+    target_link_libraries(layout_test ${PROJECT_NAME})
+  endif()
+
+  # The <gz:sonar> parser and its validation. The sweep pings a few hundred
+  # configurations; the timeout leaves room for a busy machine.
+  ament_add_gtest(sdf_test test/sdf_test.cc src/systems/SonarSdf.cc
+    TIMEOUT 300)
   if(TARGET sdf_test)
     target_include_directories(sdf_test PRIVATE src/systems)
     target_link_libraries(sdf_test ${PROJECT_NAME} gz-sim::gz-sim gz-common::gz-common)

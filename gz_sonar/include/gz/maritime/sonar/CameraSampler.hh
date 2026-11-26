@@ -19,6 +19,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
+#include <string>
 #include <vector>
 
 #include "gz/maritime/sonar/Config.hh"
@@ -50,6 +52,37 @@ struct CameraLayout
   double farClip{100.0};
 };
 
+/// \brief Widest field of view one camera takes by default, rad.
+inline constexpr double kDefaultMaxCameraWidth = 70.0 * M_PI / 180.0;
+
+/// \brief Most cameras one sonar may ask for. A fan may span a full circle
+/// (CheckRayFan), which is six cameras of 70 degrees.
+inline constexpr std::size_t kMaxCameras = 6;
+
+/// \brief Most pixels along one side of a camera's image. The Omniscan
+/// preset, the tallest, is 2 200; 8 192 is a texture size every GPU that
+/// runs Gazebo has, and one that llvmpipe has too.
+inline constexpr unsigned int kMaxCameraSide = 8192;
+
+/// \brief Most pixels over all of one sonar's cameras: each is a 4-byte
+/// depth and a 4-byte label drawn and read back every ping, so this is
+/// about 540 MB a ping. The ECHO's two cameras are 0.8 million; the ECHO
+/// with 2 048 beams, the most the reader takes, is 52 million.
+inline constexpr double kMaxCameraPixels = 67108864.0;
+
+/// \brief The cameras a sonar's fan needs, worked out from the fan's shape
+/// alone: nothing is allocated and no ray is built, so this is the check to
+/// make before building a sonar. Refuses a fan CheckRayFan refuses, and a
+/// layout past kMaxCameras, kMaxCameraSide or kMaxCameraPixels, or whose far
+/// clip plane is not beyond its near one.
+/// \param[in] _config The sonar.
+/// \param[out] _error Why not, naming the values, when there is no layout.
+/// \param[in] _maxCameraWidth Widest field of view one camera may take,
+/// rad; the fan is split into as many cameras as it needs.
+/// \return The layout, or empty.
+std::optional<CameraLayout> PlanCameraLayout(const SonarConfig &_config,
+  std::string &_error, double _maxCameraWidth = kDefaultMaxCameraWidth);
+
 /// \brief Turns the depth and label images of a sonar's cameras into the
 /// ray hits the engine takes. No rendering here: the cameras are drawn by
 /// the caller (gz-rendering in Gazebo), and this class only knows their
@@ -68,12 +101,14 @@ struct CameraLayout
 /// footprints from AssignFootprints.
 class CameraSampler
 {
-  /// \brief A sampler for one sonar.
+  /// \brief A sampler for one sonar. For a sonar PlanCameraLayout refuses
+  /// the sampler is empty, with no cameras and no rays, rather than built
+  /// at any cost; check with PlanCameraLayout first to learn why.
   /// \param[in] _config The sonar.
   /// \param[in] _maxCameraWidth Widest field of view one camera may take,
   /// rad; the fan is split into as many cameras as it needs.
   public: explicit CameraSampler(const SonarConfig &_config,
-              double _maxCameraWidth = 70.0 * M_PI / 180.0);
+              double _maxCameraWidth = kDefaultMaxCameraWidth);
 
   /// \brief The cameras to draw.
   /// \return The camera layout.

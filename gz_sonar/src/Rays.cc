@@ -18,6 +18,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
+#include <sstream>
 
 namespace gz::maritime::sonar
 {
@@ -30,32 +32,148 @@ math::Vector3d Ray::Direction() const
 }
 
 //////////////////////////////////////////////////
-std::vector<Ray> RayFan(const SonarConfig &_config)
+double RayGrid::Azimuth(std::size_t _i) const
 {
+  return -this->azHalf + (static_cast<double>(_i) + 0.5) * this->azStep;
+}
+
+//////////////////////////////////////////////////
+double RayGrid::Elevation(std::size_t _k) const
+{
+  return -this->elHalf + (static_cast<double>(_k) + 0.5) * this->elStep;
+}
+
+//////////////////////////////////////////////////
+RayGrid RayFanGrid(const SonarConfig &_config)
+{
+  RayGrid g;
   const double beamSpacing = _config.horizontalFov /
     static_cast<double>(std::max<std::size_t>(_config.beams, 1));
-  const double azStep = std::min(beamSpacing, _config.beamWidth) /
+  g.azStep = std::min(beamSpacing, _config.beamWidth) /
     static_cast<double>(std::max<std::size_t>(_config.raysPerBeam, 1));
-  const double azHalf = 0.5 * _config.horizontalFov + 2.0 * _config.beamWidth;
-  const auto azCount = static_cast<std::size_t>(
-    std::ceil(2.0 * azHalf / azStep));
+  g.azHalf = 0.5 * _config.horizontalFov + 2.0 * _config.beamWidth;
+  g.columns = std::ceil(2.0 * g.azHalf / g.azStep);
 
-  const double elHalf = 0.5 * _config.verticalFov * _config.elevationSpan;
-  const std::size_t elCount = RayFanElevationCount(_config);
-  const double elStep = 2.0 * elHalf / static_cast<double>(elCount);
+  g.elHalf = 0.5 * _config.verticalFov * _config.elevationSpan;
+  g.rows = RayFanElevationCount(_config);
+  g.elStep = 2.0 * g.elHalf / static_cast<double>(g.rows);
+  return g;
+}
+
+//////////////////////////////////////////////////
+bool CheckRayFan(const SonarConfig &_config, std::string &_error)
+{
+  auto number = [](double _v) {
+    std::ostringstream out;
+    out << std::setprecision(6) << _v;
+    return out.str();
+  };
+  // Written so that a NaN fails each test.
+  auto positive = [](double _v) { return std::isfinite(_v) && _v > 0.0; };
+  struct Named { const char *name; double value; };
+  for (const Named &n : {Named{"horizontal field of view", _config.horizontalFov},
+                         Named{"vertical field of view", _config.verticalFov},
+                         Named{"beam width", _config.beamWidth},
+                         Named{"elevation span", _config.elevationSpan}})
+  {
+    if (!positive(n.value))
+    {
+      _error = std::string("the ") + n.name + " must be positive and finite, "
+        "not " + number(n.value);
+      return false;
+    }
+  }
+  if (_config.beams < 1 || _config.raysPerBeam < 1 ||
+      _config.elevationRays < 1 || _config.samples < 1)
+  {
+    _error = "beams, rays per beam, elevation rays and samples must be at "
+      "least 1";
+    return false;
+  }
+  // elevationRays * elevationSpan is rounded to the row count; keep it
+  // where the rounding is defined.
+  if (static_cast<double>(_config.elevationRays) * _config.elevationSpan >
+      2.0 * kMaxFanRays)
+  {
+    _error = "elevation rays " + std::to_string(_config.elevationRays) +
+      " times elevation span " + number(_config.elevationSpan) +
+      " asks for more rows than a fan may have rays";
+    return false;
+  }
+
+  const RayGrid g = RayFanGrid(_config);
+  // The cameras that draw the fan are pinholes: they cannot look as far as
+  // 90 degrees up or down, and their image grows as the tangent on the way.
+  if (!(g.elHalf < kMaxFanElevation))
+  {
+    _error = "the rays reach " + number(g.elHalf * 180.0 / M_PI) +
+      " degrees in elevation (vertical field of view " +
+      number(_config.verticalFov) + " rad times elevation span " +
+      number(_config.elevationSpan) + ", halved); they must stay under " +
+      number(kMaxFanElevation * 180.0 / M_PI);
+    return false;
+  }
+  // Past a full circle the fan would sample the same directions twice.
+  if (!(2.0 * g.azHalf <= 2.0 * M_PI))
+  {
+    _error = "the fan spans " + number(2.0 * g.azHalf * 180.0 / M_PI) +
+      " degrees in azimuth (horizontal field of view " +
+      number(_config.horizontalFov) + " rad plus four beam widths of " +
+      number(_config.beamWidth) + " rad); it must not pass 360. Angles are "
+      "in radians";
+    return false;
+  }
+  if (!positive(g.azStep) || !positive(g.elStep) || !positive(g.columns))
+  {
+    _error = "the fan's ray spacing is not a positive number";
+    return false;
+  }
+  if (g.columns > kMaxFanColumns)
+  {
+    _error = "the fan needs " + number(g.columns) + " azimuth columns of "
+      "rays, " + number(g.azStep) + " rad apart (the smaller of horizontal "
+      "field of view over beams and beam width, over rays per beam) across " +
+      number(2.0 * g.azHalf) + " rad; at most " + number(kMaxFanColumns);
+    return false;
+  }
+  const double rays = g.columns * static_cast<double>(g.rows);
+  if (rays > kMaxFanRays)
+  {
+    _error = "the fan needs " + number(rays) + " rays (" +
+      number(g.columns) + " azimuth columns of " + std::to_string(g.rows) +
+      " elevation rays); at most " + number(kMaxFanRays);
+    return false;
+  }
+  const double cells = g.columns * static_cast<double>(_config.samples);
+  if (cells > kMaxFanCells)
+  {
+    _error = "the engine would keep " + number(cells) + " column samples (" +
+      number(g.columns) + " azimuth columns of " +
+      std::to_string(_config.samples) + " samples); at most " +
+      number(kMaxFanCells);
+    return false;
+  }
+  return true;
+}
+
+//////////////////////////////////////////////////
+std::vector<Ray> RayFan(const SonarConfig &_config)
+{
+  const RayGrid g = RayFanGrid(_config);
+  const auto azCount = static_cast<std::size_t>(g.columns);
 
   std::vector<Ray> rays;
-  rays.reserve(azCount * elCount);
+  rays.reserve(azCount * g.rows);
   for (std::size_t i = 0; i < azCount; ++i)
   {
-    const double az = -azHalf + (static_cast<double>(i) + 0.5) * azStep;
-    for (std::size_t k = 0; k < elCount; ++k)
+    const double az = g.Azimuth(i);
+    for (std::size_t k = 0; k < g.rows; ++k)
     {
       Ray r;
       r.azimuth = az;
-      r.elevation = -elHalf + (static_cast<double>(k) + 0.5) * elStep;
-      r.solidAngle = azStep * elStep * std::cos(r.elevation);
-      r.spacing = std::max(azStep, elStep);
+      r.elevation = g.Elevation(k);
+      r.solidAngle = g.azStep * g.elStep * std::cos(r.elevation);
+      r.spacing = std::max(g.azStep, g.elStep);
       rays.push_back(r);
     }
   }

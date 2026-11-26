@@ -18,10 +18,15 @@
 
 #include <cmath>
 #include <cstddef>
+#include <iomanip>
 #include <set>
+#include <sstream>
 #include <string>
 
 #include <gz/common/Console.hh>
+
+#include "gz/maritime/sonar/CameraSampler.hh"
+#include "gz/maritime/sonar/Rays.hh"
 
 namespace gz::sim::maritime
 {
@@ -76,6 +81,17 @@ std::optional<bool> ParseFlag(const std::string &_text)
   if (_text == "false" || _text == "0")
     return false;
   return std::nullopt;
+}
+
+//////////////////////////////////////////////////
+/// \brief A number as an error message shows it.
+/// \param[in] _value The number.
+/// \return Its text, to six significant figures.
+std::string Shown(double _value)
+{
+  std::ostringstream out;
+  out << std::setprecision(6) << _value;
+  return out.str();
 }
 
 /// \brief Reads <gz:sonar>'s children strictly: a value that does not parse
@@ -273,49 +289,93 @@ std::optional<sonar::SonarConfig> LoadSonarConfig(const std::string &_type,
 
   if (c.rangeMax <= c.rangeMin || c.rangeMin < 0.0)
   {
-    _error = "<range> needs 0 <= min < max";
+    _error = "<range> needs 0 <= min < max, not min [" + Shown(c.rangeMin) +
+      "] and max [" + Shown(c.rangeMax) + "]";
     return std::nullopt;
   }
-  if (c.horizontalFov <= 0.0 || c.verticalFov <= 0.0 || c.beamWidth <= 0.0)
+  // Every number has a range outside which it is a mistake rather than a
+  // sonar: an angle in degrees, a frequency in kHz, a typo's extra digits.
+  // The bounds are wide of any real device (the typical values are in the
+  // design page's parameter table) and exist so that a mistake is named
+  // here instead of sizing a camera, a buffer or a loop.
+  struct Bound
   {
-    _error = "fields of view and beam width must be positive";
+    const char *name;
+    double value;
+    double low;
+    double high;
+    const char *unit;
+    /// \brief An angle: say so when it is refused, since degrees for
+    /// radians is the usual way to get one wrong.
+    bool angle;
+  };
+  const double none = c.rangeNoise.value_or(0.0);
+  const Bound bounds[] = {
+    // Angles, rad. 1e-4 rad is 0.006 degrees, finer than any sonar beam; a
+    // fan cannot pass a full circle, nor a beam or the fan's thickness half
+    // of one.
+    {"<horizontal_fov>", c.horizontalFov, 1e-4, 2.0 * M_PI, "rad", true},
+    {"<vertical_fov>", c.verticalFov, 1e-4, M_PI, "rad", true},
+    {"<beam_width>", c.beamWidth, 1e-4, M_PI, "rad", true},
+    {"<angle_noise>", c.angleNoise, 0.0, 0.5 * M_PI, "rad", true},
+    // Half-widths of the vertical beam, not an angle. The pattern is 3 dB
+    // down at 1 and 300 dB down at 10; under 0.1 the fan is a sliver of
+    // the main lobe.
+    {"<elevation_span>", c.elevationSpan, 0.1, 10.0, "half-widths", false},
+    // 1 kHz to 10 MHz: below, it is not this kind of sonar; above, sound
+    // does not cross a meter of water.
+    {"<frequency>", c.frequency, 1e3, 1e7, "Hz", false},
+    // The far clip plane and the ping rate follow the window; 10 km is
+    // past the reach of anything above 1 kHz that this models.
+    {"<range><max>", c.rangeMax, 0.1, 1e4, "m", false},
+    // 0.1 microsecond (0.075 mm) to 0.1 s (75 m of range).
+    {"<pulse_length>", c.pulseLength, 1e-7, 0.1, "s", false},
+    // The range the world's sound speed takes.
+    {"<sound_speed>", c.soundSpeed.value_or(1500.0), 1300.0, 1700.0, "m/s",
+     false},
+    {"<gain_time_constant>", c.gainTimeConstant, 0.0, 3600.0, "s", false},
+    {"<tvg_spreading>", c.tvgSpreading, 0.0, 100.0, "dB per decade", false},
+    // Levels: 300 dB either way is 1e30 in intensity, well inside a
+    // double and far outside acoustics.
+    {"<gain>", c.gainDb.value_or(0.0), -300.0, 300.0, "dB", false},
+    {"<noise_floor>", c.noiseFloorDb, -300.0, 300.0, "dB", false},
+    {"<detection_threshold>", c.detectionThresholdDb, -300.0, 300.0, "dB",
+     false},
+    {"<dynamic_range>", c.dynamicRangeDb, 0.1, 300.0, "dB", false},
+    {"<range_noise>", none, 0.0, 1e4, "m", false},
+  };
+  for (const Bound &k : bounds)
+  {
+    // Written so that a NaN fails.
+    if (!(k.value >= k.low && k.value <= k.high))
+    {
+      _error = std::string(k.name) + " must be from " + Shown(k.low) +
+        " to " + Shown(k.high) + " " + k.unit + ", not [" + Shown(k.value) +
+        "]" + (k.angle ? "; angles are in radians, not degrees" : "");
+      return std::nullopt;
+    }
+  }
+  if (!(c.sidelobeLevelDb < 0.0 && c.sidelobeLevelDb >= -300.0))
+  {
+    _error = "<sidelobe_level> must be negative, from -300 dB up to but not "
+      "0, not [" + Shown(c.sidelobeLevelDb) + "]";
     return std::nullopt;
   }
   // The rays reach elevationSpan half-widths of the vertical field of view,
   // and the cameras that sample them cannot look past 90 degrees.
-  if (0.5 * c.verticalFov * c.elevationSpan >= 85.0 * M_PI / 180.0)
+  if (0.5 * c.verticalFov * c.elevationSpan >= sonar::kMaxFanElevation)
   {
-    _error = "<vertical_fov> times <elevation_span> must stay under 170 degrees";
+    _error = "<vertical_fov> [" + Shown(c.verticalFov) + "] times "
+      "<elevation_span> [" + Shown(c.elevationSpan) + "] must stay under "
+      "2.967 rad (170 degrees)";
     return std::nullopt;
   }
-  if (c.elevationSpan <= 0.0)
-  {
-    _error = "<elevation_span> must be positive";
+  // Last, what the values add up to: the ray fan and the cameras this
+  // configuration would ask for, sized without building either. Counts and
+  // angles that pass one by one can still multiply into a camera no GPU
+  // draws or a fan that takes minutes to build.
+  if (!sonar::PlanCameraLayout(c, _error))
     return std::nullopt;
-  }
-  struct Check { double value; bool ok; const char *message; };
-  const Check checks[] = {
-    {c.frequency, c.frequency > 0.0, "<frequency> must be positive"},
-    {c.pulseLength, c.pulseLength > 0.0, "<pulse_length> must be positive"},
-    {c.soundSpeed.value_or(1.0), c.soundSpeed.value_or(1.0) > 0.0,
-     "<sound_speed> must be positive"},
-    {c.dynamicRangeDb, c.dynamicRangeDb > 0.0, "<dynamic_range> must be positive"},
-    {c.gainTimeConstant, c.gainTimeConstant >= 0.0,
-     "<gain_time_constant> must not be negative"},
-    {c.tvgSpreading, c.tvgSpreading >= 0.0, "<tvg_spreading> must not be negative"},
-    {c.sidelobeLevelDb, c.sidelobeLevelDb < 0.0, "<sidelobe_level> must be negative"},
-    {c.rangeNoise.value_or(0.0), c.rangeNoise.value_or(0.0) >= 0.0,
-     "<range_noise> must not be negative"},
-    {c.angleNoise, c.angleNoise >= 0.0, "<angle_noise> must not be negative"},
-  };
-  for (const auto &k : checks)
-  {
-    if (!k.ok || !std::isfinite(k.value))
-    {
-      _error = k.message;
-      return std::nullopt;
-    }
-  }
   // Unknown elements are most likely misspellings; say so rather than
   // ignore them.
   static const std::set<std::string> known = {

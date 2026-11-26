@@ -21,7 +21,9 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <string>
+#include <vector>
 
 #include <sdf/Link.hh>
 #include <sdf/Model.hh>
@@ -29,6 +31,12 @@
 #include <sdf/Sensor.hh>
 #include <sdf/Visual.hh>
 #include <sdf/World.hh>
+
+#include "gz/maritime/sonar/CameraSampler.hh"
+#include "gz/maritime/sonar/Engine.hh"
+#include "gz/maritime/sonar/Rays.hh"
+#include "gz/maritime/sonar/Readout.hh"
+#include "gz/maritime/sonar/Water.hh"
 
 #include "SonarSdf.hh"
 
@@ -281,4 +289,221 @@ TEST(SonarSdf, WaterIsChecked)
     EXPECT_FALSE(gz::sim::maritime::ReadWater(Plugin(body), w, s, e)) << body;
     EXPECT_FALSE(e.empty()) << body;
   }
+}
+
+//////////////////////////////////////////////////
+// The three configurations from review that took a server down or built
+// far too much: each now loads a small camera or is refused by name.
+TEST(SonarSdf, LayoutIsCheckedBeforeAnythingIsBuilt)
+{
+  std::string error;
+  // One elevation row: was a 45 by 4294967291 camera.
+  for (const char *type : {"sidescan_sonar", "imaging_sonar",
+                           "profiling_sonar"})
+  {
+    const auto c = Load(type, "<elevation_rays>1</elevation_rays>"
+      "<elevation_span>2</elevation_span>", error);
+    ASSERT_TRUE(c) << type << ": " << error;
+    const auto layout = sonar::PlanCameraLayout(*c, error);
+    ASSERT_TRUE(layout) << type << ": " << error;
+    EXPECT_LE(layout->height, 8u) << type;
+    EXPECT_LE(layout->width, 700u) << type;
+  }
+  {
+    const auto c = Load("sidescan_sonar",
+      "<elevation_rays>1</elevation_rays>", error);
+    ASSERT_TRUE(c) << error;
+    const auto layout = sonar::PlanCameraLayout(*c, error);
+    ASSERT_TRUE(layout) << error;
+    EXPECT_EQ(layout->yaws.size(), 1u);
+    EXPECT_EQ(layout->width, 45u);
+    EXPECT_LE(layout->height, 8u);
+  }
+  for (const char *type : {"sidescan_sonar", "imaging_sonar",
+                           "profiling_sonar"})
+  {
+    // Hung the first update building 1e11 columns of rays.
+    EXPECT_FALSE(Load(type, "<horizontal_fov>1e-9</horizontal_fov>", error));
+    EXPECT_NE(error.find("<horizontal_fov>"), std::string::npos) << error;
+    EXPECT_NE(error.find("1e-09"), std::string::npos) << error;
+    // Degrees for radians: was 99 cameras.
+    EXPECT_FALSE(Load(type, "<horizontal_fov>120</horizontal_fov>", error));
+    EXPECT_NE(error.find("<horizontal_fov>"), std::string::npos) << error;
+    EXPECT_NE(error.find("[120]"), std::string::npos) << error;
+    EXPECT_NE(error.find("radians"), std::string::npos) << error;
+    // The same mistake in the other angles.
+    EXPECT_FALSE(Load(type, "<vertical_fov>20</vertical_fov>", error));
+    EXPECT_NE(error.find("<vertical_fov>"), std::string::npos) << error;
+    EXPECT_FALSE(Load(type, "<beam_width>4</beam_width>", error));
+    EXPECT_NE(error.find("<beam_width>"), std::string::npos) << error;
+    EXPECT_FALSE(Load(type, "<angle_noise>30</angle_noise>", error));
+    EXPECT_NE(error.find("<angle_noise>"), std::string::npos) << error;
+  }
+  // Values that pass one by one and multiply into too much.
+  EXPECT_FALSE(Load("imaging_sonar", "<beams>2048</beams>"
+    "<rays_per_beam>32</rays_per_beam>", error));
+  EXPECT_NE(error.find("azimuth columns"), std::string::npos) << error;
+  EXPECT_FALSE(Load("sidescan_sonar", "<rays_per_beam>32</rays_per_beam>",
+    error));
+  EXPECT_NE(error.find("pixels"), std::string::npos) << error;
+  EXPECT_FALSE(Load("imaging_sonar", "<horizontal_fov>0.001</horizontal_fov>",
+    error));
+  // And the exemplars' neighbors still load.
+  EXPECT_TRUE(Load("imaging_sonar", "<horizontal_fov>2.2689</horizontal_fov>"
+    "<beams>512</beams>", error)) << error;
+  EXPECT_TRUE(Load("sidescan_sonar", "<horizontal_fov>0.0035</horizontal_fov>"
+    "<beam_width>0.0035</beam_width><range_max>150</range_max>", error))
+    << error;
+  EXPECT_TRUE(Load("profiling_sonar", "<horizontal_fov>2.4</horizontal_fov>"
+    "<beam_width>0.122</beam_width><detection>beamformed</detection>", error))
+    << error;
+}
+
+namespace
+{
+//////////////////////////////////////////////////
+/// \brief Build what a sensor builds from a configuration the reader took,
+/// and ping it once on a wall: the layout is inside its limits, and the
+/// levels that come back are numbers.
+/// \param[in] _c The configuration.
+/// \param[in] _what What is being tried, for the failure message.
+/// \param[in] _ping Whether to build the sampler and engine and ping too.
+void ExpectBuilds(const sonar::SonarConfig &_c, const std::string &_what,
+  bool _ping)
+{
+  std::string error;
+  const auto layout = sonar::PlanCameraLayout(_c, error);
+  ASSERT_TRUE(layout) << _what << ": " << error;
+  EXPECT_GE(layout->yaws.size(), 1u) << _what;
+  EXPECT_LE(layout->yaws.size(), sonar::kMaxCameras) << _what;
+  EXPECT_GE(layout->width, 4u) << _what;
+  EXPECT_GE(layout->height, 4u) << _what;
+  EXPECT_LE(layout->width, sonar::kMaxCameraSide) << _what;
+  EXPECT_LE(layout->height, sonar::kMaxCameraSide) << _what;
+  EXPECT_LE(static_cast<double>(layout->yaws.size()) * layout->width *
+    layout->height, sonar::kMaxCameraPixels) << _what;
+  EXPECT_GT(layout->farClip, layout->nearClip) << _what;
+  const sonar::RayGrid g = sonar::RayFanGrid(_c);
+  const double rays = g.columns * static_cast<double>(g.rows);
+  EXPECT_LE(rays, sonar::kMaxFanRays) << _what;
+  if (!_ping)
+    return;
+
+  const sonar::CameraSampler sampler(_c);
+  ASSERT_EQ(static_cast<double>(sampler.Rays().size()), rays) << _what;
+  // A wall square to each camera in the middle of the range window.
+  const auto depthValue = static_cast<float>(0.5 * (_c.rangeMin + _c.rangeMax));
+  const std::vector<float> image(layout->width * layout->height, depthValue);
+  const std::vector<const float *> depth(layout->yaws.size(), image.data());
+  const auto hits = sampler.Sample(depth, {}, 1, {});
+  ASSERT_EQ(hits.size(), sampler.Rays().size()) << _what;
+  const sonar::Engine engine(_c, sonar::Water());
+  const auto out = engine.Ping(hits, 1);
+  ASSERT_EQ(out.data.size(), _c.beams * _c.samples) << _what;
+  for (const auto v : out.data)
+    ASSERT_TRUE(std::isfinite(v)) << _what;
+  // The read-out, where the gains, the noise and the detection are.
+  const auto levels = sonar::ReadLevels(out, _c, engine.Absorption(), 1);
+  ASSERT_EQ(levels.db.size(), out.data.size()) << _what;
+  for (const auto v : levels.db)
+    ASSERT_TRUE(std::isfinite(v)) << _what;
+  EXPECT_EQ(sonar::ReadImaging(levels, _c).data.size(), levels.db.size())
+    << _what;
+  for (const auto &s : sonar::ReadProfiling(levels, _c, 1500.0, 1))
+  {
+    ASSERT_TRUE(std::isfinite(s.angle) && std::isfinite(s.range)) << _what;
+  }
+}
+}  // namespace
+
+//////////////////////////////////////////////////
+// Every number in <gz:sonar>, at zero, negative, tiny and huge values and
+// at values around its default, for each sonar type: the reader either
+// refuses it with a reason, or what it returns builds a sane layout, and
+// (for fans of ordinary size) a sampler and an engine that ping.
+TEST(SonarSdf, EveryNumberIsRefusedOrBuilds)
+{
+  const char *types[] = {"imaging_sonar", "sidescan_sonar",
+    "profiling_sonar"};
+  const char *numbers[] = {"frequency", "horizontal_fov", "vertical_fov",
+    "elevation_span", "beam_width", "sidelobe_level", "range_min",
+    "range_max", "pulse_length", "sound_speed", "gain",
+    "gain_time_constant", "tvg_spreading", "noise_floor", "dynamic_range",
+    "detection_threshold", "range_noise", "angle_noise"};
+  const char *numberValues[] = {"0", "-0", "-1", "-1e-9", "-1e9", "-1e300",
+    "1e-300", "1e-12", "1e-9", "1e-6", "1e-4", "1e-3", "0.01", "0.1", "0.5",
+    "1", "1.5", "2", "3", "6.3", "10", "45", "120", "360", "1e3", "1500",
+    "1e4", "1e5", "1e6", "1e7", "1e9", "1e12", "1e300", "-13", "-150"};
+  const char *counts[] = {"beams", "samples", "rays_per_beam",
+    "elevation_rays", "max_soundings"};
+  const char *countValues[] = {"0", "1", "2", "3", "7", "16", "32", "33",
+    "100", "1000", "1024", "1025", "2048", "2049", "20000", "20001",
+    "100000", "999999999", "4294967296", "-1", "1.5"};
+
+  std::size_t accepted = 0, refused = 0, pinged = 0;
+  auto check = [&](const std::string &_type, const std::string &_body,
+      bool _mayPing) {
+    std::string error;
+    const auto c = Load(_type, _body, error);
+    const std::string what = _type + " " + _body;
+    if (!c)
+    {
+      ++refused;
+      EXPECT_FALSE(error.empty()) << what;
+      return;
+    }
+    ++accepted;
+    // Ping the fans of ordinary size; the largest are only sized up, so
+    // the test stays quick.
+    const sonar::RayGrid g = sonar::RayFanGrid(*c);
+    const bool ping = _mayPing && g.columns * static_cast<double>(g.rows) <= 150000.0 &&
+      g.columns * static_cast<double>(c->samples) <= 3.0e6;
+    pinged += ping ? 1 : 0;
+    ExpectBuilds(*c, what, ping);
+  };
+  auto element = [](const std::string &_name, const std::string &_value) {
+    return "<" + _name + ">" + _value + "</" + _name + ">";
+  };
+  for (const char *type : types)
+  {
+    for (const char *name : numbers)
+      for (const char *value : numberValues)
+        check(type, element(name, value), true);
+    for (const char *name : counts)
+      for (const char *value : countValues)
+        check(type, element(name, value), true);
+    // The nested spelling of the range window.
+    for (const char *value : numberValues)
+    {
+      check(type, std::string("<range><max>") + value + "</max></range>",
+        true);
+      check(type, std::string("<range><min>") + value + "</min></range>",
+        true);
+    }
+    // Pairs and triples, drawn from the same values with a fixed seed:
+    // counts and angles that pass alone can multiply. Sized up, not built.
+    std::uint32_t state = 12345u;
+    auto next = [&](std::size_t _n) {
+      state = state * 1664525u + 1013904223u;
+      return static_cast<std::size_t>((state >> 8) % _n);
+    };
+    const std::size_t nn = sizeof(numbers) / sizeof(numbers[0]);
+    const std::size_t nv = sizeof(numberValues) / sizeof(numberValues[0]);
+    const std::size_t cn = sizeof(counts) / sizeof(counts[0]);
+    const std::size_t cv = sizeof(countValues) / sizeof(countValues[0]);
+    for (int n = 0; n < 1500; ++n)
+    {
+      const std::size_t a = next(nn), b = next(nn);
+      std::string body = element(numbers[a], numberValues[next(nv)]) +
+        element(counts[next(cn)], countValues[next(cv)]);
+      if (b != a)
+        body += element(numbers[b], numberValues[next(nv)]);
+      check(type, body, false);
+    }
+  }
+  EXPECT_GT(accepted, 500u);
+  EXPECT_GT(refused, 500u);
+  EXPECT_GT(pinged, 100u);
+  std::printf("sweep: %zu accepted (%zu pinged), %zu refused\n", accepted,
+    pinged, refused);
 }

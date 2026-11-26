@@ -44,6 +44,9 @@ bool IsSonarType(const std::string &_type);
 
 /// \brief A sonar's configuration: its type's exemplar, with whatever its
 /// <gz:sonar> block sets on top. Angles in radians, as SDF gives them.
+/// Every value is checked against a range, and the ray fan and cameras the
+/// whole would need against PlanCameraLayout's limits, so a configuration
+/// this returns can be built.
 /// \param[in] _type The sensor's gz:type.
 /// \param[in] _block The <gz:sonar> element; null for the exemplar as it is.
 /// \param[out] _labels Whether the ground-truth labels topic is on.

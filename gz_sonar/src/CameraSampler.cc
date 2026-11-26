@@ -19,6 +19,9 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <optional>
+#include <sstream>
+#include <string>
 
 namespace gz::maritime::sonar
 {
@@ -52,52 +55,143 @@ math::Vector3d Rotate(double _yaw, const math::Vector3d &_v)
 }
 }  // namespace
 
+namespace
+{
+/// \brief A fan's extent and spacing, as the rays RayFan builds have them.
+struct Extent
+{
+  /// \brief Most negative azimuth, rad.
+  double azMin{0.0};
+  /// \brief Steps between columns and between rows, rad; a fan of one
+  /// column takes the row step, and one of one row has a row step of 0.
+  double azStep{0.0};
+  double elStep{0.0};
+  /// \brief Largest elevation of any ray, either way, rad.
+  double elMax{0.0};
+  /// \brief Azimuth the cameras cover: the rays and half a step each side.
+  double span{0.0};
+};
+
+//////////////////////////////////////////////////
+/// \param[in] _g The fan's grid, one CheckRayFan accepts.
+/// \return Its extent.
+Extent FanExtent(const RayGrid &_g)
+{
+  Extent e;
+  const auto columns = static_cast<std::size_t>(_g.columns);
+  e.azMin = std::min(0.0, _g.Azimuth(0));
+  const double azMax = std::max(0.0, _g.Azimuth(columns - 1));
+  e.elMax = std::max(std::abs(_g.Elevation(0)),
+    std::abs(_g.Elevation(_g.rows - 1)));
+  // With one row there is no step between rows: 0, which adds no margin
+  // and takes no part in the pixel size, rather than a sentinel that would.
+  e.elStep = _g.rows > 1 ? _g.Elevation(1) - _g.Elevation(0) : 0.0;
+  e.azStep = columns > 1 ? _g.Azimuth(1) - _g.Azimuth(0) : e.elStep;
+  e.span = azMax - e.azMin + e.azStep;
+  return e;
+}
+}  // namespace
+
+//////////////////////////////////////////////////
+std::optional<CameraLayout> PlanCameraLayout(const SonarConfig &_config,
+  std::string &_error, double _maxCameraWidth)
+{
+  if (!CheckRayFan(_config, _error))
+    return std::nullopt;
+  if (!(_maxCameraWidth > 0.0) || !(_maxCameraWidth < M_PI))
+  {
+    _error = "a camera's field of view must be between 0 and 180 degrees";
+    return std::nullopt;
+  }
+  const RayGrid g = RayFanGrid(_config);
+  const Extent e = FanExtent(g);
+  const double azMin = e.azMin, azStep = e.azStep, elStep = e.elStep;
+  const double elMax = e.elMax, span = e.span;
+  const double step = g.rows > 1 ? std::min(azStep, elStep) : azStep;
+  if (!(step > 0.0) || !std::isfinite(step))
+  {
+    _error = "the fan has one ray; it needs more than one azimuth column or "
+      "elevation row";
+    return std::nullopt;
+  }
+
+  CameraLayout layout;
+  const double cameras = std::max(1.0, std::ceil(span / _maxCameraWidth));
+  if (cameras > static_cast<double>(kMaxCameras))
+  {
+    std::ostringstream out;
+    out << "the fan needs " << cameras << " cameras to cover "
+        << span * 180.0 / M_PI << " degrees in azimuth; at most "
+        << kMaxCameras;
+    _error = out.str();
+    return std::nullopt;
+  }
+  const auto count = static_cast<std::size_t>(cameras);
+  const double half = 0.5 * span / static_cast<double>(count);
+  // One ray step of margin above and below the outermost rows, where there
+  // are rows to give a step, and never past what a pinhole can look at: with
+  // one row the step would be the whole vertical extent, and with a few
+  // wide ones the margin alone could pass 90 degrees.
+  const double top = std::min(elMax + elStep, kMaxFanElevation);
+  layout.focal = 1.0 / step;
+  const double width = std::ceil(2.0 * layout.focal * std::tan(half)) + 4.0;
+  const double height = std::ceil(
+    2.0 * layout.focal * std::tan(top) / std::cos(half)) + 4.0;
+  if (!(width <= kMaxCameraSide) || !(height <= kMaxCameraSide) ||
+      !(cameras * width * height <= kMaxCameraPixels))
+  {
+    std::ostringstream out;
+    out << "the fan needs " << count << " camera(s) of " << width << " x "
+        << height << " pixels, one pixel per " << step << " rad of ray "
+        << "spacing over " << 2.0 * half * 180.0 / M_PI << " by "
+        << 2.0 * top * 180.0 / M_PI << " degrees; at most " << kMaxCameraSide
+        << " pixels a side and " << kMaxCameraPixels << " pixels in all. "
+        << "Fewer rays per beam or elevation rays, or a narrower vertical "
+        << "field of view or elevation span, make it smaller";
+    _error = out.str();
+    return std::nullopt;
+  }
+  layout.width = static_cast<unsigned int>(width);
+  layout.height = static_cast<unsigned int>(height);
+  layout.hfov = 2.0 * std::atan(0.5 * layout.width / layout.focal);
+  layout.farClip = 1.5 * _config.rangeMax;
+  // As a float, which is what the camera takes.
+  if (!std::isfinite(static_cast<float>(layout.farClip)) ||
+      !(layout.farClip > 2.0 * layout.nearClip))
+  {
+    std::ostringstream out;
+    out << "the far clip plane, 1.5 times the maximum range of "
+        << _config.rangeMax << " m, must be finite and beyond "
+        << 2.0 * layout.nearClip << " m";
+    _error = out.str();
+    return std::nullopt;
+  }
+  for (std::size_t c = 0; c < count; ++c)
+  {
+    layout.yaws.push_back(azMin - 0.5 * azStep +
+      (static_cast<double>(c) + 0.5) * span / static_cast<double>(count));
+  }
+  return layout;
+}
+
 //////////////////////////////////////////////////
 CameraSampler::CameraSampler(const SonarConfig &_config,
   double _maxCameraWidth)
-  : config(_config), rays(RayFan(_config)),
-    elevationCount(RayFanElevationCount(_config))
+  : config(_config)
 {
-  // The fan's extent and spacing, from the rays themselves.
-  double azMin = 0.0, azMax = 0.0, elMax = 0.0;
-  double azStep = std::numeric_limits<double>::max();
-  double elStep = std::numeric_limits<double>::max();
-  for (std::size_t n = 0; n < this->rays.size(); ++n)
-  {
-    const Ray &r = this->rays[n];
-    azMin = std::min(azMin, r.azimuth);
-    azMax = std::max(azMax, r.azimuth);
-    elMax = std::max(elMax, std::abs(r.elevation));
-  }
-  if (this->rays.size() > this->elevationCount)
-  {
-    azStep = this->rays[this->elevationCount].azimuth - this->rays[0].azimuth;
-  }
-  if (this->elevationCount > 1)
-    elStep = this->rays[1].elevation - this->rays[0].elevation;
-  // A fan of one column (a sidescan beam sampled once across) has no
-  // azimuth step of its own; take the elevation step.
-  if (azStep == std::numeric_limits<double>::max())
-    azStep = elStep;
-  const double step = std::min(azStep, elStep);
-  const double span = azMax - azMin + azStep;
+  // Plan first: a fan that is refused is not built, so a bad configuration
+  // costs nothing here and leaves a sampler with no cameras and no rays.
+  std::string error;
+  const auto plan = PlanCameraLayout(_config, error, _maxCameraWidth);
+  if (!plan)
+    return;
+  this->layout = *plan;
+  this->rays = RayFan(_config);
+  this->elevationCount = RayFanElevationCount(_config);
 
-  const auto count = static_cast<std::size_t>(
-    std::max(1.0, std::ceil(span / _maxCameraWidth)));
-  const double half = 0.5 * span / static_cast<double>(count);
-  this->layout.focal = 1.0 / step;
-  this->layout.width = static_cast<unsigned int>(
-    std::ceil(2.0 * this->layout.focal * std::tan(half))) + 4;
-  this->layout.height = static_cast<unsigned int>(std::ceil(
-    2.0 * this->layout.focal * std::tan(elMax + elStep) / std::cos(half))) + 4;
-  this->layout.hfov = 2.0 * std::atan(0.5 * this->layout.width /
-    this->layout.focal);
-  this->layout.farClip = 1.5 * _config.rangeMax;
-  for (std::size_t c = 0; c < count; ++c)
-  {
-    this->layout.yaws.push_back(azMin - 0.5 * azStep +
-      (static_cast<double>(c) + 0.5) * span / static_cast<double>(count));
-  }
+  const Extent e = FanExtent(RayFanGrid(_config));
+  const double azMin = e.azMin, azStep = e.azStep, span = e.span;
+  const std::size_t count = this->layout.yaws.size();
 
   this->lookup.resize(this->rays.size());
   for (std::size_t n = 0; n < this->rays.size(); ++n)

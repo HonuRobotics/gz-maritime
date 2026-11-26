@@ -17,7 +17,9 @@
 #ifndef GZ_MARITIME_SONAR_RAYS_HH_
 #define GZ_MARITIME_SONAR_RAYS_HH_
 
+#include <cmath>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include <gz/math/Pose3.hh>
@@ -90,6 +92,71 @@ std::vector<Ray> RayFan(const SonarConfig &_config);
 /// \param[in] _config The sonar.
 /// \return The number of elevation rays, at least 1.
 std::size_t RayFanElevationCount(const SonarConfig &_config);
+
+/// \brief The shape of RayFan's grid, worked out without building a ray, so
+/// a fan can be sized up (and refused) before anything is allocated for it.
+struct RayGrid
+{
+  /// \brief Azimuth columns. A double: a careless configuration can ask for
+  /// more than any integer type holds.
+  double columns{0.0};
+
+  /// \brief Elevation rays in each column, RayFanElevationCount.
+  std::size_t rows{0};
+
+  /// \brief Angular steps between columns and between rows, rad.
+  double azStep{0.0};
+  double elStep{0.0};
+
+  /// \brief Half the fan's extent in azimuth and in elevation, rad.
+  double azHalf{0.0};
+  double elHalf{0.0};
+
+  /// \brief Azimuth of column _i, rad.
+  /// \param[in] _i The column's index.
+  /// \return The azimuth.
+  double Azimuth(std::size_t _i) const;
+
+  /// \brief Elevation of row _k, rad.
+  /// \param[in] _k The row's index.
+  /// \return The elevation.
+  double Elevation(std::size_t _k) const;
+};
+
+/// \brief The shape of the fan RayFan would build.
+/// \param[in] _config The sonar.
+/// \return The grid's shape.
+RayGrid RayFanGrid(const SonarConfig &_config);
+
+/// \brief How far up or down a fan's rays may reach, rad: 85 degrees. The
+/// cameras that draw the fan are pinholes, whose image grows as the tangent
+/// of the angle and cannot reach 90.
+inline constexpr double kMaxFanElevation = 85.0 * M_PI / 180.0;
+
+/// \brief Most azimuth columns a fan may have: thirty times the ECHO's
+/// 1 075, and room for 2 048 beams of 8 rays each with their margins. The
+/// engine keeps a row of samples and a set of beam weights per column.
+inline constexpr double kMaxFanColumns = 32768.0;
+
+/// \brief Most rays a fan may have: twenty times the ECHO's 103 296. Each
+/// ray is a hit of about 100 bytes every ping, and a depth lookup.
+inline constexpr double kMaxFanRays = 2097152.0;
+
+/// \brief Most column samples (columns times range samples) the engine may
+/// keep: it holds three arrays of that size, 20 bytes a cell, so this is
+/// about 670 MB. The ECHO's is 1.1 million; the ECHO at 20 000 samples
+/// still fits.
+inline constexpr double kMaxFanCells = 33554432.0;
+
+/// \brief Whether a sonar's fan is one RayFan and the engine can build:
+/// angles that are finite, positive and inside the limits the cameras have,
+/// and a grid within kMaxFanColumns, kMaxFanRays and kMaxFanCells. A fan
+/// that fails would take minutes or all the memory to build, so check
+/// before RayFan, Engine or CameraSampler.
+/// \param[in] _config The sonar.
+/// \param[out] _error Why not, naming the values, when it is not.
+/// \return True if the fan can be built.
+bool CheckRayFan(const SonarConfig &_config, std::string &_error);
 
 /// \brief The steepest slant a surface is taken to have: the tangent of its
 /// largest incidence angle, 50 (88.9 degrees). Past it a lone ray's
