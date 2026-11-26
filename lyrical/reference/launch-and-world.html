@@ -635,7 +635,7 @@ The site models are credited in <code class="docutils literal notranslate"><span
 <td><p>Slack water by default (<code class="docutils literal notranslate"><span class="pre">&lt;speed&gt;0&lt;/speed&gt;</span></code>); a uniform, horizontal current set in the world file and changed at run time on the ocean current topic, kept on the world as a recipe any system can ask at a point and published as ground truth. A vehicle feels it through <code class="docutils literal notranslate"><span class="pre">gz-maritime-hydrodynamics-system</span></code>, or through collisions it marks, with seawater at 1025 kg/m³ and a drag coefficient of 1 unless a shape sets its own; gz-sim’s own Hydrodynamics does not see it</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gz-sim-waves-fft-system</span></code></p></td>
-<td><p>Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out)</p></td>
+<td><p>Sea state 1, updated at 30 Hz; the waves travel towards +x (Gerstner alternative in the file, commented out)</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">model://water_surface</span></code></p></td>
 <td><p>Draws the sea</p></td>
