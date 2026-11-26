@@ -150,6 +150,12 @@ SonarConfig SurveyorProfiling()
   c.frequency = 240000.0;
   c.horizontalFov = 80.0 * kDeg;
   c.verticalFov = 4.0 * kDeg;
+  // 1 degree is the Surveyor's angle-of-arrival resolution, not its beam:
+  // Cerulean gives a 7 degree cross-track beam for conventional beamforming
+  // and under 1 degree for the angle of arrival it reports. The default
+  // detection is angle of arrival, which this models as narrow beams, so a
+  // sounding's angle is as sharp as the device's. With
+  // <detection>beamformed</detection>, set <beam_width> to 7 degrees.
   c.beams = 160;
   c.beamWidth = 1.0 * kDeg;
   c.rangeMin = 2.5;
