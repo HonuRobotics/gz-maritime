@@ -147,9 +147,10 @@ through the water yet: point the GUI at a seabed or a structure.
 
 At night, or deep, there is no daylight: set the world's water to
 `<daylight>0</daylight>` and give the vehicle spot lights. With the
-`underwater_optics` model in the world, every spot and point light is a lamp
-whose light fades through the water both ways, and whose beam the water
-scatters back to the camera:
+`underwater_optics` model in the world, a spot or point light with `lamp` in
+its name is a lamp, up to four: its light fades through the water both ways,
+and the water scatters its beam back to the camera. Other lights, a harbour
+light on a pier for one, are lit as in air:
 
 ```xml
 <light type="spot" name="lamp_port">

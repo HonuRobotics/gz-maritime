@@ -335,3 +335,126 @@ TEST_F(LampsTest, ClearReachesFartherMurkyStaysNear)
   // In clear water there is nothing to scatter: no beam.
   EXPECT_LT(glow(frames["clear"], far), 0.002);
 }
+
+/////////////////////////////////////////////////
+// A light is a lamp only if its name says so. The same scene with the
+// spot light named "torch": Ogre lights the plate with it, as in air, and
+// in the water it draws no beam over the backdrop, where the lamp of
+// lamps.sdf does.
+TEST_F(LampsTest, OnlyLightsNamedLampAreLamps)
+{
+  std::mutex mutex;
+  std::map<std::int64_t, msgs::Image> images, depths;
+  transport::Node torchNode;
+  const auto keep = [&](bool _depth)
+  {
+    return std::function<void(const msgs::Image &)>(
+        [&mutex, &images, &depths, _depth](const msgs::Image &_m)
+        {
+          const std::lock_guard<std::mutex> lock(mutex);
+          (_depth ? depths : images)[_m.header().stamp().sec() * 1000000000LL +
+                                     _m.header().stamp().nsec()] = _m;
+        });
+  };
+  torchNode.Subscribe("/uwtorch/cam/image", keep(false));
+  torchNode.Subscribe("/uwtorch/cam/depth_image", keep(true));
+  // The newest frame with both, past a stamp
+  const auto wait = [&](std::int64_t _after)
+  {
+    Frame f;
+    for (int i = 0; i < 400 && f.rgb.empty(); ++i)
+    {
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      const std::lock_guard<std::mutex> lock(mutex);
+      for (auto it = images.rbegin(); it != images.rend(); ++it)
+      {
+        if (it->first > _after && depths.count(it->first))
+        {
+          f.w = it->second.width();
+          f.h = it->second.height();
+          f.rgb.assign(it->second.data().begin(), it->second.data().end());
+          f.depth.resize(f.w * f.h);
+          std::memcpy(f.depth.data(), depths[it->first].data().data(),
+                      f.depth.size() * 4);
+          break;
+        }
+      }
+    }
+    return f;
+  };
+  const auto latest = [&]()
+  {
+    const std::lock_guard<std::mutex> lock(mutex);
+    return images.empty() ? 0 : images.rbegin()->first;
+  };
+  // Mean of the plate, brightest of the backdrop, in the middle rows
+  const auto measure = [](const Frame &_f, double &_plate, double &_backdrop)
+  {
+    int n = 0;
+    _plate = 0;
+    _backdrop = 0;
+    for (std::uint32_t v = _f.h / 3; v < 2 * _f.h / 3; ++v)
+    {
+      for (std::uint32_t u = 0; u < _f.w; ++u)
+      {
+        const std::size_t i = v * _f.w + u;
+        if (_f.depth[i] > 0 && _f.depth[i] < 4)
+        {
+          _plate += Lin(_f, i, 1);
+          ++n;
+        }
+        else if (_f.depth[i] > 4)
+        {
+          _backdrop = std::max(_backdrop, Lin(_f, i, 1));
+        }
+      }
+    }
+    _plate /= std::max(n, 1);
+    return n;
+  };
+
+  server.reset();
+  ServerConfig config;
+  config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, "torch.sdf"));
+  auto torch = std::make_unique<Server>(config);
+  torch->Run(false, 0, false);
+
+  // Clear water: Ogre lights the plate
+  const Frame clear = wait(1000000000LL);
+  ASSERT_FALSE(clear.rgb.empty()) << "no frames: is there a GPU?";
+
+  // 3C: no beam
+  msgs::Param msg;
+  auto &p = *msg.mutable_params();
+  for (const char *k : {"attenuation", "backscatter", "veil",
+                        "diffuse_attenuation"})
+  {
+    p[k].set_type(msgs::Any::STRING);
+    p[k].set_string_value("");
+  }
+  p["jerlov"].set_type(msgs::Any::STRING);
+  p["jerlov"].set_string_value("3C");
+  auto pub = torchNode.Advertise<msgs::Param>(
+      "/world/uwtorch/water_optics/set");
+  for (int i = 0; i < 50 && !pub.HasConnections(); ++i)
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  pub.Publish(msg);
+  std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+  const Frame murky = wait(latest() + 300000000LL);
+  torch.reset();
+  ASSERT_FALSE(murky.rgb.empty());
+
+  double plate = 0, backdrop = 0, lampPlate = 0, lampBackdrop = 0;
+  ASSERT_GT(measure(clear, plate, backdrop), 50) << "no plate in view";
+  measure(frames["clear"], lampPlate, lampBackdrop);
+  std::cout << "torch in clear water: plate " << plate << " (the lamp's "
+            << lampPlate << ")\n";
+  EXPECT_GT(plate, 0.3 * lampPlate) << "Ogre did not light the plate";
+
+  measure(murky, plate, backdrop);
+  measure(frames["3C"], lampPlate, lampBackdrop);
+  std::cout << "in 3C: brightest backdrop " << backdrop << " (the lamp's "
+            << lampBackdrop << ")\n";
+  EXPECT_LT(backdrop, 0.002) << "a beam from a light that is not a lamp";
+  EXPECT_GT(lampBackdrop, 0.005);
+}

@@ -343,8 +343,9 @@ the GPU. It takes no parameters; the water is the world's. Cameras above the
 water are untouched, and an underwater camera plugin in the same world passes
 its image through. Only surfaces Ogre's PBS shades are drawn through the
 water: the sky, the background, the water surface, markers and terrain are
-drawn as in air. Every spot and point light (up to four) is a lamp: its light
-fades both ways through the water and its beam is drawn; set `<daylight>0` in
+drawn as in air. A spot or point light with `lamp` in its own name (up to
+four, the first by name) is a lamp: its light fades both ways through the
+water and its beam is drawn; other lights are lit as in air; set `<daylight>0` in
 the water optics for night.
 
 ## Thruster command
