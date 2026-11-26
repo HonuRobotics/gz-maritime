@@ -526,8 +526,6 @@ What it settled, beyond this plan:
   a neutral ambient, charts at 0.5–16 m, an image panel per camera), in the
   world tests. **The BlueROV2's own camera is not switched yet**: it lives in
   `bluerobotics_models`, a separate PR there.
-- **Video**: *Through the water*, 54 s: three waters side by side with the
-  plain camera, a dive from 0.5 to 40 m, the water changed live.
 
 ### Phase 3, the GPU path: done, on `ahcorde/uw_phase3_gpu_path`
 
