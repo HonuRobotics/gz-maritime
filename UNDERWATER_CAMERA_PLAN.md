@@ -215,11 +215,11 @@ ground truth on `water_optics_info`, and a sampler any system asks.
   can be seen horizontally, through the standard relation
   `visibility ≈ 4.8 / c_green` (Zaneveld and Pegau 2003), c taken in the
   green, the band cameras are most sensitive in. With a Jerlov type, the
-  type gives the colour balance (the ratio between channels) and
-  `<visibility>` scales its strength: every channel's a and b are scaled by
-  `4.8 / (visibility · c_green)`, and so is K_d, so the colour of the water
-  is kept and only its murkiness changes. Alone, it scales the default type (oceanic
-  II). Explicit coefficients override it.
+  type gives the water and `<visibility>` its strength: what a, b and K_d
+  have above pure water's (type I) is scaled, every channel by the same
+  factor, so that `4.8 / c_green` comes out at the visibility. Clearer
+  water turns bluer and none is clearer than pure water (about 100 m).
+  Alone, it scales the default type (coastal 1C). Explicit coefficients override it.
 - **The water level comes from the wave field** when there is one (the
   `WaveCoupling` level, `SurfaceElevation` above the point), not a fixed
   z = 0.
@@ -234,8 +234,8 @@ ground truth on `water_optics_info`, and a sampler any system asks.
 | β^D, β^B, B∞, K_d derived from a, b as the plan's formulas say | unit | equal to a hand-computed value for 3 presets |
 | Explicit tags override a preset, tag by tag | unit | only the given tags change |
 | `<visibility>` sets the strength: `4.8 / c_green` of the result | unit | equals the given visibility to 1e-6, for 3 types and 1, 5, 20 m |
-| `<visibility>` keeps the type's colour balance | unit | the ratios c_red : c_green : c_blue and b : c per channel are unchanged |
-| `<visibility>` alone; with explicit coefficients | unit | alone, it scales oceanic II; explicit coefficients win, with a warning |
+| `<visibility>` scales what the type has above pure water | unit | at the type's own visibility nothing changes; clearer water is bluer; beyond pure water, or for type I, an error |
+| `<visibility>` alone; with explicit coefficients | unit | alone, it scales coastal 1C; explicit coefficients win, with a warning |
 | `<visibility>` zero, negative or missing | unit | an error naming the tag for zero or negative; missing leaves the type as it is |
 | Unknown type, negative or missing values | unit | an error naming the tag; the world keeps clear water |
 | `water_optics/set` changes the recipe while running; `water_optics_info` reports it | integration | the sampler returns the new values within one step |

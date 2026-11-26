@@ -44,7 +44,8 @@ bool Resolve(const WaterOpticsSpec &_spec, WaterOpticsData &_out,
   _error.clear();
   _warning.clear();
 
-  const std::string name = _spec.jerlov.empty() ? "II" : _spec.jerlov;
+  // The default is clear coastal water, the water of most worlds.
+  const std::string name = _spec.jerlov.empty() ? "1C" : _spec.jerlov;
   const auto type = Jerlov(name);
   if (!type)
   {
@@ -84,13 +85,30 @@ bool Resolve(const WaterOpticsSpec &_spec, WaterOpticsData &_out,
       _error = "<visibility> must be a positive number of metres";
       return false;
     }
-    // Scale the whole water, every channel alike, so its colour stays and
-    // 4.8 / c_green comes out at the visibility asked for.
-    const double cGreen = a.Y() + b.Y();
-    const double s = kVisibilityConstant / (v * cGreen);
-    a *= s;
-    b *= s;
-    kd *= s;
+    // Scale what the type has above pure water, which type I stands for,
+    // so that 4.8 / c_green comes out at the visibility asked for. The
+    // water itself stays: clearer water is bluer, and nothing is clearer
+    // than pure water.
+    const JerlovType pure = *Jerlov("I");
+    const double cPure = pure.absorption.Y() + pure.scattering.Y();
+    const double cExcess = a.Y() + b.Y() - cPure;
+    const double cWanted = kVisibilityConstant / v;
+    if (cWanted < cPure)
+    {
+      _error = "<visibility> is clearer than pure water, which can be seen "
+               "for " + std::to_string(kVisibilityConstant / cPure) + " m";
+      return false;
+    }
+    if (cExcess <= 0.0)
+    {
+      _error = "<visibility> cannot change type " + type->name +
+               ", which is pure water";
+      return false;
+    }
+    const double s = (cWanted - cPure) / cExcess;
+    a = pure.absorption + (a - pure.absorption) * s;
+    b = pure.scattering + (b - pure.scattering) * s;
+    kd = pure.diffuseAttenuation + (kd - pure.diffuseAttenuation) * s;
     if (_spec.attenuation)
     {
       _warning = "<visibility> is ignored for <attenuation>, given "
