@@ -164,6 +164,12 @@ named `torch`, not a lamp: Ogre lights the plate exactly as the lamp does
 water optics to publish each new water, not a fixed time, and skips
 without a GPU.
 
+`lamp_edges_test`, rendered, in a process of its own: five lamps, one past
+the limit, which Ogre lights as in air, and four that light nothing in view
+(one whose range lies wholly behind the camera, three aimed behind it) and
+draw no beam; a lamp on a vehicle removed while the world runs, its light
+and beam gone, then the world shut down.
+
 `underwater_rendering_test`, rendered (needs a GPU): the same scene without
 and with the GPU path, in one process. The GPU image against the reference
 camera's: mean difference 0.01 of an 8-bit step, 99th percentile 1 (the
