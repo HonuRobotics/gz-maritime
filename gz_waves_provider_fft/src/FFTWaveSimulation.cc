@@ -579,7 +579,7 @@ void FFTWaveSimulation::EnsureFoam() const
   }
   const int N = static_cast<int>(this->gridSize);
   auto &e = *this->ehukai;
-  e.propagation->propagateMinE(e.params, *e.initial, *e.state,
+  e.propagation->propagateMinE(*e.initial, *e.state,
                                static_cast<float>(this->lastUpdateT));
   ToFoamGrid(*e.state, N, this->AmplitudeScale(this->lastUpdateT),
              this->minEGrid);
