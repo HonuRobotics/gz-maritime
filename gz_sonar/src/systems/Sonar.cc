@@ -217,6 +217,25 @@ struct Rig
   std::uint64_t next{0};
   nanoseconds lastStamp{-1};
 };
+
+/// \brief A depth and segmentation camera pair no sonar is using, kept for
+/// the next sonar whose cameras have the same size, field of view and clip
+/// planes.
+///
+/// Destroying a depth camera while the scene runs crashes Ogre (its full
+/// screen quad keeps pointing at the camera's materials), so a removed
+/// sonar's cameras are parked here instead and destroyed only at render
+/// teardown, with the scene.
+struct ParkedCameras
+{
+  rendering::DepthCameraPtr depth;
+  rendering::SegmentationCameraPtr seg;
+  unsigned int width{0};
+  unsigned int height{0};
+  double hfov{0.0};
+  double nearClip{0.0};
+  double farClip{0.0};
+};
 }  // namespace
 
 class SonarPrivate
@@ -234,17 +253,25 @@ class SonarPrivate
   public: void OnRender();
   public: void OnTeardown();
 
-  /// \brief Build the cameras of one sonar under its link visual.
+  /// \brief Build the cameras of one sonar under its link visual, reusing
+  /// parked ones where they match.
   public: bool BuildRig(const RigRequest &_request, Rig &_rig);
 
-  /// \brief Disconnect a rig and destroy its cameras, so a sonar that is
-  /// removed, reset or spawned again leaves nothing behind in the scene.
-  public: void DestroyRig(Rig &_rig);
+  /// \brief Connect camera _c's frames to the rig's buffers and add the
+  /// pair to the rig.
+  public: void Connect(Rig &_rig, std::size_t _c,
+    const rendering::DepthCameraPtr &_depth,
+    const rendering::SegmentationCameraPtr &_seg);
 
-  /// \brief Destroy one rig's cameras and drop it.
+  /// \brief Disconnect a rig and park its cameras for reuse; see
+  /// ParkedCameras.
+  public: void ParkRig(Rig &_rig);
+
+  /// \brief Park one rig's cameras and drop the rig.
   public: void EraseRig(Entity _sensor);
 
-  /// \brief Destroy every rig's cameras and drop them all.
+  /// \brief At render teardown: destroy every rig's cameras and every
+  /// parked camera, and drop them all.
   public: void ClearRigs();
 
   /// \brief Map of entity to rendering visual, rebuilt when the scene
@@ -311,6 +338,7 @@ class SonarPrivate
   public: std::unordered_map<Entity, rendering::VisualPtr> visualByEntity;
   public: std::vector<rendering::VisualPtr> waterVisuals;
   public: std::vector<unsigned int> knownVisualIds;
+  public: std::vector<ParkedCameras> parked;
 
   /// \brief Cameras built so far, to give each a name never used before:
   /// gz-rendering refuses a name that is taken.
@@ -763,22 +791,27 @@ rendering::VisualPtr SonarPrivate::VisualOf(Entity _e)
 }
 
 //////////////////////////////////////////////////
-void SonarPrivate::DestroyRig(Rig &_rig)
+void SonarPrivate::ParkRig(Rig &_rig)
 {
   // Disconnect first, so no frame lands in a buffer that is going away.
   _rig.connections.clear();
-  auto destroy = [this](const rendering::SensorPtr &_camera) {
-    if (!_camera)
-      return;
-    if (auto parent = _camera->Parent())
-      parent->RemoveChild(_camera);
-    if (this->scene)
-      this->scene->DestroySensor(_camera);
-  };
-  for (const auto &c : _rig.depth)
-    destroy(c);
-  for (const auto &c : _rig.seg)
-    destroy(c);
+  const auto *layout = _rig.request.sonar ? &_rig.request.sonar->Layout() :
+    nullptr;
+  for (std::size_t c = 0; c < _rig.depth.size() && c < _rig.seg.size(); ++c)
+  {
+    for (const rendering::SensorPtr cam : {
+           std::static_pointer_cast<rendering::Sensor>(_rig.depth[c]),
+           std::static_pointer_cast<rendering::Sensor>(_rig.seg[c])})
+    {
+      if (auto parent = cam->Parent())
+        parent->RemoveChild(cam);
+    }
+    if (layout)
+    {
+      this->parked.push_back({_rig.depth[c], _rig.seg[c], layout->width,
+        layout->height, layout->hfov, layout->nearClip, layout->farClip});
+    }
+  }
   _rig.depth.clear();
   _rig.seg.clear();
 }
@@ -789,7 +822,7 @@ void SonarPrivate::EraseRig(Entity _sensor)
   auto it = this->rigs.find(_sensor);
   if (it == this->rigs.end())
     return;
-  this->DestroyRig(it->second);
+  this->ParkRig(it->second);
   this->rigs.erase(it);
 }
 
@@ -797,8 +830,18 @@ void SonarPrivate::EraseRig(Entity _sensor)
 void SonarPrivate::ClearRigs()
 {
   for (auto &[entity, rig] : this->rigs)
-    this->DestroyRig(rig);
+    this->ParkRig(rig);
   this->rigs.clear();
+  // The scene is being torn down, so the cameras can go with it.
+  for (auto &p : this->parked)
+  {
+    if (this->scene)
+    {
+      this->scene->DestroySensor(p.depth);
+      this->scene->DestroySensor(p.seg);
+    }
+  }
+  this->parked.clear();
 }
 
 //////////////////////////////////////////////////
@@ -820,6 +863,27 @@ bool SonarPrivate::BuildRig(const RigRequest &_request, Rig &_rig)
     const std::string tag = base + "_sonar_" + std::to_string(c) + "_" +
       std::to_string(this->camerasBuilt++);
 
+    // A parked pair of the same size and view is ready as it is.
+    auto match = std::find_if(this->parked.begin(), this->parked.end(),
+      [&layout](const ParkedCameras &_p) {
+        return _p.width == layout.width && _p.height == layout.height &&
+          _p.hfov == layout.hfov && _p.nearClip == layout.nearClip &&
+          _p.farClip == layout.farClip;
+      });
+    if (match != this->parked.end())
+    {
+      auto depth = match->depth;
+      auto seg = match->seg;
+      this->parked.erase(match);
+      gzdbg << "Sonar [" << base << "]: reusing parked cameras\n";
+      depth->SetLocalPose(local);
+      seg->SetLocalPose(local);
+      linkVisual->AddChild(depth);
+      linkVisual->AddChild(seg);
+      this->Connect(_rig, c, depth, seg);
+      continue;
+    }
+
     auto depth = this->scene->CreateDepthCamera(tag + "_depth");
     auto seg = this->scene->CreateSegmentationCamera(tag + "_seg");
     if (!depth || !seg)
@@ -829,7 +893,7 @@ bool SonarPrivate::BuildRig(const RigRequest &_request, Rig &_rig)
         this->scene->DestroySensor(depth);
       if (seg)
         this->scene->DestroySensor(seg);
-      this->DestroyRig(_rig);
+      this->ParkRig(_rig);
       return false;
     }
     depth->SetImageWidth(layout.width);
@@ -843,14 +907,6 @@ bool SonarPrivate::BuildRig(const RigRequest &_request, Rig &_rig)
     depth->CreateDepthTexture();
     depth->SetLocalPose(local);
     linkVisual->AddChild(depth);
-    auto *buf = &_rig.depthBuffers[c];
-    _rig.connections.push_back(depth->ConnectNewDepthFrame(
-      [buf](const float *_d, unsigned int _w, unsigned int _h, unsigned int,
-            const std::string &)
-      {
-        buf->assign(_d, _d + static_cast<std::size_t>(_w) * _h);
-      }));
-    _rig.depth.push_back(depth);
 
     seg->SetImageWidth(layout.width);
     seg->SetImageHeight(layout.height);
@@ -864,18 +920,34 @@ bool SonarPrivate::BuildRig(const RigRequest &_request, Rig &_rig)
     seg->CreateSegmentationTexture();
     seg->SetLocalPose(local);
     linkVisual->AddChild(seg);
-    auto *sbuf = &_rig.segBuffers[c];
-    auto *channels = &_rig.channels;
-    _rig.connections.push_back(seg->ConnectNewSegmentationFrame(
-      [sbuf, channels](const std::uint8_t *_d, unsigned int _w,
-                       unsigned int _h, unsigned int _c, const std::string &)
-      {
-        *channels = _c;
-        sbuf->assign(_d, _d + static_cast<std::size_t>(_w) * _h * _c);
-      }));
-    _rig.seg.push_back(seg);
+    this->Connect(_rig, c, depth, seg);
   }
   return true;
+}
+
+//////////////////////////////////////////////////
+void SonarPrivate::Connect(Rig &_rig, std::size_t _c,
+  const rendering::DepthCameraPtr &_depth,
+  const rendering::SegmentationCameraPtr &_seg)
+{
+  auto *buf = &_rig.depthBuffers[_c];
+  _rig.connections.push_back(_depth->ConnectNewDepthFrame(
+    [buf](const float *_d, unsigned int _w, unsigned int _h, unsigned int,
+          const std::string &)
+    {
+      buf->assign(_d, _d + static_cast<std::size_t>(_w) * _h);
+    }));
+  _rig.depth.push_back(_depth);
+  auto *sbuf = &_rig.segBuffers[_c];
+  auto *channels = &_rig.channels;
+  _rig.connections.push_back(_seg->ConnectNewSegmentationFrame(
+    [sbuf, channels](const std::uint8_t *_d, unsigned int _w,
+                     unsigned int _h, unsigned int _ch, const std::string &)
+    {
+      *channels = _ch;
+      sbuf->assign(_d, _d + static_cast<std::size_t>(_w) * _h * _ch);
+    }));
+  _rig.seg.push_back(_seg);
 }
 
 //////////////////////////////////////////////////
