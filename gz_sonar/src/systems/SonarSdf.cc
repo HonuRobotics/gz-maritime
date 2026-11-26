@@ -29,30 +29,124 @@ namespace sonar = gz::maritime::sonar;
 
 namespace
 {
-/// \brief A child's value, if it is there.
-template<typename T>
-std::optional<T> Child(const sdf::ElementPtr &_e, const std::string &_name)
+/// \brief A child's text, trimmed, if the child is there.
+std::optional<std::string> Text(const sdf::ElementPtr &_e,
+  const std::string &_name)
 {
   if (!_e || !_e->HasElement(_name))
     return std::nullopt;
-  return _e->FindElement(_name)->Get<T>();
+  std::string t = _e->FindElement(_name)->Get<std::string>();
+  const auto first = t.find_first_not_of(" \t\n\r");
+  const auto last = t.find_last_not_of(" \t\n\r");
+  return first == std::string::npos ? std::string() :
+    t.substr(first, last - first + 1);
 }
 
-/// \brief A count that must be positive.
-bool Count(const sdf::ElementPtr &_e, const std::string &_name,
-  std::size_t &_out, std::string &_error)
+/// \brief Parse a whole string as a finite number.
+std::optional<double> ParseNumber(const std::string &_text)
 {
-  if (const auto v = Child<int>(_e, _name))
+  try
   {
-    if (*v <= 0)
-    {
-      _error = "<" + _name + "> must be positive";
-      return false;
-    }
-    _out = static_cast<std::size_t>(*v);
+    std::size_t used = 0;
+    const double v = std::stod(_text, &used);
+    if (used == _text.size() && std::isfinite(v))
+      return v;
   }
-  return true;
+  catch (...)
+  {
+  }
+  return std::nullopt;
 }
+
+/// \brief Parse a whole string as true or false (true, false, 1 or 0).
+std::optional<bool> ParseFlag(const std::string &_text)
+{
+  if (_text == "true" || _text == "1")
+    return true;
+  if (_text == "false" || _text == "0")
+    return false;
+  return std::nullopt;
+}
+
+/// \brief Reads <gz:sonar>'s children strictly: a value that does not parse
+/// whole, or is not finite, refuses the sensor with a message naming it,
+/// rather than reading as 0 or a prefix of itself.
+class Reader
+{
+  public: Reader(const sdf::ElementPtr &_block, std::string &_error)
+    : block(_block), error(_error) {}
+
+  /// \brief A finite number, if the child is there.
+  public: bool Number(const std::string &_name, double &_out)
+  {
+    return this->Number(this->block, _name, _out);
+  }
+
+  public: bool Number(const sdf::ElementPtr &_e, const std::string &_name,
+    double &_out)
+  {
+    const auto t = Text(_e, _name);
+    if (!t)
+      return true;
+    const auto v = ParseNumber(*t);
+    if (!v)
+      return this->Fail("<" + _name + "> must be a finite number, not [" + *t + "]");
+    _out = *v;
+    return true;
+  }
+
+  public: bool Number(const std::string &_name, std::optional<double> &_out)
+  {
+    double v = 0.0;
+    const bool had = Text(this->block, _name).has_value();
+    if (!this->Number(_name, v))
+      return false;
+    if (had)
+      _out = v;
+    return true;
+  }
+
+  /// \brief A whole number from 1 to _max, if the child is there.
+  public: bool Count(const std::string &_name, std::size_t _max,
+    std::size_t &_out)
+  {
+    const auto t = Text(this->block, _name);
+    if (!t)
+      return true;
+    const bool digits = !t->empty() &&
+      t->find_first_not_of("0123456789") == std::string::npos;
+    const auto v = digits && t->size() < 10 ? std::stoul(*t) : 0ul;
+    if (v < 1 || v > _max)
+    {
+      return this->Fail("<" + _name + "> must be a whole number from 1 to " +
+        std::to_string(_max) + ", not [" + *t + "]");
+    }
+    _out = v;
+    return true;
+  }
+
+  /// \brief true or false, if the child is there.
+  public: bool Flag(const std::string &_name, bool &_out)
+  {
+    const auto t = Text(this->block, _name);
+    if (!t)
+      return true;
+    const auto v = ParseFlag(*t);
+    if (!v)
+      return this->Fail("<" + _name + "> must be true or false, not [" + *t + "]");
+    _out = *v;
+    return true;
+  }
+
+  private: bool Fail(const std::string &_message)
+  {
+    this->error = _message;
+    return false;
+  }
+
+  private: sdf::ElementPtr block;
+  private: std::string &error;
+};
 }  // namespace
 
 bool IsSonarType(const std::string &_type)
@@ -80,71 +174,55 @@ std::optional<sonar::SonarConfig> LoadSonarConfig(const std::string &_type,
   if (!_block)
     return c;
 
-  if (auto v = Child<double>(_block, "frequency"))
-    c.frequency = *v;
-  if (auto v = Child<double>(_block, "horizontal_fov"))
-    c.horizontalFov = *v;
-  if (auto v = Child<double>(_block, "vertical_fov"))
-    c.verticalFov = *v;
-  if (!Count(_block, "beams", c.beams, _error) ||
-      !Count(_block, "samples", c.samples, _error) ||
-      !Count(_block, "rays_per_beam", c.raysPerBeam, _error) ||
-      !Count(_block, "elevation_rays", c.elevationRays, _error) ||
-      !Count(_block, "max_soundings", c.maxSoundings, _error))
-  {
+  Reader r(_block, _error);
+  const sdf::ElementPtr range =
+    _block->HasElement("range") ? _block->FindElement("range") : nullptr;
+  // Upper bounds keep the cameras and buffers a sonar asks for sane.
+  const bool ok =
+    r.Number("frequency", c.frequency) &&
+    r.Number("horizontal_fov", c.horizontalFov) &&
+    r.Number("vertical_fov", c.verticalFov) &&
+    r.Count("beams", 2048, c.beams) &&
+    r.Count("samples", 20000, c.samples) &&
+    r.Count("rays_per_beam", 32, c.raysPerBeam) &&
+    r.Count("elevation_rays", 2048, c.elevationRays) &&
+    r.Count("max_soundings", 1024, c.maxSoundings) &&
+    r.Number("elevation_span", c.elevationSpan) &&
+    r.Number("beam_width", c.beamWidth) &&
+    r.Number("sidelobe_level", c.sidelobeLevelDb) &&
+    r.Number(range, "min", c.rangeMin) &&
+    r.Number(range, "max", c.rangeMax) &&
+    // Flat spellings too, for configs that cannot nest (a vehicle's parts
+    // list passes its sonar settings as one level of key: value).
+    r.Number("range_min", c.rangeMin) &&
+    r.Number("range_max", c.rangeMax) &&
+    r.Number("pulse_length", c.pulseLength) &&
+    r.Number("sound_speed", c.soundSpeed) &&
+    r.Number("gain_time_constant", c.gainTimeConstant) &&
+    r.Number("tvg_spreading", c.tvgSpreading) &&
+    r.Number("noise_floor", c.noiseFloorDb) &&
+    r.Number("dynamic_range", c.dynamicRangeDb) &&
+    r.Flag("speckle", c.speckle) &&
+    r.Flag("labels", _labels) &&
+    r.Number("detection_threshold", c.detectionThresholdDb) &&
+    r.Number("range_noise", c.rangeNoise) &&
+    r.Number("angle_noise", c.angleNoise);
+  if (!ok)
     return std::nullopt;
-  }
-  if (auto v = Child<double>(_block, "elevation_span"))
-  {
-    if (*v <= 0.0)
-    {
-      _error = "<elevation_span> must be positive";
-      return std::nullopt;
-    }
-    c.elevationSpan = *v;
-  }
-  if (auto v = Child<double>(_block, "beam_width"))
-    c.beamWidth = *v;
-  if (auto v = Child<double>(_block, "sidelobe_level"))
-    c.sidelobeLevelDb = *v;
-  if (_block->HasElement("range"))
-  {
-    const auto range = _block->FindElement("range");
-    if (auto v = Child<double>(range, "min"))
-      c.rangeMin = *v;
-    if (auto v = Child<double>(range, "max"))
-      c.rangeMax = *v;
-  }
-  // Flat spellings too, for configs that cannot nest (a vehicle's parts
-  // list passes its sonar settings as one level of key: value).
-  if (auto v = Child<double>(_block, "range_min"))
-    c.rangeMin = *v;
-  if (auto v = Child<double>(_block, "range_max"))
-    c.rangeMax = *v;
-  if (auto v = Child<double>(_block, "pulse_length"))
-    c.pulseLength = *v;
-  if (auto v = Child<double>(_block, "sound_speed"))
-    c.soundSpeed = *v;
-  if (auto v = Child<std::string>(_block, "gain"))
+
+  if (auto v = Text(_block, "gain"))
   {
     if (*v == "auto")
       c.gainDb.reset();
+    else if (auto g = ParseNumber(*v))
+      c.gainDb = *g;
     else
     {
-      try
-      {
-        c.gainDb = std::stod(*v);
-      }
-      catch (...)
-      {
-        _error = "<gain> must be auto or a number of dB, not [" + *v + "]";
-        return std::nullopt;
-      }
+      _error = "<gain> must be auto or a number of dB, not [" + *v + "]";
+      return std::nullopt;
     }
   }
-  if (auto v = Child<double>(_block, "gain_time_constant"))
-    c.gainTimeConstant = *v;
-  if (auto v = Child<std::string>(_block, "tvg"))
+  if (auto v = Text(_block, "tvg"))
   {
     if (*v == "none")
       c.tvg = sonar::Tvg::kNone;
@@ -158,17 +236,7 @@ std::optional<sonar::SonarConfig> LoadSonarConfig(const std::string &_type,
       return std::nullopt;
     }
   }
-  if (auto v = Child<double>(_block, "tvg_spreading"))
-    c.tvgSpreading = *v;
-  if (auto v = Child<double>(_block, "noise_floor"))
-    c.noiseFloorDb = *v;
-  if (auto v = Child<double>(_block, "dynamic_range"))
-    c.dynamicRangeDb = *v;
-  if (auto v = Child<bool>(_block, "speckle"))
-    c.speckle = *v;
-  if (auto v = Child<bool>(_block, "labels"))
-    _labels = *v;
-  if (auto v = Child<std::string>(_block, "detection"))
+  if (auto v = Text(_block, "detection"))
   {
     if (*v == "beamformed")
       c.detection = sonar::ProfilingDetection::kBeamformed;
@@ -180,12 +248,6 @@ std::optional<sonar::SonarConfig> LoadSonarConfig(const std::string &_type,
       return std::nullopt;
     }
   }
-  if (auto v = Child<double>(_block, "detection_threshold"))
-    c.detectionThresholdDb = *v;
-  if (auto v = Child<double>(_block, "range_noise"))
-    c.rangeNoise = *v;
-  if (auto v = Child<double>(_block, "angle_noise"))
-    c.angleNoise = *v;
 
   if (c.rangeMax <= c.rangeMin || c.rangeMin < 0.0)
   {
@@ -253,23 +315,95 @@ std::optional<sonar::SonarConfig> LoadSonarConfig(const std::string &_type,
   return c;
 }
 
+namespace
+{
+/// \brief One acoustic value, strictly: a value that does not parse whole
+/// as a finite number is reported and left unset.
+std::optional<double> MarkValue(const sdf::ElementPtr &_e,
+  const std::string &_name)
+{
+  const auto t = Text(_e, _name);
+  if (!t)
+    return std::nullopt;
+  const auto v = ParseNumber(*t);
+  if (!v)
+  {
+    gzerr << "sonar: <" << _name << "> must be a finite number, not [" << *t
+          << "]; ignored\n";
+  }
+  return v;
+}
+}  // namespace
+
 AcousticMarks ReadAcousticMarks(const sdf::ElementPtr &_element)
 {
   AcousticMarks m;
-  m.lambertDb = Child<double>(_element, "gz:acoustic_lambert");
-  m.specularDb = Child<double>(_element, "gz:acoustic_specular");
-  m.specularWidth = Child<double>(_element, "gz:acoustic_specular_width");
-  m.transparent = _element && _element->HasElement("gz:acoustic_transparent");
+  m.lambertDb = MarkValue(_element, "gz:acoustic_lambert");
+  m.specularDb = MarkValue(_element, "gz:acoustic_specular");
+  m.specularWidth = MarkValue(_element, "gz:acoustic_specular_width");
+  // <gz:acoustic_transparent/> alone means true; a value says which.
+  if (auto t = Text(_element, "gz:acoustic_transparent"))
+  {
+    if (t->empty())
+      m.transparent = true;
+    else if (auto f = ParseFlag(*t))
+      m.transparent = *f;
+    else
+    {
+      gzerr << "sonar: <gz:acoustic_transparent> must be true or false, not ["
+            << *t << "]; taken as false\n";
+    }
+  }
   return m;
 }
 
 AcousticMarks ReadAcousticValues(const sdf::ElementPtr &_element)
 {
   AcousticMarks m;
-  m.lambertDb = Child<double>(_element, "lambert");
-  m.specularDb = Child<double>(_element, "specular");
-  m.specularWidth = Child<double>(_element, "specular_width");
+  m.lambertDb = MarkValue(_element, "lambert");
+  m.specularDb = MarkValue(_element, "specular");
+  m.specularWidth = MarkValue(_element, "specular_width");
   return m;
+}
+
+bool ReadWater(const sdf::ElementPtr &_plugin, sonar::Water &_water,
+  std::uint64_t &_seed, std::string &_error)
+{
+  Reader r(_plugin, _error);
+  if (!r.Number("temperature", _water.temperature) ||
+      !r.Number("salinity", _water.salinity) ||
+      !r.Number("sound_speed", _water.soundSpeed))
+  {
+    return false;
+  }
+  // Ranges in which the absorption equations hold and water is water.
+  if (_water.temperature < -2.0 || _water.temperature > 40.0)
+  {
+    _error = "<temperature> must be from -2 to 40 degrees C";
+    return false;
+  }
+  if (_water.salinity < 0.0 || _water.salinity > 45.0)
+  {
+    _error = "<salinity> must be from 0 to 45 PSU";
+    return false;
+  }
+  if (_water.soundSpeed < 1300.0 || _water.soundSpeed > 1700.0)
+  {
+    _error = "<sound_speed> must be from 1300 to 1700 m/s";
+    return false;
+  }
+  if (auto t = Text(_plugin, "seed"))
+  {
+    const bool digits = !t->empty() &&
+      t->find_first_not_of("0123456789") == std::string::npos && t->size() < 20;
+    if (!digits)
+    {
+      _error = "<seed> must be a whole number, not [" + *t + "]";
+      return false;
+    }
+    _seed = std::stoull(*t);
+  }
+  return true;
 }
 
 void ApplyMarks(sonar::AcousticProperties &_properties,

@@ -17,12 +17,14 @@
 #ifndef GZ_MARITIME_SONAR_SYSTEMS_SONARSDF_HH_
 #define GZ_MARITIME_SONAR_SYSTEMS_SONARSDF_HH_
 
+#include <cstdint>
 #include <optional>
 #include <string>
 
 #include <sdf/Element.hh>
 
 #include "gz/maritime/sonar/Config.hh"
+#include "gz/maritime/sonar/Water.hh"
 
 namespace gz::sim::maritime
 {
@@ -67,6 +69,18 @@ AcousticMarks ReadAcousticMarks(const sdf::ElementPtr &_element);
 /// the world system's <seabed> and <default>: <lambert>, <specular>,
 /// <specular_width>.
 AcousticMarks ReadAcousticValues(const sdf::ElementPtr &_element);
+
+/// \brief Read the world system's water and seed: <temperature> (-2 to
+/// 40 C), <salinity> (0 to 45 PSU), <sound_speed> (1300 to 1700 m/s) and
+/// <seed> (a whole number), each strictly; absent ones keep their value.
+/// \param[in] _plugin The sonar system's <plugin> element.
+/// \param[in,out] _water The water, with defaults on entry.
+/// \param[in,out] _seed The seed, with its default on entry.
+/// \param[out] _error Why it failed, when it returns false.
+/// \return Whether every value given was valid.
+bool ReadWater(const sdf::ElementPtr &_plugin,
+  gz::maritime::sonar::Water &_water, std::uint64_t &_seed,
+  std::string &_error);
 
 /// \brief Apply marks on top of properties: what the marks set wins.
 void ApplyMarks(gz::maritime::sonar::AcousticProperties &_properties,

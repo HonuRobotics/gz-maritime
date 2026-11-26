@@ -400,10 +400,13 @@ void Sonar::Configure(const Entity &_entity,
   }
   d.events = &_eventMgr;
   auto sdf = std::const_pointer_cast<sdf::Element>(_sdf);
-  d.water.temperature = sdf->Get<double>("temperature", 10.0).first;
-  d.water.salinity = sdf->Get<double>("salinity", 35.0).first;
-  d.water.soundSpeed = sdf->Get<double>("sound_speed", 1500.0).first;
-  d.seed = static_cast<std::uint64_t>(sdf->Get<int>("seed", 0).first);
+  std::string error;
+  if (!ReadWater(sdf, d.water, d.seed, error))
+  {
+    gzerr << "Sonar: " << error << "; no sonar in this world will run\n";
+    d.disabled = true;
+    return;
+  }
 
   if (sdf->HasElement("seabed"))
   {

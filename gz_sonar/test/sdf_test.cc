@@ -20,12 +20,15 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <cstdint>
 #include <string>
 
 #include <sdf/Link.hh>
 #include <sdf/Model.hh>
 #include <sdf/Root.hh>
 #include <sdf/Sensor.hh>
+#include <sdf/Visual.hh>
+#include <sdf/World.hh>
 
 #include "SonarSdf.hh"
 
@@ -147,4 +150,107 @@ TEST(SonarSdf, ZeroSpecularWidthIsIgnored)
   m.specularWidth = 0.1;
   gz::sim::maritime::ApplyMarks(p, m);
   EXPECT_DOUBLE_EQ(p.specularWidth, 0.1);
+}
+
+TEST(SonarSdf, MalformedValuesAreRefused)
+{
+  // Values that used to read as 0, as a prefix of themselves, or not at all.
+  const char *bad[] = {
+    "<range_max>inf</range_max>",
+    "<range_max>nan</range_max>",
+    "<gain>40dB</gain>",
+    "<noise_floor>abc</noise_floor>",
+    "<samples>1e3</samples>",
+    "<samples>-5</samples>",
+    "<labels>yes</labels>",
+    "<speckle>maybe</speckle>",
+    "<beams>100000</beams>",
+    "<frequency>700kHz</frequency>",
+  };
+  for (const char *body : bad)
+  {
+    std::string error;
+    EXPECT_FALSE(Load("imaging_sonar", body, error)) << body;
+    EXPECT_FALSE(error.empty()) << body;
+  }
+  std::string error;
+  bool labels = false;
+  ASSERT_TRUE(Load("imaging_sonar", "<labels>1</labels><samples>500</samples>",
+    labels, error)) << error;
+  EXPECT_TRUE(labels);
+}
+
+namespace
+{
+/// \brief One <visual> with the given acoustic marks.
+gz::sim::maritime::AcousticMarks Marks(const std::string &_body)
+{
+  const std::string xml =
+    "<?xml version='1.0'?><sdf version='1.12' "
+    "xmlns:gz='http://gazebosim.org/schema'><model name='m'><link name='l'>"
+    "<visual name='v'><geometry><box><size>1 1 1</size></box></geometry>" +
+    _body + "</visual></link></model></sdf>";
+  static sdf::Root root;
+  root = sdf::Root();
+  const auto errors = root.LoadSdfString(xml);
+  EXPECT_TRUE(errors.empty()) << errors.front().Message();
+  return gz::sim::maritime::ReadAcousticMarks(
+    root.Model()->LinkByIndex(0)->VisualByIndex(0)->Element());
+}
+
+/// \brief The sonar system's <plugin> element with the given children.
+sdf::ElementPtr Plugin(const std::string &_body)
+{
+  const std::string xml =
+    "<?xml version='1.0'?><sdf version='1.12'><world name='w'>"
+    "<plugin filename='gz-maritime-sonar-system' "
+    "name='gz::sim::maritime::Sonar'>" + _body + "</plugin></world></sdf>";
+  static sdf::Root root;
+  root = sdf::Root();
+  const auto errors = root.LoadSdfString(xml);
+  EXPECT_TRUE(errors.empty()) << errors.front().Message();
+  return root.WorldByIndex(0)->Element()->FindElement("plugin");
+}
+}  // namespace
+
+TEST(SonarSdf, TransparentTakesItsValue)
+{
+  EXPECT_TRUE(Marks("<gz:acoustic_transparent/>").transparent);
+  EXPECT_TRUE(Marks("<gz:acoustic_transparent>true</gz:acoustic_transparent>")
+    .transparent);
+  EXPECT_FALSE(Marks("<gz:acoustic_transparent>false</gz:acoustic_transparent>")
+    .transparent);
+  EXPECT_FALSE(Marks("").transparent);
+  // A malformed value is reported and left unset.
+  EXPECT_FALSE(Marks("<gz:acoustic_lambert>loud</gz:acoustic_lambert>")
+    .lambertDb.has_value());
+  EXPECT_DOUBLE_EQ(*Marks("<gz:acoustic_lambert>-27</gz:acoustic_lambert>")
+    .lambertDb, -27.0);
+}
+
+TEST(SonarSdf, WaterIsChecked)
+{
+  sonar::Water water;
+  std::uint64_t seed = 0;
+  std::string error;
+  ASSERT_TRUE(gz::sim::maritime::ReadWater(Plugin(
+    "<temperature>27</temperature><salinity>35</salinity>"
+    "<sound_speed>1538</sound_speed><seed>42</seed>"), water, seed, error))
+    << error;
+  EXPECT_DOUBLE_EQ(water.temperature, 27.0);
+  EXPECT_DOUBLE_EQ(water.soundSpeed, 1538.0);
+  EXPECT_EQ(seed, 42u);
+
+  for (const char *body : {"<temperature>80</temperature>",
+                           "<salinity>-1</salinity>",
+                           "<sound_speed>abc</sound_speed>",
+                           "<sound_speed>inf</sound_speed>",
+                           "<seed>-3</seed>"})
+  {
+    sonar::Water w;
+    std::uint64_t s = 0;
+    std::string e;
+    EXPECT_FALSE(gz::sim::maritime::ReadWater(Plugin(body), w, s, e)) << body;
+    EXPECT_FALSE(e.empty()) << body;
+  }
 }
