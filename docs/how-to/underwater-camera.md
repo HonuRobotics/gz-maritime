@@ -173,15 +173,18 @@ To know how close the simulation is to your water, photograph a colour chart
 under water, and simulate the same shot:
 
 1. **Dive with a chart.** A ColorChecker (24 patches) facing the camera at a
-   measured range (1 to 4 m), at a measured depth, in daylight; note the
-   water's visibility (or measure its Jerlov type). Shoot a few frames at
-   each range, with the camera's white balance and exposure fixed.
+   measured range, close (half a metre to a metre; farther only in clear
+   water: in coastal water a chart 2 m away is all but lost in the veil),
+   at a measured depth, in daylight; note the water's visibility (or
+   measure its Jerlov type). Shoot a few frames at each range, with the
+   camera's exposure fixed and no white balance, as the simulation has
+   none: a 10 % white balance error is enough to pick the wrong water.
 2. **Simulate the shot**, in each water you think it may be. The tools are
    installed in `lib/gz_underwater_camera`:
 
    ```bash
    ros2 run gz_underwater_camera make_chart_world.py --out chart_3c.sdf \
-     --range 2 --depth 5 --jerlov 3C --width 1280 --height 720 --hfov 1.2
+     --range 0.5 --depth 2 --jerlov 3C --width 1280 --height 720 --hfov 1.2
    gz sim -s -r chart_3c.sdf &
    ros2 run gz_underwater_camera save_frame.py \
      --topic /chart/camera/underwater/image --out sim_3c.png
@@ -203,14 +206,16 @@ under water, and simulate the same shot:
 
    It lists the waters by their mean angular error, closest first, with the
    error per patch: hue and saturation, not brightness. OceanSim reports 8
-   to 14 degrees for its scenes. It also gives the luminance of each render
-   against the photo: the same ratio on every patch is only exposure, a
-   spread between patches is the water.
+   to 14 degrees for its scenes. It also prints the luminance of each render
+   against the photo, for information: it does not enter the ranking. An
+   image whose patches barely differ (under 3 degrees between any two) is
+   refused: the chart is lost in the water, and every water would look
+   alike.
 
 The water with the smallest error is the nearest; refine it with
-`<visibility>` or explicit coefficients the same way. Water types close to
-each other differ by a few degrees only, so compare a few, and read the
-brightness too.
+`<visibility>` or explicit coefficients the same way. At half a metre, 2 m
+deep, neighbouring types are 7 to 13 degrees apart (1C and 3C 7, 3C and 5C
+8.5, 5C and 7C 11), so compare a few around your guess.
 
 ## More of the water
 

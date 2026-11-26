@@ -20,9 +20,13 @@ camera at a given range and depth, in a given water. The world, run, gives
 the simulated image to compare with the real one (chart_validation.py); the
 patches' pixel boxes in that image are written beside it.
 
-    make_chart_world.py --out chart.sdf --range 2 --depth 5 --jerlov 3C \
+    make_chart_world.py --out chart.sdf --range 0.5 --depth 2 --jerlov 3C \
         [--visibility 4] [--width 1280 --height 720 --hfov 1.2] \
         [--chart-width 0.28] [--sun 0.8]
+
+The sun shines from behind the camera onto the chart's face. A chart far
+off in murky water is lost in the veil (in 3C, 2 m away, its patches
+differ by about a degree), as it is in a real photo: shoot it close.
 
 Writes chart.sdf and chart.json, the patches' boxes in its image. Run the
 world headless and save one frame of its underwater image:
@@ -54,8 +58,50 @@ PATCHES = [
 ]
 COLS, ROWS = 6, 4
 
-# The Jerlov water types gz_water_optics knows.
-JERLOV = ['I', 'IA', 'IB', 'II', 'III', '1C', '3C', '5C', '7C', '9C']
+# The Jerlov water types, as gz_water_optics has them (src/Jerlov.cc; a test
+# keeps the two the same): absorption a, scattering b and the daylight's
+# diffuse attenuation K_d, 1/m, red, green and blue.
+TABLE = {
+    'I': ((0.295, 0.046, 0.018), (0.00104, 0.00205, 0.00381), (0.302, 0.049, 0.022)),
+    'IA': ((0.295, 0.0468, 0.0221), (0.00256, 0.00402, 0.00631), (0.303, 0.0503, 0.0264)),
+    'IB': ((0.296, 0.0469, 0.0235), (0.0468, 0.0565, 0.068), (0.310, 0.0572, 0.0342)),
+    'II': ((0.296, 0.0469, 0.0241), (0.288, 0.387, 0.504), (0.337, 0.0845, 0.062)),
+    'III': ((0.297, 0.0507, 0.0388), (0.788, 1.06, 1.38), (0.390, 0.129, 0.124)),
+    '1C': ((0.304, 0.068, 0.105), (0.293, 0.395, 0.514), (0.395, 0.121, 0.179)),
+    '3C': ((0.307, 0.078, 0.154), (0.855, 1.15, 1.50), (0.456, 0.187, 0.319)),
+    '5C': ((0.327, 0.127, 0.297), (1.070, 1.44, 1.87), (0.48, 0.277, 0.535)),
+    '7C': ((0.367, 0.233, 0.542), (1.89, 2.54, 3.30), (0.600, 0.470, 0.924)),
+    '9C': ((0.436, 0.430, 0.943), (2.51, 3.38, 4.39), (0.763, 0.826, 1.56)),
+}
+JERLOV = list(TABLE)
+
+# The visibility, m, is this over the green attenuation.
+VISIBILITY_CONSTANT = 4.8
+
+
+def max_visibility():
+    """Return the visibility of pure water (type I), m: none is clearer."""
+    a, b, _ = TABLE['I']
+    return VISIBILITY_CONSTANT / (a[1] + b[1])
+
+
+def resolve(jerlov, visibility=None):
+    """
+    Return a water's attenuation c, veil b / c and K_d, per channel.
+
+    As gz_water_optics resolves it: a visibility scales what the type has
+    above pure water, so that 4.8 / c_green comes out at it.
+    """
+    a, b, kd = (list(v) for v in TABLE[jerlov])
+    if visibility is not None:
+        pa, pb, pkd = TABLE['I']
+        c_pure = pa[1] + pb[1]
+        scale = (VISIBILITY_CONSTANT / visibility - c_pure) / (a[1] + b[1] - c_pure)
+        a = [p + (x - p) * scale for p, x in zip(pa, a)]
+        b = [p + (x - p) * scale for p, x in zip(pb, b)]
+        kd = [p + (x - p) * scale for p, x in zip(pkd, kd)]
+    c = [x + y for x, y in zip(a, b)]
+    return c, [y / x for x, y in zip(c, b)], kd
 
 
 def linear(c):
@@ -109,7 +155,7 @@ def world(args):
       <ambient>{args.ambient} {args.ambient} {args.ambient} 1</ambient>
       <background>0 0 0 1</background>
     </scene>
-    <light type="directional" name="sun"><direction>0.2 0.1 -1</direction>
+    <light type="directional" name="sun"><direction>1 0 -0.3</direction>
       <diffuse>{args.sun} {args.sun} {args.sun} 1</diffuse><specular>0 0 0 1</specular></light>
     <model name="chart">
       <static>true</static>
@@ -146,8 +192,8 @@ def world(args):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     p.add_argument('--out', required=True, help='the world file to write (.sdf)')
-    p.add_argument('--range', type=float, default=2.0, help='camera to chart, m')
-    p.add_argument('--depth', type=float, default=5.0, help='of camera and chart, m')
+    p.add_argument('--range', type=float, default=0.5, help='camera to chart, m')
+    p.add_argument('--depth', type=float, default=2.0, help='of camera and chart, m')
     p.add_argument('--jerlov', default='3C', type=str.upper, choices=JERLOV,
                    help='Jerlov water type')
     p.add_argument('--visibility', type=float, help='horizontal visibility, m')
@@ -158,8 +204,21 @@ def main(argv=None):
     p.add_argument('--sun', type=float, default=0.8, help='the sun light diffuse level')
     p.add_argument('--ambient', type=float, default=0.3, help='the ambient light level')
     a = p.parse_args(argv)
-    if a.visibility is not None and a.visibility <= 0:
-        p.error('--visibility must be a positive number of metres')
+    clearest = max_visibility()
+    if a.visibility is not None:
+        if not (0 < a.visibility < clearest):
+            p.error(f'--visibility must be over 0 and under {clearest:.1f} m, '
+                    "pure water's")
+        if a.jerlov == 'I':
+            p.error('--visibility cannot change type I, which is pure water')
+    if not (math.isfinite(a.range) and a.range > 0):
+        p.error('--range must be a positive number of metres')
+    if not (math.isfinite(a.depth) and a.depth > 0):
+        p.error('--depth must be a positive number of metres')
+    if not (0 < a.hfov < math.pi):
+        p.error('--hfov must be between 0 and pi radians')
+    if a.width < 1 or a.height < 1:
+        p.error('--width and --height must be at least 1 pixel')
     sdf, patches = world(a)
     open(a.out, 'w').write(sdf)
     json_path = Path(a.out).with_suffix('.json')
