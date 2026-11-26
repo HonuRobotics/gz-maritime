@@ -158,8 +158,12 @@ void main()
   vec3 N = normalize(inPs.rotMatrix * bump.xyz);
 
   vec3 E = normalize(inPs.eyeVec);
-  // The camera is below the surface: every point of it is above the camera.
-  if (E.z > 0.0)
+  // Seen from below: the view ray runs along the surface's geometric
+  // normal, which points up out of the water. Not "higher than the
+  // camera", which a crest above a camera on a boat also is (it faces the
+  // camera); and not gl_FrontFacing, which render targets flip against the
+  // window.
+  if (dot(E, normalize(inPs.rotMatrix[2])) > 0.0)
   {
     fragColor = FromBelow(E, N);
     if (uwAttenuation.w > 0.5)

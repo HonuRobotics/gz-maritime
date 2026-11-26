@@ -36,6 +36,8 @@ using gz::sim::underwater_test::CaptureWorld;
 TEST(UnderwaterRenderingFallback, ReferenceCameraDrawsTheWater)
 {
   const Capture off = CaptureWorld("gpu_off.sdf");
+  if (!off.rendered)
+    GTEST_SKIP() << "nothing rendered: no GPU?";
   const Capture failed = CaptureWorld("gpu_on.sdf");
 
   ASSERT_FALSE(off.underWater.empty());

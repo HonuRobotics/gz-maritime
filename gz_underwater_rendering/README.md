@@ -67,7 +67,14 @@ the lamps on and the denser it is); on an NVIDIA RTX 4090 Laptop, about
 low quality the snow costs the Intel 1 to 4 ms.
 
 With it, a reference underwater camera (`gz_underwater_camera`) in the same
-world passes its image through: the renderer has already drawn the water.
+world applies only its own response: the renderer has already drawn the
+water.
+
+To turn it off and on while running, publish a `gz.msgs.Boolean` on
+`/world/<world>/underwater_rendering/enable`; to start with it off, set
+`<enabled>false</enabled>` in the plugin (default true). Off, or with its
+model removed, the renderer draws nothing and the reference cameras draw the
+water again.
 
 ## What it computes
 
@@ -91,6 +98,9 @@ that scope it) contains `lamp`, in any case, is a lamp, up to four, the
 first by name; other lights are lit by Ogre as in air, with no beam, so a
 harbour light on a pier stays as it is. A lamp:
 
+- **It lights as Ogre would**: the diffuse term of Ogre's default BRDF,
+  with Ogre's attenuation, spot cone and range fade, so in air, or seen by a
+  camera above the water, a lamp looks as any other light.
 - **Its light fades both ways**: from the lamp to what it lights, and from
   there to the camera, `exp(−β^D (d_lamp + r))`.
 - **Its beam**: the light the water scatters back to the camera inside the
@@ -128,15 +138,20 @@ off, set its intensity to 0: it then costs nothing.
 - **Caustics**: on what faces up under waves, a moving pattern of light
   focused by the surface, its contrast fading with depth as `exp(−K_d z)`.
   Its strength is the water's `<caustics>`, off by default, scaled by how
-  high the waves are (estimated from the wave field at 64 points): none on
-  flat water.
+  high the waves are: the significant height at 64 points around the
+  cameras, smoothed over 0.5 s, from the water optics sampler's surface, so
+  the GUI, whose wave field has no engine of its own, shows them too. None
+  on flat water. The pattern's phases are wrapped on the CPU in double, so
+  it moves on smoothly however long the simulation runs.
 - **Marine snow**: the water's `<marine_snow>` is the fraction of 25 cm
   cells near the camera holding a speck. Specks are fixed in the world
   (hashed per cell, found by walking the cells each view ray crosses, up to
   3 m, as far as the first speck the ray touches), lit by the lamps and
   faintly by the daylight.
 - **The surface from below**: `gz_waves_rendering`'s water surface is
-  two-sided and, seen from below, shows Snell's window: the sky through a
+  two-sided and, seen from below (the view ray along the surface's up
+  normal, so a crest above a camera on a boat is still seen from above),
+  shows Snell's window: the sky through a
   cone of 48.6 degrees about the vertical, refracted, and the water's mirror
   outside it. With this package in the world the surface is seen through
   the water like everything else: the mirror shows the water's own colour,
@@ -147,7 +162,8 @@ off, set its intensity to 0: it then costs nothing.
   water's colour, not the sky or the scene's background. A black box around
   the world (100 km wide, from 100 m above the water to 12 km below) is
   drawn behind everything, at the far plane and after the sky; through the
-  water it is the veil. Cameras above the water, depth images, lidars and
+  water it is the veil. It is drawn after the opaque items, so the pixels
+  they cover are not shaded twice. Cameras above the water, depth images, lidars and
   segmentation do not see it.
 
 ## How it works
@@ -163,8 +179,10 @@ off, set its intensity to 0: it then costs nothing.
   shader. Those shaders have no world position, so the vertex shader works
   out the ray from the camera from the clip-space position, and they do
   not say whether the image keeps linear light, so the listener does.
-  Where gz-rendering gives the unlit shaders no composite pieces of its
-  own, these are the only ones.
+  gz-rendering 10 gives the unlit shaders no composite pieces of its own,
+  so these are the only ones; a gz-rendering that does is not handled, and
+  unlit is then drawn as in air, with a warning. Both listeners derive from
+  one that wraps gz-rendering's and forwards what they do not change.
 - **Chained, not replaced.** gz-rendering's own composite pieces
   (`Hlms/Gz/Pbs`) are read at run time and copied with one more
   `@insertpiece` each; gz-rendering's Hlms listener is called first and the
@@ -172,11 +190,22 @@ off, set its intensity to 0: it then costs nothing.
 - **Lamps.** The shader lights with them itself, so they, and only they,
   are hidden from Ogre's own lighting while the water is drawn (and given
   back when it is not). The set is rebuilt each frame from gz-rendering's
-  lights, so a lamp removed with its vehicle is simply gone. Turning Ogre's Forward+ off instead would change the pass buffer's
-  layout under the listener's data; hiding the lamps does not.
+  lights, so a lamp removed with its vehicle is simply gone. Turning Ogre's
+  Forward+ off instead would change the pass buffer's layout under the
+  listener's data; hiding the lamps does not. Hidden for every camera, they
+  are lit in the shader for every camera too, the same as Ogre lights them
+  in air: the hiding shows only under water.
 - **An Ogre bridge** (`libunderwater-ogre2-bridge.so`), loaded with dlopen,
   as `gz_waves_rendering` does: linking gz-rendering's ogre2 library into a
-  plugin stops gz-rendering loading its engine.
+  plugin stops gz-rendering loading its engine. Its C interface and the
+  water it takes are in `src/systems/UnderwaterOgre2Bridge.hh`, with a
+  version the plugin checks first. It finds the Ogre Next headers with
+  `gz_find_ogre_next()`, from `gz_waves_rendering`.
+- **The world's mark** names the plugin's entity, so it no longer holds
+  once that entity is gone: removing the model leaves no plugin to take it
+  off. The plugin, going, tells the bridge to draw nothing; it cannot
+  uninstall from outside the render thread, so the bridge stays, idle, until
+  a plugin sets the water again.
 
 ## Limits
 
@@ -189,12 +218,15 @@ off, set its intensity to 0: it then costs nothing.
   the water for an orthographic camera.
 - **Depth below the wave over the camera.** As in the reference camera,
   the water's surface is a flat level for each camera: the still level
-  plus the wave over the camera, which the plugin asks the wave field for
-  every step. The wave over each thing in view is not followed. A camera's
-  level is that of the place it had a frame before.
+  plus the wave over the camera, which the renderer asks the plugin's water
+  optics sampler for in each pass, for any number of cameras and in the GUI
+  too (the sampler builds its own wave engine from the recipe). The wave
+  over each thing in view is not followed.
 - **Lamps**: lights named `lamp` only, up to four (the others are lit by
-  Ogre, with a warning); lit by their diffuse term (no specular), with no
-  shadows. The reference camera has no lamps.
+  Ogre, with a warning); lit by Ogre's diffuse term (no specular), with no
+  shadows; their beams show only where something is drawn behind them (the
+  open water's background is not shaded). The reference camera has no
+  lamps.
 - **ogre2 and GLSL only** (the pieces use GLSL's `fract`).
 - **Caustics** are a procedural pattern scaled by the wave height, not
   traced from the actual surface; the snow does not drift.
@@ -215,10 +247,15 @@ its clear-water colour faded both ways (worst 1 step); the beam along the
 centre row against a single-scatter integration in the test (within 2 % of
 its peak in IB, 3C and 7C water); clear water carrying the beam farther and
 murky water keeping it nearer the lamp; and the same scene with the light
-named `torch`, not a lamp: Ogre lights the plate, and no beam.
+named `torch`, not a lamp: Ogre lights the plate exactly as the lamp does
+(to 3 %; it is the same to the 8-bit step), and no beam. It waits for the
+water optics to publish each new water, not a fixed time, and skips
+without a GPU.
 
 `effects_test`, rendered: caustics' contrast at 8 m against 3 m deep is
-`exp(−K_d · 5)` within 6 % (time-averaged), none on flat water; marine snow
+`exp(−K_d · 5)` within 6 % (time-averaged), none on flat water; the
+surface drawn above the seabed not darkening it (caustics off, to the
+rounding); open water the veil; marine snow
 specks fixed frame to frame, none once the snow is off, the depth image
 unchanged; at night with the lamps off, nothing to see. Under a wave of
 0.5 m, a camera 0.15 m above the still water is under water in 34 of 80
@@ -228,7 +265,8 @@ particles 2 m away, in water that fades and veils: 0.3095 in linear light
 for 0.3092 from the formula and their colour in air.
 
 `snell_test`, rendered: Snell's window's half-angle 48.5 degrees (Snell's
-law: 48.6), from 5 m below near-flat water.
+law: 48.6), from 5 m below near-flat water. The rendered tests skip
+without a GPU.
 
 `underwater_rendering_test`, rendered (needs a GPU): the same scene without
 and with the GPU path, in one process. The GPU image against the reference
@@ -238,4 +276,7 @@ the water byte for byte the same; segmentation labels byte for byte the
 same; the reference camera passing its image through.
 `underwater_rendering_fallback_test`, in a process of its own: with the
 pieces missing, nothing is installed and the reference camera draws the
-water, as without the GPU path.
+water, as without the GPU path. `underwater_rendering_runtime_test`, in a
+process of its own: turned off on its topic, then on again, then its model
+removed; off and removed look as without the GPU path. All three skip
+without a GPU.

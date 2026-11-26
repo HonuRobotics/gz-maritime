@@ -24,6 +24,7 @@
 #include <optional>
 #include <ostream>
 #include <string>
+#include <vector>
 
 #include <gz/math/Vector3.hh>
 
@@ -133,6 +134,55 @@ struct WaterOpticsData
   }
 };
 
+/// \brief A number of the water: its world file element and set topic
+/// key, how it sets a spec, and where the resolved optics hold it. Every
+/// consumer of the parameters (the system's world file and topic, its
+/// ground truth, the docs test) goes through this table, so a new one is
+/// added in one place.
+struct NumberParam
+{
+  /// \brief Element and key.
+  const char *name;
+
+  /// \brief Set it in a spec; std::nullopt removes it, back to what the
+  /// type gives, where it can be removed.
+  void (*set)(WaterOpticsSpec &, std::optional<double>);
+
+  /// \brief Whether an empty value removes it.
+  bool removable;
+
+  /// \brief Its value in the resolved optics, for the ground truth.
+  double (*get)(const WaterOpticsData &);
+};
+
+/// \brief A per-channel value of the water, "r g b": its element and key,
+/// and its members in the spec and in the resolved optics.
+struct ColourParam
+{
+  /// \brief Element and key.
+  const char *name;
+
+  /// \brief In the spec; unset, the type gives it.
+  std::optional<Rgb> WaterOpticsSpec::*spec;
+
+  /// \brief In the resolved optics.
+  Rgb WaterOpticsData::*data;
+};
+
+/// \brief The water's numbers.
+/// \return The table.
+const std::vector<NumberParam> &NumberParams();
+
+/// \brief The water's per-channel values.
+/// \return The table.
+const std::vector<ColourParam> &ColourParams();
+
+/// \brief Whether two optics are the same water, their generation aside.
+/// \param[in] _a One.
+/// \param[in] _b The other.
+/// \return True if they are.
+bool SameWater(const WaterOpticsData &_a, const WaterOpticsData &_b);
+
 /// \brief Turn what a world asks for into the water's optics.
 ///
 /// * The base is a Jerlov type (coastal 1C if none is named), from its
@@ -144,7 +194,9 @@ struct WaterOpticsData
 ///   at the visibility: clearer water turns bluer, as real water does, and
 ///   it can be no clearer than pure water (about 100 m). Type I itself
 ///   cannot be scaled.
-/// * Each explicit coefficient then replaces its derived value.
+/// * Each explicit coefficient then replaces its derived value. When all
+///   four are explicit, no type is used: `jerlov` comes out empty, and a
+///   type asked for, known or not, is ignored with a warning.
 /// \param[in] _spec What the world asks for.
 /// \param[out] _out The optics, when the spec is valid; its generation is
 /// left as it was.

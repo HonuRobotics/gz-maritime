@@ -27,7 +27,7 @@ world system:
 
 | Element | Meaning |
 |---|---|
-| `<jerlov>` | The Jerlov water type: `I`, `IA`, `IB`, `II`, `III` (open ocean, clearest first) or `1C`, `3C`, `5C`, `7C`, `9C` (coastal). Default `II`. Case does not matter. |
+| `<jerlov>` | The Jerlov water type: `I`, `IA`, `IB`, `II`, `III` (open ocean, clearest first) or `1C`, `3C`, `5C`, `7C`, `9C` (coastal). Default `1C`. Case does not matter. Ignored, with a warning, when all four coefficients below are given. |
 | `<visibility>` | How far a black target can be seen horizontally, m. It scales what the type has above pure water, up to about 100 m. Optional. |
 | `<attenuation>`, `<backscatter>`, `<diffuse_attenuation>` | Per red, green, blue, 1/m, as `r g b`: each replaces the value the type gives. Optional. |
 | `<veil>` | Per red, green, blue, the veil's colour just below the surface as a fraction of the daylight there. Optional. |
@@ -35,11 +35,11 @@ world system:
 | `<daylight>` | How strong the daylight is, against the renderer's sun: it scales the veil. Default 1; 0 at night, when only the vehicle's lamps light the water. |
 | `<caustics>` | Strength of the caustics on what faces up, 0 to 1, default 0 (off); scaled by the waves' height (none on flat water). |
 | `<marine_snow>` | Fraction of 25 cm cells near the camera holding a speck of marine snow, 0 to 1, default 0. |
-| `<publish_rate>` | Rate of the ground truth, Hz, simulation time. Default 1. |
+| `<publish_rate>` | Rate of the ground truth, Hz of wall time, so it keeps coming while paused; it is also published on every change. 0 publishes on a change only. Default 1. |
 
 Any other element is warned about. A water type nobody knows, a visibility
 that is not positive or a negative coefficient is one error, and the world
-has clear water.
+has clear water until a good message comes on the set topic.
 
 ### What a water type means
 
@@ -111,16 +111,20 @@ step or frame, then ask:
 | Call | Returns |
 |---|---|
 | `Depth(position, time)` | Depth below the local water surface, m (negative above it) |
-| `Daylight(depth)` | exp(−K_d depth): the daylight left |
-| `Veil(depth)` | B∞ exp(−K_d depth): the veil there |
-| `Transmittance(range)` | exp(−β^D range): an object's light left |
-| `VeilBuildUp(range)` | 1 − exp(−β^B range): the veil built up |
+| `Veil(depth)` | daylight · B∞ exp(−K_d depth): the veil there, zero above the surface and at night |
+| `Data()` | The optics themselves: β^D, β^B, B∞ and K_d per channel |
 
 A camera at depth z sees an object of colour J (as lit) at range r as
 
 ```
-I = J · Transmittance(r) + Veil(z) · VeilBuildUp(r)
+I = J · exp(−β^D r) + Veil(z) · (1 − exp(−β^B r))
 ```
+
+`Depth` is the same in every process. Where the wave field's engine is not
+there (the GUI and the sensors receive the wave recipe only), the sampler
+builds one of its own from the recipe, as the water's visual does; it needs
+the wave engine's plugin in that process, which the water surface model
+loads.
 
 A world without the system has clear water: nothing fades and there is no
 veil.
@@ -131,14 +135,22 @@ veil.
 colcon test --packages-select gz_water_optics
 ```
 
-- `water_optics_core_test`: the table against its source; every type
-  present and in order; c, the veil and the visibility derived from a type,
-  and one case by hand; visibility giving exactly the distance asked and
-  keeping the colour, for three types and three distances; explicit values
-  overriding tag by tag; the errors; the sampler's closed forms.
+- `water_optics_core_test`: the table's values pinned; every type present
+  and in order; c, the veil and the visibility derived from a type, and one
+  case by hand; visibility giving exactly the distance asked, scaling what
+  the type has above pure water; explicit values overriding tag by tag, and
+  all four ignoring the type; the errors; the sampler's closed forms, its
+  copy on a new generation only, and depth below the wave from the recipe
+  alone, as in the GUI; every parameter in the reference and among the set
+  topic's keys.
 - `water_optics_test`, in running worlds: the recipe written; the set topic
-  and the ground truth, bad messages changing nothing; clear water without
-  the system or with a bad world file; depth below a Gerstner wave.
+  and the ground truth; bad messages and messages that change nothing
+  leaving the generation as it was, each checked with a marker sent after
+  it; numbers as integers and strings; a reset; the ground truth while
+  paused, and on a change only at a rate of 0; clear water without the
+  system, and with a bad world file until a good message; depth below a
+  Gerstner wave.
+- `test_figures`: the plan's figures regenerated, byte for byte.
 
 ## Sources
 

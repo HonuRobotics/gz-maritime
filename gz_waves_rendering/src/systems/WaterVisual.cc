@@ -146,6 +146,11 @@ class WaterVisual::Implementation
   /// is, for the per-sensor underwater camera to fade. Guarded by mutex_.
   public: std::optional<std::array<float, 13>> underwater;
 
+  /// \brief What the fragment shader's buffers hold: none until they are
+  /// made, then the water last uploaded (itself none when not drawn).
+  /// Render thread.
+  public: std::optional<std::optional<std::array<float, 13>>> uwUploaded;
+
   // Grid/displacement path state (engine + heightmap; its scalar cache is in
   // the 4-byte band). The engine is this visual's private instance, written by
   // PreUpdate and read by OnSceneUpdate — both under mutex_.
@@ -302,6 +307,8 @@ bool WaterVisual::Implementation::ResolveVisual()
     this->visual->SetMaterial(mat);
     this->scene->DestroyMaterial(mat);
     this->material = this->visual->Material();
+    // A new material: its buffers are made again
+    this->uwUploaded.reset();
     if (!this->material)
     {
       gzerr << "[WaterVisual] failed to attach material to visual" << '\n';
@@ -555,20 +562,27 @@ void WaterVisual::Implementation::OnSceneUpdate()
   {
     auto vsParams = this->material->VertexShaderParams();
     (*vsParams)["t"] = this->currentSimTime;
-    // The water between an underwater camera and the surface above it.
-    auto fsParams = this->material->FragmentShaderParams();
-    const std::array<float, 13> none{};
-    const auto &u = this->underwater ? *this->underwater : none;
-    const char *names[] = {"uwAttenuation", "uwBackscatter", "uwVeil",
-                           "uwDiffuse"};
-    for (int k = 0; k < 4; ++k)
+    // The water between an underwater camera and the surface above it:
+    // the buffers made once, and filled when the water changes.
+    if (!this->uwUploaded || *this->uwUploaded != this->underwater)
     {
-      // w: 1 when the water is drawn (uwAttenuation), the daylight (uwVeil).
-      float v[4] = {u[3 * k], u[3 * k + 1], u[3 * k + 2],
-                    k == 0 ? (this->underwater ? 1.0f : 0.0f) :
-                    k == 2 ? u[12] : 0.0f};
-      (*fsParams)[names[k]].InitializeBuffer(4);
-      (*fsParams)[names[k]].UpdateBuffer(v);
+      auto fsParams = this->material->FragmentShaderParams();
+      const std::array<float, 13> none{};
+      const auto &u = this->underwater ? *this->underwater : none;
+      const char *names[] = {"uwAttenuation", "uwBackscatter", "uwVeil",
+                             "uwDiffuse"};
+      for (int k = 0; k < 4; ++k)
+      {
+        // w: 1 when the water is drawn (uwAttenuation), the daylight
+        // (uwVeil).
+        float v[4] = {u[3 * k], u[3 * k + 1], u[3 * k + 2],
+                      k == 0 ? (this->underwater ? 1.0f : 0.0f) :
+                      k == 2 ? u[12] : 0.0f};
+        if (!this->uwUploaded)
+          (*fsParams)[names[k]].InitializeBuffer(4);
+        (*fsParams)[names[k]].UpdateBuffer(v);
+      }
+      this->uwUploaded = this->underwater;
     }
   }
 
@@ -636,6 +650,7 @@ void WaterVisual::Implementation::OnRenderTeardown()
   this->tileVisuals.clear();
   this->visual.reset();
   this->material.reset();
+  this->uwUploaded.reset();
   this->scene.reset();
   // Force re-upload after the scene rebuilds.
   const std::lock_guard<std::mutex> lock(this->mutex_);

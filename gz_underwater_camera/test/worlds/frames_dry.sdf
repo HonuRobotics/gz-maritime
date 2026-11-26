@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<!--
+  A camera 2 m below z = 0 in a world with no water optics: clear water, so
+  the image passes through.
+-->
+<sdf version="1.9">
+  <world name="frames_dry">
+    <physics name="p" type="ignored">
+      <max_step_size>0.01</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <model name="rig">
+      <static>true</static>
+      <pose>0 0 -2 0 0 0</pose>
+      <link name="link">
+      <sensor name="cam" type="rgbd_camera">
+        <pose>0 0.0 0 0 0 0</pose>
+        <topic>fdry/cam</topic>
+        <update_rate>10</update_rate>
+        <camera>
+          <horizontal_fov>1.2</horizontal_fov>
+          <image><width>8</width><height>6</height></image>
+          <clip><near>0.1</near><far>60</far></clip>
+        </camera>
+        <plugin filename="gz-maritime-underwater-camera-system"
+                name="gz::sim::maritime::UnderwaterCamera"></plugin>
+      </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>

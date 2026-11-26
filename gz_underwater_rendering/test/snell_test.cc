@@ -40,12 +40,14 @@ TEST(Snell, WindowAt48Point6Degrees)
 {
   std::mutex mutex;
   std::optional<msgs::Image> frame;
+  bool rendered = false;
   transport::Node node;
   std::function<void(const msgs::Image &)> cb = [&](const msgs::Image &_m)
   {
+    const std::lock_guard<std::mutex> lock(mutex);
+    rendered = true;
     if (_m.header().stamp().sec() < 2)
       return;
-    const std::lock_guard<std::mutex> lock(mutex);
     frame = _m;
   };
   node.Subscribe("/uwsnell/cam", cb);
@@ -57,14 +59,16 @@ TEST(Snell, WindowAt48Point6Degrees)
   {
     {
       const std::lock_guard<std::mutex> lock(mutex);
-      if (frame)
+      if (frame || (i == 200 && !rendered))
         break;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
   server.reset();
   const std::lock_guard<std::mutex> lock(mutex);
-  ASSERT_TRUE(frame) << "no frame: is there a GPU?";
+  if (!rendered)
+    GTEST_SKIP() << "nothing rendered: no GPU?";
+  ASSERT_TRUE(frame) << "no frame";
 
   const int w = frame->width(), h = frame->height();
   const double fx = w / (2 * std::tan(2.6 / 2));
