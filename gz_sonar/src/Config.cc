@@ -98,6 +98,9 @@ SonarConfig EchoImaging()
   c.samples = 1024;
   c.pulseLength = 1.0e-5;
   c.tvg = Tvg::kSpreadingAbsorption;
+  // Fixed gain, chosen so a sandy seabed (-27 dB) sits mid-gray, about
+  // 24 dB below full scale.
+  c.gainDb = 52.0;
   return c;
 }
 
@@ -117,6 +120,9 @@ SonarConfig OmniscanSidescan()
   c.samples = 600;
   c.pulseLength = 1.0e-4;
   c.tvg = Tvg::kSpreadingAbsorption;
+  // Fixed gain, chosen so the seabed of the survey world sits about 25 dB
+  // below full scale; if set to auto, it is smoothed over about a second.
+  c.gainDb = 45.0;
   c.gainTimeConstant = 1.0;
   // A pulse ten times the imaging sonar's, so a band ten times narrower
   // and 10 dB less noise.
@@ -145,6 +151,9 @@ SonarConfig SurveyorProfiling()
   c.tvg = Tvg::kNone;
   // The sidescan's pulse, so its noise band.
   c.noiseFloorDb = -150.0;
+  // Fixed gain: it sets only the water column's levels, since detection
+  // compares echoes with the noise.
+  c.gainDb = 45.0;
   c.detection = ProfilingDetection::kAngleOfArrival;
   c.maxSoundings = 20;
   c.elevationRays = 16;

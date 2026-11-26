@@ -190,6 +190,8 @@ int Sidescan(const std::string &_out)
   sonar::SonarConfig c = sonar::OmniscanSidescan();
   c.rangeMax = 20.0;
   c.samples = 400;
+  // Automatic gain, to show it smoothed across pings.
+  c.gainDb.reset();
   const auto scene = PassScene();
   sonar::Engine engine(c, HarborWater());
   const auto rays = sonar::RayFan(c);

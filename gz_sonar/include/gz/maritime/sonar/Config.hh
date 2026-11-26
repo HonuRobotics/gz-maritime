@@ -150,8 +150,13 @@ struct SonarConfig
   /// bathymetric multibeams, whose ray tracing is out of scope here.
   std::optional<double> soundSpeed;
 
-  /// \brief Fixed gain in dB; empty for automatic gain.
-  std::optional<double> gainDb;
+  /// \brief Receiver gain, dB: published level = received level +
+  /// time-varied gain + gain, so a fixed gain keeps the absolute level a
+  /// classifier needs from ping to ping. Typically 40 to 60 for the scale
+  /// of BeamIntensity. Empty for automatic gain, which sets it from each
+  /// frame's own median and peak echo: easier to look at, but a per-frame
+  /// normalization that erases the absolute level.
+  std::optional<double> gainDb{52.0};
 
   /// \brief How quickly automatic gain follows the scene, s: it moves
   /// toward each ping's own gain with this time constant. 0 takes each

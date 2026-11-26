@@ -59,14 +59,14 @@ A few of the sonar's own parameters make its image easier or harder to work with
 ```yaml
      sonar: {range_max: 15, samples: 768, labels: true,
              noise_floor: -110,  # received noise, dB; -140 by default
-             gain: auto,         # or a fixed gain in dB, such as 60
+             gain: 52,           # fixed by default; auto sets it from each frame
              speckle: true}      # false removes the grain
 ```
 
 | Parameter | Effect | Easier | Harder |
 |---|---|---|---|
 | `noise_floor` | Noise at the receiver, dB; it rises with range in the image, as the time-varied gain does | −150 | −110 |
-| `gain` | `auto`, or a fixed gain in dB | `auto` | a fixed gain too low or too high |
+| `gain` | A fixed gain in dB (52 by default), or `auto`, which scales each frame by its own echoes and so erases their absolute level | the default | a fixed gain too low or too high, or `auto` for a classifier |
 | `speckle` | The grain of a real sonar image | `false` | `true` |
 | `range_max` | The range window, m | close to the targets | much longer |
 

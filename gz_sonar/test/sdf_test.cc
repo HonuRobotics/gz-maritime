@@ -84,6 +84,14 @@ TEST(SonarSdf, EmptyBlockGivesEachExemplar)
   EXPECT_EQ(profiling->maxSoundings, 20u);
 
   EXPECT_FALSE(Load("radar", "", error));
+
+  // A fixed gain by default, so the absolute level survives; auto asks for
+  // the per-frame automatic gain.
+  for (const auto &c : {imaging, sidescan, profiling})
+    EXPECT_TRUE(c->gainDb);
+  const auto automatic = Load("imaging_sonar", "<gain>auto</gain>", error);
+  ASSERT_TRUE(automatic) << error;
+  EXPECT_FALSE(automatic->gainDb);
 }
 
 TEST(SonarSdf, ElementsOverrideTheDefaults)
