@@ -1019,6 +1019,125 @@ TEST(Engine, ThreadThatFailsToStart)
 }
 
 //////////////////////////////////////////////////
+// The presets are the devices' published figures and the levels the
+// walkthroughs are tuned to (Config.cc gives the sources), so each is
+// pinned: a preset that changes must change here too. First the ECHO:
+// 700 kHz to 30 m, 120 x 20 degrees, 256 beams of 1.5 degrees, range
+// resolution under 8 mm.
+TEST(Presets, EchoImaging)
+{
+  const sonar::SonarConfig c = sonar::EchoImaging();
+  EXPECT_DOUBLE_EQ(c.frequency, 700e3);
+  EXPECT_DOUBLE_EQ(c.horizontalFov, 120.0 * kDeg);
+  EXPECT_DOUBLE_EQ(c.verticalFov, 20.0 * kDeg);
+  EXPECT_EQ(c.beams, 256u);
+  EXPECT_DOUBLE_EQ(c.beamWidth, 1.5 * kDeg);
+  EXPECT_DOUBLE_EQ(c.sidelobeLevelDb, -25.0);
+  EXPECT_DOUBLE_EQ(c.rangeMin, 0.2);
+  EXPECT_DOUBLE_EQ(c.rangeMax, 30.0);
+  EXPECT_EQ(c.samples, 1024u);
+  EXPECT_DOUBLE_EQ(c.pulseLength, 1.0e-5);
+  // The datasheet's range resolution, from the pulse.
+  EXPECT_LT(0.5 * 1500.0 * c.pulseLength, 0.008);
+  EXPECT_FALSE(c.soundSpeed.has_value());
+  ASSERT_TRUE(c.gainDb.has_value());
+  EXPECT_DOUBLE_EQ(*c.gainDb, 52.0);
+  EXPECT_DOUBLE_EQ(c.gainTimeConstant, 0.0);
+  EXPECT_EQ(c.tvg, sonar::Tvg::kSpreadingAbsorption);
+  EXPECT_DOUBLE_EQ(c.tvgSpreading, 30.0);
+  EXPECT_DOUBLE_EQ(c.noiseFloorDb, -140.0);
+  EXPECT_DOUBLE_EQ(c.dynamicRangeDb, 60.0);
+  EXPECT_TRUE(c.speckle);
+  EXPECT_EQ(c.seed, 0u);
+  EXPECT_EQ(c.raysPerBeam, 4u);
+  EXPECT_EQ(c.elevationRays, 64u);
+  EXPECT_DOUBLE_EQ(c.elevationSpan, 3.0);
+  EXPECT_EQ(c.threads, 0u);
+}
+
+//////////////////////////////////////////////////
+// The Omniscan 450 SS: 450 kHz, 0.5 degrees along track by 50 degrees, one
+// beam, 600 samples, a 50 m window.
+TEST(Presets, OmniscanSidescan)
+{
+  const sonar::SonarConfig c = sonar::OmniscanSidescan();
+  EXPECT_DOUBLE_EQ(c.frequency, 450e3);
+  EXPECT_DOUBLE_EQ(c.horizontalFov, 0.5 * kDeg);
+  EXPECT_DOUBLE_EQ(c.verticalFov, 50.0 * kDeg);
+  EXPECT_EQ(c.beams, 1u);
+  EXPECT_DOUBLE_EQ(c.beamWidth, 0.5 * kDeg);
+  EXPECT_DOUBLE_EQ(c.sidelobeLevelDb, -13.26);
+  EXPECT_DOUBLE_EQ(c.rangeMin, 1.0);
+  EXPECT_DOUBLE_EQ(c.rangeMax, 50.0);
+  EXPECT_EQ(c.samples, 600u);
+  EXPECT_DOUBLE_EQ(c.pulseLength, 1.0e-4);
+  EXPECT_FALSE(c.soundSpeed.has_value());
+  ASSERT_TRUE(c.gainDb.has_value());
+  EXPECT_DOUBLE_EQ(*c.gainDb, 45.0);
+  EXPECT_DOUBLE_EQ(c.gainTimeConstant, 1.0);
+  EXPECT_EQ(c.tvg, sonar::Tvg::kSpreadingAbsorption);
+  EXPECT_DOUBLE_EQ(c.tvgSpreading, 30.0);
+  EXPECT_DOUBLE_EQ(c.noiseFloorDb, -150.0);
+  EXPECT_DOUBLE_EQ(c.dynamicRangeDb, 60.0);
+  EXPECT_TRUE(c.speckle);
+  EXPECT_EQ(c.seed, 0u);
+  EXPECT_EQ(c.raysPerBeam, 8u);
+  EXPECT_EQ(c.elevationRays, 400u);
+  EXPECT_DOUBLE_EQ(c.elevationSpan, 2.0);
+  EXPECT_EQ(c.threads, 0u);
+}
+
+//////////////////////////////////////////////////
+// The Surveyor 240-16: 240 kHz, 80 degrees across by 4 along, angle of
+// arrival to 1 degree, up to 20 soundings a ping, 400 range steps, 50 m.
+TEST(Presets, SurveyorProfiling)
+{
+  const sonar::SonarConfig c = sonar::SurveyorProfiling();
+  EXPECT_DOUBLE_EQ(c.frequency, 240e3);
+  EXPECT_DOUBLE_EQ(c.horizontalFov, 80.0 * kDeg);
+  EXPECT_DOUBLE_EQ(c.verticalFov, 4.0 * kDeg);
+  EXPECT_EQ(c.beams, 160u);
+  EXPECT_DOUBLE_EQ(c.beamWidth, 1.0 * kDeg);
+  EXPECT_DOUBLE_EQ(c.sidelobeLevelDb, -13.26);
+  EXPECT_DOUBLE_EQ(c.rangeMin, 2.5);
+  EXPECT_DOUBLE_EQ(c.rangeMax, 50.0);
+  EXPECT_EQ(c.samples, 400u);
+  EXPECT_DOUBLE_EQ(c.pulseLength, 1.0e-4);
+  EXPECT_FALSE(c.soundSpeed.has_value());
+  ASSERT_TRUE(c.gainDb.has_value());
+  EXPECT_DOUBLE_EQ(*c.gainDb, 45.0);
+  EXPECT_DOUBLE_EQ(c.gainTimeConstant, 0.0);
+  EXPECT_EQ(c.tvg, sonar::Tvg::kNone);
+  EXPECT_DOUBLE_EQ(c.noiseFloorDb, -150.0);
+  EXPECT_TRUE(c.speckle);
+  EXPECT_EQ(c.seed, 0u);
+  EXPECT_EQ(c.raysPerBeam, 4u);
+  EXPECT_EQ(c.elevationRays, 16u);
+  EXPECT_DOUBLE_EQ(c.elevationSpan, 2.0);
+  EXPECT_EQ(c.detection, sonar::ProfilingDetection::kAngleOfArrival);
+  EXPECT_EQ(c.maxSoundings, 20u);
+  EXPECT_DOUBLE_EQ(c.detectionThresholdDb, 15.0);
+  EXPECT_FALSE(c.rangeNoise.has_value());
+  EXPECT_DOUBLE_EQ(c.angleNoise, 0.009);
+  EXPECT_EQ(c.threads, 0u);
+}
+
+//////////////////////////////////////////////////
+// What the presets' comments say of each other: the sidescan and the
+// profiler send a pulse ten times the imaging sonar's, so a band ten times
+// narrower and 10 dB less noise.
+TEST(Presets, NoiseFollowsThePulse)
+{
+  const sonar::SonarConfig echo = sonar::EchoImaging();
+  for (const sonar::SonarConfig &c :
+       {sonar::OmniscanSidescan(), sonar::SurveyorProfiling()})
+  {
+    EXPECT_NEAR(c.noiseFloorDb - echo.noiseFloorDb,
+      -10.0 * std::log10(c.pulseLength / echo.pulseLength), 1e-9);
+  }
+}
+
+//////////////////////////////////////////////////
 // Smoothed automatic gain: a sudden change moves the gain by 1 - e^(-dt/tau)
 // of the way per ping, and a zero time constant follows each ping.
 TEST(Readout, GainTrackerSmooths)
