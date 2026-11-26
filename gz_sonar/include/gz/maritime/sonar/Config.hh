@@ -216,11 +216,13 @@ struct SonarConfig
   /// \brief Profiling: most soundings per ping (angle of arrival).
   std::size_t maxSoundings{20};
 
-  /// \brief Profiling: level above the noise floor that counts, dB.
-  /// Typically 6 to 20. Larger values reject weak echoes and drop more
-  /// soundings at grazing angles; smaller values keep more, including
-  /// spurious ones from noise.
-  double detectionThresholdDb{10.0};
+  /// \brief Profiling: level above the noise that counts, dB. Typically
+  /// 12 to 20. Exponential noise passes 10 dB once in e^10, about 22 000
+  /// samples, so the Surveyor's 64 000 samples a ping would give about
+  /// three false soundings at 10 dB; 15 dB, once in 5 x 10^13. Larger values
+  /// reject weak echoes and drop more soundings at grazing angles; smaller
+  /// values keep more, including spurious ones from noise.
+  double detectionThresholdDb{15.0};
 
   /// \brief Profiling: range noise at high signal-to-noise ratio, m; empty
   /// for half a range sample.

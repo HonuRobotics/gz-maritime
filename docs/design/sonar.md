@@ -282,7 +282,7 @@ Output parameters that only one type uses:
 | Imaging | `dynamic_range` | The levels below full scale that the published 8-bit image spans, dB | 60 | 40 to 80 |
 | Profiling | `detection` | How angles are found: `beamformed` (one sounding per beam) or `angle_of_arrival` (the strongest echoes, any angle) | angle_of_arrival | either |
 | Profiling | `max_soundings` | Angle-of-arrival detection: the fan's sectors, so the most soundings per ping | 20 | 10 to 40 |
-| Profiling | `detection_threshold` | Echo level above the noise floor that counts as a sounding, dB | 10 (chosen) | 3 to 20 |
+| Profiling | `detection_threshold` | Echo level above the noise at its range that counts as a sounding, dB; at 10, noise alone passes a few of the Surveyor's 64 000 samples a ping, at 15 practically none | 15 (chosen) | 12 to 20 |
 | Profiling | `range_noise` | Standard deviation of range at high signal-to-noise ratio, m; grows as the ratio falls | half a range step (chosen; the Surveyor's precision is not published) | 0.005 to 0.1 |
 | Profiling | `angle_noise` | Standard deviation of a sounding's angle, rad | 0.009 (0.5°, chosen) | 0.1° to 2° |
 | Profiling | `water_column` | Also publish the thin-fan intensity before detection | false | true or false |

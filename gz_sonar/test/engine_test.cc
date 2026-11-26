@@ -533,6 +533,32 @@ TEST(Readout, ProfilingFlatSeabed)
 }
 
 /////////////////////////////////////////////////
+// A profiler in empty water: the default threshold passes no noise, where
+// 10 dB passed a few samples a ping.
+TEST(Readout, ProfilingEmptyWaterIsQuiet)
+{
+  for (auto mode : {sonar::ProfilingDetection::kBeamformed,
+                    sonar::ProfilingDetection::kAngleOfArrival})
+  {
+    sonar::SonarConfig c = sonar::SurveyorProfiling();
+    c.detection = mode;
+    sonar::Engine engine(c, HarborWater());
+    auto count = [&](double _threshold) {
+      c.detectionThresholdDb = _threshold;
+      std::size_t n = 0;
+      for (std::uint64_t ping = 0; ping < 50; ++ping)
+      {
+        n += sonar::ReadProfiling(sonar::ReadLevels(Flat(c, 0.0), c,
+          engine.Absorption(), ping), c, 1500.0, ping).size();
+      }
+      return n;
+    };
+    EXPECT_EQ(count(sonar::SonarConfig().detectionThresholdDb), 0u);
+    EXPECT_GT(count(10.0), 50u);
+  }
+}
+
+/////////////////////////////////////////////////
 // Threads change how fast, never what: the same bits for 1, 3, 8 or 24
 // threads, at the imaging preset's full fan.
 TEST(Engine, SameResultForAnyThreadCount)
