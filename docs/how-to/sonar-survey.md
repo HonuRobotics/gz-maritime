@@ -152,7 +152,7 @@ ros2 run gz_sonar survey_lawnmower.py sonar_shipwreck \
   --x0 -40 --x1 45 --y0 -30 --y1 40 --spacing 10
 ```
 
-`survey_lawnmower.py` runs eight lines along x, 10 m apart, from y = −30 to 40, holding each with a heading and cross-track controller and turning at the ends. At about 1.8 m/s the survey takes about 12.5 minutes of sim time. `record_survey.py` saves every sidescan line, every ping of soundings and the boat's pose, each with its sim time; stop it with Ctrl-C once the survey is done, and it saves what it has.
+`survey_lawnmower.py` runs eight lines along x, 10 m apart, from y = −30 to 40, holding each with a heading and cross-track controller and turning at the ends. At about 1.8 m/s the survey takes about 8 minutes of sim time. `record_survey.py` saves every sidescan line, every ping of soundings and the boat's pose, each with its sim time; stop it with Ctrl-C once the survey is done, and it saves what it has.
 
 ```{figure} images/sonar-shipwreck-pass.webp
 :alt: Animation: above, the Gazebo view of the boat crossing over the wreck; below, the port and starboard waterfalls growing as it goes, the wreck's engine house and its dark shadow scrolling down the starboard side
@@ -189,6 +189,6 @@ ros2 run gz_sonar soundings_cloud.py survey.npz cloud.ply
 ```{figure} images/sonar-shipwreck-soundings.png
 :alt: Plan view of the soundings around the wreck, colored by height: the open seabed dark at 8 m, the long low forward hull a little lighter, and the intact stern section and the mast standing up in green and yellow
 
-The soundings around the wreck, colored by height: 150,240 points for the whole survey. The forward hull stands a little above the seabed, the stern section about 2 m, and the mast highest of all.
+The soundings around the wreck, colored by height: 92,220 points for the whole survey. The forward hull stands a little above the seabed, the stern section about 2 m, and the mast highest of all.
 ```
 
