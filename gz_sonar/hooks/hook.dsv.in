@@ -1,3 +1,4 @@
 prepend-non-duplicate;GZ_SIM_SYSTEM_PLUGIN_PATH;@CMAKE_INSTALL_PREFIX@/lib
 prepend-non-duplicate;PYTHONPATH;@CMAKE_INSTALL_PREFIX@/lib/python
 prepend-non-duplicate;GZ_SIM_RESOURCE_PATH;@CMAKE_INSTALL_PREFIX@/share/gz_sonar/models
+prepend-non-duplicate;GZ_DESCRIPTOR_PATH;@CMAKE_INSTALL_PREFIX@/share/gz/protos

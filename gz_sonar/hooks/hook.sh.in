@@ -1,3 +1,4 @@
 _colcon_prepend_unique_value GZ_SIM_SYSTEM_PLUGIN_PATH @CMAKE_INSTALL_PREFIX@/lib
 _colcon_prepend_unique_value PYTHONPATH @CMAKE_INSTALL_PREFIX@/lib/python
 _colcon_prepend_unique_value GZ_SIM_RESOURCE_PATH @CMAKE_INSTALL_PREFIX@/share/gz_sonar/models
+_colcon_prepend_unique_value GZ_DESCRIPTOR_PATH @CMAKE_INSTALL_PREFIX@/share/gz/protos
