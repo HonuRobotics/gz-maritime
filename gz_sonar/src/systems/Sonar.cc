@@ -229,6 +229,9 @@ struct Rig
   unsigned int channels{3};
   /// \brief The next ping and the time it is due.
   std::uint64_t next{0};
+  /// \brief The rate whose grid `next` counts on; when the sonar's rate
+  /// changes (its set_rate service), next is recomputed on the new grid.
+  double rate{0.0};
   nanoseconds lastStamp{-1};
 };
 
@@ -1001,7 +1004,8 @@ void SonarPrivate::OnPreRender()
   {
     for (auto &[entity, rig] : this->rigs)
     {
-      rig.next = FirstPingAt(t, rig.request.sonar->Rate());
+      rig.rate = rig.request.sonar->Rate();
+      rig.next = FirstPingAt(t, rig.rate);
       rig.lastStamp = nanoseconds(-1);
     }
     for (auto &r : this->waitingRigs)
@@ -1076,7 +1080,8 @@ void SonarPrivate::OnPreRender()
     if (this->BuildRig(*it, rig))
     {
       // The first ping on the rate grid from here, as every later one is.
-      rig.next = FirstPingAt(t, it->sonar->Rate());
+      rig.rate = it->sonar->Rate();
+      rig.next = FirstPingAt(t, rig.rate);
       it = this->waitingRigs.erase(it);
     }
     else
@@ -1099,6 +1104,11 @@ void SonarPrivate::OnRender()
   for (auto &[entity, rig] : this->rigs)
   {
     const double rate = rig.request.sonar->Rate();
+    if (rate != rig.rate)
+    {
+      rig.next = FirstPingAt(t, rate);
+      rig.rate = rate;
+    }
     const auto due = DueTime(rig.next, rate);
     if (t < due)
       continue;
