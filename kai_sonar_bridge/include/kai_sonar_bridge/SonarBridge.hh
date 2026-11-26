@@ -39,6 +39,13 @@ namespace kai_sonar_bridge
 ///   lazy        subscribe to a sonar's gz topic only while one of its ROS
 ///               topics has a subscriber (default true, see below)
 ///   subscription_heartbeat  period of that check, ms (default 200)
+///   reliability "reliable" (the default) or "best_effort", for every
+///               publisher. Reliable serves reliable and best-effort
+///               subscribers alike; best-effort is for a lossy link, where
+///               resending a large image costs more than losing it, and
+///               does not reach a reliable subscriber such as RViz's
+///               default displays.
+///   depth       messages each publisher keeps (default 5)
 ///
 /// Images and soundings share one frame convention, the `_acoustic` frame
 /// (see Conversions.hh).

@@ -43,6 +43,9 @@ constexpr std::size_t kWaterfallLines = 400;
 /// \brief The longer side of a drawn fan, pixels.
 constexpr int kFanSide = 600;
 
+/// \brief Default messages a publisher keeps.
+constexpr int kDepth = 5;
+
 /// \brief Default period of the lazy subscription check, ms. The first
 /// ping after a ROS subscriber appears waits this long at most, and the
 /// sonar pings on this long after the last one leaves; reading a few
@@ -50,15 +53,22 @@ constexpr int kFanSide = 600;
 constexpr int kHeartbeatMs = 200;
 
 //////////////////////////////////////////////////
-/// \brief The QoS of every topic the bridge publishes. Reliable, because a
-/// reliable publisher serves both reliable subscribers (RViz's displays, by
-/// default) and best-effort ones (the sensor-data QoS), where a best-effort
-/// publisher serves only the second. Keep-last, so a slow subscriber drops
-/// old pings rather than holding up the bridge.
+/// \brief The QoS of every topic the bridge publishes. Reliable by
+/// default, because a reliable publisher serves both reliable subscribers
+/// (RViz's displays, by default) and best-effort ones (the sensor-data
+/// QoS), where a best-effort publisher serves only the second. Keep-last,
+/// so a slow subscriber drops old pings rather than holding up the bridge.
+/// \param[in] _reliability "reliable" or "best_effort".
+/// \param[in] _depth Messages kept, at least 1.
 /// \return The QoS.
-rclcpp::QoS PublisherQoS()
+rclcpp::QoS PublisherQoS(const std::string &_reliability, int _depth)
 {
-  return rclcpp::QoS(rclcpp::KeepLast(5)).reliable();
+  rclcpp::QoS qos{rclcpp::KeepLast(static_cast<std::size_t>(_depth))};
+  if (_reliability == "best_effort")
+    qos.best_effort();
+  else
+    qos.reliable();
+  return qos;
 }
 
 //////////////////////////////////////////////////
@@ -267,6 +277,29 @@ SonarBridge::SonarBridge(const rclcpp::NodeOptions &_options)
   const auto kinds = this->declare_parameter<std::vector<std::string>>(
     "kinds", std::vector<std::string>{});
   this->dataPtr->view = this->declare_parameter<bool>("view", true);
+  rcl_interfaces::msg::ParameterDescriptor reliabilityDesc;
+  reliabilityDesc.description = "Reliability of every publisher";
+  reliabilityDesc.additional_constraints = "reliable or best_effort";
+  const auto reliability = this->declare_parameter<std::string>(
+    "reliability", "reliable", reliabilityDesc);
+  if (reliability != "reliable" && reliability != "best_effort")
+  {
+    // Refused rather than replaced: a misspelled best_effort that quietly
+    // became reliable would only show on the lossy link it was meant for.
+    throw rclcpp::exceptions::InvalidParameterValueException(
+      "reliability must be reliable or best_effort, not [" + reliability +
+      "]");
+  }
+  rcl_interfaces::msg::ParameterDescriptor depthDesc;
+  depthDesc.description = "Messages each publisher keeps (keep-last)";
+  depthDesc.integer_range.resize(1);
+  depthDesc.integer_range[0].from_value = 1;
+  depthDesc.integer_range[0].to_value = 1000;
+  depthDesc.integer_range[0].step = 1;
+  const auto depth = this->declare_parameter<int>("depth", kDepth,
+    depthDesc);
+  const rclcpp::QoS qos = PublisherQoS(reliability,
+    static_cast<int>(depth));
   const bool lazy = this->declare_parameter<bool>("lazy", true);
   rcl_interfaces::msg::ParameterDescriptor heartbeatDesc;
   heartbeatDesc.description = "Period of the lazy subscription check, ms";
@@ -300,22 +333,20 @@ SonarBridge::SonarBridge(const rclcpp::NodeOptions &_options)
     }
     if (s->detections)
     {
-      s->detPub = this->create_publisher<RosDetections>(rosTopics[i],
-        PublisherQoS());
+      s->detPub = this->create_publisher<RosDetections>(rosTopics[i], qos);
       if (this->dataPtr->view)
       {
         s->cloudPub = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-          rosTopics[i] + "/points", PublisherQoS());
+          rosTopics[i] + "/points", qos);
       }
     }
     else
     {
-      s->pub = this->create_publisher<RosImage>(rosTopics[i],
-        PublisherQoS());
+      s->pub = this->create_publisher<RosImage>(rosTopics[i], qos);
       if (this->dataPtr->view)
       {
         s->viewPub = this->create_publisher<sensor_msgs::msg::Image>(
-          rosTopics[i] + "/view", PublisherQoS());
+          rosTopics[i] + "/view", qos);
       }
     }
     // Lazy, the gz topic is joined by the first check that finds a ROS

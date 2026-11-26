@@ -44,7 +44,7 @@ ros2 launch kai_sonar_bridge sonar_bridge.launch.xml \
 
 `ros_gz_bridge` cannot convert the sonar's message; this bridge publishes `marine_acoustic_msgs/ProjectedSonarImage`, and a `/view` image beside it. Each image is stamped with the frame in `frame_ids`, which TF must carry: `ProjectedSonarImage` puts Z along the beam and X up, so give the vehicle's URDF a fixed frame on the sonar, rotated from the sensor's by roll 180°, pitch −90° (`rpy="3.14159 -1.5708 0"`). Without `frame_ids` the bridge warns and stamps the gz sensor's name with `_acoustic` appended, which TF does not know.
 
-The bridge is lazy, as `ros_gz_bridge` is with `lazy`: it subscribes to a sonar's gz topic only while one of that sonar's ROS topics has a subscriber, checking every `subscription_heartbeat` (200 ms by default), so a bridge nobody listens to leaves the sonar idle. `lazy:=false` subscribes from the start.
+The bridge is lazy, as `ros_gz_bridge` is with `lazy`: it subscribes to a sonar's gz topic only while one of that sonar's ROS topics has a subscriber, checking every `subscription_heartbeat` (200 ms by default), so a bridge nobody listens to leaves the sonar idle. `lazy:=false` subscribes from the start. It publishes with a reliable QoS, keeping the last 5 messages; `reliability:=best_effort` and `depth` change that, for a lossy link where resending a large image costs more than losing it. A best-effort publisher does not reach a reliable subscriber, which RViz's displays are by default.
 
 ## Sidescan and profiler
 

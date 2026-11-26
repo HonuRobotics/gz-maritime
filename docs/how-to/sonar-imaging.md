@@ -42,7 +42,7 @@ The fan, forward up: nothing close in, then the seabed from about 4 m, where the
 
 ## Read the sonar in ROS 2
 
-The sonar data is the `marine_acoustic_msgs/ProjectedSonarImage` on `/bluerov2/sonar_forward/image`, published by `kai_sonar_bridge` with a reliable QoS, so both a reliable subscriber (RViz's default) and a best-effort one (the sensor-data QoS, which `read_sonar.py` uses) receive it:
+The sonar data is the `marine_acoustic_msgs/ProjectedSonarImage` on `/bluerov2/sonar_forward/image`, published by `kai_sonar_bridge` with a reliable QoS by default (its `reliability` parameter), so both a reliable subscriber (RViz's default) and a best-effort one (the sensor-data QoS, which `read_sonar.py` uses) receive it:
 
 ```bash
 ros2 topic info /bluerov2/sonar_forward/image

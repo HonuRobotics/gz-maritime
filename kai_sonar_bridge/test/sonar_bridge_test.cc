@@ -517,6 +517,87 @@ TEST_F(SonarBridgeTest, HeartbeatMustBePositive)
 }
 
 //////////////////////////////////////////////////
+TEST_F(SonarBridgeTest, ReliableByDefault)
+{
+  auto bridge = this->Start(this->Options());
+  for (const std::string &topic : {this->rosImageTopic,
+      this->rosImageTopic + "/view", this->rosSoundingsTopic,
+      this->rosSoundingsTopic + "/points"})
+  {
+    std::vector<rclcpp::TopicEndpointInfo> info;
+    ASSERT_TRUE(WaitFor([&]()
+      {
+        info = this->listener->get_publishers_info_by_topic(topic);
+        return info.size() == 1u;
+      })) << topic;
+    EXPECT_EQ(info[0].qos_profile().reliability(),
+      rclcpp::ReliabilityPolicy::Reliable) << topic;
+  }
+  // Reliable and best-effort subscribers both receive.
+  Listener<RosImage> reliable(*this->listener, this->rosImageTopic,
+    rclcpp::QoS(5).reliable());
+  Listener<RosImage> bestEffort(*this->listener, this->rosImageTopic,
+    rclcpp::SensorDataQoS());
+  const GzImage gzImage = ImageOf(5, 4);
+  EXPECT_TRUE(this->PublishUntil(
+    [&]() { this->imagePub.Publish(gzImage); },
+    [&]() { return reliable.Count() > 0 && bestEffort.Count() > 0; }));
+  this->Stop(bridge);
+}
+
+//////////////////////////////////////////////////
+TEST_F(SonarBridgeTest, BestEffortOnRequest)
+{
+  auto bridge = this->Start(this->Options(
+    {{"reliability", "best_effort"}, {"depth", 1}}));
+  for (const std::string &topic : {this->rosImageTopic,
+      this->rosImageTopic + "/view", this->rosSoundingsTopic,
+      this->rosSoundingsTopic + "/points"})
+  {
+    std::vector<rclcpp::TopicEndpointInfo> info;
+    ASSERT_TRUE(WaitFor([&]()
+      {
+        info = this->listener->get_publishers_info_by_topic(topic);
+        return info.size() == 1u;
+      })) << topic;
+    EXPECT_EQ(info[0].qos_profile().reliability(),
+      rclcpp::ReliabilityPolicy::BestEffort) << topic;
+  }
+  // A reliable subscriber cannot be served by a best-effort publisher, so
+  // it is not a listener: the sonar is left idle rather than pinging for
+  // someone who would receive nothing.
+  {
+    Listener<RosImage> reliable(*this->listener, this->rosImageTopic,
+      rclcpp::QoS(5).reliable());
+    EXPECT_TRUE(Stays(this->imagePub, false));
+  }
+  Listener<RosImage> bestEffort(*this->listener, this->rosImageTopic,
+    rclcpp::SensorDataQoS());
+  ASSERT_TRUE(WaitFor([&]() { return this->imagePub.HasConnections(); }));
+  const GzImage gzImage = ImageOf(5, 4);
+  EXPECT_TRUE(this->PublishUntil(
+    [&]() { this->imagePub.Publish(gzImage); },
+    [&]() { return bestEffort.Count() > 0; }));
+  this->Stop(bridge);
+}
+
+//////////////////////////////////////////////////
+TEST_F(SonarBridgeTest, BadQosIsRefused)
+{
+  for (const char *bad : {"", "Reliable", "besteffort", "best-effort"})
+  {
+    EXPECT_THROW(SonarBridge(this->Options({{"reliability", bad}})),
+      rclcpp::exceptions::InvalidParameterValueException) << bad;
+  }
+  for (const int bad : {0, -1, 1001})
+  {
+    EXPECT_THROW(SonarBridge(this->Options({{"depth", bad}})),
+      rclcpp::exceptions::InvalidParameterValueException) << bad;
+  }
+  EXPECT_NO_THROW(SonarBridge(this->Options({{"depth", 1000}})));
+}
+
+//////////////////////////////////////////////////
 TEST_F(SonarBridgeTest, DestroyedWhilePingsArrive)
 {
   // A gz publisher in this process runs the bridge's callback on its own

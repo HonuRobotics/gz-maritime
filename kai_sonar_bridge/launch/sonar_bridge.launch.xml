@@ -15,6 +15,9 @@
   <arg name="view" default="true" description="Also publish a /view image beside each ROS topic"/>
   <arg name="lazy" default="true"
        description="Subscribe to a sonar in Gazebo only while one of its ROS topics has a subscriber, so an unwatched sonar does not ping"/>
+  <arg name="reliability" default="reliable"
+       description="QoS reliability of every publisher: reliable, or best_effort for a lossy link (which RViz's default displays do not receive)"/>
+  <arg name="depth" default="5" description="Messages each publisher keeps"/>
   <arg name="name" default="sonar_bridge"/>
   <node pkg="kai_sonar_bridge" exec="sonar_bridge" name="$(var name)" output="screen">
     <param name="gz_topics" value="$(var gz_topics)"/>
@@ -23,5 +26,7 @@
     <param name="kinds" value="$(var kinds)"/>
     <param name="view" value="$(var view)"/>
     <param name="lazy" value="$(var lazy)"/>
+    <param name="reliability" value="$(var reliability)"/>
+    <param name="depth" value="$(var depth)"/>
   </node>
 </launch>
