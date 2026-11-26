@@ -258,17 +258,20 @@ std::vector<RayHit> CameraSampler::Sample(
   // Normals from neighboring hits on the ray grid, in the sensor frame: for
   // each direction, the one-sided difference with the smaller range jump,
   // so a silhouette does not tilt the surface toward the background when
-  // one neighbor is on the surface. With neither (an object one ray wide)
-  // the normal is unknown and the hit keeps kUnknownIncidence.
+  // one neighbor is on the surface. With neither on the same surface (an
+  // object one ray wide) the normal is unknown and the hit keeps
+  // kUnknownIncidence.
   const std::size_t ne = this->elevationCount;
   const std::size_t cols = hits.size() / std::max<std::size_t>(ne, 1);
   std::vector<math::Vector3d> points(hits.size());
   for (std::size_t n = 0; n < hits.size(); ++n)
     points[n] = hits[n].ray.Direction() * hits[n].range;
-  auto ok = [&](long _i, long _k) {
+  // A neighbor counts only on the same surface: a neighbor on the wall
+  // behind a pole one ray wide would tilt the pole's normal to grazing.
+  auto ok = [&](std::size_t _n, long _i, long _k) {
     return _i >= 0 && _k >= 0 && _i < static_cast<long>(cols) &&
-      _k < static_cast<long>(ne) &&
-      hits[static_cast<std::size_t>(_i) * ne + static_cast<std::size_t>(_k)].hit;
+      _k < static_cast<long>(ne) && SameSurface(hits[_n],
+        hits[static_cast<std::size_t>(_i) * ne + static_cast<std::size_t>(_k)]);
   };
   for (std::size_t i = 0; i < cols; ++i)
   {
@@ -287,8 +290,8 @@ std::vector<RayHit> CameraSampler::Sample(
         const long ka = static_cast<long>(k) + _dk;
         const long ib = static_cast<long>(i) - _di;
         const long kb = static_cast<long>(k) - _dk;
-        const bool fa = ok(ia, ka);
-        const bool fb = ok(ib, kb);
+        const bool fa = ok(n, ia, ka);
+        const bool fb = ok(n, ib, kb);
         if (!fa && !fb)
           return false;
         const std::size_t na = fa ? static_cast<std::size_t>(ia) * ne +

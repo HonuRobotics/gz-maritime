@@ -275,3 +275,61 @@ TEST(CameraSampler, DoesNotBlendAStepAlongAPixelRow)
   EXPECT_GT(checked, 1000u);
   EXPECT_EQ(between, 0u);
 }
+
+/////////////////////////////////////////////////
+// A pole one ray wide, facing the sonar, in front of a wall: its neighbors
+// in azimuth are on the wall, so they cannot give its normal, and it keeps
+// the 45 degree fallback, as the same pole does in open water. With the
+// wall's own label, and with the pole's label on the wall too (one model),
+// where only the jump in range tells them apart.
+TEST(CameraSampler, PoleOneRayWideBeforeAWallKeepsTheFallback)
+{
+  sonar::SonarConfig c = sonar::EchoImaging();
+  c.rangeMax = 10.0;
+  const sonar::CameraSampler sampler(c);
+  // The azimuth step of the fan, and the ray column nearest straight ahead.
+  const auto &rays = sampler.Rays();
+  const std::size_t ne = sonar::RayFanElevationCount(c);
+  const double azStep = rays[ne].azimuth - rays[0].azimuth;
+  double az0 = rays[0].azimuth;
+  for (std::size_t n = 0; n < rays.size(); n += ne)
+    if (std::abs(rays[n].azimuth) < std::abs(az0))
+      az0 = rays[n].azimuth;
+  const double x = 4.0;
+  const double yc = x * std::tan(az0);
+  const double half = 0.5 * x * azStep;
+
+  for (std::uint32_t wallLabel : {3u, 2u})
+  {
+    for (bool wall : {false, true})
+    {
+      sonar::SyntheticScene scene;
+      scene.AddBox({x, yc - half, 0.0}, {x + 0.02, yc + half, 4.0},
+        Lambert(-15.0), 2);
+      if (wall)
+        scene.AddPlane({8, 0, 0}, {-1, 0, 0}, Lambert(-20.0), wallLabel);
+      const Pose3d pose(0, 0, 2, 0, 0, 0);
+      const auto hits = DrawAndSample(sampler, scene, pose,
+        {Lambert(-20.0), Lambert(-20.0), Lambert(-15.0), Lambert(-20.0)});
+      std::size_t onPole = 0, bad = 0;
+      double worst = 0.0;
+      for (const auto &h : hits)
+      {
+        if (!h.hit || h.range > 6.0)
+          continue;
+        ++onPole;
+        // Head on is 0; the fallback is 45 degrees. Anything else is a
+        // normal taken across the jump to the wall.
+        const double inc = h.incidence;
+        const double err = std::min(inc, std::abs(inc - 45.0 * kDeg));
+        worst = std::max(worst, inc);
+        if (err > 2.0 * kDeg)
+          ++bad;
+      }
+      std::printf("wall %d label %u: %zu rays on the pole, largest "
+        "incidence %.1f deg\n", wall, wallLabel, onPole, worst / kDeg);
+      EXPECT_GT(onPole, 10u);
+      EXPECT_EQ(bad, 0u) << "wall " << wall << " label " << wallLabel;
+    }
+  }
+}

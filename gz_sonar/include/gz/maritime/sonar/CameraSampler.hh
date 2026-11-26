@@ -63,8 +63,9 @@ struct CameraLayout
 /// grazing angle; elsewhere, at a silhouette, the nearest pixel is kept, so
 /// a target and the background behind it are not blended. Depth is along the
 /// camera's optical axis and is converted to range along the ray. Normals
-/// come from neighboring hits on the ray grid (the one-sided difference with
-/// the smaller range jump), and footprints from AssignFootprints.
+/// come from neighboring hits on the ray grid on the same surface
+/// (SameSurface; the one-sided difference with the smaller range jump), and
+/// footprints from AssignFootprints.
 class CameraSampler
 {
   /// \brief A sampler for one sonar.
