@@ -170,6 +170,7 @@ the full rationale (section refs below).
   step in the current; a vehicle whose hydrodynamics carries plugin added
   mass turns that step into a force spike, so keep added mass out of a
   vehicle that may see one, or add a ramp before relying on it.
+- **The sonar worlds are walkthrough worlds, outside the world rules.** `gz_sonar/worlds/` (`sonar_imaging`, `sonar_survey`, `sonar_shipwreck`) exist only for the sonar how-tos, and copy the water world of the vehicle each one flies (`bluerobotics_models`' `bluerov2_water.sdf` and `blueboat_water.sdf`): gz-sim's graded buoyancy enabled by name on that vehicle's displacement link, the world named for its scene rather than `default`, and no wind system. They need the vehicles from `bluerobotics_models` and nothing in this repository launches them. Do not use them as a pattern or build on them; a world for general use goes in `kai_gazebo` and follows the rules above.
 - **A hull feels the water through one model: Fossen or marks, never
   both.** A model with identified coefficients keeps its Hydrodynamics
   plugin and marks nothing for the current. A model without them marks the
