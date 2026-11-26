@@ -33,3 +33,19 @@
   ros_type_name: "geometry_msgs/msg/TwistStamped"
   gz_type_name: "gz.msgs.Twist"
   direction: GZ_TO_ROS
+
+# The water's optics, changed from ROS: jerlov (a string), visibility,
+# daylight and water_level (numbers), and attenuation, backscatter, veil and
+# diffuse_attenuation ("r g b" strings), any of them. Needs the water optics
+# system in the world.
+- topic_name: "/world/default/water_optics/set"
+  ros_type_name: "ros_gz_interfaces/msg/ParamVec"
+  gz_type_name: "gz.msgs.Param"
+  direction: ROS_TO_GZ
+
+# The water's optics, as ground truth: the resolved type, coefficients,
+# visibility and water level, as named parameters.
+- topic_name: "/world/default/water_optics_info"
+  ros_type_name: "ros_gz_interfaces/msg/ParamVec"
+  gz_type_name: "gz.msgs.Param"
+  direction: GZ_TO_ROS
