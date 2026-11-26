@@ -90,6 +90,8 @@ Whether anyone subscribes is gz-transport's answer, and it can miss a subscriber
 
 It then costs its full rate with nobody listening, so set it only where it is needed. The `enable` service still turns it off.
 
+The answer can be wrong the other way too: a subscriber that dies without unsubscribing (killed with `SIGKILL`, or a script that ends by `os._exit`) still counts, so the sonar keeps pinging although `gz topic -i` lists no subscriber. The log then says `pinging` and never `no subscriber, not pinging`. Turn the sonar off with its `enable` service, or restart the server.
+
 ## Check
 
 ```bash
