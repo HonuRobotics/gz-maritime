@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cerrno>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -705,6 +706,7 @@ TEST(Engine, ThreadCount)
   }
 }
 
+#ifdef __linux__
 namespace
 {
 //////////////////////////////////////////////////
@@ -722,6 +724,46 @@ std::size_t ThreadsOfProcess()
 }
 
 //////////////////////////////////////////////////
+/// \brief Wait for this process to have a number of threads. A thread that
+/// has been joined can stay listed for a moment, longer on a busy machine,
+/// so the count is polled rather than read once.
+/// \param[in] _expected The number of threads.
+/// \param[in] _limit How long to wait.
+/// \return Whether the count got there within the limit.
+bool ThreadsOfProcessBecome(std::size_t _expected,
+  std::chrono::seconds _limit = std::chrono::seconds(30))
+{
+  const auto deadline = std::chrono::steady_clock::now() + _limit;
+  while (ThreadsOfProcess() != _expected)
+  {
+    if (std::chrono::steady_clock::now() >= deadline)
+      return false;
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  return true;
+}
+
+//////////////////////////////////////////////////
+/// \brief The threads of this process once those an earlier test joined
+/// are off the list: the count that has held for 20 ms.
+/// \return The number of threads.
+std::size_t SettledThreadsOfProcess()
+{
+  const auto deadline =
+    std::chrono::steady_clock::now() + std::chrono::seconds(30);
+  std::size_t count = ThreadsOfProcess();
+  for (int same = 0; same < 20 &&
+       std::chrono::steady_clock::now() < deadline;)
+  {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    const std::size_t now = ThreadsOfProcess();
+    same = now == count ? same + 1 : 0;
+    count = now;
+  }
+  return count;
+}
+
+//////////////////////////////////////////////////
 /// \brief Worker threads the engines of this process share.
 /// \return The number of threads.
 std::size_t SharedWorkers()
@@ -732,7 +774,6 @@ std::size_t SharedWorkers()
 }
 }  // namespace
 
-#ifdef __linux__
 //////////////////////////////////////////////////
 // The engines share their threads, and the threads go with the last engine:
 // eight sonars run no more threads than one, and making and dropping
@@ -740,40 +781,49 @@ std::size_t SharedWorkers()
 // leaves no threads behind.
 TEST(Engine, NoThreadsLeftBehind)
 {
+  // A small fan: the threads are the subject, and the test is repeated.
   sonar::SonarConfig c = CleanEcho();
+  c.samples = 128;
+  c.raysPerBeam = 1;
   sonar::SyntheticScene scene;
   scene.AddPlane({0, 0, 0}, {0, 0, 1}, Lambert(-27.0), 1);
   const Pose3d pose(0, 0, 2, 0, 15.0 * kDeg, 0);
   const auto hits = scene.Cast(pose, sonar::RayFan(c), 1.5 * c.rangeMax);
 
-  const std::size_t before = ThreadsOfProcess();
+  const std::size_t before = SettledThreadsOfProcess();
   for (int round = 0; round < 5; ++round)
   {
     // An engine on one thread starts none.
     c.threads = 1;
     auto single = std::make_unique<sonar::Engine>(c, HarborWater());
-    EXPECT_EQ(ThreadsOfProcess(), before);
+    EXPECT_TRUE(ThreadsOfProcessBecome(before)) << ThreadsOfProcess();
 
     std::vector<std::unique_ptr<sonar::Engine>> engines;
     for (std::size_t threads : {0u, 8u, 3u, 0u, 2u, 24u, 0u, 0u})
     {
       c.threads = threads;
       engines.push_back(std::make_unique<sonar::Engine>(c, HarborWater()));
-      EXPECT_EQ(ThreadsOfProcess(), before + SharedWorkers());
+      EXPECT_TRUE(ThreadsOfProcessBecome(before + SharedWorkers()))
+        << ThreadsOfProcess();
     }
     for (auto &engine : engines)
       engine->Ping(hits, static_cast<std::uint64_t>(round));
-    EXPECT_EQ(ThreadsOfProcess(), before + SharedWorkers());
+    EXPECT_TRUE(ThreadsOfProcessBecome(before + SharedWorkers()))
+      << ThreadsOfProcess();
 
-    // The threads stay while any engine uses them, whichever it is.
+    // The threads stay while any engine uses them, whichever it is. Here
+    // the count must hold, not arrive, so it is read once: it can only be
+    // wrong by being too low, which no lingering thread explains.
     std::swap(engines[round], engines.back());
     while (engines.size() > 1)
     {
       engines.pop_back();
-      EXPECT_EQ(ThreadsOfProcess(), before + SharedWorkers());
+      EXPECT_GE(ThreadsOfProcess(), before + SharedWorkers());
     }
+    EXPECT_TRUE(ThreadsOfProcessBecome(before + SharedWorkers()))
+      << ThreadsOfProcess();
     engines.clear();
-    EXPECT_EQ(ThreadsOfProcess(), before);
+    EXPECT_TRUE(ThreadsOfProcessBecome(before)) << ThreadsOfProcess();
   }
 }
 #endif
@@ -935,7 +985,7 @@ TEST(Engine, ThreadThatFailsToStart)
   for (std::size_t granted : {std::size_t(0), SharedWorkers() / 2,
        SharedWorkers() - 1})
   {
-    const std::size_t before = ThreadsOfProcess();
+    const std::size_t before = SettledThreadsOfProcess();
     threadsRefused = 0;
     threadsGranted = static_cast<int>(granted);
     {
@@ -943,7 +993,8 @@ TEST(Engine, ThreadThatFailsToStart)
       threadsGranted = -1;
       EXPECT_EQ(threadsRefused, 1) << granted;
       EXPECT_EQ(engine.Threads(), granted + 1);
-      EXPECT_EQ(ThreadsOfProcess(), before + granted);
+      EXPECT_TRUE(ThreadsOfProcessBecome(before + granted))
+        << ThreadsOfProcess();
       for (std::uint64_t ping = 0; ping < 3; ++ping)
       {
         const auto out = engine.Ping(hits, ping);
