@@ -82,7 +82,10 @@ out gl_PerVertex
 // periodic across world space.
 vec3 SampleDisplaced(vec2 worldXY, float s)
 {
-  vec2 uv = fract(worldXY / tileSize);
+  // Grid point (i, j) is the water at (i, j) * tileSize / N, and its texel's
+  // centre is half a texel into the texture. Without that half the drawn sea
+  // sits half a cell from the field, towards +x and +y.
+  vec2 uv = fract(worldXY / tileSize + 0.5 / vec2(textureSize(heightMap, 0)));
   vec4 hd = texture(heightMap, uv);
   // Dx/Dy are the final displacement (engine-side choppiness already applied).
   return vec3(worldXY + s * hd.gb, s * hd.r);

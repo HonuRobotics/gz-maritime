@@ -38,21 +38,23 @@ import pytest
 WORLDS = Path(get_package_share_directory('kai_gazebo')) / 'worlds'
 ALL = ('open_water', 'sydney_regatta', 'sydney_regatta_lite', 'benderson_park',
        'benderson_park_lite', 'sand_island', 'sand_island_lite', 'la_spezia', 'la_spezia_lite',
-       'marina_bay', 'marina_bay_lite', 'robotx_2026', 'aquatic_centre',
+       'marina_bay', 'marina_bay_lite', 'robotx_2026', 'aquatic_centre', 'acoustic_demo',
        'underwater_camera_demo')
 # Worlds indoors, whose water is their own model's: no drawn sea.
 INDOOR = ('aquatic_centre',)
 # Worlds with no Fuel model in them, so they load with no network and no cache.
-LOCAL = ('open_water', 'underwater_camera_demo')
+LOCAL = ('open_water', 'acoustic_demo', 'underwater_camera_demo')
 REQUIRED_SYSTEMS = (
     'gz-sim-physics-system', 'gz-sim-user-commands-system',
     'gz-sim-scene-broadcaster-system', 'gz-sim-sensors-system',
     'gz-sim-imu-system', 'gz-sim-magnetometer-system', 'gz-sim-navsat-system',
     'gz-sim-air-pressure-system', 'gz-maritime-buoyancy-system',
     'gz-maritime-wind-system', 'gz-maritime-ocean-current-system',
+    'gz-maritime-acoustics-system',
 )
-# The gz_maritime_gui panels every world docks, drawing off.
-REQUIRED_PANELS = ('OceanCurrentPanel', 'WindPanel', 'ScenarioPanel')
+# The gz_maritime_gui panels every world docks, drawing off (but in the
+# acoustic demo, whose point is the acoustics panel's drawing).
+REQUIRED_PANELS = ('OceanCurrentPanel', 'WindPanel', 'ScenarioPanel', 'AcousticsPanel')
 
 
 def sdf_env():
@@ -85,6 +87,10 @@ def test_world_keeps_the_contract(world):
     for panel in ('OceanCurrentPanel', 'WindPanel'):
         display = gui[panel].find('display')
         assert display is not None and display.text == 'off', f'{panel} draws by default'
+    if world != 'acoustic_demo':
+        for tag in ('reach', 'pings', 'readings'):
+            draw = gui['AcousticsPanel'].find(tag)
+            assert draw is None or draw.text == 'false', f'AcousticsPanel draws {tag} by default'
     uris = [i.find('uri').text for i in w.findall('include')]
     drawn = any(u.startswith('model://water_surface') for u in uris)
     if world in INDOOR:

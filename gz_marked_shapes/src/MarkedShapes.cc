@@ -29,6 +29,7 @@
 #include <sdf/Box.hh>
 #include <sdf/Capsule.hh>
 #include <sdf/Collision.hh>
+#include <sdf/Cone.hh>
 #include <sdf/Cylinder.hh>
 #include <sdf/Ellipsoid.hh>
 #include <sdf/Geometry.hh>
@@ -146,6 +147,7 @@ bool Resolve(const EntityComponentManager &_ecm, const Entity _collision,
   if (nullptr == geom)
     return false;
 
+  _shape.type = geom->Type();
   switch (geom->Type())
   {
     case sdf::GeometryType::BOX:
@@ -185,6 +187,14 @@ bool Resolve(const EntityComponentManager &_ecm, const Entity _collision,
       _shape.half = r;
       _shape.area.Set(GZ_PI * r.Y() * r.Z(), GZ_PI * r.X() * r.Z(),
                       GZ_PI * r.X() * r.Y());
+      break;
+    }
+    case sdf::GeometryType::CONE:
+    {
+      const double r = geom->ConeShape()->Radius();
+      const double l = geom->ConeShape()->Length();
+      _shape.half.Set(r, r, l / 2.0);
+      _shape.area.Set(r * l, r * l, GZ_PI * r * r);
       break;
     }
     case sdf::GeometryType::MESH:
@@ -320,6 +330,18 @@ void MarkedLinks::Reset()
   this->links.clear();
   this->newLinks.clear();
   this->rescan = true;
+}
+
+//////////////////////////////////////////////////
+void MarkedLinks::Prune(const EntityComponentManager &_ecm)
+{
+  for (auto it = this->links.begin(); it != this->links.end();)
+  {
+    if (_ecm.HasEntity(it->first))
+      ++it;
+    else
+      it = this->links.erase(it);
+  }
 }
 
 //////////////////////////////////////////////////

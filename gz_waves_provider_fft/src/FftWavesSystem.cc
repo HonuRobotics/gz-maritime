@@ -67,7 +67,8 @@ namespace gz::sim::systems
 ///   spectrum/spreading/dispersion tags, ...) is independent of `<sea_state>`
 ///   and applies in both modes — combine freely.
 ///
-/// `<direction>` is parsed but not applied — Ehukai assumes wind along +X.
+/// `<direction>` is parsed but not applied — Ehukai assumes wind along +X, so
+/// the waves travel towards +x.
 ///
 /// \verbatim
 /// <plugin filename="gz-sim-waves-fft-system" name="gz::sim::systems::FftWaves">
