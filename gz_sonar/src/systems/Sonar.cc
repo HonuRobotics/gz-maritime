@@ -1328,10 +1328,9 @@ void SonarPrivate::OnRender()
       continue;
     // Off (its enable service) or nobody listening: skip this ping's render
     // and model, but keep to the rate grid so ping numbers stay tied to time.
-    // HasConnections is gz-transport's word, and that can miss a subscriber;
-    // a sonar with <always_ping> does not ask. Each change is said at debug
-    // level, so a subscriber that gets nothing can be told from one that
-    // was not seen.
+    // HasConnections is gz-transport's word; a sonar with <always_ping> does
+    // not ask. Each change is said at debug level, so it shows in the log why
+    // a subscriber gets nothing.
     const auto &sonar = *rig.request.sonar;
     const Rig::State state = !sonar.IsActive() ? Rig::State::kOff :
       sonar.AlwaysPing() || sonar.HasConnections() ? Rig::State::kPinging :

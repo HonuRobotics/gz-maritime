@@ -80,7 +80,7 @@ gz service -s /my_vehicle/sonar_forward/image/enable --reqtype gz.msgs.Boolean -
 
 `data: true` turns it back on; `<topic>/set_rate` (a `gz.msgs.Double`) changes its rate.
 
-Whether anyone subscribes is gz-transport's answer, and it can miss a subscriber: a process that subscribes to several sonar topics one after another may get nothing on some of them until another process subscribes to the same topic. If a subscriber gets no pings, run the server with `-v 4`, where each sonar logs when it starts and stops pinging and why; if it says `no subscriber, not pinging` while you are subscribed, make that sonar ping regardless:
+Whether anyone subscribes is gz-transport's answer. If a subscriber gets no pings, run the server with `-v 4`, where each sonar logs when it starts and stops pinging and why. To make a sonar ping whether or not anything subscribes:
 
 ```xml
 <gz:sonar>
@@ -90,7 +90,7 @@ Whether anyone subscribes is gz-transport's answer, and it can miss a subscriber
 
 It then costs its full rate with nobody listening, so set it only where it is needed. The `enable` service still turns it off.
 
-The answer can be wrong the other way too: a subscriber that dies without unsubscribing (killed with `SIGKILL`, or a script that ends by `os._exit`) still counts, so the sonar keeps pinging although `gz topic -i` lists no subscriber. The log then says `pinging` and never `no subscriber, not pinging`. Turn the sonar off with its `enable` service, or restart the server.
+The answer can be wrong: a subscriber that dies without unsubscribing (killed with `SIGKILL`, or a script that ends by `os._exit`) still counts, so the sonar keeps pinging although `gz topic -i` lists no subscriber. The log then says `pinging` and never `no subscriber, not pinging`. Turn the sonar off with its `enable` service, or restart the server.
 
 ## Check
 

@@ -129,8 +129,7 @@ class SonarSensor : public sensors::Sensor
   public: bool HasConnections() const override;
 
   /// \brief Whether the sonar pings with no subscriber too, its
-  /// <always_ping>. HasConnections trusts gz-transport, which can miss a
-  /// subscriber; this is the way around it.
+  /// <always_ping>.
   /// \return True if it pings regardless of subscribers.
   public: bool AlwaysPing() const;
 
