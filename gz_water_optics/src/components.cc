@@ -17,4 +17,5 @@
 // Registers the WaterOptics component. Every plugin that reads or writes it
 // links this library, so the registration runs as soon as one is loaded,
 // including in a GUI or sensors process that receives it in the scene state.
+#include "gz/sim/components/UnderwaterRendering.hh"
 #include "gz/sim/components/WaterOptics.hh"

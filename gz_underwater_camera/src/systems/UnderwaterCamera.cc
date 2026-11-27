@@ -44,6 +44,7 @@
 #include <gz/sim/Util.hh>
 #include <gz/sim/components/RgbdCamera.hh>
 
+#include "gz/sim/components/UnderwaterRendering.hh"
 #include "gz/sim/underwater_camera/UnderwaterImage.hh"
 #include "gz/sim/water_optics/WaterOpticsSampler.hh"
 
@@ -196,6 +197,9 @@ class gz::sim::maritime::UnderwaterCameraPrivate
 
   /// \brief The worker.
   public: std::thread worker;
+
+  /// \brief Whether the pass-through was announced.
+  public: bool warnedDrawn{false};
 };
 
 //////////////////////////////////////////////////
@@ -512,6 +516,11 @@ void UnderwaterCamera::PostUpdate(const UpdateInfo &_info,
   d.Listen(d.imagePub.HasConnections() || d.infoPub.HasConnections());
 
   d.sampler.Sync(_ecm);
+  // The renderer already draws the water into every camera's image: do not
+  // apply it twice.
+  const auto *mark = _ecm.Component<components::UnderwaterRendering>(
+      worldEntity(_ecm));
+  const bool drawn = mark && _ecm.HasEntity(mark->Data());
   const auto pose = worldPose(d.sensor, _ecm);
   uc::Water water;
   if (d.sampler.Valid())
@@ -526,6 +535,19 @@ void UnderwaterCamera::PostUpdate(const UpdateInfo &_info,
   }
   // Without water optics, the camera is in clear water: only its response
   water.cameraRotation = pose.Rot();
+
+  if (drawn)
+  {
+    // The water is in the image already: only the camera's response
+    water.cameraDepth = 0.0;
+    if (!d.warnedDrawn)
+    {
+      gzmsg << "UnderwaterCamera: the renderer draws the water "
+            << "(gz_underwater_rendering); only the camera's response is "
+            << "applied\n";
+      d.warnedDrawn = true;
+    }
+  }
 
   auto &box = *d.mailbox;
   {
