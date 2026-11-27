@@ -294,7 +294,7 @@ std::mutex LampsTest::mutex;
 std::map<std::int64_t, msgs::Image> LampsTest::images, LampsTest::depths;
 }  // namespace
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The plate, lit by the lamp: its clear-water colour faded both ways, lamp
 // to plate and plate to camera, plus the beam in front of it.
 TEST_F(LampsTest, LitPlateFadesBothWays)
@@ -333,7 +333,7 @@ TEST_F(LampsTest, LitPlateFadesBothWays)
   EXPECT_LE(worst, 2);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The beam against the black backdrop, along the centre row, against the
 // fine integration, in each water: its profile within 5 % of its peak.
 TEST_F(LampsTest, BeamProfile)
@@ -366,7 +366,7 @@ TEST_F(LampsTest, BeamProfile)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Clear water carries the beam farther across the view; murkier water
 // keeps it nearer the lamp. (Brighter near the lens is not one of them:
 // 35 cm from the lens, the murkiest water fades the lamp's light before it
@@ -390,7 +390,7 @@ TEST_F(LampsTest, ClearReachesFartherMurkyStaysNear)
   EXPECT_LT(glow(frames["clear"], far), 0.002);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A light is a lamp only if its name says so. The same scene with the
 // spot light named "torch": Ogre lights the plate with it, as in air, and
 // in the water it draws no beam over the backdrop, where the lamp of

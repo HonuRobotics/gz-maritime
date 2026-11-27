@@ -48,7 +48,7 @@ int CentreGreen(CameraPtr _camera)
 }
 }  // namespace
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // An orthographic camera beside a perspective one, the bridge driven
 // through its C interface, without Gazebo. The perspective camera sees the
 // box through the water, as the model has it; the orthographic one (the

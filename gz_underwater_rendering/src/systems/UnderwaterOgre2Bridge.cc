@@ -368,14 +368,19 @@ class Backdrop : public Ogre::Camera::Listener
     }
   }
 
-  /// \brief Tell each RGBD camera's colour pass, while the backdrop
-  /// shows, that the scene has a background, so it keeps the backdrop
-  /// where nothing was hit: without a sky, that pass paints those pixels
-  /// with the scene's background colour, and the backdrop writes no depth.
-  /// Hidden, the camera has gz-rendering's own setting back: a background
-  /// only with a sky. The depth is not touched.
+  /// \brief Tell each RGBD camera's colour pass under the water, while
+  /// the backdrop shows, that the scene has a background, so it keeps the
+  /// backdrop where nothing was hit: without a sky, that pass paints those
+  /// pixels with the scene's background colour, and the backdrop writes no
+  /// depth. A camera above the water, or with the backdrop hidden, has
+  /// gz-rendering's own setting: a background only with a sky, so it does
+  /// not show what lies just past its far plane. The depth is not touched.
   /// \param[in] _show Whether the backdrop shows.
-  private: void MarkDepthCameras(bool _show)
+  /// \param[in] _level The still water level, world z.
+  /// \param[in] _surface The surface over each camera, or null.
+  /// \param[in] _time Simulation time, for the surface, s.
+  private: void MarkDepthCameras(bool _show, float _level, Surface *_surface,
+                                 double _time)
   {
     if (!gz::rendering::isEngineLoaded("ogre2"))
       return;
@@ -404,17 +409,34 @@ class Backdrop : public Ogre::Camera::Listener
         if (!pass->hasFragmentProgram())
           continue;
         auto params = pass->getFragmentProgramParameters();
-        if (params->_findNamedConstantDefinition("hasBackground"))
-          params->setNamedConstant("hasBackground", _show ? 1 : own);
+        if (!params->_findNamedConstantDefinition("hasBackground"))
+          continue;
+        bool under = false;
+        if (_show)
+        {
+          const auto at = sensor->WorldPosition();
+          const Ogre::Vector3 p(static_cast<float>(at.X()),
+                                static_cast<float>(at.Y()),
+                                static_cast<float>(at.Z()));
+          const float level =
+              _surface ? _surface->Level(p, _level, _time) : _level;
+          under = p.z < level;
+        }
+        params->setNamedConstant("hasBackground", under ? 1 : own);
       }
     }
   }
 
   /// \brief Show it in every scene, around the water level, or hide it.
-  public: void Update(bool _show, float _level)
+  /// \param[in] _show Whether to show it.
+  /// \param[in] _level The still water level, world z.
+  /// \param[in] _surface The surface over each camera, or null.
+  /// \param[in] _time Simulation time, for the surface, s.
+  public: void Update(bool _show, float _level, Surface *_surface = nullptr,
+                      double _time = 0.0)
   {
     this->WatchCameras();
-    this->MarkDepthCameras(_show && !this->failed);
+    this->MarkDepthCameras(_show && !this->failed, _level, _surface, _time);
     Ogre::Root *root = Ogre::Root::getSingletonPtr();
     if (!root)
       return;
@@ -457,7 +479,7 @@ class Backdrop : public Ogre::Camera::Listener
   /// \brief Take it out of the scenes that are still there.
   public: void Destroy()
   {
-    this->MarkDepthCameras(false);
+    this->MarkDepthCameras(false, 0.0f, nullptr, 0.0);
     Ogre::Root *root = Ogre::Root::getSingletonPtr();
     if (root)
     {
@@ -496,6 +518,7 @@ class Backdrop : public Ogre::Camera::Listener
   {
     this->items.clear();
     this->watched.clear();
+    this->solid.clear();
     this->failed = false;
   }
 
@@ -824,6 +847,7 @@ class UnderwaterListener : public ChainedListener
   {
     this->lamps.clear();
     this->hidden.clear();
+    this->warnedLamps = 0;
   }
 
   /// \brief The limit last warned about, when there were more lamps than
@@ -1189,7 +1213,8 @@ void SetWater(const UwWater *_v)
   // Lamps that appear later (a vehicle spawned with its lights) are hidden
   // on the frame they appear.
   s.listener.HideLamps(w.active);
-  s.listener.backdrop.Update(s.done && w.active, _v ? _v->level : 0.0f);
+  s.listener.backdrop.Update(s.done && w.active, _v ? _v->level : 0.0f,
+                            &s.listener.surface, _v ? _v->time : 0.0);
   if (!_v)
     return;
   std::memcpy(w.attenuation, _v->attenuation, sizeof(w.attenuation));

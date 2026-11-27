@@ -144,6 +144,8 @@ class WorldRun
   /// \brief Of the first frame with both images after a stamp: the mean
   /// linear green of what is nearer than 4 m in each quarter of the image's
   /// width, middle rows.
+  /// \param[in] _after Stamp, ns: the frame must come after it.
+  /// \param[out] _mean The four means, left to right.
   /// \return Whether there was one.
   public: bool Quarters(std::int64_t _after, std::array<double, 4> &_mean)
   {
@@ -199,7 +201,7 @@ bool Started(WorldRun &_run)
 }
 }  // namespace
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Five lamps, one more than the shader takes. The four it takes light
 // nothing in view: one whose range lies wholly behind the camera (its
 // interval along each view ray is reversed) and three aimed behind it; none
@@ -220,7 +222,7 @@ TEST(LampEdges, MoreLampsThanTheLimitAndLampsOutOfView)
   EXPECT_LT(backdrop, 0.002) << "a beam from a lamp that lights no view";
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A lamp on a vehicle: its beam shows; the vehicle is removed while the
 // world runs, and the lamp, its light and its beam are gone, nothing left
 // pointing at it; then the world shuts down.
@@ -262,7 +264,7 @@ TEST(LampEdges, LampRemovedThenShutdown)
   run.server.reset();
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The renderer's model removed while a lamp shines: the lamp goes back to
 // Ogre, which lights the plate with it as in air, and the beam is gone.
 TEST(LampEdges, LampsGoBackToOgreWhenTheRendererGoes)
@@ -302,7 +304,7 @@ TEST(LampEdges, LampsGoBackToOgreWhenTheRendererGoes)
   run.server.reset();
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Four lamps at <quality>low</quality>, which lights two in the shader:
 // the other two are left to Ogre, not hidden from it, so each of the four
 // plates is lit by its lamp.

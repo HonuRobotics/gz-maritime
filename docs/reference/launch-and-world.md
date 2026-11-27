@@ -350,7 +350,7 @@ starts it off, and a `gz.msgs.Boolean` on
 `<quality>` in its plugin, `low`, `medium` (default) or `high`, sets how
 finely the lamps' beams are marched and how far marine snow is drawn.
 Cameras above the water see as in air (lamps included, lit as Ogre lights
-them), and an underwater camera plugin in the same world applies only its
+them, but casting no shadows while the water is drawn), and an underwater camera plugin in the same world applies only its
 own response while it is on. Depth is measured below the wave over each
 camera. What PBS shades and what is unlit (particles) is drawn through the
 water; looking at nothing, a camera under water sees the veil; the water

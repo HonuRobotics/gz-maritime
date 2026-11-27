@@ -117,6 +117,14 @@ class UnderwaterRendering
 
   public: void PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm) override
   {
+    // The GUI never unloads the plugin: once its model is gone there, it
+    // draws nothing more, as the server's cameras do
+    if (!_ecm.HasEntity(this->owner))
+    {
+      const std::lock_guard<std::mutex> lock(this->mutex);
+      this->water.reset();
+      return;
+    }
     const Entity world = worldEntity(_ecm);
     this->SyncOptics(_ecm, world);
 
@@ -206,30 +214,49 @@ class UnderwaterRendering
   {
     const bool here = _world != kNullEntity &&
         _ecm.Component<components::WaterOptics>(_world);
+    // A reply that brought no state: ask again, at most once a second
+    if (this->askedState && !here)
+    {
+      const std::lock_guard<std::mutex> lock(this->pulled->mutex);
+      if (this->pulled->failed &&
+          std::chrono::steady_clock::now() - this->askedAt >=
+              std::chrono::seconds(1))
+      {
+        this->pulled->failed = false;
+        this->askedState = false;
+      }
+    }
     if (!here && _world != kNullEntity && !this->askedState)
     {
       this->askedState = true;
+      this->askedAt = std::chrono::steady_clock::now();
       std::shared_ptr<Pulled> into = this->pulled;
       std::function<void(const msgs::SerializedStepMap &, const bool)> cb =
           [into](const msgs::SerializedStepMap &_rep, const bool _ok)
           {
-            if (!_ok)
-              return;
-            auto ecm = std::make_unique<EntityComponentManager>();
-            ecm->SetState(_rep.state());
+            std::unique_ptr<EntityComponentManager> ecm;
+            if (_ok)
+            {
+              ecm = std::make_unique<EntityComponentManager>();
+              ecm->SetState(_rep.state());
+            }
             const std::lock_guard<std::mutex> lock(into->mutex);
-            into->ecm = std::move(ecm);
+            into->failed = !_ok;
+            if (ecm)
+              into->ecm = std::move(ecm);
           };
       this->node.Request("/world/" + this->worldName + "/state", cb);
     }
-    if (!here)
     {
       const std::lock_guard<std::mutex> lock(this->pulled->mutex);
-      if (this->pulled->ecm)
+      if (!here && this->pulled->ecm)
       {
         this->sampler.Sync(*this->pulled->ecm);
         return;
       }
+      // The component is here: the pulled copy of the world is not needed
+      if (here)
+        this->pulled->ecm.reset();
     }
     this->sampler.Sync(_ecm);
   }
@@ -349,15 +376,28 @@ class UnderwaterRendering
     this->installed = false;
   }
 
-  /// \brief The world's state, asked for once, while this process's
-  /// entity manager has no water optics. Shared with the reply's callback.
+  /// \brief The world's state, asked for while this process's entity
+  /// manager has no water optics. Shared with the reply's callback.
   private: struct Pulled
   {
+    /// \brief Guards the rest.
     std::mutex mutex;
+    /// \brief The state the reply brought, until the component arrives.
     std::unique_ptr<EntityComponentManager> ecm;
+    /// \brief Whether the last ask got no state: ask again.
+    bool failed{false};
   };
+
+  /// \brief The world's state, pulled for the GUI.
   private: std::shared_ptr<Pulled> pulled{std::make_shared<Pulled>()};
+
+  /// \brief Whether the state was asked for, and no reply said it failed.
   private: bool askedState{false};
+
+  /// \brief When it was last asked for, to ask again at most once a second.
+  private: std::chrono::steady_clock::time_point askedAt;
+
+  /// \brief The world's name, for its state service.
   private: std::string worldName{"default"};
 
   private: water_optics::WaterOpticsSampler sampler;

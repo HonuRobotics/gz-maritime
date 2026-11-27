@@ -209,8 +209,9 @@ under water, and simulate the same shot:
    to 14 degrees for its scenes. It also prints the luminance of each render
    against the photo, for information: it does not enter the ranking. An
    image whose patches barely differ (under 3 degrees between any two) is
-   refused: the chart is lost in the water, and every water would look
-   alike.
+   refused with exit code 3: the chart is lost in the water, and every
+   water would look alike. With `--threshold`, a closest water whose error
+   is not under it exits 1.
 
 The water with the smallest error is the nearest; refine it with
 `<visibility>` or explicit coefficients the same way. At half a metre, 2 m

@@ -50,7 +50,10 @@
 	// lights a fragment from lightDir: what Ogre itself would give the lamp.
 	// Ogre does not declare its BRDF in a pass without lights of its own, so
 	// it is written out here, with Ogre's own Fresnel pieces. Clear coat is
-	// left out.
+	// left out. Copied from Ogre-Next 2.3's default BRDF, as gz-rendering 10
+	// ships it (ogre2/media/Hlms/Pbs/Any/Main/200.BRDFs_piece_ps.any,
+	// BRDF_Default): a newer Ogre or gz-rendering needs this compared with
+	// that file again. lamp_air_test checks the two agree.
 	float3 uwBrdf( float3 lightDir, float3 lightDiffuse, float3 lightSpecular,
 	               PixelData pixelData )
 	{

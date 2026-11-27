@@ -27,7 +27,7 @@
 using gz::sim::underwater_test::Capture;
 using gz::sim::underwater_test::CaptureWorld;
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // When the renderer cannot draw the water, here because its pieces are not
 // where GZ_UNDERWATER_HLMS_DIR says, it does not mark the world: the
 // reference camera draws the water, as in a world without the GPU path.

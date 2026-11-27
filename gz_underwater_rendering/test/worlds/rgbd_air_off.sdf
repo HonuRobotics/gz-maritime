@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!--
+  An RGBD camera 2 m above the water, in a world with no sky, looking at a
+  red box 42 m ahead, past its 40 m far plane. Without the GPU path, for comparison. Its colour image
+  shows the scene's background where nothing is in range, the box
+  included, with the renderer as without it.
+-->
+<sdf version="1.9">
+  <world name="uwrgbdair">
+    <physics name="p" type="ignored"><max_step_size>0.01</max_step_size><real_time_factor>0</real_time_factor></physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors"><render_engine>ogre2</render_engine></plugin>
+    <plugin filename="gz-maritime-water-optics-system" name="gz::sim::maritime::WaterOptics">
+      <jerlov>3C</jerlov>
+    </plugin>
+    <scene><ambient>0.6 0.6 0.6 1</ambient><background>0.2 0.2 0.2 1</background></scene>
+    <light type="directional" name="sun"><direction>-0.3 0.2 -1</direction></light>
+    <model name="box"><static>true</static><pose>42 0 2 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><box><size>1 20 10</size></box></geometry>
+        <material><ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse></material></visual></link></model>
+    <model name="rig"><static>true</static>
+      <link name="cam"><pose>0 0 2 0 0 0</pose><sensor name="rgbd" type="rgbd_camera"><topic>uwrgbdair/rgbd</topic><update_rate>10</update_rate><always_on>1</always_on>
+        <camera><horizontal_fov>1.0</horizontal_fov><image><width>160</width><height>120</height></image><clip><near>0.1</near><far>40</far></clip><depth_camera><clip><near>0.1</near><far>40</far></clip></depth_camera></camera></sensor></link>
+    </model>
+  </world>
+</sdf>
