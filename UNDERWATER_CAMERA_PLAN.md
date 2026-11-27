@@ -571,8 +571,9 @@ What it settled:
 In the GPU path (`gz_underwater_rendering`), as the spike said it must be.
 
 - **Lamps** are the world's spot and point lights (up to four). The shader
-  lights with them itself, by their diffuse term with Ogre's own spot cone
-  and attenuation, faded `exp(−β^D d)` from lamp to fragment, then the
+  lights with them itself, by Ogre's own default BRDF (diffuse and
+  specular, metal included; no clear coat) with Ogre's spot cone and
+  attenuation, so a lamp above the water lights as Ogre would, faded `exp(−β^D d)` from lamp to fragment, then the
   water to the camera as for any light. To count them once, they are hidden
   from Ogre's lighting while the water is drawn. (Switching Forward+ off by
   property was tried first: Ogre still writes Forward+'s data into the pass
@@ -603,8 +604,10 @@ In the GPU path (`gz_underwater_rendering`), as the spike said it must be.
   whole ray for every lamp: 25.8 ms a frame to 14.8 ms with two lamps off,
   25.9 to 18.2 with two on; on an RTX 4090 Laptop the whole effect is about
   1 ms.
-- **Limits**: diffuse only, no shadows; four lamps; the beam shows where
-  something is drawn behind it; the reference camera has no lamps.
+- **Limits**: no shadows, in air too while the renderer draws; four lamps;
+  the beam shows where something is drawn behind it; the reference camera
+  has no lamps. Once the renderer's model is removed, the lamps are Ogre's
+  again.
 
 ## Open questions
 
