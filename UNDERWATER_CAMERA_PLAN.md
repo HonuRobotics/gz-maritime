@@ -550,7 +550,16 @@ What it settled:
   water and segmentation labels byte for byte unchanged; the reference
   camera passes through when the GPU path is on (an `UnderwaterRendering`
   marker component on the world).
-- **The GUI uses it**: checked with screenshots on a virtual display.
+- **The GUI uses it**: checked with screenshots on a virtual display. It
+  can load after the GUI's first state, which then lacks the water optics
+  component, never sent again unchanged; the plugin asks for the world's
+  state once and reads it until the component comes (on a virtual display,
+  8 starts of 8 draw the water; 2 of 8 without).
+- **Removed, added again, the next world**: a plugin going cannot reach the
+  render thread, so the bridge turns the water off itself at the next frame;
+  a new instance takes over the world's mark; and an install in a new Ogre
+  (the next world in the same process) forgets what was left in the old one.
+  Each has a test.
 - **Not done, against the plan**: unlit materials were drawn as in air (only
   PBS was shaded) until the fix below. The sky, the background and the water surface were too,
   until the fixes below. Depth was from
@@ -563,8 +572,9 @@ What it settled:
 In the GPU path (`gz_underwater_rendering`), as the spike said it must be.
 
 - **Lamps** are the world's spot and point lights (up to four). The shader
-  lights with them itself, by their diffuse term with Ogre's own spot cone
-  and attenuation, faded `exp(−β^D d)` from lamp to fragment, then the
+  lights with them itself, by Ogre's own default BRDF (diffuse and
+  specular, metal included; no clear coat) with Ogre's spot cone and
+  attenuation, so a lamp above the water lights as Ogre would, faded `exp(−β^D d)` from lamp to fragment, then the
   water to the camera as for any light. To count them once, they are hidden
   from Ogre's lighting while the water is drawn. (Switching Forward+ off by
   property was tried first: Ogre still writes Forward+'s data into the pass
@@ -595,8 +605,10 @@ In the GPU path (`gz_underwater_rendering`), as the spike said it must be.
   whole ray for every lamp: 25.8 ms a frame to 14.8 ms with two lamps off,
   25.9 to 18.2 with two on; on an RTX 4090 Laptop the whole effect is about
   1 ms.
-- **Limits**: diffuse only, no shadows; four lamps; the reference camera
-  has no lamps. (The beam used to show only where something was drawn
+- **Limits**: no shadows, in air too while the renderer draws; four lamps
+  (two at `<quality>low`, below, the others left to Ogre); the reference
+  camera has no lamps. Once the renderer's model is removed, the lamps are
+  Ogre's again. (The beam used to show only where something was drawn
   behind it; the backdrop of the fixes below ended that.)
 
 ### Phase 5, what makes it look real: done, on `ahcorde/uw_phase5a_scatter_and_port` and `ahcorde/uw_phase5b_caustics_snow_snell`
@@ -622,10 +634,13 @@ What changed from the plan:
 - The surface from below is drawn in Snell's window. Since the fixes below
   it is seen through the water too.
 - **The reference camera.** Its
-  loops run on the machine's cores, the sRGB encoding is a lookup that
-  gives the formula's own answer, and forward scatter blurs only the
-  levels a pixel reads. Same output, byte for byte: 1920x1080 in 24 ms for
-  152 (the water alone), 320 for 1042 with forward scatter.
+  loops run on a pool of threads the process keeps, and the sRGB encoding
+  is a lookup that gives the formula's own answer: 1920x1080 in 27 ms for
+  the water alone, 42 with noise. Forward scatter spreads each pixel's
+  direct light by its own path through the water (a scatter, not a gather;
+  the veil is not spread), so a near object does not bleed into open water
+  or onto a far wall beside it, and no light is lost at a depth edge: 160
+  ms at 1920x1080.
 
 Found later with a demo, a two-minute BlueROV2 dive at Sand Island over the
 site's bathymetry, and fixed here:
@@ -661,6 +676,21 @@ site's bathymetry, and fixed here:
   gz-rendering chains a camera's render passes on its colour image only
   (`Ogre2RenderTarget` connects `rt0` and `rt1`); the depth is not handed
   to an added pass, so this needs a change in gz-rendering first.
+
+Found in review, and fixed here:
+
+- **A speckled band at the horizon**, in every world with the surface: far
+  away, at grazing angles, the normal interpolated from a triangle's corners
+  disagrees with the triangle drawn, and parts of a surface seen from above
+  were shaded as seen from below. The side is now the drawn triangle's own
+  normal, from screen derivatives: from 2 m over a rippled sea, 106 pixels
+  of 768,000 seen from below, 14,078 before.
+- **An RGBD camera without a sky saw open water as the background
+  colour**: its colour pass paints whatever nothing was hit with it, and the
+  backdrop writes no depth. While the backdrop shows, the pass is told the
+  scene has a background; the depth is not touched.
+- **At `<quality>low` two lamps were dark**: four were hidden from Ogre and
+  two lit in the shader. Only those the shader lights are hidden now.
 
 ### Phase 6, validation against reality: tools done, validation not done, on `ahcorde/uw_phase6_validation`
 
