@@ -531,8 +531,10 @@ lights) and include the <code class="docutils literal notranslate"><span class="
 <p>The underwater camera plugin works on its own image; the GUI only sees
 through the water with the <code class="docutils literal notranslate"><span class="pre">underwater_optics</span></code> model in the world
 (<a class="reference internal" href="underwater-camera.html#the-gui-view-and-every-camera-at-once"><span class="std std-ref">See through the water</span></a>).
-With the model, they agree on every surface; where a camera sees nothing but
-sky, the camera plugin shows the veil and the GUI still shows the sky.</p>
+With the model, they agree on every surface and on open water, where both
+show the veil. Looking up at the surface, the GUI draws Snell’s window,
+faded by the water, where the camera plugin shows the sky the renderer drew
+through the water up to the surface.</p>
 </section>
 </section>
 

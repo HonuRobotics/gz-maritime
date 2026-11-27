@@ -181,5 +181,7 @@ lights) and include the `underwater_optics` model
 The underwater camera plugin works on its own image; the GUI only sees
 through the water with the `underwater_optics` model in the world
 ([See through the water](underwater-camera.md#the-gui-view-and-every-camera-at-once)).
-With the model, they agree on every surface; where a camera sees nothing but
-sky, the camera plugin shows the veil and the GUI still shows the sky.
+With the model, they agree on every surface and on open water, where both
+show the veil. Looking up at the surface, the GUI draws Snell's window,
+faded by the water, where the camera plugin shows the sky the renderer drew
+through the water up to the surface.

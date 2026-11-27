@@ -346,10 +346,15 @@ world with water optics, and every ogre2 camera, and the GUI's 3D view, sees
 through the water: the same model as the underwater camera, per fragment, on
 the GPU. The water is the world's; `<enabled>false</enabled>` in its plugin
 starts it off, and a `gz.msgs.Boolean` on
-`/world/<world>/underwater_rendering/enable` turns it off and on. Cameras
-above the water are untouched, and an underwater camera plugin in the same
-world applies only its own response while it is on. Only surfaces Ogre's PBS shades are drawn through the
-water: the sky, the background, the water surface, markers and terrain are
+`/world/<world>/underwater_rendering/enable` turns it off and on.
+`<quality>` in its plugin, `low`, `medium` (default) or `high`, sets how
+finely the lamps' beams are marched and how far marine snow is drawn.
+Cameras above the water see as in air (lamps included, lit as Ogre lights
+them), and an underwater camera plugin in the same world applies only its
+own response while it is on. Depth is measured below the wave over each
+camera. What PBS shades and what is unlit (particles) is drawn through the
+water; looking at nothing, a camera under water sees the veil; the water
+surface from below shows Snell's window, faded by the water; terrain is
 drawn as in air. A spot or point light with `lamp` in its own name (up to
 four, the first by name) is a lamp: its light fades both ways through the
 water and its beam is drawn, and it casts no shadow, in air too; other
