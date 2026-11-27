@@ -1,8 +1,9 @@
 <?xml version="1.0"?>
 <!--
   The plugin where it does not belong, in a plain camera: disabled. And in
-  an rgbd_camera with parameters that make no sense: each falls back to its
-  default, and the camera still works.
+  rgbd_cameras with parameters that make no sense: each falls back to its
+  default, and gives the image of a reference camera beside it that sets
+  the defaults explicitly.
 -->
 <sdf version="1.9">
   <world name="frames_errors">
@@ -41,6 +42,51 @@
           <exposure>2abc</exposure>
           <white_balance>magic</white_balance>
           <shot_noise>-1</shot_noise>
+          <read_noise>-2</read_noise>
+        </plugin>
+      </sensor>
+      <sensor name="ref" type="rgbd_camera">
+        <topic>ferr/ref</topic>
+        <update_rate>10</update_rate>
+        <camera>
+          <horizontal_fov>1.2</horizontal_fov>
+          <image><width>8</width><height>6</height></image>
+          <clip><near>0.1</near><far>60</far></clip>
+        </camera>
+        <plugin filename="gz-maritime-underwater-camera-system"
+                name="gz::sim::maritime::UnderwaterCamera">
+          <exposure>1</exposure>
+          <white_balance>none</white_balance>
+          <shot_noise>0</shot_noise>
+          <read_noise>0</read_noise>
+        </plugin>
+      </sensor>
+      <sensor name="odd_auto" type="rgbd_camera">
+        <topic>ferr/odd_auto</topic>
+        <update_rate>10</update_rate>
+        <camera>
+          <horizontal_fov>1.2</horizontal_fov>
+          <image><width>8</width><height>6</height></image>
+          <clip><near>0.1</near><far>60</far></clip>
+        </camera>
+        <plugin filename="gz-maritime-underwater-camera-system"
+                name="gz::sim::maritime::UnderwaterCamera">
+          <exposure>auto</exposure>
+          <max_gain>0.5</max_gain>
+        </plugin>
+      </sensor>
+      <sensor name="ref_auto" type="rgbd_camera">
+        <topic>ferr/ref_auto</topic>
+        <update_rate>10</update_rate>
+        <camera>
+          <horizontal_fov>1.2</horizontal_fov>
+          <image><width>8</width><height>6</height></image>
+          <clip><near>0.1</near><far>60</far></clip>
+        </camera>
+        <plugin filename="gz-maritime-underwater-camera-system"
+                name="gz::sim::maritime::UnderwaterCamera">
+          <exposure>auto</exposure>
+          <max_gain>16</max_gain>
         </plugin>
       </sensor>
       </link>
