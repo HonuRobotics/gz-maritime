@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<!-- One sonar bridge: gz_sonar's SonarImage topics to
+     marine_acoustic_msgs/ProjectedSonarImage, plus a /view image beside each.
+
+     ros2 launch kai_sonar_bridge sonar_bridge.launch.xml \
+       gz_topics:="[/rov/sonar_forward/image]" \
+       ros_topics:="[/rov/sonar_forward/image]" -->
+<launch>
+  <arg name="gz_topics" description="The sonars' gz-transport topics, as a list"/>
+  <arg name="ros_topics" description="The ROS 2 topics, one per gz topic"/>
+  <arg name="frame_ids" default="['']"
+       description="Frames to stamp, as a list; an empty entry for the default"/>
+  <arg name="kinds" default="['']"
+       description="Per sonar, image (the default) or detections for a profiler"/>
+  <arg name="view" default="true" description="Also publish a /view image beside each ROS topic"/>
+  <arg name="lazy" default="true"
+       description="Subscribe to a sonar in Gazebo only while one of its ROS topics has a subscriber, so an unwatched sonar does not ping"/>
+  <arg name="reliability" default="reliable"
+       description="QoS reliability of every publisher: reliable, or best_effort for a lossy link (which RViz's default displays do not receive)"/>
+  <arg name="depth" default="5" description="Messages each publisher keeps"/>
+  <arg name="name" default="sonar_bridge"/>
+  <node pkg="kai_sonar_bridge" exec="sonar_bridge" name="$(var name)" output="screen">
+    <param name="gz_topics" value="$(var gz_topics)"/>
+    <param name="ros_topics" value="$(var ros_topics)"/>
+    <param name="frame_ids" value="$(var frame_ids)"/>
+    <param name="kinds" value="$(var kinds)"/>
+    <param name="view" value="$(var view)"/>
+    <param name="lazy" value="$(var lazy)"/>
+    <param name="reliability" value="$(var reliability)"/>
+    <param name="depth" value="$(var depth)"/>
+  </node>
+</launch>

@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<sdf version="1.12" xmlns:gz="http://gazebosim.org/schema">
+  <model name="sonar_box">
+    <static>true</static>
+    <link name="link">
+      <visual name="body" gz:acoustic_lambert="-15">
+        <geometry><box><size>0.5 0.5 0.5</size></box></geometry>
+        <material><diffuse>0.6 0.6 0.6 1</diffuse><ambient>0.6 0.6 0.6 1</ambient></material>
+      </visual>
+      <collision name="body">
+        <geometry><box><size>0.5 0.5 0.5</size></box></geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

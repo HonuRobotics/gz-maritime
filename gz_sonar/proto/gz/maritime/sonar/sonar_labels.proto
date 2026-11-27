@@ -1,0 +1,32 @@
+// Copyright (C) 2026 Honu Robotics
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+package gz.maritime.sonar;
+
+import "gz/msgs/header.proto";
+
+/// Ground truth for one ping: for every beam and sample, which surface sent
+/// it the most energy. 
+message SonarLabels
+{
+  gz.msgs.Header header = 1;
+  uint64 ping           = 2;
+  uint32 beam_count     = 3;
+  uint32 sample_count   = 4;
+  /// Beam-major label ids, one byte per cell; 0 for nothing.
+  bytes labels          = 5;
+  /// The scoped name of each label id, indexed by id; entry 0 is empty.
+  repeated string names = 6;
+}

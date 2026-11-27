@@ -22,3 +22,8 @@ honu_github = ('HonuRobotics', 'gz-maritime')
 # Anchors for headings down to ###, so a page can link to a section
 # (`page.md#section-title`).
 myst_heading_anchors = 3
+
+# A plain ```mermaid fence renders as a diagram, so it also previews on
+# GitHub and in editors. sphinx-honu does this itself from v0.2.1; drop
+# this line when the pin in requirements.txt reaches it.
+myst_fence_as_directive = ['mermaid']

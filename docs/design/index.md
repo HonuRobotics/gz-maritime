@@ -219,8 +219,21 @@ the scene against depth, a colour chart by range.
 What a camera must show: a 50 % grey target at each range, in three waters.
 ```
 
+## Sonar
+
+Imaging, profiling and sidescan sonar share one engine, a sonar-equation model on geometry sampled with gz-rendering, configured by the shape of each sonar's fan. The use cases, the theory of operation, the interface, and the implementation, testing and walkthroughs are in [Sonar simulation design](sonar.md). Contributors can run the engine on its own with [Render a ping without Gazebo](render-a-ping.md). What a sonar costs, where the time goes, and how to keep it in budget are in [Sonar performance](sonar-performance.md).
+
 ## Related
 
 The [bluerobotics_models](https://github.com/HonuRobotics/bluerobotics_models)
 documentation explains how the BlueBoat and BlueROV2 are assembled from parts,
 and how they keep their floating volume on a link of its own.
+
+```{toctree}
+:hidden:
+:maxdepth: 1
+
+sonar
+render-a-ping
+sonar-performance
+```

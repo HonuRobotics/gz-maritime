@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>gz_sonar</name>
+  <version>0.1.0</version>
+  <description>Sonar simulation for imaging, profiling and sidescan sonar: an incoherent beam model that turns the surfaces a fan of rays hits into echo intensity per beam and range sample, and the readouts each kind of sonar delivers. The engine library has no Gazebo dependency; see docs/design/sonar.md.</description>
+  <maintainer email="briansbingham@gmail.com">Brian Bingham</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>gz_math_vendor</depend>
+  <depend>gz_sim_vendor</depend>
+  <depend>gz_sensors_vendor</depend>
+  <depend>gz_rendering_vendor</depend>
+  <depend>gz_plugin_vendor</depend>
+  <depend>gz_common_vendor</depend>
+  <depend>gz_transport_vendor</depend>
+  <depend>gz_msgs_vendor</depend>
+  <!-- The example scripts: capture, draw and map sonar data -->
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-matplotlib</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
