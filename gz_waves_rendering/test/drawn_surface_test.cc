@@ -19,9 +19,11 @@
 
 #include <unistd.h>
 
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
@@ -198,6 +200,33 @@ class GridWaveField : public gsw::IWaveField
 
   /// \brief The grids as the renderer takes them.
   private: gsw::WaveField2D field;
+};
+
+/// \brief The token of the foamy test field.
+constexpr char kFoamyEngine[] = "drawn_foam_test";
+
+/// \brief The folding metric the foamy field hands out everywhere: 1 is
+/// flat water, 0 folded through. Set by the test before each run.
+std::atomic<double> gFoam{1.0};
+
+/// \brief The test's field, with foam: Foam() is a grid of gFoam.
+class FoamyField : public GridWaveField
+{
+  // Documentation inherited
+  public: void SetParameters(const gsw::WaveParameters &_params) override
+  {
+    GridWaveField::SetParameters(_params);
+    this->foam.assign(_params.gridSize * _params.gridSize, gFoam.load());
+  }
+
+  // Documentation inherited
+  public: std::string_view Kind() const override { return kFoamyEngine; }
+
+  // Documentation inherited
+  public: const double *Foam() const override { return this->foam.data(); }
+
+  /// \brief The folding metric, column-major.
+  private: std::vector<double> foam;
 };
 
 /// \brief One depth frame.
@@ -391,6 +420,83 @@ TEST(WaterVisual, DrawsTheSurfaceOfTheWaveField)
     // The comparison tells half a cell.
     EXPECT_GT(halfCellOff.differenceRms, 3.0 * same.differenceRms);
   }
+}
+
+//////////////////////////////////////////////////
+/// \brief Mean grey of the middle of a colour frame of the foamy sea.
+/// \param[in] _foam The folding metric the field hands out everywhere.
+/// \param[out] _grey The mean, 0 to 255.
+/// \return False if no frame came: this machine cannot render.
+bool FoamySea(double _foam, double &_grey)
+{
+  gFoam = _foam;
+  gsw::WavefieldData field;
+  field.algorithm = kFoamyEngine;
+  field.params.tileSize = kTile;
+  field.params.gridSize = kCells;
+  field.generation = 1;
+  gz::sim::ServerConfig config;
+  config.SetSdfFile(std::string(TEST_WORLD_DIR) + "/drawn_foam.sdf");
+  config.SetHeadlessRendering(true);
+  gz::sim::TestFixture fixture(config);
+  fixture.OnConfigure(
+    [&](const gz::sim::Entity &_world,
+        const std::shared_ptr<const sdf::Element> &,
+        gz::sim::EntityComponentManager &_ecm,
+        gz::sim::EventManager &)
+    {
+      _ecm.CreateComponent(_world, gz::sim::components::Wavefield(field));
+    }).Finalize();
+
+  auto mutex = std::make_shared<std::mutex>();
+  auto last = std::make_shared<std::vector<std::uint8_t>>();
+  auto count = std::make_shared<int>(0);
+  gz::transport::Node node;
+  std::function<void(const gz::msgs::Image &)> onImage =
+    [mutex, last, count](const gz::msgs::Image &_msg)
+    {
+      std::lock_guard<std::mutex> lock(*mutex);
+      last->assign(_msg.data().begin(), _msg.data().end());
+      ++*count;
+    };
+  node.Subscribe("/drawn_foam/image", onImage);
+  const auto frames = [&] { std::lock_guard<std::mutex> l(*mutex); return *count; };
+  for (int second = 0; second < 10 && frames() < 3; ++second)
+    fixture.Server()->Run(true, 100, false);
+  const auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::seconds(10);
+  while (frames() < 3 && std::chrono::steady_clock::now() < deadline)
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  node.Unsubscribe("/drawn_foam/image");
+  std::lock_guard<std::mutex> lock(*mutex);
+  if (last->empty())
+    return false;
+  // The middle half of a 128 by 128 RGB frame
+  double sum = 0.0;
+  int n = 0;
+  for (int v = 32; v < 96; ++v)
+    for (int u = 32; u < 96; ++u, ++n)
+      for (int c = 0; c < 3; ++c)
+        sum += (*last)[3 * (v * 128 + u) + c] / 3.0;
+  _grey = sum / n;
+  return true;
+}
+
+//////////////////////////////////////////////////
+/// The renderer draws the foam the engine hands out through Foam(): a sea
+/// folded through everywhere is foam white, one that folds nowhere is not.
+/// Uploading no foam would draw the two alike.
+TEST(WaterVisual, DrawsTheEnginesFoam)
+{
+  gsw::RegisterWaveEngineFactory(kFoamyEngine,
+      [] { return std::make_shared<FoamyField>(); });
+  double flat = 0.0, folded = 0.0;
+  if (!FoamySea(1.0, flat))
+    GTEST_SKIP() << "no image: this machine cannot render";
+  ASSERT_TRUE(FoamySea(0.0, folded));
+  std::cout << "mean grey: " << flat << " folding nowhere, " << folded
+            << " folded through\n";
+  EXPECT_GT(folded, flat + 20.0) << "the foam was not drawn";
 }
 
 //////////////////////////////////////////////////
