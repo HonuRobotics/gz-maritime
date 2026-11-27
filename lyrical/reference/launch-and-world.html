@@ -1044,6 +1044,18 @@ publishes <code class="docutils literal notranslate"><span class="pre">&lt;topic
 <td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
 <td><p>The noise’s seed, mixed with the sensor’s scoped name, so each camera gets its own noise.</p></td>
 </tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;forward_scatter&gt;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
+<td><p>Forward scatter: the light from the objects blurred by their range, sigma = forward_scatter · range radians, at most 40 px; between two pixels, by the smaller of their two ranges.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;port&gt;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">none</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">flat</span></code> (refracts, magnifies about 1.33×) or <code class="docutils literal notranslate"><span class="pre">dome</span></code> (centred on the lens: no change).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;water_index&gt;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1.333</span></code></p></td>
+<td><p>Refractive index of the water, for a flat port; 1 or more.</p></td>
+</tr>
 </tbody>
 </table>
 <p>The water is the world’s (<code class="docutils literal notranslate"><span class="pre">gz-maritime-water-optics-system</span></code>); without it, or
