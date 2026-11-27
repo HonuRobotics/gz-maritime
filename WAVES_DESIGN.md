@@ -769,4 +769,7 @@ colcon test --packages-select gz_waves_rendering
   shape (`Eval`'s `SurfaceHeight`, which undoes the horizontal displacement
   of the engine's render grid), opt-in per world instead of the flat
   buoyancy. It reads the field at the source system's `<update_rate>` and
-  never advances it. No `kai_gazebo` world runs it yet.
+  never advances it. It tags the world with the core's `WaveCoupling` tag,
+  and there `gz_hydrodynamics` damps against the waves' water velocity too
+  (`waves::WaterVelocity`, faded with depth). No `kai_gazebo` world runs it
+  yet.
