@@ -97,23 +97,60 @@ USV drives the BlueBoat unchanged, and an autopilot's servo outputs map onto
 it directly. The mode is on its way upstream; when a Gazebo release carries
 it, vehicles switch the plugin's filename and name and nothing else.
 
+## Pingers in the world, receivers on vehicles
+
+VRX's acoustic pinger plugin lived on the receiving boat and held the pinger
+as a position of its own: each boat had its own copy of the pinger, a
+scoring plugin kept the copies in step over a topic, and a pinger hung under
+a buoy did not move with it. `gz_acoustics` turns that round, the way the
+buoyancy and wind marks do:
+
+- **A pinger is a thing in the world.** A model plugin writes it as a
+  component on a link, so it moves with whatever carries it, every vehicle
+  hears the same one, and the world can list them all.
+- **A receiver is a sensor.** A gz-sensors custom sensor on any link, found
+  by the world's acoustics system on any model, spawned at any time; its
+  reading is in its own frame.
+- **Behaviour, not acoustics.** A ping is an event on a schedule, carried at
+  the speed of sound to each receiver, and heard or not by a few rules
+  (water, reach, band, field of view, dropout, overlap), each of which can
+  be switched off.
+  Nothing models how sound bends, echoes or fades beyond spherical
+  spreading; a team testing its own signal processing will need more than
+  this, which is left for later (time differences per hydrophone).
+- **The world owns the switch.** A pinger changes on its own `set` topic;
+  choosing which one pings in a task belongs to whoever runs the task, such
+  as a competition server, which only has to send `set` messages.
+
+The plan, the survey of other simulators it draws on and what is left are
+in [ACOUSTIC_PINGER_PLAN.md](https://github.com/HonuRobotics/gz-maritime/blob/lyrical/ACOUSTIC_PINGER_PLAN.md).
+
 ## Buoyancy that follows the waves
 
-Today vehicles float on the flat water level, and the drawn waves pass
+Vehicles float on the flat water level by default, and the drawn waves pass
 through their hulls ([Waves and physics today](../how-to/own-vehicle.md#waves-and-physics-today)).
-Coupling buoyancy to the waves is planned, as a separate consumer of the wave
-field. The main points it has to handle:
+`gz_waves_buoyancy` couples buoyancy to the waves, as a separate consumer of
+the wave field that a world runs instead of the flat buoyancy. How it meets
+each point:
 
-- **A local water surface per collision shape.** Sample the wave height
-  around each shape, fit a plane, and measure the volume under that plane
-  instead of under z = 0.
+- **A local water surface per collision shape.** It samples the height of the
+  drawn surface at each shape's centre and at the ends of its footprint, fits
+  a plane, and measures the volume under that plane instead of under z = 0.
 - **Long hulls.** One plane per shape is only good when the shape is short
-  compared to the wavelength, so long hulls need splitting into segments.
+  compared to the wavelength; the plane averages a shorter chop, and a long
+  hull is better split into segments.
 - **Update rate.** The wave field updates at `<update_rate>` (30 Hz in
-  `open_water.sdf`), slower than physics (250 Hz), so the forces need
-  interpolating.
+  `open_water.sdf`), slower than physics (250 Hz). Advancing it every step
+  costs about four times the run time and changes the motion by nothing
+  measurable, so the buoyancy reads the field as last advanced. A world that
+  wants smoother forces sets `<update_rate>0</update_rate>` on the wave
+  system.
 - **Choppy seas.** The high-fidelity sea also moves the surface sideways;
-  finding the true height at a point needs that displacement.
+  `waves::SurfaceHeight` undoes that displacement to find the height of the
+  surface as drawn.
+- **Hydrostatic only.** The water pushes straight up with the weight
+  displaced: no pressure change with depth under the wave, no horizontal wave
+  force.
 
 ## Related
 

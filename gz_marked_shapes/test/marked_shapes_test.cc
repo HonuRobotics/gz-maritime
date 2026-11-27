@@ -236,18 +236,23 @@ TEST(Resolve, EveryGeometry)
     public: std::string geometry;
     public: math::Vector3d half;
     public: math::Vector3d area;
+    public: sdf::GeometryType type;
   };
   const double pi = GZ_PI;
   const Case cases[] = {
-    {"<box><size>1 2 3</size></box>", {0.5, 1, 1.5}, {6, 3, 2}},
+    {"<box><size>1 2 3</size></box>", {0.5, 1, 1.5}, {6, 3, 2},
+     sdf::GeometryType::BOX},
     {"<cylinder><radius>0.5</radius><length>2</length></cylinder>",
-     {0.5, 0.5, 1}, {2, 2, pi / 4}},
+     {0.5, 0.5, 1}, {2, 2, pi / 4}, sdf::GeometryType::CYLINDER},
     {"<sphere><radius>2</radius></sphere>", {2, 2, 2},
-     {4 * pi, 4 * pi, 4 * pi}},
+     {4 * pi, 4 * pi, 4 * pi}, sdf::GeometryType::SPHERE},
     {"<capsule><radius>0.5</radius><length>2</length></capsule>",
-     {0.5, 0.5, 1.5}, {2 + pi / 4, 2 + pi / 4, pi / 4}},
+     {0.5, 0.5, 1.5}, {2 + pi / 4, 2 + pi / 4, pi / 4},
+     sdf::GeometryType::CAPSULE},
     {"<ellipsoid><radii>1 2 3</radii></ellipsoid>", {1, 2, 3},
-     {6 * pi, 3 * pi, 2 * pi}},
+     {6 * pi, 3 * pi, 2 * pi}, sdf::GeometryType::ELLIPSOID},
+    {"<cone><radius>0.5</radius><length>2</length></cone>",
+     {0.5, 0.5, 1}, {1, 1, pi / 4}, sdf::GeometryType::CONE},
   };
   for (const auto &c : cases)
   {
@@ -259,6 +264,7 @@ TEST(Resolve, EveryGeometry)
     ExpectNear(c.area, shape.area);
     EXPECT_EQ(math::Pose3d(1, 2, 3, 0, 0, 0), shape.pose);
     EXPECT_DOUBLE_EQ(1.0, shape.cd);
+    EXPECT_EQ(c.type, shape.type);
   }
 }
 
@@ -278,6 +284,7 @@ TEST(Resolve, MeshIsItsBoundingBox)
   ExpectNear(math::Vector3d(1, 0.5, 1), shape.half);
   ExpectNear(math::Vector3d(2, 4, 2), shape.area);
   ExpectNear(math::Vector3d(1 - 0.5, 1, 1), shape.pose.Pos());
+  EXPECT_EQ(sdf::GeometryType::MESH, shape.type);
 }
 
 /////////////////////////////////////////////////
@@ -375,4 +382,20 @@ TEST(MarkedLinks, RemovedLinkIsForgotten)
       });
   EXPECT_TRUE(links.Links().empty());
   EXPECT_FALSE(asked);
+}
+
+/////////////////////////////////////////////////
+/// Prune forgets a removed link without pushing on anything.
+TEST(MarkedLinks, PruneForgetsARemovedLink)
+{
+  OneCollision one(Marked("<box><size>1 1 1</size></box>"));
+  MarkedLinks links(kMark, kCdMark);
+  links.Find(one.ecm);
+  links.Prune(one.ecm);
+  ASSERT_EQ(1u, links.Links().size());
+
+  one.ecm.RequestRemoveEntity(one.link);
+  one.ecm.ProcessRemoveEntityRequests();
+  links.Prune(one.ecm);
+  EXPECT_TRUE(links.Links().empty());
 }

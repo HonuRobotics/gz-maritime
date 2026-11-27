@@ -49,6 +49,20 @@
   ros_type_name: geometry_msgs/msg/TwistStamped
   gz_type_name: gz.msgs.Twist
   direction: GZ_TO_ROS
+# Acoustic receiver: one message per ping heard, named double parameters
+# bearing, elevation (rad, sensor frame), frequency (Hz), amplitude (dB re
+# 1 m) and the boolean valid; the stamp is when the ping arrived. Retuned
+# with frequency and bandwidth (Hz) on its set topic.
+- ros_topic_name: /@name@/acoustic_receiver
+  gz_topic_name: /@name@/acoustic_receiver
+  ros_type_name: ros_gz_interfaces/msg/ParamVec
+  gz_type_name: gz.msgs.Param
+  direction: GZ_TO_ROS
+- ros_topic_name: /@name@/acoustic_receiver/set
+  gz_topic_name: /@name@/acoustic_receiver/set
+  ros_type_name: ros_gz_interfaces/msg/ParamVec
+  gz_type_name: gz.msgs.Param
+  direction: ROS_TO_GZ
 - ros_topic_name: /@name@/navsat
   gz_topic_name: /@name@/navsat
   ros_type_name: sensor_msgs/msg/NavSatFix

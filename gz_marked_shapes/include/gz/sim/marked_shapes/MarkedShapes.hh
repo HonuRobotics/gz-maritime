@@ -31,6 +31,7 @@
 #include <gz/sim/EntityComponentManager.hh>
 #include <gz/sim/System.hh>
 #include <sdf/Element.hh>
+#include <sdf/Geometry.hh>
 
 namespace gz::sim::marked_shapes
 {
@@ -48,6 +49,12 @@ struct Shape
 
   /// \brief Drag coefficient.
   public: double cd{1.0};
+
+  /// \brief The collision's geometry type: with `half` it gives the shape
+  /// back (a box's sides, a cylinder's or a cone's radius and length, a
+  /// sphere's radius, a capsule's radius and its length plus a radius each
+  /// end, an ellipsoid's radii). A mesh is its bounding box.
+  public: sdf::GeometryType type{sdf::GeometryType::EMPTY};
 };
 
 /// \brief Which side of the water level a fluid acts on.
@@ -96,7 +103,8 @@ math::Vector3d CutAreas(const math::Vector3d &_area,
                         const math::Quaterniond &_rot, double _fraction);
 
 /// \brief Resolve one collision into a shape, when it carries the mark.
-/// Boxes, cylinders, spheres, capsules and ellipsoids keep their shape; a
+/// Boxes, cylinders, spheres, capsules, ellipsoids and cones keep their
+/// shape; a
 /// mesh counts as its bounding box.
 /// \param[in] _ecm The entity component manager.
 /// \param[in] _collision The collision entity.
@@ -164,6 +172,11 @@ class MarkedLinks
   /// \brief Forget every link; the next Find scans them all again.
   public: void Reset();
 
+  /// \brief Forget the links removed from the world, for a system that
+  /// reads Links() without calling ApplyDrag.
+  /// \param[in] _ecm The entity component manager.
+  public: void Prune(const EntityComponentManager &_ecm);
+
   /// \brief Push on the part of every marked shape on one side of the
   /// water: quadratic drag, 0.5 * rho * Cd * A * |v| * v per shape axis, on
   /// the fluid's velocity relative to the centre of that part, at that
@@ -180,7 +193,7 @@ class MarkedLinks
                          double _waterLevel, const FluidVelocity &_fluid);
 
   /// \brief The marked shapes, by link; a link removed from the world is
-  /// forgotten at the next ApplyDrag.
+  /// forgotten at the next ApplyDrag or Prune.
   /// \return The shapes.
   public: const std::unordered_map<Entity, std::vector<Shape>> &Links()
       const;
