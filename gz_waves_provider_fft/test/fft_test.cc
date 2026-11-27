@@ -72,6 +72,55 @@ double MaxAbsElevation(const gsw::WavefieldData &_d, double _t)
     m = std::max(m, std::abs(gsw::SurfaceElevation(_d, xs[i], ys[i], _t)));
   return m;
 }
+
+/// \brief Central difference of a periodic grid along one of its indices,
+/// per cell.
+/// \param[in] _g The grid, indexed (x, y).
+/// \param[in] _alongX True for the difference along x, false along y.
+/// \return The differences, same size as the grid.
+Eigen::MatrixXd Slope(const Eigen::MatrixXd &_g, bool _alongX)
+{
+  const Eigen::Index n = _g.rows();
+  Eigen::MatrixXd out(n, n);
+  for (Eigen::Index j = 0; j < n; ++j)
+  {
+    for (Eigen::Index i = 0; i < n; ++i)
+    {
+      out(i, j) = _alongX
+          ? 0.5 * (_g((i + 1) % n, j) - _g((i + n - 1) % n, j))
+          : 0.5 * (_g(i, (j + 1) % n) - _g(i, (j + n - 1) % n));
+    }
+  }
+  return out;
+}
+
+/// \brief Pearson correlation of two grids, cell by cell.
+/// \param[in] _a One grid.
+/// \param[in] _b The other, same size.
+/// \return The correlation, in [-1, 1].
+double Correlation(const Eigen::MatrixXd &_a, const Eigen::MatrixXd &_b)
+{
+  const Eigen::ArrayXXd a = _a.array() - _a.mean();
+  const Eigen::ArrayXXd b = _b.array() - _b.mean();
+  return (a * b).sum() / std::sqrt(a.square().sum() * b.square().sum());
+}
+
+/// \brief A quantity asked of the engine at every grid point.
+/// \param[in] _sim The engine.
+/// \param[in] _at The quantity, as a function of world x and y [m].
+/// \return Its values, indexed (x, y) as the engine's grids are.
+template <typename Fn>
+Eigen::MatrixXd AtGridPoints(const gsw::FFTWaveSimulation &_sim, Fn _at)
+{
+  const Eigen::Index n = static_cast<Eigen::Index>(_sim.GridSize());
+  const double cell = _sim.TileSizeMeters() / static_cast<double>(n);
+  Eigen::MatrixXd out(n, n);
+  for (Eigen::Index j = 0; j < n; ++j)
+    for (Eigen::Index i = 0; i < n; ++i)
+      out(i, j) = _at(static_cast<double>(i) * cell,
+                      static_cast<double>(j) * cell);
+  return out;
+}
 }  // namespace
 
 //////////////////////////////////////////////////
@@ -319,6 +368,74 @@ TEST(FFTWaveSimulation, DeterministicAcrossRunsWithSameSeed)
 }
 
 //////////////////////////////////////////////////
+/// An update prepared on the worker thread is the synchronous update, bit
+/// for bit: every grid, and the particle velocity read after it.
+TEST(FFTWaveSimulation, PreparedUpdateIsTheSynchronousOne)
+{
+  auto plain = MakeSim(/*seed=*/42);
+  auto ahead = MakeSim(/*seed=*/42);
+  for (double t : {0.5, 1.0, 3.25, 7.0})
+  {
+    SCOPED_TRACE(t);
+    plain.Update(t);
+    ahead.Prepare(t);
+    ahead.Update(t);
+    EXPECT_EQ(plain.HeightGrid(), ahead.HeightGrid());
+    EXPECT_EQ(plain.DispXGrid(), ahead.DispXGrid());
+    EXPECT_EQ(plain.DispYGrid(), ahead.DispYGrid());
+    const gsw::WaveField2D *a = plain.Field();
+    const gsw::WaveField2D *b = ahead.Field();
+    for (std::size_t i = 0; i < a->n * a->n; ++i)
+      ASSERT_EQ(a->foam[i], b->foam[i]) << i;
+    EXPECT_EQ(plain.ParticleVelocity(12.0, 34.0, t),
+              ahead.ParticleVelocity(12.0, 34.0, t));
+  }
+}
+
+//////////////////////////////////////////////////
+/// A hint that turns out wrong costs nothing but the work: an update for
+/// another time, a repeated or replaced hint, and a reconfigure with a job
+/// in flight all give the field a plain engine gives.
+TEST(FFTWaveSimulation, AWrongHintChangesNothing)
+{
+  auto plain = MakeSim(/*seed=*/7);
+  auto ahead = MakeSim(/*seed=*/7);
+
+  // Hinted 2.0, asked 1.5; then the stale 2.0 result must not be served
+  // for 2.5.
+  ahead.Prepare(2.0);
+  ahead.Update(1.5);
+  plain.Update(1.5);
+  EXPECT_EQ(plain.HeightGrid(), ahead.HeightGrid());
+  ahead.Update(2.5);
+  plain.Update(2.5);
+  EXPECT_EQ(plain.HeightGrid(), ahead.HeightGrid());
+
+  // A hint replaced before it is used, and one given twice.
+  ahead.Prepare(4.0);
+  ahead.Prepare(5.0);
+  ahead.Prepare(5.0);
+  ahead.Update(5.0);
+  plain.Update(5.0);
+  EXPECT_EQ(plain.HeightGrid(), ahead.HeightGrid());
+  // The time already current is not prepared again.
+  ahead.Prepare(5.0);
+
+  // Reconfigured with a job in flight: the new recipe's field, not the old.
+  gsw::WaveParameters p = DefaultParams();
+  p.tileSize = 100.0;
+  p.gridSize = 64;
+  p.seed = 9;
+  ahead.Prepare(6.0);
+  ahead.SetParameters(p);
+  plain.SetParameters(p);
+  ahead.Update(6.0);
+  plain.Update(6.0);
+  EXPECT_EQ(plain.HeightGrid(), ahead.HeightGrid());
+  EXPECT_EQ(plain.DispXGrid(), ahead.DispXGrid());
+}
+
+//////////////////////////////////////////////////
 TEST(FFTWaveSimulation, DifferentSeedsProduceDifferentFields)
 {
   auto a = MakeSim(/*seed=*/1);
@@ -419,25 +536,93 @@ TEST(FFTWaveSimulation, ParticleVelocityZeroAtRest)
   EXPECT_NEAR(v.Length(), 0.0, 1e-9);
 }
 
+// The tests below hold every grid to the sea Ehukai computes. Ehukai pads
+// each grid to N + 1 cells per row and runs x along a row; read as N cells
+// per row the tile is sheared, and read without the transpose the waves run
+// across the wind with the displacements on the wrong axes. Each test fails
+// for one or both mistakes in the grid it reads, at every seed tried.
 //////////////////////////////////////////////////
-TEST(FFTWaveSimulation, WindDirectionBiasesAmplitude)
+TEST(FFTWaveSimulation, SlopesAlongAndAcrossTheWindAreUncorrelated)
 {
-  // Ehukai's directional spreading concentrates energy along the wind axis
-  // (assumed +x). We expect a higher RMS along x than perpendicular when
-  // sampled over a long enough strip.
-  gsw::WaveParameters p = DefaultParams();
-  p.direction = 0.0;  // wind along +x
-  gsw::FFTWaveSimulation sim(p, 100.0, 64, 7);
-  sim.Update(20.0);
-
-  double sxx = 0, syy = 0;
-  int    cxx = 0, cyy = 0;
-  for (double s = -40.0; s <= 40.0; s += 1.0)
+  // The sea spreads evenly to both sides of the wind, so the slope along x
+  // says nothing about the slope along y. A sheared tile ties them (about
+  // -0.8).
+  for (std::uint32_t seed : {1u, 2u, 3u})
   {
-    sxx += std::abs(sim.Elevation(s, 0.0, 20.0)); ++cxx;
-    syy += std::abs(sim.Elevation(0.0, s, 20.0)); ++cyy;
+    SCOPED_TRACE(seed);
+    auto sim = MakeSim(seed);
+    sim.Update(20.0);
+    const Eigen::MatrixXd &h = sim.HeightGrid();
+    EXPECT_LT(std::abs(Correlation(Slope(h, true), Slope(h, false))), 0.4);
   }
-  EXPECT_GT(sxx / cxx, syy / cyy);
+}
+
+//////////////////////////////////////////////////
+TEST(FFTWaveSimulation, WavesTravelDownwind)
+{
+  // Ehukai's wind is along +x. A wave moving towards +x drops the water
+  // where the surface slopes up along x and lifts it where it slopes down.
+  for (std::uint32_t seed : {1u, 2u, 3u})
+  {
+    SCOPED_TRACE(seed);
+    auto sim = MakeSim(seed);
+    sim.Update(20.0);
+    const Eigen::MatrixXd before = sim.HeightGrid();
+    sim.Update(20.1);
+    const Eigen::MatrixXd change = sim.HeightGrid() - before;
+    EXPECT_LT(Correlation(change, Slope(before, true)), -0.5);
+  }
+}
+
+//////////////////////////////////////////////////
+TEST(FFTWaveSimulation, ChopPullsTheSurfaceTowardsTheCrests)
+{
+  // The horizontal displacement gathers the surface at the crests and
+  // spreads it in the troughs: its divergence is negative where the water
+  // is high. Sheared, or with x and y displacements swapped, it is not.
+  for (std::uint32_t seed : {1u, 2u, 3u})
+  {
+    SCOPED_TRACE(seed);
+    auto sim = MakeSim(seed);
+    sim.Update(20.0);
+    const Eigen::MatrixXd divergence =
+        Slope(sim.DispXGrid(), true) + Slope(sim.DispYGrid(), false);
+    EXPECT_LT(Correlation(sim.HeightGrid(), divergence), -0.5);
+  }
+}
+
+//////////////////////////////////////////////////
+TEST(FFTWaveSimulation, TheSurfaceFoldsAtTheCrests)
+{
+  // The folding metric is low where the chop gathers the surface, which is
+  // where the water is high. Read with another layout than the height, it
+  // loses the crests.
+  for (std::uint32_t seed : {1u, 2u, 3u})
+  {
+    SCOPED_TRACE(seed);
+    auto sim = MakeSim(seed);
+    sim.Update(20.0);
+    const Eigen::MatrixXd folding = AtGridPoints(sim,
+        [&sim](double _x, double _y) { return sim.Jacobian(_x, _y, 20.0); });
+    EXPECT_LT(Correlation(folding, sim.HeightGrid()), -0.4);
+  }
+}
+
+//////////////////////////////////////////////////
+TEST(FFTWaveSimulation, WaterAtTheCrestsMovesDownwind)
+{
+  // Under a wave moving towards +x the water moves forward at the crests
+  // and back in the troughs: its x velocity follows the height.
+  for (std::uint32_t seed : {1u, 2u, 3u})
+  {
+    SCOPED_TRACE(seed);
+    auto sim = MakeSim(seed);
+    sim.Update(20.0);
+    const Eigen::MatrixXd forward = AtGridPoints(sim,
+        [&sim](double _x, double _y)
+        { return sim.ParticleVelocity(_x, _y, 20.0).X(); });
+    EXPECT_GT(Correlation(forward, sim.HeightGrid()), 0.7);
+  }
 }
 
 // WMO sea state code -> representative wave parameters (the canonical table).

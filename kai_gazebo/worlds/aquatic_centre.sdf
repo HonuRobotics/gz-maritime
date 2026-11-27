@@ -199,6 +199,19 @@
       <direction>0</direction>
     </plugin>
 
+    <!-- Acoustics (gz_acoustics): pingers ping, receivers hear them, both
+         found on any model (a pinger is the gz-maritime-acoustic-pinger-system
+         plugin on a link, model://acoustic_pinger is one ready made; a
+         receiver is a custom sensor, gz:type="acoustic_receiver"). Silent
+         until a pinger shows up; the world names neither. Each ping travels
+         at the speed of sound and is heard below the water only. -->
+    <plugin
+      filename="gz-maritime-acoustics-system"
+      name="gz::sim::maritime::Acoustics">
+      <speed_of_sound>1500</speed_of_sound>
+      <water_level>0</water_level>
+    </plugin>
+
     <!-- Wave source, for the contract: the services and any system that
          asks the wave field find one. Sea state 0, and no water surface
          model draws it: the pool's water is the hall model's own, flat, and
@@ -412,6 +425,14 @@
       <plugin filename="ScenarioPanel" name="Scenarios">
         <gz-gui>
           <title>Scenarios</title>
+          <property type="string" key="state">docked</property>
+        </gz-gui>
+      </plugin>
+
+      <!-- Acoustics (gz_maritime_gui): the pingers and the receivers, and what they hear; drawing off until turned on in the panel. -->
+      <plugin filename="AcousticsPanel" name="Acoustics">
+        <gz-gui>
+          <title>Acoustics</title>
           <property type="string" key="state">docked</property>
         </gz-gui>
       </plugin>

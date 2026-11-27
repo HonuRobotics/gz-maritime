@@ -200,6 +200,19 @@
       <jerlov>1C</jerlov>
     </plugin>
 
+    <!-- Acoustics (gz_acoustics): pingers ping, receivers hear them, both
+         found on any model (a pinger is the gz-maritime-acoustic-pinger-system
+         plugin on a link, model://acoustic_pinger is one ready made; a
+         receiver is a custom sensor, gz:type="acoustic_receiver"). Silent
+         until a pinger shows up; the world names neither. Each ping travels
+         at the speed of sound and is heard below the water only. -->
+    <plugin
+      filename="gz-maritime-acoustics-system"
+      name="gz::sim::maritime::Acoustics">
+      <speed_of_sound>1500</speed_of_sound>
+      <water_level>0</water_level>
+    </plugin>
+
     <!-- ==================================================================
          WAVE SOURCE — the engine is the plugin's identity. Keep exactly ONE of
          the two <plugin> blocks below active and comment the other out. Both
@@ -208,7 +221,7 @@
          the comment directly above each block.
          ================================================================== -->
 
-    <!-- Wave source. Two engines are available: FFT (EncinoWaves spectral,
+    <!-- Wave source. Two engines are available: FFT (Ehukai spectral,
          higher fidelity) is active here; Gerstner (analytic sum of component
          waves) is the commented alternative below. Full parameter lists and the
          <sea_state> precedence rules live in each plugin's documentation.
@@ -239,7 +252,8 @@
              intentionally unphysical, ~1.0 = physical Hs); <tile_size> and
              <grid_size> are the periodic domain and FFT resolution; <choppiness>
              sharpens crests; <direction> is parsed but not yet applied
-             (EncinoWaves assumes wind along +X). -->
+             (Ehukai assumes wind along +X, so the waves travel
+             towards +x). -->
         <!--
         <period>3.2</period>
         <gain>9.5</gain>
@@ -474,6 +488,14 @@
       <plugin filename="ScenarioPanel" name="Scenarios">
         <gz-gui>
           <title>Scenarios</title>
+          <property type="string" key="state">docked</property>
+        </gz-gui>
+      </plugin>
+
+      <!-- Acoustics (gz_maritime_gui): the pingers and the receivers, and what they hear; drawing off until turned on in the panel. -->
+      <plugin filename="AcousticsPanel" name="Acoustics">
+        <gz-gui>
+          <title>Acoustics</title>
           <property type="string" key="state">docked</property>
         </gz-gui>
       </plugin>
