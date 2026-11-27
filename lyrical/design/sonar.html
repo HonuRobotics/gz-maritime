@@ -1,0 +1,1752 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sonar simulation design &mdash; Gz Maritime lyrical documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/honu.css?v=44af46ee" />
+
+  
+    <link rel="shortcut icon" href="../_static/honu-robotics-favicon.svg"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=46f74c5b"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script type="module">import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.12.1/dist/mermaid.esm.min.mjs";
+
+
+
+
+
+const initStyles = () => {
+    const defaultStyle = document.createElement('style');
+    defaultStyle.textContent = "pre.mermaid {\n    /* Same as .mermaid-container > pre */\n    display: block;\n    width: 100%;\n}\n\npre.mermaid > svg {\n    /* Same as .mermaid-container > pre > svg */\n    height: 500px;\n    width: 100%;\n    max-width: 100% !important;\n}";
+    document.head.appendChild(defaultStyle);
+
+    const fullscreenStyle = document.createElement('style');
+    fullscreenStyle.textContent = ".mermaid-container {\n    position: relative;\n    display: flex;\n    flex-direction: row;\n    width: 100%;\n}\n\n.mermaid-container > pre {\n    display: block;\n    width: 100%;\n}\n\n.mermaid-container > pre > svg {\n    height: 500px;\n    width: 100%;\n    max-width: 100% !important;\n}\n\n.mermaid-fullscreen-btn {\n    position: absolute;\n    width: 28px;\n    height: 28px;\n    background: rgba(255, 255, 255, 0.95);\n    border: 1px solid rgba(0, 0, 0, 0.3);\n    border-radius: 4px;\n    cursor: pointer;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    transition: all 0.2s;\n    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);\n    font-size: 14px;\n    line-height: 1;\n    padding: 0;\n    color: #333;\n}\n\n.mermaid-fullscreen-btn:hover {\n    opacity: 100% !important;\n    background: rgba(255, 255, 255, 1);\n    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);\n    transform: scale(1.1);\n}\n\n.mermaid-fullscreen-btn.dark-theme {\n    background: rgba(50, 50, 50, 0.95);\n    border: 1px solid rgba(255, 255, 255, 0.3);\n    color: #e0e0e0;\n}\n\n.mermaid-fullscreen-btn.dark-theme:hover {\n    background: rgba(60, 60, 60, 1);\n    box-shadow: 0 3px 10px rgba(255, 255, 255, 0.2);\n}\n\n.mermaid-fullscreen-modal {\n    display: none;\n    position: fixed !important;\n    top: 0 !important;\n    left: 0 !important;\n    width: 95vw;\n    height: 100vh;\n    background: rgba(255, 255, 255, 0.98);\n    z-index: 9999;\n    padding: 20px;\n    overflow: auto;\n}\n\n.mermaid-fullscreen-modal.dark-theme {\n    background: rgba(0, 0, 0, 0.98);\n}\n\n.mermaid-fullscreen-modal.active {\n    display: flex;\n    align-items: center;\n    justify-content: center;\n}\n\n.mermaid-container-fullscreen {\n    position: relative;\n    width: 95vw;\n    height: 90vh;\n    max-width: 95vw;\n    max-height: 90vh;\n    background: white;\n    border-radius: 8px;\n    padding: 20px;\n    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);\n    overflow: auto;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n}\n\n.mermaid-container-fullscreen.dark-theme {\n    background: #1a1a1a;\n    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);\n}\n\n.mermaid-container-fullscreen pre.mermaid {\n    width: 100%;\n    height: 100%;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n}\n\n.mermaid-container-fullscreen .mermaid svg {\n    height: 100% !important;\n    width: 100% !important;\n    cursor: grab;\n}\n\n.mermaid-fullscreen-close {\n    position: fixed !important;\n    top: 20px !important;\n    right: 20px !important;\n    width: 40px;\n    height: 40px;\n    background: rgba(255, 255, 255, 0.95);\n    border: 1px solid rgba(0, 0, 0, 0.2);\n    border-radius: 50%;\n    cursor: pointer;\n    z-index: 10000;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);\n    transition: all 0.2s;\n    font-size: 24px;\n    line-height: 1;\n    color: #333;\n}\n\n.mermaid-fullscreen-close:hover {\n    background: white;\n    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);\n    transform: scale(1.1);\n}\n\n.mermaid-fullscreen-close.dark-theme {\n    background: rgba(50, 50, 50, 0.95);\n    border: 1px solid rgba(255, 255, 255, 0.2);\n    color: #e0e0e0;\n}\n\n.mermaid-fullscreen-close.dark-theme:hover {\n    background: rgba(60, 60, 60, 1);\n    box-shadow: 0 6px 16px rgba(255, 255, 255, 0.2);\n}\n\n.mermaid-fullscreen-modal .mermaid-fullscreen-btn {\n    display: none !important;\n}";
+    document.head.appendChild(fullscreenStyle);
+}
+
+// Detect if page has dark background
+const isDarkTheme = () => {
+    // We use a set of heuristics:
+    // 1. Check for common dark mode classes or attributes
+    // 2. Check computed background color brightness
+    if (document.documentElement.classList.contains('dark') ||
+        document.documentElement.getAttribute('data-theme') === 'dark' ||
+        document.body.classList.contains('dark') ||
+        document.body.getAttribute('data-theme') === 'dark') {
+        // console.log("Dark theme detected via class/attribute");
+        return true;
+    }
+    if (document.documentElement.classList.contains('light') ||
+        document.documentElement.getAttribute('data-theme') === 'light' ||
+        document.body.classList.contains('light') ||
+        document.body.getAttribute('data-theme') === 'light') {
+        // console.log("Light theme detected via class/attribute");
+        return false;
+    }
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        // console.log("Dark theme detected via prefers-color-scheme");
+        return true;
+    }
+    const bgColor = window.getComputedStyle(document.body).backgroundColor;
+    const match = bgColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)/);
+    if (match) {
+        const r = parseInt(match[1]);
+        const g = parseInt(match[2]);
+        const b = parseInt(match[3]);
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        // console.log("Background color brightness:", brightness);
+        return brightness < 128;
+    }
+    // console.log("No dark or light theme detected, defaulting to light theme");
+    return false;
+};
+
+let darkTheme = isDarkTheme();
+let modal = null;
+let modalContent = null;
+let previousScrollOffset = [window.scrollX, window.scrollY];
+let _lazyObserver = null;
+let _renderQueue = Promise.resolve();
+let closeModal = () => {};
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal?.classList.contains('active')) {
+        closeModal();
+    }
+});
+
+// Apply d3 zoom to each SVG. Idempotent: an SVG already wrapped is skipped,
+// so this is safe to call both for the initial batch and for diagrams that
+// render lazily once they become visible.
+const addZoomToSvgs = (svgs) => {
+    svgs.each(function() {
+        if (this.getAttribute('data-zoom-applied') === 'true') return;
+        var svg = d3.select(this);
+        svg.html("<g class='wrapper'>" + svg.html() + "</g>");
+        var inner = svg.select("g");
+        var zoom = d3.zoom().on("zoom", function(event) {
+            inner.attr("transform", event.transform);
+        });
+        svg.call(zoom);
+        this.setAttribute('data-zoom-applied', 'true');
+    });
+};
+
+const runMermaid = async (rerun) => {
+    console.log("Running mermaid diagrams, rerun =", rerun);
+    // clear all existing mermaid charts
+    let all_mermaids = document.querySelectorAll(".mermaid");
+
+    if (rerun) {
+        // Disconnect any previous lazy rendering observer
+        if (_lazyObserver) {
+            _lazyObserver.disconnect();
+            _lazyObserver = null;
+        }
+
+        all_mermaids.forEach((el) => {
+            el.removeAttribute('data-mermaid-deferred');
+            el.removeAttribute('data-mermaid-render-failed');
+            if(!el.hasAttribute("data-original-code")) {
+                // store original code
+                // console.log(`Storing original code for first run: `, el.innerHTML);
+                el.setAttribute('data-original-code', el.innerHTML);
+            }
+            if(el.getAttribute("data-processed") === "true") {
+                // remove and restore original
+                el.removeAttribute("data-processed");
+                // console.log(`Restoring original code for re-run: `, el.getAttribute('data-original-code'));
+                el.innerHTML = el.getAttribute('data-original-code');
+            } else {
+                // store original code
+                // console.log(`Storing original code for re-run: `, el.innerHTML);
+                el.setAttribute('data-original-code', el.innerHTML);
+            }
+        });
+
+        // Separate visible and hidden elements. Mermaid's layout engine measures
+        // text dimensions via the DOM, which fails for elements hidden by a parent
+        // (e.g., Reveal.js non-active slides, sphinx-design unopened tabs),
+        // producing broken SVGs. Render visible elements now, defer hidden ones.
+        const visible = [];
+        const hidden = [];
+        all_mermaids.forEach((el) => {
+            // offsetParent is null for display:none ancestors.
+            // getClientRects().length > 0 catches position:fixed elements
+            // (which also have null offsetParent but are still visible).
+            if (el.offsetParent !== null || el.getClientRects().length > 0) {
+                visible.push(el);
+            } else {
+                hidden.push(el);
+                el.setAttribute('data-mermaid-deferred', 'true');
+            }
+        });
+
+        if (visible.length > 0) {
+            try {
+                await mermaid.run({ nodes: visible });
+            } catch (e) {
+                console.error("Mermaid rendering failed:", e);
+            }
+        }
+
+        // Lazily render hidden elements when they become visible.
+        // Uses a promise chain (_renderQueue) to serialize rendering,
+        // since IntersectionObserver may report multiple entries at once
+        // and mermaid.run() is not safe to call concurrently.
+        if (hidden.length > 0) {
+            if (typeof IntersectionObserver === 'undefined') {
+                console.warn("IntersectionObserver not available; hidden mermaid diagrams will not render.");
+            } else {
+                _renderQueue = Promise.resolve();
+                _lazyObserver = new IntersectionObserver((entries) => {
+                    for (const entry of entries) {
+                        if (entry.isIntersecting && entry.target.getAttribute("data-processed") !== "true") {
+                            _lazyObserver.unobserve(entry.target);
+                            const el = entry.target;
+                            _renderQueue = _renderQueue.then(async () => {
+                                try {
+                                    await mermaid.run({ nodes: [el] });
+                                    el.removeAttribute('data-mermaid-deferred');
+                                    // Apply zoom to the now-rendered diagram, matching
+                                    // the decoration visible diagrams receive.
+                                    if (false) {
+                                        addZoomToSvgs(d3.selectAll("").select(function() {
+                                            return this.querySelector("svg");
+                                        }));
+                                    }
+                                } catch (e) {
+                                    console.error("Mermaid deferred rendering failed:", e);
+                                    el.removeAttribute('data-mermaid-deferred');
+                                    el.setAttribute('data-mermaid-render-failed', 'true');
+                                }
+                            });
+                        }
+                    }
+                });
+                hidden.forEach((el) => _lazyObserver.observe(el));
+            }
+        }
+    }
+
+    all_mermaids = document.querySelectorAll(".mermaid");
+    // Exclude deferred (hidden) and render-failed elements from completion checks
+    const mermaids_active = document.querySelectorAll(".mermaid:not([data-mermaid-deferred]):not([data-mermaid-render-failed])");
+    const mermaids_processed = document.querySelectorAll(".mermaid:not([data-mermaid-deferred]):not([data-mermaid-render-failed])[data-processed='true']");
+
+    if (false) {
+        const mermaids_to_add_zoom = 0 === -1 ? mermaids_active.length : 0;
+        if(mermaids_to_add_zoom > 0) {
+            var svgs = d3.selectAll("").select(function() {
+                return this.querySelector("svg");
+            });
+            // Wait until every active (visible) diagram has rendered. Deferred
+            // diagrams are excluded, so a fixed d3_node_count that counts a
+            // hidden diagram no longer loops forever waiting for its SVG.
+            if(mermaids_active.length !== mermaids_processed.length) {
+                setTimeout(() => runMermaid(false), 200);
+                return;
+            }
+            addZoomToSvgs(svgs);
+        }
+    } else if(mermaids_active.length !== mermaids_processed.length) {
+        // Wait for mermaid to process all diagrams
+        setTimeout(() => runMermaid(false), 200);
+        return;
+    }
+
+    // Stop here if not adding fullscreen capability
+    if (!true) return;
+
+    if (modal !== null ) {
+        // Destroy existing modal
+        modal.remove();
+        modal = null;
+        modalContent = null;
+    }
+
+    modal = document.createElement('div');
+    modal.className = 'mermaid-fullscreen-modal' + (darkTheme ? ' dark-theme' : '');
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Fullscreen diagram viewer');
+    modal.innerHTML = `
+        <button class="mermaid-fullscreen-close${darkTheme ? ' dark-theme' : ''}" aria-label="Close fullscreen">✕</button>
+        <div class="mermaid-container-fullscreen${darkTheme ? ' dark-theme' : ''}"></div>
+    `;
+    document.body.appendChild(modal);
+
+    modalContent = modal.querySelector('.mermaid-container-fullscreen');
+    const closeBtn = modal.querySelector('.mermaid-fullscreen-close');
+
+    closeModal = () => {
+        modal.classList.remove('active');
+        modalContent.innerHTML = '';
+        document.body.style.overflow = ''
+        window.scrollTo({left: previousScrollOffset[0], top: previousScrollOffset[1], behavior: 'instant'});
+    };
+
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+    document.querySelectorAll('.mermaid').forEach((mermaidDiv) => {
+        if (mermaidDiv.parentNode.classList.contains('mermaid-container') ||
+            mermaidDiv.closest('.mermaid-fullscreen-modal')) {
+            // Already processed, adjust button class if needed
+            const existingBtn = mermaidDiv.parentNode.querySelector('.mermaid-fullscreen-btn');
+            if (existingBtn) {
+                existingBtn.className = 'mermaid-fullscreen-btn' + (darkTheme ? ' dark-theme' : '');
+            }
+            return;
+        }
+
+        const container = document.createElement('div');
+        container.className = 'mermaid-container';
+        mermaidDiv.parentNode.insertBefore(container, mermaidDiv);
+        container.appendChild(mermaidDiv);
+
+        const fullscreenBtn = document.createElement('button');
+        fullscreenBtn.className = 'mermaid-fullscreen-btn' + (darkTheme ? ' dark-theme' : '');
+        fullscreenBtn.setAttribute('aria-label', 'View diagram in fullscreen');
+        fullscreenBtn.textContent = "\u26f6";
+        fullscreenBtn.style.opacity = "50%";
+
+        // Calculate dynamic position based on diagram's margin and padding
+        const diagramStyle = window.getComputedStyle(mermaidDiv);
+        const marginTop = parseFloat(diagramStyle.marginTop) || 0;
+        const marginRight = parseFloat(diagramStyle.marginRight) || 0;
+        const paddingTop = parseFloat(diagramStyle.paddingTop) || 0;
+        const paddingRight = parseFloat(diagramStyle.paddingRight) || 0;
+        fullscreenBtn.style.top = `${marginTop + paddingTop + 4}px`;
+        fullscreenBtn.style.right = `${marginRight + paddingRight + 4}px`;
+
+        fullscreenBtn.addEventListener('click', () => {
+            previousScrollOffset = [window.scrollX, window.scrollY];
+            const clone = mermaidDiv.cloneNode(true);
+            modalContent.innerHTML = '';
+            modalContent.appendChild(clone);
+
+            const svg = clone.querySelector('svg');
+            if (svg) {
+                svg.removeAttribute('width');
+                svg.removeAttribute('height');
+                svg.style.width = '100%';
+                svg.style.height = 'auto';
+                svg.style.maxWidth = '100%';
+                svg.style.display = 'block';
+
+                if (false) {
+                    setTimeout(() => {
+                        const g = svg.querySelector('g');
+                        if (g) {
+                            var svgD3 = d3.select(svg);
+                            svgD3.html("<g class='wrapper'>" + svgD3.html() + "</g>");
+                            var inner = svgD3.select("g");
+                            var zoom = d3.zoom().on("zoom", function(event) {
+                                inner.attr("transform", event.transform);
+                            });
+                            svgD3.call(zoom);
+                        }
+                    }, 100);
+                }
+            }
+
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        });
+        container.appendChild(fullscreenBtn);
+    });
+};
+
+
+
+const load = async () => {
+    initStyles();
+
+
+    await runMermaid(true);
+
+    const reRunIfThemeChanges = async () => {
+        const newDarkTheme = isDarkTheme();
+        if (newDarkTheme !== darkTheme) {
+            darkTheme = newDarkTheme;
+            console.log("Theme change detected, re-running mermaid with", darkTheme ? "dark" : "default", "theme");
+            await mermaid.initialize(
+                {...{"startOnLoad": false},
+                ...{ darkMode: darkTheme, theme: darkTheme ? "dark" : "default" },
+                }
+            );
+            await runMermaid(true);
+        }
+    };
+
+    // Update theme classes when theme changes
+    const themeObserver = new MutationObserver(reRunIfThemeChanges);
+    themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class', 'style', 'data-theme']
+    });
+    themeObserver.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class', 'style', 'data-theme']
+    });
+};
+
+
+
+
+
+console.log("Initializing mermaid with", darkTheme ? "dark" : "default", "theme");
+mermaid.initialize(
+    {...{"startOnLoad": false},
+    ...{ darkMode: darkTheme, theme: darkTheme ? "dark" : "default" },
+    }
+);
+
+window.addEventListener("load", load);
+window.runMermaid = runMermaid;</script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Render a ping without Gazebo" href="render-a-ping.html" />
+    <link rel="prev" title="Design" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Gz Maritime
+              <img src="../_static/honu-robotics-white-logo.svg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting-started/index.html">Getting started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/requirements.html">Requirements</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/requirements.html#optional">Optional</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/requirements.html#docker">Docker</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/installation.html">Installation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#clone">1. Clone</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#install-the-dependencies">2. Install the dependencies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#build">3. Build</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#check">4. Check</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/first-simulation.html">First simulation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#the-ocean-on-its-own">1. The ocean on its own</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#put-a-boat-on-it">2. Put a boat on it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#drive-it">3. Drive it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#look-at-it-in-rviz">4. Look at it in RViz</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#add-a-second-boat">5. Add a second boat</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#make-waves">6. Make waves</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#next">Next</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../vehicles/index.html">Vehicles</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../vehicles/index.html#what-a-world-provides-what-a-vehicle-brings">What a world provides, what a vehicle brings</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/custom-usv.html">Custom USV</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#run-it">Run it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#drive-it">Drive it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#topics">Topics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#frames">Frames</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#what-it-is-made-of">What it is made of</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#limitations">Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/bluerobotics.html">BlueBoat and BlueROV2</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/bluerobotics.html#blueboat">BlueBoat</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/bluerobotics.html#bluerov2">BlueROV2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/bluerobotics.html#several-vehicles-on-one-ocean">Several vehicles on one ocean</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/holybro.html">Holybro X500</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/holybro.html#run-it">Run it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/holybro.html#on-the-ocean">On the ocean</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../how-to/index.html">How to guides</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/index.html#bring-your-own-vehicle">Bring your own vehicle</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/index.html#sonar">Sonar</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/index.html#more">More</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/own-vehicle.html">Bring your own vehicle</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/own-vehicle.html#who-does-what">Who does what</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/own-vehicle.html#the-path">The path</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/own-vehicle.html#why-the-urdf-comes-first">Why the URDF comes first</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/own-vehicle.html#how-a-vehicle-floats">How a vehicle floats</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/own-vehicle.html#what-the-gazebo-maritime-tutorials-cover">What the Gazebo maritime tutorials cover</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/own-vehicle.html#waves-and-physics-today">Waves and physics today</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/own-vehicle.html#already-have-a-model">Already have a model?</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/vehicle-description.html">Describe the vehicle</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/vehicle-description.html#put-the-origin-on-the-waterline">Put the origin on the waterline</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/vehicle-description.html#work-out-the-draft">Work out the draft</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/vehicle-description.html#collision-shapes-are-for-contact">Collision shapes are for contact</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/vehicle-description.html#mass-and-inertia">Mass and inertia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/vehicle-description.html#propellers">Propellers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/vehicle-description.html#sensor-frames">Sensor frames</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/vehicle-description.html#no-instance-name-no-gazebo">No instance name, no Gazebo</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/vehicle-description.html#check-it">Check it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/vehicle-description.html#build-it">Build it</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/gazebo-composition.html">Compose the Gazebo model</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/gazebo-composition.html#the-wrapper">The wrapper</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/gazebo-composition.html#what-survives-the-conversion">What survives the conversion</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/gazebo-composition.html#mark-the-collisions-that-displace">Mark the collisions that displace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/gazebo-composition.html#thrusters">Thrusters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/gazebo-composition.html#hydrodynamic-damping">Hydrodynamic damping</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/gazebo-composition.html#added-mass">Added mass</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/gazebo-composition.html#sensors">Sensors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/gazebo-composition.html#joint-states">Joint states</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/gazebo-composition.html#build-it">Build it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/gazebo-composition.html#marking-from-a-urdf">Marking from a URDF</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/spawn-and-drive.html">Spawn and drive</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/spawn-and-drive.html#the-simulation-part">The simulation part</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/spawn-and-drive.html#spawn-an-instance">Spawn an instance</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/spawn-and-drive.html#your-sim-launch-xml">Your <code class="docutils literal notranslate"><span class="pre">sim.launch.xml</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/spawn-and-drive.html#one-name-per-instance">One name per instance</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/spawn-and-drive.html#what-the-launch-needs-from-a-vehicle">What the launch needs from a vehicle</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/spawn-and-drive.html#the-bridge-configuration">The bridge configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/spawn-and-drive.html#drive">Drive</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/spawn-and-drive.html#change-the-sea-while-it-runs">Change the sea while it runs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/spawn-and-drive.html#several-vehicles">Several vehicles</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/spawn-and-drive.html#other-vehicles">Other vehicles</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/sensors.html">Add sensors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sensors.html#what-the-world-provides">What the world provides</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sensors.html#the-pattern">The pattern</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sensors.html#a-camera">A camera</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sensors.html#an-underwater-camera">An underwater camera</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sensors.html#check-a-sensor">Check a sensor</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/several-vehicles.html">Several vehicles on one ocean</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/several-vehicles.html#bring-it-up">1. Bring it up</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/several-vehicles.html#one-name-each">2. One name each</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/several-vehicles.html#read-a-sensor">3. Read a sensor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/several-vehicles.html#command-an-actuator">4. Command an actuator</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/several-vehicles.html#drive-one-with-a-gamepad">5. Drive one with a gamepad</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/several-vehicles.html#add-a-second-boat">6. Add a second boat</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/several-vehicles.html#change-the-sea">7. Change the sea</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/several-vehicles.html#what-to-know">What to know</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/site-worlds.html">Sail the competition sites</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/site-worlds.html#sydney-international-regatta-centre">Sydney International Regatta Centre</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/site-worlds.html#nathan-benderson-park">Nathan Benderson Park</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/site-worlds.html#sand-island">Sand Island</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/site-worlds.html#la-spezia">La Spezia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/site-worlds.html#marina-bay">Marina Bay</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/site-worlds.html#robotx-2026">RobotX 2026</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/site-worlds.html#what-to-know">What to know</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/aquatic-centre.html">Dive in the aquatic centre</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/aquatic-centre.html#what-to-know">What to know</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/own-world.html">Use your own world</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/own-world.html#what-a-world-needs">What a world needs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/own-world.html#the-buoyancy-system">The buoyancy system</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/own-world.html#the-water-s-optics">The water’s optics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/own-world.html#the-world-name">The world name</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/own-world.html#adding-a-seabed">Adding a seabed</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/wind-and-current.html">Change and see the wind and the current</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/wind-and-current.html#steer-them-by-hand">Steer them by hand</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/wind-and-current.html#set-them-exactly">Set them exactly</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/wind-and-current.html#see-them">See them</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/wind-and-current.html#what-each-vehicle-meets">What each vehicle meets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/wind-and-current.html#wind-socks">Wind socks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/wind-and-current.html#scenarios-and-the-demo">Scenarios and the demo</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/wind-and-current.html#in-your-own-world">In your own world</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/lens-drops.html">Put rain on a camera’s lens</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/lens-drops.html#add-it-to-a-camera">Add it to a camera</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/lens-drops.html#how-much-rain-lands">How much rain lands</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/lens-drops.html#change-the-rain-while-it-runs">Change the rain while it runs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/lens-drops.html#ground-truth-for-perception">Ground truth for perception</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/lens-drops.html#things-to-know">Things to know</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/underwater-camera.html">See through the water</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#give-a-world-its-water">Give a world its water</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#set-how-far-you-can-see">Set how far you can see</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#change-it-while-the-world-runs">Change it while the world runs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#check-what-the-world-has">Check what the world has</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#add-an-underwater-camera">Add an underwater camera</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#see-its-image">See its image</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#the-gui-view-and-every-camera-at-once">The GUI view, and every camera at once</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#lights-at-depth">Lights at depth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#check-it-against-real-footage">Check it against real footage</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#more-of-the-water">More of the water</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/sonar-imaging.html">Imaging (forward-looking) sonar from the ROV</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-imaging.html#launch">Launch</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-imaging.html#watch-the-sonar">Watch the sonar</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-imaging.html#read-the-sonar-in-ros-2">Read the sonar in ROS 2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-imaging.html#turn-the-rov">Turn the ROV</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/sonar-survey.html">USV survey examples: profiling and sidescan sonar</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-survey.html#part-1-single-pass-over-the-undulating-seabed-with-discrete-targets">Part 1: Single pass over the undulating seabed with discrete targets</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/sonar-survey.html#launch">Launch</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/sonar-survey.html#watch-the-sonars">Watch the sonars</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/sonar-survey.html#drive-the-pass">Drive the pass</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/sonar-survey.html#what-to-look-for">What to look for</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-survey.html#part-2-map-a-shipwreck">Part 2: Map a shipwreck</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/sonar-survey.html#id1">Launch</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/sonar-survey.html#survey-and-record">Survey and record</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/sonar-survey.html#the-sidescan-mosaic">The sidescan mosaic</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/sonar-survey.html#the-soundings-as-a-point-cloud">The soundings as a point cloud</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/sonar-add.html">Add a sonar to your vehicle</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-add.html#the-sensor">The sensor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-add.html#the-world">The world</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-add.html#the-bridge">The bridge</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-add.html#sidescan-and-profiler">Sidescan and profiler</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-add.html#on-the-blue-robotics-vehicles">On the Blue Robotics vehicles</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-add.html#switch-it-off">Switch it off</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-add.html#check">Check</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/sonar-features.html">Sonar features: acoustic properties and truth labels</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-features.html#acoustic-properties">Acoustic properties</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/sonar-features.html#mark-a-surface">Mark a surface</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/sonar-features.html#hide-a-surface">Hide a surface</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../how-to/sonar-features.html#name-the-seabed">Name the seabed</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-features.html#tune-the-image">Tune the image</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-features.html#repeatable-randomness-the-seed">Repeatable randomness: the seed</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sonar-features.html#truth-labels">Truth labels</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/acoustic-pingers.html">Find an acoustic pinger</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/acoustic-pingers.html#run-the-demo">Run the demo</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/acoustic-pingers.html#see-them-in-the-gui">See them in the GUI</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/acoustic-pingers.html#put-a-pinger-in-a-world">Put a pinger in a world</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/acoustic-pingers.html#give-your-vehicle-a-receiver">Give your vehicle a receiver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/acoustic-pingers.html#coming-from-vrx">Coming from VRX</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/faq.html">Troubleshooting</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#my-vehicle-sinks">My vehicle sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#my-vehicle-bumps-into-things-it-shouldn-t-or-sits-on-the-water-oddly">My vehicle bumps into things it shouldn’t, or sits on the water oddly</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#unsupported-collision-geometry-for-graded-buoyancy">“Unsupported collision geometry for graded buoyancy”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-vehicle-capsizes">The vehicle capsizes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-boat-moves-sideways-or-spins-instead-of-going-forward">The boat moves sideways, or spins, instead of going forward</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-boat-barely-moves-or-a-bigger-command-changes-nothing">The boat barely moves, or a bigger command changes nothing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-spawn-launch-stops-with-invalid-instance-name">The spawn launch stops with “invalid instance name”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-spawn-launch-returns-straight-away">The spawn launch returns straight away</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#two-boats-answer-the-same-command-or-rviz-shows-a-jumping-robot">Two boats answer the same command, or RViz shows a jumping robot</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#a-plugin-can-t-find-a-link">A plugin can’t find a link</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-server-stops-with-ode-internal-error-aabbbound">The server stops with “ODE INTERNAL ERROR … aabbBound”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-boat-falls-very-slowly-when-spawned-high">The boat falls very slowly when spawned high</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#rviz-shows-nothing-or-fixed-frame-does-not-exist">RViz shows nothing, or “Fixed Frame does not exist”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#robot-state-publisher-warns-about-the-root-link-inertia">robot_state_publisher warns about the root link inertia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-ocean-looks-flat-or-white-in-the-gui">The ocean looks flat or white in the GUI</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#camera-images-look-green-or-blue">Camera images look green or blue</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#two-simulations-interfere-with-each-other">Two simulations interfere with each other</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-underwater-image-is-the-same-as-the-plain-one">The underwater image is the same as the plain one</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-underwater-image-is-all-one-colour">The underwater image is all one colour</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-underwater-image-gets-black-at-depth">The underwater image gets black at depth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-gui-and-the-underwater-camera-differ">The GUI and the underwater camera differ</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/launch-and-world.html">Launch files, world and services</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#launch-files">Launch files</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-simulation-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">simulation.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-spawn-vehicle-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">spawn_vehicle.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-multi-vehicle-demo-launch-py"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">multi_vehicle_demo.launch.py</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-sim-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">sim.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-rviz-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">rviz.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-display-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">display.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#instantiate-vehicle-py"><code class="docutils literal notranslate"><span class="pre">instantiate_vehicle.py</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#instance-rviz-py"><code class="docutils literal notranslate"><span class="pre">instance_rviz.py</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#worlds">Worlds</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#the-open-water-sdf-world">The <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code> world</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#buoyancy-markup">Buoyancy markup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#wind-markup">Wind markup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#wind-parameters">Wind parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#ocean-current-markup">Ocean current markup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#ocean-current-parameters">Ocean current parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#water-optics-parameters">Water optics parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#underwater-camera-parameters">Underwater camera parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#underwater-rendering">Underwater rendering</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#thruster-command">Thruster command</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#services">Services</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#examples">Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#wind">Wind</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#direction-and-units">Direction and units</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#ocean-current">Ocean current</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#id1">Direction and units</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#water-optics">Water optics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#topics">Topics</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Design</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="index.html#the-waves">The waves</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#floating-vehicles-the-world-doesn-t-know">Floating vehicles the world doesn’t know</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#one-name-per-instance">One name per instance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#one-thruster-interface">One thruster interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#pingers-in-the-world-receivers-on-vehicles">Pingers in the world, receivers on vehicles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#buoyancy-that-follows-the-waves">Buoyancy that follows the waves</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#seeing-through-the-water">Seeing through the water</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#sonar">Sonar</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#related">Related</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Sonar simulation design</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#use-cases">Use cases</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sonars-in-scope">Sonars in scope</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#glossary">Glossary</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#related-work">Related work</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#theory-of-operation">Theory of operation</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#the-model-and-its-components">The model and its components</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="#geometry">Geometry</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#transmission-loss">Transmission loss</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#backscatter">Backscatter</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#sonar">Sonar</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#fluctuations">Fluctuations</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#output">Output</a></li>
+</ul>
+</li>
+<li class="toctree-l5"><a class="reference internal" href="#acoustic-properties-of-the-scene">Acoustic properties of the scene</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#where-it-sits-among-the-alternatives">Where it sits among the alternatives</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#why-this-level-suits-the-use-cases">Why this level suits the use cases</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#imaging-sonar">Imaging sonar</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#profiling-sonar">Profiling sonar</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#sidescan">Sidescan</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#interface">Interface</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#sdf">SDF</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#messages">Messages</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#implementation">Implementation</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#packages">Packages</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#one-ping">One ping</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#design-choices">Design choices</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#known-limits">Known limits</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#performance">Performance</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#testing">Testing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#walkthroughs">Walkthroughs</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="render-a-ping.html">Render a ping without Gazebo</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="render-a-ping.html#what-this-tests">What this tests</a></li>
+<li class="toctree-l4"><a class="reference internal" href="render-a-ping.html#build-and-test-the-engine">Build and test the engine</a></li>
+<li class="toctree-l4"><a class="reference internal" href="render-a-ping.html#render-and-draw">Render and draw</a></li>
+<li class="toctree-l4"><a class="reference internal" href="render-a-ping.html#what-to-look-for">What to look for</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="render-a-ping.html#scene-a-a-sphere-in-open-water">Scene A: a sphere in open water</a></li>
+<li class="toctree-l5"><a class="reference internal" href="render-a-ping.html#scene-b-a-box-on-a-flat-seabed">Scene B: a box on a flat seabed</a></li>
+<li class="toctree-l5"><a class="reference internal" href="render-a-ping.html#scene-c-a-seabed-rising-to-starboard">Scene C: a seabed rising to starboard</a></li>
+<li class="toctree-l5"><a class="reference internal" href="render-a-ping.html#the-pass-sidescan-and-profiling">The pass: sidescan and profiling</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="render-a-ping.html#where-things-live">Where things live</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sonar-performance.html">Sonar performance</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="sonar-performance.html#the-case">The case</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-performance.html#results">Results</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-performance.html#why-the-gpu-matters-little">Why the GPU matters little</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-performance.html#recommendations">Recommendations</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../project/index.html">Project</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Gz Maritime</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Design</a></li>
+      <li class="breadcrumb-item active">Sonar simulation design</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/design/sonar.md" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="sonar-simulation-design">
+<h1>Sonar simulation design<a class="headerlink" href="#sonar-simulation-design" title="Link to this heading"></a></h1>
+<p>Status: implemented, under review, 2026-11-22.</p>
+<section id="use-cases">
+<h2>Use cases<a class="headerlink" href="#use-cases" title="Link to this heading"></a></h2>
+<p>The sonar simulation exists so that a team can develop underwater perception and mapping in simulation and run the same pipeline on the real vehicle. The driving case is the Virtual RobotX 2027 competition, but the needs are generic to small marine robots working in shallow harbor water:</p>
+<ol class="arabic simple">
+<li><p>Detect and classify objects underwater, from a strong, simple target (a hollow sphere) up to lookalike shapes, low-contrast objects and clutter near structures, including when the camera cannot see.</p></li>
+<li><p>Measure the range and bearing to a nearby object precisely enough to report its position in the world.</p></li>
+<li><p>Decide whether a space (a dock bay, a route) is clear of submerged obstructions.</p></li>
+<li><p>Survey an area and produce a georeferenced map product of the seabed and an object on it, such as a shipwreck, from a surface vehicle, an underwater vehicle, or both. For development, the map product is a georeferenced point cloud that fuses sonar data with the vehicle’s positioning, and it is scored by its geometric difference from the simulation’s ground truth.</p></li>
+</ol>
+<p>The water is shallow: nominally 3 to 12 m, at most 30 m.</p>
+<p>The simulation is used for scored competition runs as well as development, so it must be repeatable from a seed, run on the evaluation hardware alongside several vehicles, and expose difficulty through a small set of documented parameters. The scoring hardware has a GPU, and the sonar must hold its configured rate there; it must also run, more slowly, on any machine that can run Gazebo’s cameras, so that no team needs a GPU to develop.</p>
+<p><img alt="Imaging, profiling and sidescan sonar: the same engine with different fan geometry" src="../_images/sonar_types.png" /></p>
+<p>Three types of sonar: the same engine, with different geometry.</p>
+</section>
+<section id="sonars-in-scope">
+<h2>Sonars in scope<a class="headerlink" href="#sonars-in-scope" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Sonar</p></th>
+<th class="head"><p>Where</p></th>
+<th class="head"><p>Use cases</p></th>
+<th class="head"><p>Exemplar</p></th>
+<th class="head"><p>Native product of the exemplar</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Imaging sonar (forward-looking multibeam)</p></td>
+<td><p>UUV, looking forward</p></td>
+<td><p>1, 2, 3</p></td>
+<td><p>Sonoptix ECHO (defaults): 400 kHz to 100 m or 700 kHz to 30 m, 256 beams over 90° or 120°, 20° vertical, up to 25 Hz. Also, for example, Teledyne BlueView M900-130 Mk2: 900 kHz, 130°, to 100 m</p></td>
+<td><p>uint8 matrix, one column per beam and one row per range sample</p></td>
+</tr>
+<tr class="row-odd"><td><p>Profiling sonar (downward multibeam)</p></td>
+<td><p>UUV looking down, or USV</p></td>
+<td><p>4</p></td>
+<td><p>Cerulean Surveyor 240-16 (defaults): 240 kHz, angle of arrival, 4° along track by 80° across, 10 to 20 soundings per ping, up to 100 m, up to 20 Hz. Also, for example, a beamformed profiler such as the Teledyne Odom MB2: 200 to 460 kHz, 1.8° by 1.8° beams</p></td>
+<td><p>Soundings: a range and an angle per detection, sometimes with water-column intensity</p></td>
+</tr>
+<tr class="row-even"><td><p>Sidescan</p></td>
+<td><p>USV, one bar under the hull with a transducer on each side</p></td>
+<td><p>4</p></td>
+<td><p>Cerulean Omniscan 450 SS: 450 kHz, 0.5° along track by 50° vertical, up to 150 m, up to 20 Hz</p></td>
+<td><p>One line per ping: 200 to 1200 uint16 samples in dB, with range start, length, gain and sound speed</p></td>
+</tr>
+</tbody>
+</table>
+<p>A UUV carries a sonar looking forward, one looking down, or both; the BlueROV2’s chassis has one sonar slot, for the Ping360, so these sonars go on by free placement. A USV carries the sidescan, the profiling sonar, or both.</p>
+<p>Out of scope: single-beam echosounders and altimeters, interferometric sidescan, synthetic aperture sonar, sub-bottom profilers, mechanically scanned sonars (imaging or profiling), 3D sonars with a two-dimensional receive array, acoustic positioning (USBL, LBL) and acoustic communication, which is a separate design.</p>
+<p>The three sonars differ in where they point and how wide the beam is in elevation, not in the underlying physics. An imaging sonar has a beam wide in elevation: every pixel sums echoes from a tall wedge of water, so the image shows the scene’s appearance (highlights, shadows) but loses each return’s elevation. A profiling sonar has a beam narrow in elevation, so each beam’s strongest return fixes a point in 3D, and the vehicle’s motion sweeps the profile into bathymetry. A sidescan is a single fan-shaped beam per side, swept along the track by the vehicle’s motion.</p>
+<section id="glossary">
+<h3>Glossary<a class="headerlink" href="#glossary" title="Link to this heading"></a></h3>
+<p>How this project uses the terms. The field uses several of them loosely, so the synonyms column says what else a reader may meet and what we avoid.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Term</p></th>
+<th class="head"><p>How we use it</p></th>
+<th class="head"><p>Synonyms and terms we avoid</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Multibeam sonar</p></td>
+<td><p>A sonar whose array forms many beams at once, side by side across a fan. In this project a multibeam sonar is either an imaging sonar or a profiling sonar.</p></td>
+<td><p>“Multibeam” alone means a profiling sonar to hydrographers and often an imaging sonar in robotics papers; we always say which.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Imaging sonar</p></td>
+<td><p>A multibeam sonar whose beams are wide in elevation. Its product is an intensity image in range and bearing; the elevation of each return is lost.</p></td>
+<td><p>Forward-looking sonar (FLS), multibeam imaging sonar, 2D sonar, acoustic camera (usually for the highest-frequency units). We avoid FLS as a type name, because it names the pointing direction: a profiler or a 3D sonar can also look forward.</p></td>
+</tr>
+<tr class="row-even"><td><p>Profiling sonar</p></td>
+<td><p>A multibeam sonar that ensonifies a thin fan, narrow along track and wide across it. Inside the device it has the echo intensity of the fan in angle and range, a thin-slice image of the scene; it detects the bottom in it, rejects outliers, and delivers soundings: a range and an angle per detection. Motion sweeps the profiles into bathymetry.</p></td>
+<td><p>Multibeam echosounder (MBES), bathymetric multibeam, swath sonar, multibeam profiler. Water column is the name for the intensity before detection, when a device exposes it. Not a sub-bottom profiler, which images layers beneath the seabed.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Sidescan sonar</p></td>
+<td><p>One beam per side, narrow along track and wide in elevation, pointing sideways. Each ping gives one intensity line per side; motion along the track builds the image.</p></td>
+<td><p>Side-scan, side scan, SSS. It is not a multibeam sonar in this project.</p></td>
+</tr>
+<tr class="row-even"><td><p>Ping</p></td>
+<td><p>One transmission and the echoes received from it.</p></td>
+<td><p>Shot, frame (for an imaging sonar’s image).</p></td>
+</tr>
+<tr class="row-odd"><td><p>Beam</p></td>
+<td><p>One direction the sonar resolves within a ping.</p></td>
+<td><p>Channel (in some vendor formats).</p></td>
+</tr>
+<tr class="row-even"><td><p>Sample</p></td>
+<td><p>One time step of a beam’s received echo, which corresponds to one range, at 2R/c.</p></td>
+<td><p>Range bin, bin, row (in the ECHO’s matrix).</p></td>
+</tr>
+<tr class="row-odd"><td><p>Azimuth, elevation</p></td>
+<td><p>The angles across a fan and out of it: for an imaging sonar, horizontal and vertical; for a sidescan, along track and across the swath.</p></td>
+<td><p>Horizontal and vertical field of view (FOV), beam width and beam height (Cerulean).</p></td>
+</tr>
+<tr class="row-even"><td><p>Beam width</p></td>
+<td><p>The angle between the −3 dB points of a beam’s two-way response.</p></td>
+<td><p>Beam angle, opening angle.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Incidence angle, grazing angle</p></td>
+<td><p>The angle between the ray and the surface normal (incidence), or between the ray and the surface itself (grazing). They add to 90°.</p></td>
+<td><p>Angle of incidence. Seabed backscatter is usually quoted against grazing angle.</p></td>
+</tr>
+<tr class="row-even"><td><p>Waterfall, mosaic</p></td>
+<td><p>A waterfall stacks sidescan lines in ping order, in the sonar’s own frame. A mosaic places them in the world from the vehicle’s position and heading.</p></td>
+<td><p>Sidescan image, georeferenced image.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="related-work">
+<h2>Related work<a class="headerlink" href="#related-work" title="Link to this heading"></a></h2>
+<p>A survey of the field in November 2026 found the following.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Simulator</p></th>
+<th class="head"><p>Sonar model</p></th>
+<th class="head"><p>Fidelity</p></th>
+<th class="head"><p>What we take from it</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>DAVE, now <a class="reference external" href="https://github.com/IOES-Lab/POSIM">IOES-Lab/POSIM</a> (Gazebo Jetty, ROS 2 Lyrical, Apache-2.0)</p></td>
+<td><p>Point scattering on depth-camera rays, complex Gaussian amplitudes, beam pattern, per-beam time series; CPU, CUDA and WGPU back ends; publishes <code class="docutils literal notranslate"><span class="pre">marine_acoustic_msgs/ProjectedSonarImage</span></code></p></td>
+<td><p>Coherent point scattering on rasterized geometry, the only open model at this level</p></td>
+<td><p>The output contract, the depth-camera sampling, and the scattering formulation, as ideas and, where useful, adapted code. Its absorption constant suits about 100 kHz rather than the MHz heads it ships, its back ends disagree numerically, and it has not been validated quantitatively against real data</p></td>
+</tr>
+<tr class="row-odd"><td><p>HoloOcean (Unreal; papers: <a class="reference external" href="https://doi.org/10.1109/ICRA46639.2022.9812353">simulator</a>, ICRA 2022; <a class="reference external" href="https://doi.org/10.1109/IROS47612.2022.9981119">sonar</a>, IROS 2022)</p></td>
+<td><p>Octree, ray-cast and GPU back ends; cosine and impedance shading, mean per bin, heuristic noise; imaging, profiling, sidescan, single beam</p></td>
+<td><p>Geometric (octree projection; ray casting in development for HoloOcean 2.0) with partial intensity physics</p></td>
+<td><p>That one engine can serve imaging, profiling and sidescan by configuration. Averaging per bin, instead of summing, removes the dependence on ensonified area</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference external" href="https://github.com/patrykcieslak/stonefish">Stonefish</a> (OpenGL, GPL-3.0)</p></td>
+<td><p>Rasterize and bin per beam column; correct ping timing from 2R/c</p></td>
+<td><p>Image-based to geometric</p></td>
+<td><p>Ping timing; the GPL rules out reusing code</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference external" href="https://github.com/umfieldrobotics/OceanSim">OceanSim</a> (Isaac Sim)</p></td>
+<td><p>GPU ray-traced point cloud, cosine and attenuation, normalized by range</p></td>
+<td><p>Geometric</p></td>
+<td><p>Normalizing per frame or row erases the absolute intensity that classification needs</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference external" href="https://github.com/MARUSimulator">MARUS</a> (Unity)</p></td>
+<td><p>CPU ray casts, cosine-squared shading; labeled dataset export</p></td>
+<td><p>Geometric</p></td>
+<td><p>Per-return object labels for training data</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference external" href="https://github.com/smarc-project">SMaRC</a> (Unity, plus auvlib)</p></td>
+<td><p>Cheap runtime sidescan with the real vehicle’s message; differentiable renderers fitted to real surveys offline</p></td>
+<td><p>Geometric at run time</p></td>
+<td><p>A sidescan message modeled on the real sensor’s packet, so the same consumer runs on both</p></td>
+</tr>
+</tbody>
+</table>
+<p>Three findings carry into this design. Of the perception simulators only POSIM puts the geometry (beam angles, range per sample) in its output, as a <code class="docutils literal notranslate"><span class="pre">ProjectedSonarImage</span></code>; from the others a consumer receives a picture without its coordinate system. Where users have measured transfer to real data, geometric tasks transfer (feature matching trained on HoloOcean beat LightGlue on real tank data) and intensity and noise do not (a HoloOcean-trained denoiser failed on real data). And Gazebo itself has no sonar sensor; gz-sensors issue #19 has been open since 2020.</p>
+</section>
+<section id="theory-of-operation">
+<h2>Theory of operation<a class="headerlink" href="#theory-of-operation" title="Link to this heading"></a></h2>
+<p>The engine is an <strong>incoherent sonar-equation model on rendered geometry</strong>: Gazebo renders the surfaces the sonar sees, and the sonar equation turns each into echo power, added without phase.</p>
+<p>For each beam and range sample the echo power from every surface patch the beam sees is summed, using the sonar equation: two-way spherical spreading, Francois–Garrison absorption, the patch’s backscatter strength times the area the beam ensonifies, and the two-way beam pattern. Backscatter follows Lambert’s law (μ cos² of the incidence angle) plus a Gaussian specular lobe near normal incidence. Phases are never computed, so the model is incoherent: the interference between scatterers is applied afterward as speckle, an exponentially distributed multiplier on intensity.</p>
+<p>This section describes, at a high level, the model component by component, with references for the details; places it among the alternative approaches; justifies why it suits the driving use cases; and then describes how the one model is adapted to the different sonar types: the multibeam sonars (imaging and profiling) and the sidescan.</p>
+<section id="the-model-and-its-components">
+<h3>The model and its components<a class="headerlink" href="#the-model-and-its-components" title="Link to this heading"></a></h3>
+<p>All three sonars use this one engine, also called an incoherent intensity model. It treats every surface the sonar sees as a patch made of many small, independent scatterers, and its result is the echo intensity in every beam and range sample, which is then turned into what the real device delivers: the message the sonar plugin publishes (see Output, below). Coiras and Groen, <a class="reference external" href="https://doi.org/10.5772/39406">“Simulation and 3D reconstruction of side-looking sonar images”</a> (in <em>Advances in Sonar Technology</em>, 2009, open access), derive this model in “Sonar simulation”: from the wave equation and point scattering down to the Lambertian, incoherent form used here. Sena and Santos Neto, <a class="reference external" href="https://sol.sbc.org.br/index.php/erbase/article/download/46318/46077/">“SideScanSim: an open-source side-scan sonar simulator”</a> (2026, with an <a class="reference external" href="https://github.com/andreluissena/SideScanSim">open implementation</a>), write out the same ingredients in a few lines each: the sonar equation with spreading and Francois–Garrison absorption, Lambert’s law for the seabed, time-varied gain, and speckle as an exponentially distributed intensity. Short introduction to the <a class="reference external" href="https://dosits.org/science/advanced-topics/sonar-equation/">“SONAR equation”</a>.</p>
+<p>The engine follows the terms of the active sonar equation, received level = source level − 2 TL + BS + 10 log A, weighted by the beam pattern, in six components:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Component</p></th>
+<th class="head"><p>Sonar-equation term</p></th>
+<th class="head"><p>What we model</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Geometry</p></td>
+<td><p>Which surfaces the sonar sees, at what range and incidence</p></td>
+<td><p>Rays sampled from depth and segmentation cameras; the first hit only, which gives shadows</p></td>
+</tr>
+<tr class="row-odd"><td><p>Transmission loss</p></td>
+<td><p>2 TL</p></td>
+<td><p>Straight paths, one sound speed, two-way spherical spreading and Francois–Garrison absorption</p></td>
+</tr>
+<tr class="row-even"><td><p>Backscatter</p></td>
+<td><p>BS + 10 log A</p></td>
+<td><p>Lambert’s law plus a specular lobe, per surface, times the area each ray covers</p></td>
+</tr>
+<tr class="row-odd"><td><p>Sonar</p></td>
+<td><p>Source level, directivity and range resolution</p></td>
+<td><p>The two-way beam pattern with its sidelobes and vertical taper, the beams, the pulse length and range samples</p></td>
+</tr>
+<tr class="row-even"><td><p>Fluctuations</p></td>
+<td><p>The statistics of the received level</p></td>
+<td><p>Speckle as an exponentially distributed multiplier, and a noise floor</p></td>
+</tr>
+<tr class="row-odd"><td><p>Output</p></td>
+<td><p>What the sonar plugin publishes, as the device would</p></td>
+<td><p>Time-varied gain and gain, then 8-bit or dB levels in a <code class="docutils literal notranslate"><span class="pre">SonarImage</span></code> message, or bottom-detected soundings in a <code class="docutils literal notranslate"><span class="pre">SonarDetections</span></code> message</p></td>
+</tr>
+</tbody>
+</table>
+<p>The contribution of a ray hitting a surface at range R and incidence θ is proportional to b²(φ, ψ) · σ(θ) · A / R⁴ · 10^(−2αR/10), where b is the one-way beam pattern at the ray’s azimuth φ and elevation ψ, A = R² ΔΩ / cos θ is the area the ray’s solid angle ΔΩ covers on the surface, and α is the absorption in dB per meter. The source level is a constant, which the gain applied before the levels are published absorbs.</p>
+<pre  class="mermaid">
+        flowchart LR
+  G[&quot;Geometry&lt;br/&gt;&lt;i&gt;range, incidence, label per ray&lt;/i&gt;&quot;] --&gt; E[&quot;Transmission loss and backscatter&lt;br/&gt;&lt;i&gt;echo level per ray&lt;/i&gt;&quot;]
+  E --&gt; B[&quot;Sonar&lt;br/&gt;&lt;i&gt;beam pattern, pulse length, binning&lt;/i&gt;&quot;]
+  B --&gt; S[&quot;Fluctuations&lt;br/&gt;&lt;i&gt;speckle and noise, seeded&lt;/i&gt;&quot;]
+  S --&gt; R[&quot;Output&lt;br/&gt;&lt;i&gt;TVG, gain, dB, 8-bit; or detect range&lt;/i&gt;&quot;]
+    </pre><section id="geometry">
+<h4>Geometry<a class="headerlink" href="#geometry" title="Link to this heading"></a></h4>
+<p>For each ping, a fan of rays covers the sonar’s field of view at finer resolution than the beams, in azimuth and in elevation. In elevation the rays reach past the beam’s −3 dB edge, to <code class="docutils literal notranslate"><span class="pre">elevation_span</span></code> half-widths of the vertical beam (three for the imaging sonar, where the pattern is 27 dB down), so the seabed shows faintly before the main beam reaches it, as on a real sonar; the fan then stops, a sampling limit rather than physics. Each ray returns the range to the first surface it hits, the incidence angle there, and the acoustic properties of that surface. Taking only the first hit along each ray produces acoustic shadows without any extra step. In Gazebo the rays come from gz-rendering: a depth camera gives the range, read at each ray’s exact direction by interpolating 1/z between pixels, which is exact on a plane, also one seen at a grazing angle, where depth changes fast from pixel to pixel but 1/z stays affine; a seabed that is not quite a plane (a mesh’s creases, an undulation) is read the same way, as long as 1/z bends by less than half its change from one pixel to the next; at a step or a silhouette, where it bends by as much as it changes, the nearest pixel is kept instead; a segmentation camera gives the entity hit; and normals come from neighboring hits on the ray grid that are on the same surface: with the same label, and with a jump in range no larger than a surface at 45° incidence would give across the angle between the two rays, or a larger jump that a third ray carries on, 1/range changing by about as much again to the next ray along the grid, as it does on a plane at any grazing angle and does not past the edge of a plate with a wall behind it; a hit whose normal cannot be estimated, on an object one ray wide, is given an incidence of 45°, a plain diffuse return with no glint, rather than the strongest return head on. This was measured at 0.02 mm median range error on a box on a seabed; gz-rendering’s ray sensor (GpuRays) was rejected for an error floor of about 8 mm and no normals. Reading between pixels has two limits: detail finer than a pixel, such as ripples shorter than the stretch of seabed one pixel covers, is not in the depth image at all; and steps that repeat about one pixel row apart, such as stairs seen at a grazing angle, read as a ramp, which puts some rays in open water above a tread. Depth cameras report depth along their optical axis, which the sampler converts to range along the ray.</p>
+</section>
+<section id="transmission-loss">
+<h4>Transmission loss<a class="headerlink" href="#transmission-loss" title="Link to this heading"></a></h4>
+<p>Two-way spherical spreading, 1/R⁴ in intensity (40 log R in dB), and absorption over the two-way path. Absorption comes from the Francois–Garrison equations at the configured frequency, temperature and salinity, at the surface, not from a fixed constant. The shallow, near-isovelocity water lets the engine ignore refraction and propagation modeling: paths are straight, and sound speed is a single configured value. Multipath, the bounces off the surface and the seabed that matter for a sidescan in shallow water, is not modeled yet; the water surface is hidden from the sonar.</p>
+</section>
+<section id="backscatter">
+<h4>Backscatter<a class="headerlink" href="#backscatter" title="Link to this heading"></a></h4>
+<p>The backscatter is σ(θ) = μ cos²θ + R²/(8πw²) · exp(−θ²/2w²): Lambert’s law for rough, diffuse scattering, per unit area (μ times the square of the sine of the grazing angle), with μ a property of the surface, plus an optional Gaussian specular lobe of angular width w for smooth objects, which return strongly only near normal incidence. The lobe is the Kirchhoff approximation near normal incidence for facet slopes of rms w, so its strength is set by R², the square of the reflection coefficient at normal incidence, and the 1/(8πw²) makes it carry the energy of a mirror: a sphere of radius a returns R² a²/4, the target strength of a rigid sphere when R² = 1, whatever the width. A wider lobe shows the glint over more viewing angles at a lower peak. μ is the backscattering cross section per unit area and per unit solid angle at normal incidence, and 10 log₁₀ μ is the backscattering strength the literature tabulates (<a class="reference external" href="https://apps.dtic.mil/sti/pdfs/ADB199453.pdf">APL-UW TR 9407</a> (1994; approved for public release in 1997), Section IV.C.2, Eq. 34, p. IV-22). The law is the acoustic form of <a class="reference external" href="https://en.wikipedia.org/wiki/Lambertian_reflectance">Lambertian reflectance</a>, which in optics has a single cosine. The square comes from the two legs of a monostatic sonar: a tilted patch both intercepts less of the beam and scatters less of it back. Because the engine multiplies σ by the area each ray covers, which grows as 1/cosθ, one ray’s return falls as cosθ, the same curve as the optical cosine shading many simulators apply per hit. What the sonar equation adds is the scale: μ is a measured backscatter strength, so the seabed values in the literature apply directly, and summing over area makes a return follow the area the beam ensonifies. Lambert’s law is the standard first-order law for diffuse seabed backscatter, with one parameter (Mackenzie measured μ ≈ −27 dB), and fits at intermediate grazing angles; near normal incidence the specular lobe takes over, and at very low grazing angles real seabeds depart from it. A richer law, such as the APL-UW models, would drop into the same place. Each surface’s values come from SDF, as described in <a class="reference internal" href="#acoustic-properties-of-the-scene">Acoustic properties of the scene</a>.</p>
+</section>
+<section id="sonar">
+<h4>Sonar<a class="headerlink" href="#sonar" title="Link to this heading"></a></h4>
+<p>Each ray’s contribution is added (not averaged) into the beams according to the beam pattern, so sidelobes appear around bright targets, and into the range sample at 2R/c, spread uniformly over the wider of the pulse length and the range interval the ray’s footprint covers on a slanted surface. The sampler measures that interval from the ranges the ray’s neighbors on the grid hit on the same surface, by the same test as for normals: on a plane seen at any grazing angle the footprints meet as far as the ray spacing lets them, and at the edge of a target, where the neighbor misses it or hits something farther back, even another part of the same model, the footprint stays small instead of smearing the target in range. Without neighbors the engine estimates it from the incidence angle, capped at 8 samples. Summing over the elevation of a beam reproduces the imaging sonar’s elevation ambiguity; for the narrow beams of the profiler and the narrow along-track width of the sidescan it collapses to almost nothing.</p>
+</section>
+<section id="fluctuations">
+<h4>Fluctuations<a class="headerlink" href="#fluctuations" title="Link to this heading"></a></h4>
+<p>A noise floor is added to each sample’s intensity as a received level, the receiver’s ambient and electronic noise, and the sum is multiplied by one exponentially distributed random factor, the statistics of fully developed speckle from many unresolved scatterers: echo and noise add as one Gaussian field, so where they are equal the contrast stays at 1, where two independent draws would give 0.71. The noise enters before the time-varied gain and the gain, as in a real receiver, so in the published levels it rises with range as the time-varied gain does, and an echo that spreading and absorption have weakened below it is lost: range, frequency and salinity limit what the sonar sees. Every random draw comes from a generator seeded from the sonar system’s <code class="docutils literal notranslate"><span class="pre">&lt;seed&gt;</span></code>, the sensor’s name and the ping number, so a run is reproducible.</p>
+</section>
+<section id="output">
+<h4>Output<a class="headerlink" href="#output" title="Link to this heading"></a></h4>
+<p>What a real device delivers differs by sonar, so what the sonar plugin publishes does too (in the <code class="docutils literal notranslate"><span class="pre">SonarImage</span></code> and <code class="docutils literal notranslate"><span class="pre">SonarDetections</span></code> messages under <a class="reference internal" href="#messages">Messages</a>): an 8-bit image for the <a class="reference internal" href="#imaging-sonar">imaging sonar</a>, a line in dB for the <a class="reference internal" href="#sidescan">sidescan</a>, and soundings for the <a class="reference internal" href="#profiling-sonar">profiling sonar</a>.</p>
+</section>
+</section>
+<section id="acoustic-properties-of-the-scene">
+<h3>Acoustic properties of the scene<a class="headerlink" href="#acoustic-properties-of-the-scene" title="Link to this heading"></a></h3>
+<p>Each surface needs the two backscatter terms above: the Lambert strength μ and, for smooth objects, the specular strength R² and width w. Materials of a mesh part live in its <code class="docutils literal notranslate"><span class="pre">.glb</span></code>, and the SDF <code class="docutils literal notranslate"><span class="pre">&lt;visual&gt;</span></code> of a <code class="docutils literal notranslate"><span class="pre">.glb</span></code> must not declare a <code class="docutils literal notranslate"><span class="pre">&lt;material&gt;</span></code>, so acoustic properties cannot come from SDF materials; the simple targets in <code class="docutils literal notranslate"><span class="pre">gz_sonar</span></code>, primitives with no mesh, keep an SDF material for their color. They are set with <code class="docutils literal notranslate"><span class="pre">gz:</span></code> attributes on the <code class="docutils literal notranslate"><span class="pre">&lt;visual&gt;</span></code> or <code class="docutils literal notranslate"><span class="pre">&lt;model&gt;</span></code>, the way the project already marks collisions for buoyancy and wind. Strengths are in dB (10 log₁₀ μ and 10 log₁₀ R²), the form backscatter is quoted in the literature, and the width is in radians, as SDF gives every angle. Ground truth labels come from the same pass: each ray knows which entity it hit. Labels are the segmentation camera’s 8 bits, one id per model and property set for the whole world, so a world can tell 254 surfaces apart; past that, the rest share one id with the default properties, and labeling per ping by range is the way beyond it.</p>
+<p>Nothing has to be marked for the sonar to see it. Every surface gets values from the first of these that sets them:</p>
+<ol class="arabic simple">
+<li><p>Elements on the visual the ray hit.</p></li>
+<li><p>Elements directly under its model, which apply to all of the model’s visuals, so a model of many parts is marked once.</p></li>
+<li><p>The world’s <code class="docutils literal notranslate"><span class="pre">&lt;default&gt;</span></code> in the sonar system.</p></li>
+<li><p>The built-in default: −20 dB Lambert, no specular term.</p></li>
+</ol>
+<p>So an unmarked model is a plain diffuse scatterer, and marking is only needed for the objects a task depends on: targets, lookalikes, the wreck. The specular term is never on by default, because a glint on every flat face would make everything look smooth.</p>
+<p>The seabed is named in the world rather than marked, because site worlds take their terrain from Fuel models that we do not edit: the sonar system’s <code class="docutils literal notranslate"><span class="pre">&lt;seabed&gt;</span></code> lists the seabed models and their values. Three kinds of surface return no echo at all: the water surface drawn by <code class="docutils literal notranslate"><span class="pre">gz_waves_rendering</span></code>, which the engine hides from its cameras; the model that carries the sonar, so a hull or mount never echoes into its own sensor; and anything marked <code class="docutils literal notranslate"><span class="pre">gz:acoustic_transparent=&quot;true&quot;</span></code>, for visual-only objects such as markers above the water.</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cm">&lt;!-- A hollow glass float: smooth, so weak diffuse scattering and a strong</span>
+<span class="cm">     specular glint when the sonar looks at it head on. --&gt;</span>
+<span class="nt">&lt;visual</span><span class="w"> </span><span class="na">name=</span><span class="s">"float"</span><span class="w"> </span><span class="na">gz:acoustic_lambert=</span><span class="s">"-30"</span><span class="w"> </span><span class="na">gz:acoustic_specular=</span><span class="s">"-3"</span>
+<span class="w">        </span><span class="na">gz:acoustic_specular_width=</span><span class="s">"0.07"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;geometry&gt;&lt;sphere&gt;&lt;radius&gt;</span>0.2<span class="nt">&lt;/radius&gt;&lt;/sphere&gt;&lt;/geometry&gt;</span>
+<span class="nt">&lt;/visual&gt;</span>
+
+<span class="cm">&lt;!-- A course marker that is only for the cameras. --&gt;</span>
+<span class="nt">&lt;visual</span><span class="w"> </span><span class="na">name=</span><span class="s">"flag"</span><span class="w"> </span><span class="na">gz:acoustic_transparent=</span><span class="s">"true"</span><span class="nt">&gt;</span>
+<span class="w">  </span>...
+<span class="nt">&lt;/visual&gt;</span>
+
+<span class="cm">&lt;!-- In the world: the water, the seabed, and the default for anything unmarked. --&gt;</span>
+<span class="nt">&lt;plugin</span><span class="w"> </span><span class="na">filename=</span><span class="s">"gz-maritime-sonar-system"</span><span class="w"> </span><span class="na">name=</span><span class="s">"gz::sim::maritime::Sonar"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;temperature&gt;</span>29<span class="nt">&lt;/temperature&gt;</span>
+<span class="w">  </span><span class="nt">&lt;salinity&gt;</span>30<span class="nt">&lt;/salinity&gt;</span>
+<span class="w">  </span><span class="nt">&lt;seabed&gt;</span>
+<span class="w">    </span><span class="nt">&lt;model&gt;</span>marina_bay<span class="nt">&lt;/model&gt;</span>
+<span class="w">    </span><span class="nt">&lt;lambert&gt;</span>-27<span class="nt">&lt;/lambert&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/seabed&gt;</span>
+<span class="w">  </span><span class="nt">&lt;default&gt;&lt;lambert&gt;</span>-20<span class="nt">&lt;/lambert&gt;&lt;/default&gt;</span>
+<span class="nt">&lt;/plugin&gt;</span>
+</pre></div>
+</div>
+<p>The values are illustrative, not calibrated. The shipped worlds use −27 dB for their sandy seabeds, Mackenzie’s figure, which is darker than the APL-UW handbook’s sand (below).</p>
+<p>The full set of acoustic properties, with a sense of scale for each. The figures are order-of-magnitude guides for choosing values, to be checked against the cited sources before anything is calibrated.</p>
+<p>On a visual, or directly under a model:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">gz:acoustic_lambert</span></code>: diffuse backscatter strength, 10 log₁₀ μ, in dB. Lambert-equivalent values for the generic bottom types of <a class="reference external" href="https://apps.dtic.mil/sti/pdfs/ADB199453.pdf">APL-UW TR 9407</a> (1994; approved for public release in 1997) (Table 3, pp. IV-23 to IV-25, and Figure 2, p. IV-26), read at 30 kHz and 20° grazing: about +1 dB for rough rock, −6 for rock, −10 for cobble, −13 for sandy gravel, −18 to −19 for sand and −23 to −28 for silt. The handbook covers 10 to 100 kHz, below these sonars’ 240 to 700 kHz, where its values run a few dB stronger, so applying them here is an extrapolation. The built-in default for objects is −20 dB.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">gz:acoustic_specular</span></code>: strength of the glint near normal incidence, 10 log₁₀ R², in dB, with R the reflection coefficient at normal incidence, which the impedance contrast between water and the surface sets (APL-UW TR 9407, Eq. 37, p. IV-27). From about −20 dB, a faint glint off a rough surface, to around 0 dB for smooth, hard surfaces such as glass, metal plate or concrete; at 0 dB a sphere has the target strength of a rigid one, so the 0.2 m glass float at −3 dB is about −23 dB. Off unless set.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">gz:acoustic_specular_width</span></code>: angular width of that glint, in radians (<a class="reference external" href="https://link.springer.com/chapter/10.1007/978-0-387-36945-7_6">Jackson and Richardson, High-Frequency Seafloor Acoustics</a>). From 0.02 to 0.03 (1 to 2°) for very smooth surfaces to 0.17 to 0.35 (10 to 20°) for rough ones; about 0.07 (4°) suits most man-made objects.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">gz:acoustic_transparent</span></code>: the sonar does not see this surface. <code class="docutils literal notranslate"><span class="pre">true</span></code> or <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p></li>
+</ul>
+<p>In the world’s sonar system:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;seabed&gt;</span></code>: the seabed models and their Lambert and specular values, on the same scale as above.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;default&gt;</span></code>: values for any surface not otherwise set. Same scale as <code class="docutils literal notranslate"><span class="pre">gz:acoustic_lambert</span></code>; −20 dB if the world sets nothing.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;temperature&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;salinity&gt;</span></code>: water properties that set absorption at each sonar’s frequency (<a class="reference external" href="https://data-ww3.ifremer.fr/BIB/Francois_Garrison_JASA1982.pdf">Francois and Garrison 1982</a>; <a class="reference external" href="https://www.ldeo.columbia.edu/res/pi/MB-System/mbweb/html/mbabsorption.html">MB-System mbabsorption</a>). Temperature from 0 to 30 °C, with Singapore harbor water around 29 to 30 °C; salinity from 0 PSU (fresh) to 35 PSU (open ocean), with harbors and estuaries often 20 to 32 PSU. The resulting absorption, at 10 °C and 35 PSU, is roughly 0.03 dB/m at 100 kHz, 0.1 dB/m at 450 kHz and 0.3 dB/m at 900 kHz, rising steeply above 1 MHz.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;seed&gt;</span></code>: where every sonar’s random draws start, mixed with each sensor’s name and the ping number, so two sonars in one world draw differently and a run repeats. An integer; 0 by default, which is a seed like any other.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;sound_speed&gt;</span></code>: one value for the whole water column, which sets range from travel time (<a class="reference external" href="https://en.wikipedia.org/wiki/Speed_of_sound#Seawater">speed of sound in seawater</a>). From about 1400 m/s (cold fresh water) to 1550 m/s (warm salt water); 1500 m/s is the nominal value, and warm tropical harbor water is around 1540 m/s. It is set on its own, not derived from the temperature and salinity, which set only absorption; a world that wants the two to agree sets the value they give.</p></li>
+</ul>
+</section>
+<section id="where-it-sits-among-the-alternatives">
+<h3>Where it sits among the alternatives<a class="headerlink" href="#where-it-sits-among-the-alternatives" title="Link to this heading"></a></h3>
+<p>The alternatives, from least to most physical, and so from least to most computation. Neither acousticians nor roboticists share one set of names for them, and robotics papers call the second, third and fourth all “physics-based”, so we name each by what it computes and list the other names a reader will meet.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Model</p></th>
+<th class="head"><p>Also called</p></th>
+<th class="head"><p>What it does</p></th>
+<th class="head"><p>Examples</p></th>
+<th class="head"><p>Why not here</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Image-based conversion</p></td>
+<td><p>Depth-camera based, image processing</p></td>
+<td><p>Renders the scene with a camera, as depth or normals, and converts the picture into a sonar fan</p></td>
+<td><p>The depth-camera sonar of UUV Simulator and DAVE, UWSim, ACOUSIM (<a class="reference external" href="https://arxiv.org/abs/2605.19712">Basha S and Nambiar 2026</a>)</p></td>
+<td><p>Intensities are not physical and often normalized away, and the output carries no geometry; classification cues are not trustworthy</p></td>
+</tr>
+<tr class="row-odd"><td><p>Geometric model with Lambertian shading</p></td>
+<td><p>Ray tracing or ray casting, rasterization, octree projection, tube tracing; geometry-driven (<a class="reference external" href="https://arxiv.org/abs/2606.06130">Attia et al. 2026</a>)</p></td>
+<td><p>Finds range, bearing and shadows from the geometry, by casting rays or rasterizing, and shades each hit with a cosine law</p></td>
+<td><p>HoloOcean (octree projection in <a class="reference external" href="https://publications.ri.cmu.edu/resolve/2022/10/Potokar22icra.pdf">Potokar et al. 2022</a>, ray casting in HoloOcean 2.0), OceanSim (GPU ray tracing, <a class="reference external" href="https://arxiv.org/abs/2503.01074">Song et al. 2025</a>), Stonefish, MARUS</p></td>
+<td><p>Range, bearing and shadows are right, but brightness does not follow the area seen, absorption or the beam pattern, which is where the harder detection and classification levels live</p></td>
+</tr>
+<tr class="row-even"><td><p>Sonar-equation model</p></td>
+<td><p>Incoherent intensity model; energy based (<a class="reference external" href="https://doi.org/10.5772/18029">Guériot and Sintes 2011</a>)</p></td>
+<td><p>As described above</p></td>
+<td><p>This design; SideScanSim</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p>Coherent point-scattering model</p></td>
+<td><p>Point-based scattering model (<a class="reference external" href="https://doi.org/10.1121/1.4976584">Brown et al. 2017</a>), point scatterer approach, time-series model; for large targets, facets with the Kirchhoff approximation</p></td>
+<td><p>Gives each scatterer a complex amplitude and sums the waves in each beam, so speckle and sidelobes emerge from interference</p></td>
+<td><p>DAVE, now POSIM (<a class="reference external" href="https://doi.org/10.3389/frobt.2021.706646">Choi et al. 2021</a>); Penn State’s PoSSM</p></td>
+<td><p>Heavier, usually needing a GPU toolkit, and the phase it computes is never seen by a team, which receives beamformed intensity</p></td>
+</tr>
+<tr class="row-even"><td><p>Propagation-model driven</p></td>
+<td><p>Acoustic propagation models (ray tracing such as Bellhop, normal modes, parabolic equation); the nearby established term, sonar performance model, predicts detection rather than images</p></td>
+<td><p>Adds sound-speed refraction, multipath and reverberation from ocean acoustic propagation models</p></td>
+<td><p>APL-UW’s Sonar Simulation Toolset (<a class="reference external" href="https://www.apl.washington.edu/research/downloads/publications/tr_0702.pdf">TR 0702</a>)</p></td>
+<td><p>Built for sonar design, not for real-time robotics, and unnecessary in water no deeper than 30 m</p></td>
+</tr>
+</tbody>
+</table>
+<p>The backscatter law is a separate choice from the model: Lambert’s law, the Kirchhoff approximation, small-roughness perturbation, or the APL-UW models, any of which the second to fourth models can use. Ours, and why we chose it, is under Backscatter in <a class="reference internal" href="#the-model-and-its-components">The model and its components</a>.</p>
+<p>We use POSIM, the continuation of DAVE’s multibeam model (<a class="reference external" href="https://doi.org/10.3389/frobt.2021.706646">Choi et al. 2021</a>), as the principal constraint and comparison for this design: the reference one level up. It samples the scene the same way, with a depth camera, and adds what our model approximates: the phase of each echo, so speckle and sidelobes come out of interference instead of being applied statistically. Our images were compared with POSIM’s on the same scenes. That is one simulation against another, both approximations, so POSIM is not taken as truth and does not over-constrain the design. Agreement, as on target ranges, bearings and shadows, says the incoherent approximation is enough for the driving use cases. A difference should trace to a known difference between the models, such as our tapered vertical beam against its hard ±10° edge, our per-surface backscatter against its single reflectivity, or our shaded sidelobes against its beam pattern; where it traces to a deliberate choice of ours, we keep the choice rather than match POSIM. Its backscatter is simpler than ours, the same Lambert form with one reflectivity for every surface and no specular term, so the comparison checks how the image is formed, not the backscatter.</p>
+</section>
+<section id="why-this-level-suits-the-use-cases">
+<h3>Why this level suits the use cases<a class="headerlink" href="#why-this-level-suits-the-use-cases" title="Link to this heading"></a></h3>
+<p>In the driving use cases, perception consumes what a real sonar delivers after beamforming, and mapping consumes soundings. The simulation produces exactly those data artifacts: for the imaging sonar, a matrix of 8-bit intensities with one column per beam and one row per range sample, which a viewer draws as a fan-shaped image; for the sidescan, one line of intensities in dB per ping, which the consumer stacks into a waterfall and georeferences into a mosaic; and for the profiling sonar, soundings, a travel time and an angle per detection, which the consumer turns into a point cloud. This level matches the focus of the challenge, which is classification and shared autonomy, not beamforming and signal processing.</p>
+</section>
+<section id="imaging-sonar">
+<h3>Imaging sonar<a class="headerlink" href="#imaging-sonar" title="Link to this heading"></a></h3>
+<p>Configured as a fan of N beams over the horizontal field of view, wide in elevation, pointing forward with a configurable tilt. The sonar plugin publishes an 8-bit image in a <code class="docutils literal notranslate"><span class="pre">SonarImage</span></code> message, made by applying time-varied gain for spreading and absorption, <code class="docutils literal notranslate"><span class="pre">tvg_spreading</span></code>·log₁₀R + 2αR in dB (30 log R by default), then the gain, which sets full scale (fixed by default), then a fixed mapping of the top <code class="docutils literal notranslate"><span class="pre">dynamic_range</span></code> dB below full scale (60 by default) onto 1 to 255, linear in dB, with 0 for anything weaker, giving the device’s 8-bit beam × sample matrix. The gain is fixed by default, so a target’s brightness is the same in every frame and from one run to the next, the absolute level that classification needs; <code class="docutils literal notranslate"><span class="pre">auto</span></code> sets it from each frame’s own median and peak echo, which is easier to look at but is the per-frame normalization held against OceanSim above, and the gain each frame used is in the gz-transport message but not in the ROS one. Thresholding and color maps, which the ECHO’s own viewer applies with its dark point, white point and color map settings, are display choices left to the consumer. The configuration covers wide-fan imaging sonars such as the Sonoptix ECHO and the Teledyne BlueView M900-130 Mk2 (900 kHz, 130°, to 100 m); we use the ECHO for defaults: 256 beams over 120° at 700 kHz, 20° vertical, a 10 µs pulse (7.5 mm in range), and 1024 samples over the range window, set with <code class="docutils literal notranslate"><span class="pre">samples</span></code>.</p>
+</section>
+<section id="profiling-sonar">
+<h3>Profiling sonar<a class="headerlink" href="#profiling-sonar" title="Link to this heading"></a></h3>
+<p>A real profiling sonar works in three stages: it ensonifies a thin fan, forms the echo intensity across the fan in angle and range, then detects the bottom and rejects outliers on the device, delivering soundings. The simulation follows the same stages.</p>
+<ol class="arabic simple">
+<li><p>The engine runs exactly as for the imaging sonar, configured as a fan that is narrow along track (a few degrees) and wide across track, pointing down. It produces the intensity matrix of the thin slice, beam by range sample.</p></li>
+<li><p>Bottom detection in that matrix gives the soundings the sonar plugin publishes in a <code class="docutils literal notranslate"><span class="pre">SonarDetections</span></code> message, each an angle, a two-way travel time, an intensity and a flag. Beamformed detection takes, per beam, the strongest return above a threshold and flags returns inconsistent with their neighbors; angle-of-arrival detection keeps the strongest echo in each of <code class="docutils literal notranslate"><span class="pre">max_soundings</span></code> sectors of the fan. Both add range noise that grows as the signal-to-noise ratio falls. Where nothing exceeds the threshold, as at grazing angles and over weak surfaces, the beam drops out.</p></li>
+<li><p>The soundings are published, a two-way travel time and an angle per detection. Optionally the intensity matrix from step 1 is published as well, as water-column data, so a team can write its own bottom detection; it is on by default only if the exemplar exposes it.</p></li>
+</ol>
+<p>Devices differ in how they get the angle, and the simulation covers both. A beamformed profiler reports one sounding per beam at fixed beam angles. An angle-of-arrival profiler, such as the Cerulean Surveyor 240-16, transmits one thin fan (4° by 80°), estimates the direction of the strongest echoes from a small receive array (16 elements), and reports a variable number of soundings per ping (10 to 20), each with its own angle; the device reports no intensity, and the simulation fills in the detected level. For the second kind, the simulation keeps the strongest detection in each of N sectors across the fan, with angle noise. Neither kind needs phase in the simulation, because only the soundings leave the device.</p>
+<p>The bathymetric work that a large-ocean multibeam needs (sound-speed ray tracing, multi-sector timing) is unnecessary at 30 m or less. We use the Surveyor 240-16 for defaults: angle-of-arrival detection, 240 kHz, a 4° by 80° fan, up to 20 soundings per ping, 200 to 800 range steps; the simulation’s default window reaches 50 m, the device up to 100 m. The same sensor mounts under the BlueBoat or on the base of the BlueROV2, looking down.</p>
+</section>
+<section id="sidescan">
+<h3>Sidescan<a class="headerlink" href="#sidescan" title="Link to this heading"></a></h3>
+<p>Configured as one beam per side, narrow along track and wide in elevation, pointing to the side with a depression angle set by the mount; on the BlueBoat each side points 20° down. One ping produces one line; the line-by-line waterfall and any mosaic are built by the consumer from the vehicle’s motion, as with the real sensor, so the vessel’s roll, pitch and yaw enter the data without special handling. The sonar plugin publishes each side’s line in a <code class="docutils literal notranslate"><span class="pre">SonarImage</span></code> message: each sample in dB as float32, with time-varied gain for spreading and absorption applied by default, as sidescan viewers expect. The time-varied gain is an exact term, <code class="docutils literal notranslate"><span class="pre">tvg_spreading</span></code>·log₁₀R + 2αR in dB, and the gz-transport message carries it for every sample along with the gain, so a consumer can take both out; <code class="docutils literal notranslate"><span class="pre">marine_acoustic_msgs/ProjectedSonarImage</span></code> has no field for either, so on the ROS side <code class="docutils literal notranslate"><span class="pre">tvg</span></code> set to <code class="docutils literal notranslate"><span class="pre">none</span></code> and a fixed <code class="docutils literal notranslate"><span class="pre">gain</span></code> publish the received level directly. The gain is fixed by default; set to <code class="docutils literal notranslate"><span class="pre">auto</span></code>, it is smoothed across pings with a time constant of about a second, as real sidescans do: set ping by ping, it darkens every line that holds a bright target and stripes the waterfall, as Phase 1 showed. The Omniscan scales its dB values into uint16 for its link, which the simulation has no need to copy. The Omniscan defaults: 450 kHz, 0.5° by 50°, no tilt, 600 samples, far field beyond 9 m. The nadir gap, the first bottom return, and the grazing-angle dependence of the seabed return all follow from the geometry and the backscatter law.</p>
+</section>
+</section>
+<section id="interface">
+<h2>Interface<a class="headerlink" href="#interface" title="Link to this heading"></a></h2>
+<section id="sdf">
+<h3>SDF<a class="headerlink" href="#sdf" title="Link to this heading"></a></h3>
+<p>Each sonar is a gz-sensors custom sensor, the pattern <code class="docutils literal notranslate"><span class="pre">gz_wind</span></code>’s anemometer already uses: <code class="docutils literal notranslate"><span class="pre">&lt;sensor</span> <span class="pre">type=&quot;custom&quot;</span> <span class="pre">gz:type=&quot;imaging_sonar&quot;&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">gz:type=&quot;sidescan_sonar&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">gz:type=&quot;profiling_sonar&quot;</span></code>, with the standard <code class="docutils literal notranslate"><span class="pre">&lt;update_rate&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;topic&gt;</span></code> and <code class="docutils literal notranslate"><span class="pre">&lt;pose&gt;</span></code>, and a <code class="docutils literal notranslate"><span class="pre">&lt;gz:sonar&gt;</span></code> block. Every element in the block is optional, and an empty block gives the exemplar for that type:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;sensor</span><span class="w"> </span><span class="na">name=</span><span class="s">"sonar_forward"</span><span class="w"> </span><span class="na">type=</span><span class="s">"custom"</span><span class="w"> </span><span class="na">gz:type=</span><span class="s">"imaging_sonar"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;pose&gt;</span>0.2<span class="w"> </span>0<span class="w"> </span>-0.1<span class="w"> </span>0<span class="w"> </span>0.26<span class="w"> </span>0<span class="nt">&lt;/pose&gt;</span>
+<span class="w">  </span><span class="nt">&lt;update_rate&gt;</span>10<span class="nt">&lt;/update_rate&gt;</span>
+<span class="w">  </span><span class="nt">&lt;topic&gt;</span>bluerov2/sonar_forward/image<span class="nt">&lt;/topic&gt;</span>
+<span class="w">  </span><span class="nt">&lt;gz:sonar&gt;</span>
+<span class="w">    </span><span class="nt">&lt;frequency&gt;</span>700000<span class="nt">&lt;/frequency&gt;</span>
+<span class="w">    </span><span class="nt">&lt;horizontal_fov&gt;</span>2.094<span class="nt">&lt;/horizontal_fov&gt;</span>
+<span class="w">    </span><span class="nt">&lt;vertical_fov&gt;</span>0.349<span class="nt">&lt;/vertical_fov&gt;</span>
+<span class="w">    </span><span class="nt">&lt;beams&gt;</span>256<span class="nt">&lt;/beams&gt;</span>
+<span class="w">    </span><span class="nt">&lt;beam_width&gt;</span>0.026<span class="nt">&lt;/beam_width&gt;</span>
+<span class="w">    </span><span class="nt">&lt;range&gt;&lt;min&gt;</span>0.2<span class="nt">&lt;/min&gt;&lt;max&gt;</span>30<span class="nt">&lt;/max&gt;&lt;/range&gt;</span>
+<span class="w">    </span><span class="nt">&lt;samples&gt;</span>1024<span class="nt">&lt;/samples&gt;</span>
+<span class="w">    </span><span class="nt">&lt;noise_floor&gt;</span>-140<span class="nt">&lt;/noise_floor&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/gz:sonar&gt;</span>
+<span class="nt">&lt;/sensor&gt;</span>
+</pre></div>
+</div>
+<p>The sensor’s x axis is the acoustic axis, the direction the sonar looks; the pose points it forward, down or to the side. The fan spans the horizontal field of view about the sensor’s z axis and the vertical field of view about its y axis. So the same two parameters describe all three types: an imaging sonar’s wide horizontal fan and 20° of elevation, a profiler’s 80° across-track fan and 4° along track, and a sidescan’s 0.5° along track and 50° of elevation.</p>
+<p>Parameters shared by the three types. The defaults come from each type’s exemplar where its documentation gives a value; “chosen” marks a value the exemplar does not document, set to something plausible.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Meaning</p></th>
+<th class="head"><p>Imaging (ECHO)</p></th>
+<th class="head"><p>Profiling (Surveyor 240-16)</p></th>
+<th class="head"><p>Sidescan (Omniscan 450 SS)</p></th>
+<th class="head"><p>Typical range</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;update_rate&gt;</span></code> (sensor)</p></td>
+<td><p>Pings per second; the engine also caps it at c/2R so one ping’s echoes return before the next</p></td>
+<td><p>10 Hz (up to 25)</p></td>
+<td><p>10 Hz (up to 20)</p></td>
+<td><p>10 Hz (up to 20)</p></td>
+<td><p>1 to 25 Hz</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">frequency</span></code></p></td>
+<td><p>Center frequency in Hz; sets absorption</p></td>
+<td><p>700 000</p></td>
+<td><p>240 000</p></td>
+<td><p>450 000</p></td>
+<td><p>200 kHz to 2.25 MHz</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">horizontal_fov</span></code></p></td>
+<td><p>Width of the fan about the sensor’s z axis, rad</p></td>
+<td><p>2.094 (120°)</p></td>
+<td><p>1.396 (80°)</p></td>
+<td><p>0.0087 (0.5°)</p></td>
+<td><p>0.5° to 140°</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">vertical_fov</span></code></p></td>
+<td><p>Thickness of the fan about the sensor’s y axis, rad</p></td>
+<td><p>0.349 (20°)</p></td>
+<td><p>0.070 (4°)</p></td>
+<td><p>0.873 (50°)</p></td>
+<td><p>1° to 50°</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">beams</span></code></p></td>
+<td><p>Beams across the fan</p></td>
+<td><p>256</p></td>
+<td><p>160 (the fan’s intensity before detection; the soundings per ping are <code class="docutils literal notranslate"><span class="pre">max_soundings</span></code>)</p></td>
+<td><p>1</p></td>
+<td><p>1 to about 1000; at most 2048</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">beam_width</span></code></p></td>
+<td><p>Two-way −3 dB width of one beam across the fan, rad</p></td>
+<td><p>0.026 (1.5°)</p></td>
+<td><p>0.017 (1°, its angle-of-arrival resolution; 7° for <code class="docutils literal notranslate"><span class="pre">detection</span></code> <code class="docutils literal notranslate"><span class="pre">beamformed</span></code>)</p></td>
+<td><p>the horizontal FOV</p></td>
+<td><p>0.25° to 3°</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">sidelobe_level</span></code></p></td>
+<td><p>First sidelobe relative to the main lobe, dB</p></td>
+<td><p>−25 (chosen, typical of a shaded array)</p></td>
+<td><p>−13 (chosen)</p></td>
+<td><p>−13 (chosen)</p></td>
+<td><p>−13 (unshaded array) to −40 (heavily shaded)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">range/min</span></code>, <code class="docutils literal notranslate"><span class="pre">range/max</span></code> (or <code class="docutils literal notranslate"><span class="pre">range_min</span></code>, <code class="docutils literal notranslate"><span class="pre">range_max</span></code>)</p></td>
+<td><p>Range window, m</p></td>
+<td><p>0.2, 30</p></td>
+<td><p>2.5, 50</p></td>
+<td><p>1 (chosen), 50</p></td>
+<td><p>min 0.1 to 5; max 5 to 300; 0 ≤ min &lt; max</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">samples</span></code></p></td>
+<td><p>Range samples per beam per ping</p></td>
+<td><p>1024 (chosen)</p></td>
+<td><p>400</p></td>
+<td><p>600</p></td>
+<td><p>200 to 4000; at most 20 000</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">pulse_length</span></code></p></td>
+<td><p>Transmit pulse, s; sets range resolution cτ/2</p></td>
+<td><p>1e-5 (7.5 mm)</p></td>
+<td><p>1e-4 (chosen)</p></td>
+<td><p>1e-4 (chosen)</p></td>
+<td><p>10 to 200 µs</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">sound_speed</span></code></p></td>
+<td><p>Speed the device assumes when it converts time to range, m/s. The world’s <code class="docutils literal notranslate"><span class="pre">&lt;sound_speed&gt;</span></code> is the truth; a difference between them biases every range, as a mis-set sonar does</p></td>
+<td><p>the world’s value</p></td>
+<td><p>the world’s value, reported in the message only, since soundings are travel times</p></td>
+<td><p>the world’s value</p></td>
+<td><p>1400 to 1550</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gain</span></code></p></td>
+<td><p>Receiver gain applied before the levels are published: a fixed value in dB, or <code class="docutils literal notranslate"><span class="pre">auto</span></code>, which puts each frame’s median echo 24 dB below full scale but never clips more than its brightest 0.1 % of echoes</p></td>
+<td><p>52 (chosen)</p></td>
+<td><p>45 (chosen)</p></td>
+<td><p>45 (chosen)</p></td>
+<td><p>auto, or 0 to 60 dB</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gain_time_constant</span></code></p></td>
+<td><p>With <code class="docutils literal notranslate"><span class="pre">auto</span></code>, how quickly the gain follows the scene, s; 0 sets it from each ping alone</p></td>
+<td><p>0</p></td>
+<td><p>0</p></td>
+<td><p>1</p></td>
+<td><p>0 to 5</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tvg</span></code></p></td>
+<td><p>Time-varied gain: <code class="docutils literal notranslate"><span class="pre">none</span></code>, <code class="docutils literal notranslate"><span class="pre">spreading</span></code> or <code class="docutils literal notranslate"><span class="pre">spreading_absorption</span></code></p></td>
+<td><p>spreading_absorption</p></td>
+<td><p>none</p></td>
+<td><p>spreading_absorption</p></td>
+<td><p>one of the three</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tvg_spreading</span></code></p></td>
+<td><p>The spreading term of the time-varied gain, dB per decade of range: <code class="docutils literal notranslate"><span class="pre">tvg_spreading</span></code>·log₁₀R</p></td>
+<td><p>30</p></td>
+<td><p>30</p></td>
+<td><p>30</p></td>
+<td><p>20 to 40</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">noise_floor</span></code></p></td>
+<td><p>Noise at the receiver, added before the time-varied gain and the gain, dB re the echo of a 1 m² target 1 m away on axis; higher is harder and shortens the useful range</p></td>
+<td><p>−140 (chosen)</p></td>
+<td><p>−150 (chosen)</p></td>
+<td><p>−150 (chosen)</p></td>
+<td><p>−160 (quiet) to −110 (noisy)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">speckle</span></code></p></td>
+<td><p>Multiply each sample by the speckle factor</p></td>
+<td><p>true</p></td>
+<td><p>true</p></td>
+<td><p>true</p></td>
+<td><p>true or false</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">labels</span></code></p></td>
+<td><p>Publish the ground-truth labels topic, <code class="docutils literal notranslate"><span class="pre">&lt;topic&gt;/labels</span></code></p></td>
+<td><p>false</p></td>
+<td><p>false</p></td>
+<td><p>false</p></td>
+<td><p>true or false</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">always_ping</span></code></p></td>
+<td><p>Ping with no subscriber too</p></td>
+<td><p>false</p></td>
+<td><p>false</p></td>
+<td><p>false</p></td>
+<td><p>true or false</p></td>
+</tr>
+</tbody>
+</table>
+<p>Output parameters that only one type uses:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Type</p></th>
+<th class="head"><p>Parameter</p></th>
+<th class="head"><p>Meaning</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Typical range</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Imaging</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">dynamic_range</span></code></p></td>
+<td><p>The levels below full scale that the published 8-bit image spans, dB</p></td>
+<td><p>60</p></td>
+<td><p>40 to 80</p></td>
+</tr>
+<tr class="row-odd"><td><p>Profiling</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">detection</span></code></p></td>
+<td><p>How angles are found: <code class="docutils literal notranslate"><span class="pre">beamformed</span></code> (one sounding per beam) or <code class="docutils literal notranslate"><span class="pre">angle_of_arrival</span></code> (the strongest echoes, any angle)</p></td>
+<td><p>angle_of_arrival</p></td>
+<td><p>either</p></td>
+</tr>
+<tr class="row-even"><td><p>Profiling</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">max_soundings</span></code></p></td>
+<td><p>Angle-of-arrival detection: the fan’s sectors, so the most soundings per ping</p></td>
+<td><p>20</p></td>
+<td><p>10 to 40; at most 1024</p></td>
+</tr>
+<tr class="row-odd"><td><p>Profiling</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">detection_threshold</span></code></p></td>
+<td><p>Echo level above the noise at its range that counts as a sounding, dB; at 10, noise alone passes a few of the Surveyor’s 64 000 samples a ping, at 15 practically none</p></td>
+<td><p>15 (chosen)</p></td>
+<td><p>12 to 20</p></td>
+</tr>
+<tr class="row-even"><td><p>Profiling</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">range_noise</span></code></p></td>
+<td><p>Standard deviation of range at high signal-to-noise ratio, m; grows as the ratio falls</p></td>
+<td><p>half a range step (chosen; the Surveyor’s precision is not published)</p></td>
+<td><p>0.005 to 0.1</p></td>
+</tr>
+<tr class="row-odd"><td><p>Profiling</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">angle_noise</span></code></p></td>
+<td><p>Standard deviation of a sounding’s angle, rad</p></td>
+<td><p>0.009 (0.5°, chosen)</p></td>
+<td><p>0.1° to 2°</p></td>
+</tr>
+<tr class="row-even"><td><p>Profiling</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">water_column</span></code></p></td>
+<td><p>Also publish the thin-fan intensity before detection</p></td>
+<td><p>false</p></td>
+<td><p>true or false</p></td>
+</tr>
+</tbody>
+</table>
+<p>Advanced: geometry sampling. These set how finely the engine samples the scene, not anything about the sonar, and the defaults are chosen for accuracy. Lowering them is the way to buy speed, at the cost of fidelity; see <a class="reference internal" href="#performance">Performance</a>.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Meaning</p></th>
+<th class="head"><p>Imaging (ECHO)</p></th>
+<th class="head"><p>Profiling (Surveyor 240-16)</p></th>
+<th class="head"><p>Sidescan (Omniscan 450 SS)</p></th>
+<th class="head"><p>Trade-off</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">rays_per_beam</span></code></p></td>
+<td><p>Rays across one beam width; a whole number, at most 32</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+<td><p>8</p></td>
+<td><p>The largest lever: the cameras’ width and the work per ping scale with it. Below 4, small targets and edges fall between rays and shadows lose detail; 2 is the practical minimum</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">elevation_rays</span></code></p></td>
+<td><p>Rays across the vertical field of view, counted at a span of 2; a whole number, at most 2048</p></td>
+<td><p>64</p></td>
+<td><p>16</p></td>
+<td><p>400</p></td>
+<td><p>Fewer rays leave gaps in range on surfaces seen at grazing angles, which the footprints from neighboring rays only partly fill</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">threads</span></code></p></td>
+<td><p>Most threads one ping of this sonar runs on, its own worker included; a whole number from 1. Unset, a ping uses the whole shared pool and takes its turn at it</p></td>
+<td><p>unset</p></td>
+<td><p>unset</p></td>
+<td><p>unset</p></td>
+<td><p>A ping waits its turn behind any other sonar’s ping, which for a sidescan or profiler beside an imaging sonar is far longer than its own work; 1 keeps the ping on the sonar’s own worker and never waits, which suits those small fans, and is slow for an imaging sonar</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">elevation_span</span></code></p></td>
+<td><p>How far the rays reach out of the fan, in half-widths of the vertical beam; the ray count scales with it. From 0.1 to 10, with <code class="docutils literal notranslate"><span class="pre">vertical_fov</span></code> times <code class="docutils literal notranslate"><span class="pre">elevation_span</span></code> under 170°</p></td>
+<td><p>3</p></td>
+<td><p>2</p></td>
+<td><p>2</p></td>
+<td><p>Wider shows more of the faint seabed below the beam; 3 costs about 50 % more rays than 2</p></td>
+</tr>
+</tbody>
+</table>
+<p>The reader is strict. Every value is checked when the sensor loads, and a sensor with a bad one is refused with an error that names it, while the rest of the world runs: a value that is not a finite number (or <code class="docutils literal notranslate"><span class="pre">true</span></code> or <code class="docutils literal notranslate"><span class="pre">false</span></code> for a flag), a count that is not a whole number from 1 to its limit above, a range window without 0 ≤ min &lt; max, or a number outside its range. Angles are in radians: <code class="docutils literal notranslate"><span class="pre">horizontal_fov</span></code> from 0.0001 to 2π, <code class="docutils literal notranslate"><span class="pre">vertical_fov</span></code> and <code class="docutils literal notranslate"><span class="pre">beam_width</span></code> from 0.0001 to π, <code class="docutils literal notranslate"><span class="pre">angle_noise</span></code> up to π/2, so a field of view given in degrees is refused rather than read as nineteen turns. <code class="docutils literal notranslate"><span class="pre">elevation_span</span></code> is from 0.1 to 10, and <code class="docutils literal notranslate"><span class="pre">vertical_fov</span></code> times <code class="docutils literal notranslate"><span class="pre">elevation_span</span></code> stays under 170°. <code class="docutils literal notranslate"><span class="pre">frequency</span></code> is from 1 kHz to 10 MHz, <code class="docutils literal notranslate"><span class="pre">range/max</span></code> from 0.1 m to 10 km, <code class="docutils literal notranslate"><span class="pre">pulse_length</span></code> from 0.1 µs to 0.1 s, <code class="docutils literal notranslate"><span class="pre">sound_speed</span></code> from 1300 to 1700 m/s, and levels within 300 dB of zero. The values together are then sized up before anything is built: the fan (horizontal field of view plus four beam widths) may not pass a full circle, and may have at most 32 768 azimuth columns of rays, 2 million rays and 33 million column samples (columns times <code class="docutils literal notranslate"><span class="pre">samples</span></code>); the cameras that draw it may be at most six, 8192 pixels a side and 67 million pixels in all. The error says which limit and which parameters to reduce. An element it does not know is ignored with a warning, since it is most likely a misspelling.</p>
+<p>The imaging sonar always publishes an 8-bit beam-by-sample image, as the ECHO delivers it.</p>
+<p>A world system, <code class="docutils literal notranslate"><span class="pre">gz::sim::maritime::Sonar</span></code> in <code class="docutils literal notranslate"><span class="pre">gz-maritime-sonar-system</span></code> (the counterpart of the wind system), owns the water properties and the scene’s acoustic defaults described above, and drives every sonar sensor in the world, including those on vehicles spawned at run time. It draws each sonar’s cameras on the rendering thread of gz-sim’s Sensors system, which the world must load, and joins that thread’s render events only while the world has a sonar: a connected render event makes the rendering thread run every physics step, so a world without a sonar pays nothing. It belongs in the <code class="docutils literal notranslate"><span class="pre">&lt;world&gt;</span></code>, once; if a world has sonars but no Sensors system, it warns that nothing will ping. A sonar pings only while something subscribes to its data, labels or water column, as gz-sim’s own rendering sensors do; that is gz-transport’s report of its subscribers, which can keep one that died without unsubscribing. <code class="docutils literal notranslate"><span class="pre">&lt;always_ping&gt;</span></code> in <code class="docutils literal notranslate"><span class="pre">&lt;gz:sonar&gt;</span></code> makes a sonar ping whether or not anything subscribes, and at debug verbosity each sonar logs when it starts and stops pinging and why. Its <code class="docutils literal notranslate"><span class="pre">&lt;topic&gt;/enable</span></code> service (<code class="docutils literal notranslate"><span class="pre">gz.msgs.Boolean</span></code>) turns it off and on at run time; skipped pings keep to the rate grid, so ping numbers stay tied to sim time. Pings are scheduled in nanoseconds of sim time on each sonar’s rate grid, ping k at k divided by the rate, and stamped with the time of the scene they saw; a slow ping holds the simulation back rather than being dropped. A sonar or target spawned or removed at run time takes effect at the first frame after the update that made the change, so it reaches the same ping in every run, and a world reset starts every sonar over on its grid. The output stays a function of the seed, the scene and its changes. A vehicle described by a parts config, as the BlueROV2 and the BlueBoat are, passes a <code class="docutils literal notranslate"><span class="pre">sonar:</span></code> dict on the part’s entry into this block, one element per key.</p>
+</section>
+<section id="messages">
+<h3>Messages<a class="headerlink" href="#messages" title="Link to this heading"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Sonar</p></th>
+<th class="head"><p>ROS 2 message</p></th>
+<th class="head"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Imaging</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">marine_acoustic_msgs/ProjectedSonarImage</span></code></p></td>
+<td><p>Beam directions, the range of each sample, frequency, sound speed and beam widths, and the uint8 beam × sample data, in one message</p></td>
+</tr>
+<tr class="row-odd"><td><p>Profiling</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">marine_acoustic_msgs/SonarDetections</span></code></p></td>
+<td><p>Per sounding: two-way travel time, across-track angle (<code class="docutils literal notranslate"><span class="pre">rx_angles</span></code>), along-track angle (<code class="docutils literal notranslate"><span class="pre">tx_angles</span></code>), intensity and a flag (OK, or rejected by the sonar or by a filter). The arrays can change length from ping to ping, so a variable number of soundings fits. This mirrors the Surveyor’s own angle and time-of-flight packet, and leaves the conversion from travel time to range to the team, as on the real sensor</p></td>
+</tr>
+<tr class="row-even"><td><p>Profiling water column (optional)</p></td>
+<td><p>On <code class="docutils literal notranslate"><span class="pre">&lt;topic&gt;/water_column</span></code>, gz-transport only for now</p></td>
+<td><p>The thin-fan intensity before bottom detection, as levels in dB, when the sensor sets <code class="docutils literal notranslate"><span class="pre">&lt;water_column&gt;true&lt;/water_column&gt;</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Sidescan</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">marine_acoustic_msgs/ProjectedSonarImage</span></code>, one beam per message</p></td>
+<td><p>Each side is its own sensor, as each side of the Omniscan’s bar is a transducer of its own, and each ping is one beam: its direction, the range of each sample, and the samples as float32 in dB, with time-varied gain for spreading and absorption applied by default, which the gz-transport message carries so it can be removed (see Sidescan sonar above). <code class="docutils literal notranslate"><span class="pre">marine_acoustic_msgs</span></code> has no sidescan message; using the imaging sonar’s message means one consumer path, one conversion and one visualization for both. Nothing in the message marks the values as dB, so that is a documented convention</p></td>
+</tr>
+<tr class="row-even"><td><p>Ground truth (optional)</p></td>
+<td><p>Per-sample label ids and the name of each, on <code class="docutils literal notranslate"><span class="pre">&lt;topic&gt;/labels</span></code> (gz-transport only for now). One id per model and set of acoustic properties, up to 254 at once; a removed model’s ids are reused, lowest first, so read the names with each ping</p></td>
+<td><p>Never on the sensor topic; an imaging sonar cannot resolve elevation, so 3D points from it would be information the real sensor never gives</p></td>
+</tr>
+</tbody>
+</table>
+<p>No sensor publishes a point cloud. RViz has no display for the <code class="docutils literal notranslate"><span class="pre">marine_acoustic_msgs</span></code> types, so <code class="docutils literal notranslate"><span class="pre">kai_sonar_bridge</span></code> also publishes, optionally and for viewing only: the imaging sonar’s data drawn as a fan and each sidescan’s lines stacked into a scrolling waterfall, both as <code class="docutils literal notranslate"><span class="pre">sensor_msgs/Image</span></code> on <code class="docutils literal notranslate"><span class="pre">&lt;topic&gt;/view</span></code>; and the profiler’s soundings as a <code class="docutils literal notranslate"><span class="pre">sensor_msgs/PointCloud2</span></code> on <code class="docutils literal notranslate"><span class="pre">&lt;topic&gt;/points</span></code>, in the soundings’ frame, which TF places with the vehicle’s pose. These are display aids built from the sensor messages, not sensor outputs. The bridge is lazy, as <code class="docutils literal notranslate"><span class="pre">ros_gz_bridge</span></code> is with <code class="docutils literal notranslate"><span class="pre">lazy</span></code>: it subscribes to a sonar’s gz topic only while one of that sonar’s ROS topics (the data, the view or the points) has a subscriber, and leaves it when the last one goes, so a running bridge with nobody listening in ROS is not a subscriber and the sonar does not ping for it. It checks its publishers’ subscriber counts on a timer, every <code class="docutils literal notranslate"><span class="pre">subscription_heartbeat</span></code> (200 ms by default), which is how long the first ping can wait and the sonar can run on; the count is read directly, so the check does not depend on the middleware delivering matched events. <code class="docutils literal notranslate"><span class="pre">lazy:=false</span></code> subscribes from the start. While subscribed, it converts a ping only when one of its topics has a subscriber, and draws a view only when the view has one. The bridge publishes everything with a reliable QoS by default, keeping the last five messages: a reliable publisher serves both reliable subscribers, as RViz’s displays are by default, and best-effort ones, as the sensor-data QoS is, where a best-effort publisher would leave a reliable subscriber with nothing. The <code class="docutils literal notranslate"><span class="pre">reliability</span></code> parameter (<code class="docutils literal notranslate"><span class="pre">reliable</span></code> or <code class="docutils literal notranslate"><span class="pre">best_effort</span></code>) and <code class="docutils literal notranslate"><span class="pre">depth</span></code> change that for the whole bridge, for a lossy link where resending a 270 kB image costs more than losing it; that case is not measured. Topics follow the vehicle’s part rule, <code class="docutils literal notranslate"><span class="pre">/&lt;vehicle&gt;/&lt;part</span> <span class="pre">name&gt;/image</span></code> (for example <code class="docutils literal notranslate"><span class="pre">/bluerov2/sonar_forward/image</span></code>), which keeps one name per instance; the sidescan’s two sides add a level, <code class="docutils literal notranslate"><span class="pre">/&lt;vehicle&gt;/&lt;part&gt;/port/image</span></code> and <code class="docutils literal notranslate"><span class="pre">/stbd/image</span></code>, and the profiler publishes <code class="docutils literal notranslate"><span class="pre">/&lt;vehicle&gt;/&lt;part&gt;/detections</span></code>. Images and soundings follow one frame convention. <code class="docutils literal notranslate"><span class="pre">ProjectedSonarImage</span></code> puts Z along the acoustic axis and X up, to match profilers that report in north-east-down, while the SDF sensor and ROS put x along it, so each sonar’s messages are stamped in an <code class="docutils literal notranslate"><span class="pre">_acoustic</span></code> frame of the part’s, rotated from the sensor’s by that fixed rotation (x′ = z, y′ = −y, z′ = x). For a down-looking profiler that frame is north-east-down itself, X forward, Y starboard, Z down, which is the frame in which <code class="docutils literal notranslate"><span class="pre">SonarDetections</span></code> counts its across-track angles positive to starboard. A sounding at <code class="docutils literal notranslate"><span class="pre">rx_angles</span></code> θ then lies along (0, sin θ, cos θ), the same direction as an image beam at azimuth −θ, so one consumer can treat both alike; the profiler’s point cloud is drawn in the same frame.</p>
+<p>Inside Gazebo the sensors publish gz-transport messages of gz-maritime’s own, <code class="docutils literal notranslate"><span class="pre">gz.maritime.sonar.SonarImage</span></code>, <code class="docutils literal notranslate"><span class="pre">SonarDetections</span></code> and <code class="docutils literal notranslate"><span class="pre">SonarLabels</span></code>, generated with gz-msgs. <code class="docutils literal notranslate"><span class="pre">ros_gz_bridge</span></code> converts only the DVL message from <code class="docutils literal notranslate"><span class="pre">marine_acoustic_msgs</span></code>, so <code class="docutils literal notranslate"><span class="pre">kai_sonar_bridge</span></code> converts these to <code class="docutils literal notranslate"><span class="pre">ProjectedSonarImage</span></code> and <code class="docutils literal notranslate"><span class="pre">SonarDetections</span></code>. That keeps ROS out of the Gazebo plugins, unlike POSIM, which publishes ROS 2 from inside the sensor; contributing the conversions to <code class="docutils literal notranslate"><span class="pre">ros_gz_bridge</span></code> later would let the bridge node go.</p>
+</section>
+</section>
+<section id="implementation">
+<h2>Implementation<a class="headerlink" href="#implementation" title="Link to this heading"></a></h2>
+<p>Everything is built in gz-maritime from components it already uses: gz-sim, gz-sensors, gz-rendering, gz-transport, gz-msgs, gz-math, and on the ROS side <code class="docutils literal notranslate"><span class="pre">marine_acoustic_msgs</span></code>, already installed because <code class="docutils literal notranslate"><span class="pre">ros_gz_bridge</span></code> depends on it. There is no new external dependency, and no CUDA or other GPU toolkit: the GPU is reached only through gz-rendering, which also runs on a CPU-only renderer (Mesa llvmpipe), so one code path serves both.</p>
+<section id="packages">
+<h3>Packages<a class="headerlink" href="#packages" title="Link to this heading"></a></h3>
+<pre  class="mermaid">
+        flowchart LR
+  E[&quot;gz_sonar engine&lt;br/&gt;(library, no Gazebo)&quot;] --&gt; S[&quot;gz-maritime-sonar-system&lt;br/&gt;(gz-sim world system)&quot;]
+  S -- &quot;gz-transport&quot; --&gt; B[&quot;kai_sonar_bridge&lt;br/&gt;(ROS 2 node)&quot;]
+  P[&quot;bluerobotics_models&lt;br/&gt;sonar parts&quot;] -. &quot;fit sensors,&lt;br/&gt;start the bridge&quot; .-&gt; S
+  P -.-&gt; B
+    </pre><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">gz_sonar</span></code>, in two parts.</p>
+<ul>
+<li><p>The library: the sonar model, with no Gazebo dependency. <code class="docutils literal notranslate"><span class="pre">Config</span></code> holds the parameters and the three device presets, <code class="docutils literal notranslate"><span class="pre">Rays</span></code> the fan of rays, <code class="docutils literal notranslate"><span class="pre">Water</span></code> the absorption, <code class="docutils literal notranslate"><span class="pre">Engine</span></code> the sonar equation (hits to intensity per beam and sample), <code class="docutils literal notranslate"><span class="pre">Readout</span></code> the published content (gain and levels, the imaging sonar’s 8-bit image, the sidescan’s dB line, the profiler’s soundings), <code class="docutils literal notranslate"><span class="pre">Random</span></code> the seeded draws, <code class="docutils literal notranslate"><span class="pre">CameraSampler</span></code> the step from depth and label images to hits, and <code class="docutils literal notranslate"><span class="pre">SyntheticScene</span></code> analytic shapes for tests.</p></li>
+<li><p>The system plugin, <code class="docutils literal notranslate"><span class="pre">gz-maritime-sonar-system</span></code>: <code class="docutils literal notranslate"><span class="pre">Sonar</span></code> is the world system, <code class="docutils literal notranslate"><span class="pre">SonarSensor</span></code> one sonar with its worker and publishers, <code class="docutils literal notranslate"><span class="pre">SonarSdf</span></code> the reader of <code class="docutils literal notranslate"><span class="pre">&lt;gz:sonar&gt;</span></code> and the acoustic marks. Beside it, the gz-transport messages (<code class="docutils literal notranslate"><span class="pre">SonarImage</span></code>, <code class="docutils literal notranslate"><span class="pre">SonarDetections</span></code>, <code class="docutils literal notranslate"><span class="pre">SonarLabels</span></code>), the walkthrough worlds, target models and example scripts.</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">kai_sonar_bridge</span></code>: a ROS 2 node converting the messages to <code class="docutils literal notranslate"><span class="pre">marine_acoustic_msgs</span></code> and drawing the viewing aids.</p></li>
+<li><p>In <code class="docutils literal notranslate"><span class="pre">bluerobotics_models</span></code>: the three sonar parts with their frames, one shared xacro for their sensors and one table for the bridge’s parameters, so either vehicle carries any sonar from its config, and its launch starts the bridge.</p></li>
+</ul>
+<p>The model is a library so it can be built, tested and run without a simulator: <a class="reference internal" href="render-a-ping.html"><span class="std std-doc">Render a ping without Gazebo</span></a> draws pings from analytic scenes, and the engine tests check them against known answers. Everything Gazebo-specific is in the plugin and everything ROS-specific in the bridge, so the plugin never links ROS and a user without ROS still gets the sonar on gz-transport. The bridge exists because <code class="docutils literal notranslate"><span class="pre">ros_gz_bridge</span></code> does not convert these messages; contributing the conversions there would retire it. The names follow the repo’s split between <code class="docutils literal notranslate"><span class="pre">gz_*</span></code> (Gazebo) and <code class="docutils literal notranslate"><span class="pre">kai_*</span></code> (ROS) packages.</p>
+</section>
+<section id="one-ping">
+<h3>One ping<a class="headerlink" href="#one-ping" title="Link to this heading"></a></h3>
+<figure class="align-default" id="id1">
+<img alt="Swimlane chart of one ping on three threads: gz-sim steps the world; on the rendering thread the Sensors system updates the scene, the sonar plugin asks for a render and gz-rendering draws depth and segmentation on the GPU; on the sonar's worker thread gz_sonar turns the images into hits, computes beams and samples, and publishes" src="../_images/sonar-ping-flow.svg" />
+<figcaption>
+<p><span class="caption-text">One ping, on three threads. Only the shaded step uses the GPU.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<ol class="arabic simple">
+<li><p>Each sonar pings on a fixed grid of simulated time, ping k at k divided by its rate.</p></li>
+<li><p>On gz-sim’s rendering thread, owned by the Sensors system, the plugin has gz-rendering draw the sonar’s cameras: a depth image and a segmentation image. The imaging sonar’s 120° fan takes two cameras side by side; a sidescan or profiler’s thin fan one or two narrow ones. The water surface, acoustically transparent surfaces and the sonar’s own vehicle are hidden while they draw.</p></li>
+<li><p>The images go into a queue, at most two deep, to the sonar’s own worker thread.</p></li>
+<li><p>On the worker, <code class="docutils literal notranslate"><span class="pre">CameraSampler</span></code> turns the images into hits (a range, an incidence angle from the neighboring pixels, and the surface’s acoustic properties from its label), <code class="docutils literal notranslate"><span class="pre">Engine</span></code> sums their echoes into beams and range samples, and <code class="docutils literal notranslate"><span class="pre">Readout</span></code> makes the published content: the 8-bit image or dB line of a <code class="docutils literal notranslate"><span class="pre">SonarImage</span></code>, or the soundings of a <code class="docutils literal notranslate"><span class="pre">SonarDetections</span></code>.</p></li>
+<li><p>The result is published on gz-transport, stamped with the simulated time of the scene that was drawn, and the bridge republishes it on ROS 2 in the part’s frame.</p></li>
+</ol>
+<p>Geometry comes from rendering because a sonar needs a range and a surface for tens of thousands of rays per ping: rendering gives them in one pass, on the same meshes the cameras see. Ray casting against the physics geometry would see collision shapes rather than visuals, and is far slower on detailed meshes. The segmentation image carries the acoustics: each distinct set of acoustic properties gets a label id, so the label image both tells the engine how each hit echoes and is the ground truth the <code class="docutils literal notranslate"><span class="pre">labels</span></code> option publishes.</p>
+</section>
+<section id="design-choices">
+<h3>Design choices<a class="headerlink" href="#design-choices" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>One world system for every sonar. Sonars are gz-sim custom sensors, and one system finds and drives all of them, including on vehicles spawned while the world runs. It owns the water and the scene’s acoustic defaults, which belong to the world rather than to each sensor, and joins the rendering thread only while a sonar exists, so a world without one pays nothing.</p></li>
+<li><p>Determinism over speed. Every random draw is seeded from the world’s <code class="docutils literal notranslate"><span class="pre">&lt;seed&gt;</span></code>, the sensor’s name and the ping number; a ping is never dropped, the simulation waits instead; and changes at run time (a spawn, a removal, a reset) take effect at the first frame reaching the simulated time they were made. A run therefore repeats exactly, for training data, scoring and debugging.</p></li>
+<li><p>Two threads. Only drawing is on the rendering thread, which the simulation waits for; the model, most of a ping’s work, runs on the worker alongside the simulation, its engine step spread over one pool of threads that all the sonars of the process share: one per hardware thread, at most eight counting the worker, since a ping gets little faster beyond that and the other cores are left to the simulation. The pool starts with the first sonar and is joined when the last one goes. Sonars whose pings coincide take turns at it, each ping on all the threads, so eight sonars run no more threads than one; taking turns is also faster than running side by side, because a ping works through tens of megabytes and each then has the processor’s cache to itself. The cap is fixed (<code class="docutils literal notranslate"><span class="pre">SonarConfig::threads</span></code> in the library lowers one sonar’s share; SDF does not expose it), and the output is the same bits for any number of threads. This is why a GPU matters little.</p></li>
+<li><p>Presets with open parameters. An empty <code class="docutils literal notranslate"><span class="pre">&lt;gz:sonar/&gt;</span></code> gives the exemplar device for its type, any parameter can be overridden, and values are validated when the sensor loads.</p></li>
+<li><p>Messages of our own on gz-transport, standard ones on ROS. The gz-transport messages carry everything the model knows, including each sidescan line’s gain and the labels; the ROS side uses <code class="docutils literal notranslate"><span class="pre">marine_acoustic_msgs</span></code>, as real sonar drivers do, so code written for the real device runs unchanged.</p></li>
+</ul>
+<p>The code is our own. Ideas, structure and test cases came from the open implementations: POSIM (sampling the fan with a depth camera, the point-scattering formulation, <code class="docutils literal notranslate"><span class="pre">ProjectedSonarImage</span></code>, and its known issues as a checklist), HoloOcean (one engine for all three sonar types, per-return labels), Stonefish (capping the ping rate at c/2R), MARUS (labeled datasets) and SMaRC (a sidescan output shaped like the real vehicle’s).</p>
+</section>
+<section id="known-limits">
+<h3>Known limits<a class="headerlink" href="#known-limits" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Waves do not move a vehicle yet: gz-maritime’s waves are drawn but not coupled to buoyancy, so a sonar’s platform does not roll or heave with them.</p></li>
+<li><p>Several vehicles with sonars in one world work, but their cost has been measured only in the one case under Performance.</p></li>
+<li><p>The model has been checked against itself and against POSIM, not yet against recordings from the real devices (see <a class="reference internal" href="#testing">Testing</a>).</p></li>
+</ul>
+</section>
+<section id="performance">
+<h3>Performance<a class="headerlink" href="#performance" title="Link to this heading"></a></h3>
+<p>The sonar is one of the more expensive sensors in a world, so sonars belong only in scenarios that use them. In one representative case, the shipwreck world with a BlueROV2 and a BlueBoat on a 12-core workstation, the ROV’s imaging sonar at the default 10 Hz took the world from real time to 0.78 of it, the BlueBoat’s sidescan to 0.89, a profiler to 0.92, and all three together to 0.71; with nobody subscribed, all three cost nothing measurable. A GPU made little difference: rendering on the CPU (llvmpipe) was within 0.07 in every case. The assessment, and what to expect, are in <a class="reference internal" href="sonar-performance.html"><span class="std std-doc">Sonar performance</span></a>.</p>
+</section>
+</section>
+<section id="testing">
+<h2>Testing<a class="headerlink" href="#testing" title="Link to this heading"></a></h2>
+<p>The engine’s physics is checked by gtests on analytic scenes (<code class="docutils literal notranslate"><span class="pre">engine_test</span></code>, <code class="docutils literal notranslate"><span class="pre">sampler_test</span></code>) and the SDF interface by <code class="docutils literal notranslate"><span class="pre">sdf_test</span></code>, headless, in drydock; the vehicles’ sonar parts by bluerobotics_models’ tests. The whole-world checks were run on the walkthrough worlds. Whether images look right is left to a person.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>What</p></th>
+<th class="head"><p>How it is checked</p></th>
+<th class="head"><p>Result</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Geometry</p></td>
+<td><p>A sphere at known range and bearing; a flat seabed (<code class="docutils literal notranslate"><span class="pre">engine_test</span></code>)</p></td>
+<td><p>Return at 2R/c within one sample, in the right beam</p></td>
+</tr>
+<tr class="row-odd"><td><p>Spreading and absorption</p></td>
+<td><p>The sphere at several ranges, against Francois–Garrison (<code class="docutils literal notranslate"><span class="pre">engine_test</span></code>)</p></td>
+<td><p>Level falls as 40 log R + 2αR</p></td>
+</tr>
+<tr class="row-even"><td><p>Backscatter and area</p></td>
+<td><p>A seabed at several grazing angles, patches of different size (<code class="docutils literal notranslate"><span class="pre">engine_test</span></code>)</p></td>
+<td><p>Lambert’s cos²θ; level grows with ensonified area</p></td>
+</tr>
+<tr class="row-odd"><td><p>Shadows</p></td>
+<td><p>A box on the seabed (<code class="docutils literal notranslate"><span class="pre">engine_test</span></code>)</p></td>
+<td><p>A shadow of the predicted length</p></td>
+</tr>
+<tr class="row-even"><td><p>Beam pattern</p></td>
+<td><p>A point target across the fan (<code class="docutils literal notranslate"><span class="pre">engine_test</span></code>)</p></td>
+<td><p>−3 dB width and sidelobe level as configured</p></td>
+</tr>
+<tr class="row-odd"><td><p>Elevation ambiguity</p></td>
+<td><p>Two targets at one range, different elevations (<code class="docutils literal notranslate"><span class="pre">engine_test</span></code>)</p></td>
+<td><p>Both in the same sample of the same beam</p></td>
+</tr>
+<tr class="row-even"><td><p>Speckle</p></td>
+<td><p>A uniform seabed (<code class="docutils literal notranslate"><span class="pre">engine_test</span></code>)</p></td>
+<td><p>Exponentially distributed intensity</p></td>
+</tr>
+<tr class="row-odd"><td><p>Published levels</p></td>
+<td><p>The imaging mapping, the sidescan’s time-varied gain, soundings on a flat seabed (<code class="docutils literal notranslate"><span class="pre">engine_test</span></code>)</p></td>
+<td><p>The documented laws hold; removing the gain recovers the received level</p></td>
+</tr>
+<tr class="row-even"><td><p>Interface</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sdf_test</span></code>, <code class="docutils literal notranslate"><span class="pre">layout_test</span></code>; bluerobotics_models’ frame and bridge tests</p></td>
+<td><p>Defaults per device, bad values refused, every parameter swept from tiny to huge and refused or built, camera layouts inside their limits, frames and topics consistent</p></td>
+</tr>
+<tr class="row-odd"><td><p>Determinism</p></td>
+<td><p>The same seed on any thread count, alone and with eight sonars pinging at once (<code class="docutils literal notranslate"><span class="pre">engine_test</span></code>); two runs of a world with a target spawned mid-run</p></td>
+<td><p>Identical pings; byte-identical messages</p></td>
+</tr>
+<tr class="row-even"><td><p>GPU and CPU-only</p></td>
+<td><p>The same ping on a GPU and on llvmpipe</p></td>
+<td><p>The same surfaces, ranges within 4 mm</p></td>
+</tr>
+<tr class="row-odd"><td><p>Map product</p></td>
+<td><p>The shipwreck survey with true and noisy poses</p></td>
+<td><p>With true poses 95 % of soundings over the wreck within 0.095 m of the true surface; the error grows with the positioning noise</p></td>
+</tr>
+<tr class="row-even"><td><p>Real data (future work)</p></td>
+<td><p>Recordings of known targets with a real ECHO, Omniscan and Surveyor, not yet available</p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+<p>The last row is the only one that would check the model against the world rather than against itself; it waits for recordings.</p>
+</section>
+<section id="walkthroughs">
+<h2>Walkthroughs<a class="headerlink" href="#walkthroughs" title="Link to this heading"></a></h2>
+<p>The walkthroughs are in <code class="docutils literal notranslate"><span class="pre">docs/how-to/</span></code>, in the style of the existing pages: what to run, one sentence of why for each step, and the example we ran, so the reader can compare; the contributor walkthrough is beside this design. Each runs from a world, launch files and the example scripts in the repo.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Walkthrough</p></th>
+<th class="head"><p>Use cases</p></th>
+<th class="head"><p>What the reader does</p></th>
+<th class="head"><p>Shows</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><a class="reference internal" href="render-a-ping.html"><span class="std std-doc">Render a ping without Gazebo</span></a> (contributors)</p></td>
+<td><p>all</p></td>
+<td><p>Runs the engine on synthetic scenes and draws imaging pings and a sidescan and profiling pass</p></td>
+<td><p>Each picture shows what the scene predicts: the sphere at its range, the box’s shadow, the slope’s brighter side, the targets and their shadows in the pass</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../how-to/sonar-imaging.html"><span class="std std-doc">Imaging (forward-looking) sonar from the ROV</span></a></p></td>
+<td><p>1, 2, 3</p></td>
+<td><p>Launches a BlueROV2 with the imaging sonar looking forward, facing a glass float, a steel cylinder, a concrete block and a tire on a sandy seabed, and turns it while watching the image</p></td>
+<td><p>The four targets and their shadows show in the fan at the ranges and bearings the world places them, and slide across and out of the fan as the ROV turns</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../how-to/sonar-add.html"><span class="std std-doc">Add a sonar to your vehicle</span></a></p></td>
+<td><p>all</p></td>
+<td><p>Adds a sonar sensor to a model, points it with <code class="docutils literal notranslate"><span class="pre">&lt;pose&gt;</span></code>, sets a few parameters, and runs the bridge</p></td>
+<td><p>The vehicle’s sonar topic publishes under its instance name. Extends <a class="reference internal" href="../how-to/sensors.html"><span class="std std-doc">Add sensors</span></a></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../how-to/sonar-features.html"><span class="std std-doc">Sonar features: acoustic properties and truth labels</span></a></p></td>
+<td><p>1, 3</p></td>
+<td><p>Marks surfaces with acoustic properties and names the seabed; raises the noise floor; replays a run from its seed; turns on the labels topic and records labeled images</p></td>
+<td><p>A raised noise floor fills the shadows and lowers the contrast; the same seed gives the same images; each target’s samples carry its label, and the flag, marked transparent, has none</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../how-to/sonar-survey.html"><span class="std std-doc">USV survey examples: profiling and sidescan sonar</span></a>, part 1: a pass over the seabed</p></td>
+<td><p>4</p></td>
+<td><p>Launches a BlueBoat carrying the profiling sonar looking down and the sidescan with a beam to each side, over gently undulating terrain with a few hard-return targets, and drives one straight pass over them</p></td>
+<td><p>The sidescan waterfalls show each target as a bright return with a shadow beyond it, on the side it lies; the profiler’s soundings trace the terrain under the track and rise over the targets the boat passes above</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../how-to/sonar-survey.html#part-2-map-a-shipwreck"><span class="std std-ref">USV survey examples: profiling and sidescan sonar</span></a>, part 2: map a shipwreck</p></td>
+<td><p>4</p></td>
+<td><p>Surveys the wreck from the BlueBoat in a lawnmower pattern, builds a georeferenced sidescan mosaic and a georeferenced point cloud of the soundings with the example scripts, with and without positioning noise</p></td>
+<td><p>The wreck and its shadow show in the mosaic at the wreck’s true position and heading, and the point cloud traces its shape; with positioning noise, both blur</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Design" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="render-a-ping.html" class="btn btn-neutral float-right" title="Render a ping without Gazebo" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Honu Robotics.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  
+<div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    <span class="fa fa-book"> Other Versions</span>
+    v: lyrical
+    <span class="fa fa-caret-down"></span>
+  </span>
+  <div class="rst-other-versions">
+    <dl id="honu-version-list">
+      <dt>Distributions</dt>
+      <dd><a href="/gz-maritime/lyrical/" data-version="lyrical">Lyrical</a></dd>
+    </dl>
+  </div>
+</div>
+<script>
+  (function () {
+    var current = "lyrical";
+    var base = "/gz-maritime/";
+
+    /* Keep the reader on the same page when switching versions; the
+       version root href stays as the fallback for pages a version lacks. */
+    function wire() {
+      document.querySelectorAll('.rst-other-versions a[data-version]').forEach(function (a) {
+        var target = a.getAttribute('data-version');
+        var path = window.location.pathname;
+        if (target !== current && path.indexOf('/' + current + '/') !== -1) {
+          a.href = path.replace('/' + current + '/', '/' + target + '/');
+        }
+      });
+    }
+
+    if (!window.fetch) { wire(); return; }
+
+    /* The deploy tool maintains versions.json at the site root; reading it
+       at runtime lets builds published before a new distribution existed
+       still offer it in the flyout. Offline or local preview builds fall
+       back to the build time list rendered above. */
+    fetch(base + 'versions.json', {cache: 'no-cache'}).then(function (response) {
+      if (!response.ok) { throw new Error(response.status); }
+      return response.json();
+    }).then(function (entries) {
+      var list = document.getElementById('honu-version-list');
+      if (!list || !entries.length) { return; }
+      list.querySelectorAll('dd').forEach(function (dd) { dd.remove(); });
+      entries.forEach(function (entry) {
+        var a = document.createElement('a');
+        a.href = entry.url;
+        a.setAttribute('data-version', entry.name);
+        a.textContent = entry.name.charAt(0).toUpperCase() + entry.name.slice(1);
+        var dd = document.createElement('dd');
+        dd.appendChild(a);
+        list.appendChild(dd);
+      });
+    }).catch(function () {}).finally(wire);
+  })();
+</script><script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

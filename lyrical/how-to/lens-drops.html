@@ -99,6 +99,7 @@
 </li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">How to guides</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="index.html#bring-your-own-vehicle">Bring your own vehicle</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#sonar">Sonar</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="index.html#more">More</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="own-vehicle.html">Bring your own vehicle</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#who-does-what">Who does what</a></li>
@@ -232,6 +233,52 @@
 <li class="toctree-l4"><a class="reference internal" href="underwater-camera.html#more-of-the-water">More of the water</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="sonar-imaging.html">Imaging (forward-looking) sonar from the ROV</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="sonar-imaging.html#launch">Launch</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-imaging.html#watch-the-sonar">Watch the sonar</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-imaging.html#read-the-sonar-in-ros-2">Read the sonar in ROS 2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-imaging.html#turn-the-rov">Turn the ROV</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sonar-survey.html">USV survey examples: profiling and sidescan sonar</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="sonar-survey.html#part-1-single-pass-over-the-undulating-seabed-with-discrete-targets">Part 1: Single pass over the undulating seabed with discrete targets</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="sonar-survey.html#launch">Launch</a></li>
+<li class="toctree-l5"><a class="reference internal" href="sonar-survey.html#watch-the-sonars">Watch the sonars</a></li>
+<li class="toctree-l5"><a class="reference internal" href="sonar-survey.html#drive-the-pass">Drive the pass</a></li>
+<li class="toctree-l5"><a class="reference internal" href="sonar-survey.html#what-to-look-for">What to look for</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-survey.html#part-2-map-a-shipwreck">Part 2: Map a shipwreck</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="sonar-survey.html#id1">Launch</a></li>
+<li class="toctree-l5"><a class="reference internal" href="sonar-survey.html#survey-and-record">Survey and record</a></li>
+<li class="toctree-l5"><a class="reference internal" href="sonar-survey.html#the-sidescan-mosaic">The sidescan mosaic</a></li>
+<li class="toctree-l5"><a class="reference internal" href="sonar-survey.html#the-soundings-as-a-point-cloud">The soundings as a point cloud</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sonar-add.html">Add a sonar to your vehicle</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="sonar-add.html#the-sensor">The sensor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-add.html#the-world">The world</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-add.html#the-bridge">The bridge</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-add.html#sidescan-and-profiler">Sidescan and profiler</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-add.html#on-the-blue-robotics-vehicles">On the Blue Robotics vehicles</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-add.html#switch-it-off">Switch it off</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-add.html#check">Check</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sonar-features.html">Sonar features: acoustic properties and truth labels</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="sonar-features.html#acoustic-properties">Acoustic properties</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="sonar-features.html#mark-a-surface">Mark a surface</a></li>
+<li class="toctree-l5"><a class="reference internal" href="sonar-features.html#hide-a-surface">Hide a surface</a></li>
+<li class="toctree-l5"><a class="reference internal" href="sonar-features.html#name-the-seabed">Name the seabed</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-features.html#tune-the-image">Tune the image</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-features.html#repeatable-randomness-the-seed">Repeatable randomness: the seed</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-features.html#truth-labels">Truth labels</a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="acoustic-pingers.html">Find an acoustic pinger</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="acoustic-pingers.html#run-the-demo">Run the demo</a></li>
 <li class="toctree-l4"><a class="reference internal" href="acoustic-pingers.html#see-them-in-the-gui">See them in the GUI</a></li>
@@ -318,7 +365,73 @@
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html#pingers-in-the-world-receivers-on-vehicles">Pingers in the world, receivers on vehicles</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html#buoyancy-that-follows-the-waves">Buoyancy that follows the waves</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html#seeing-through-the-water">Seeing through the water</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../design/index.html#related">Related</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#sonar">Sonar</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#related">Related</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../design/sonar.html">Sonar simulation design</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar.html#use-cases">Use cases</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar.html#sonars-in-scope">Sonars in scope</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#glossary">Glossary</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar.html#related-work">Related work</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar.html#theory-of-operation">Theory of operation</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#the-model-and-its-components">The model and its components</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="../design/sonar.html#geometry">Geometry</a></li>
+<li class="toctree-l6"><a class="reference internal" href="../design/sonar.html#transmission-loss">Transmission loss</a></li>
+<li class="toctree-l6"><a class="reference internal" href="../design/sonar.html#backscatter">Backscatter</a></li>
+<li class="toctree-l6"><a class="reference internal" href="../design/sonar.html#sonar">Sonar</a></li>
+<li class="toctree-l6"><a class="reference internal" href="../design/sonar.html#fluctuations">Fluctuations</a></li>
+<li class="toctree-l6"><a class="reference internal" href="../design/sonar.html#output">Output</a></li>
+</ul>
+</li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#acoustic-properties-of-the-scene">Acoustic properties of the scene</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#where-it-sits-among-the-alternatives">Where it sits among the alternatives</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#why-this-level-suits-the-use-cases">Why this level suits the use cases</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#imaging-sonar">Imaging sonar</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#profiling-sonar">Profiling sonar</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#sidescan">Sidescan</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar.html#interface">Interface</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#sdf">SDF</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#messages">Messages</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar.html#implementation">Implementation</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#packages">Packages</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#one-ping">One ping</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#design-choices">Design choices</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#known-limits">Known limits</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#performance">Performance</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar.html#testing">Testing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar.html#walkthroughs">Walkthroughs</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../design/render-a-ping.html">Render a ping without Gazebo</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../design/render-a-ping.html#what-this-tests">What this tests</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/render-a-ping.html#build-and-test-the-engine">Build and test the engine</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/render-a-ping.html#render-and-draw">Render and draw</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/render-a-ping.html#what-to-look-for">What to look for</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../design/render-a-ping.html#scene-a-a-sphere-in-open-water">Scene A: a sphere in open water</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/render-a-ping.html#scene-b-a-box-on-a-flat-seabed">Scene B: a box on a flat seabed</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/render-a-ping.html#scene-c-a-seabed-rising-to-starboard">Scene C: a seabed rising to starboard</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/render-a-ping.html#the-pass-sidescan-and-profiling">The pass: sidescan and profiling</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../design/render-a-ping.html#where-things-live">Where things live</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../design/sonar-performance.html">Sonar performance</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar-performance.html#the-case">The case</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar-performance.html#results">Results</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar-performance.html#why-the-gpu-matters-little">Why the GPU matters little</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar-performance.html#recommendations">Recommendations</a></li>
+</ul>
+</li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../project/index.html">Project</a></li>

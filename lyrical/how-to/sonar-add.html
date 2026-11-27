@@ -1,0 +1,639 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Add a sonar to your vehicle &mdash; Gz Maritime lyrical documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/honu.css?v=44af46ee" />
+
+  
+    <link rel="shortcut icon" href="../_static/honu-robotics-favicon.svg"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=46f74c5b"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Sonar features: acoustic properties and truth labels" href="sonar-features.html" />
+    <link rel="prev" title="USV survey examples: profiling and sidescan sonar" href="sonar-survey.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Gz Maritime
+              <img src="../_static/honu-robotics-white-logo.svg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting-started/index.html">Getting started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/requirements.html">Requirements</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/requirements.html#optional">Optional</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/requirements.html#docker">Docker</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/installation.html">Installation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#clone">1. Clone</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#install-the-dependencies">2. Install the dependencies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#build">3. Build</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/installation.html#check">4. Check</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../getting-started/first-simulation.html">First simulation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#the-ocean-on-its-own">1. The ocean on its own</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#put-a-boat-on-it">2. Put a boat on it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#drive-it">3. Drive it</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#look-at-it-in-rviz">4. Look at it in RViz</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#add-a-second-boat">5. Add a second boat</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#make-waves">6. Make waves</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../getting-started/first-simulation.html#next">Next</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../vehicles/index.html">Vehicles</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../vehicles/index.html#what-a-world-provides-what-a-vehicle-brings">What a world provides, what a vehicle brings</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/custom-usv.html">Custom USV</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#run-it">Run it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#drive-it">Drive it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#topics">Topics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#frames">Frames</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#what-it-is-made-of">What it is made of</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/custom-usv.html#limitations">Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/bluerobotics.html">BlueBoat and BlueROV2</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/bluerobotics.html#blueboat">BlueBoat</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/bluerobotics.html#bluerov2">BlueROV2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/bluerobotics.html#several-vehicles-on-one-ocean">Several vehicles on one ocean</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../vehicles/holybro.html">Holybro X500</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/holybro.html#run-it">Run it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../vehicles/holybro.html#on-the-ocean">On the ocean</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How to guides</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="index.html#bring-your-own-vehicle">Bring your own vehicle</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#sonar">Sonar</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#more">More</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="own-vehicle.html">Bring your own vehicle</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#who-does-what">Who does what</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#the-path">The path</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="own-vehicle.html#why-the-urdf-comes-first">Why the URDF comes first</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#how-a-vehicle-floats">How a vehicle floats</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#what-the-gazebo-maritime-tutorials-cover">What the Gazebo maritime tutorials cover</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#waves-and-physics-today">Waves and physics today</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-vehicle.html#already-have-a-model">Already have a model?</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="vehicle-description.html">Describe the vehicle</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#put-the-origin-on-the-waterline">Put the origin on the waterline</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#work-out-the-draft">Work out the draft</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#collision-shapes-are-for-contact">Collision shapes are for contact</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#mass-and-inertia">Mass and inertia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#propellers">Propellers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#sensor-frames">Sensor frames</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#no-instance-name-no-gazebo">No instance name, no Gazebo</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#check-it">Check it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vehicle-description.html#build-it">Build it</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="gazebo-composition.html">Compose the Gazebo model</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#the-wrapper">The wrapper</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="gazebo-composition.html#what-survives-the-conversion">What survives the conversion</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#mark-the-collisions-that-displace">Mark the collisions that displace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#thrusters">Thrusters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#hydrodynamic-damping">Hydrodynamic damping</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="gazebo-composition.html#added-mass">Added mass</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#sensors">Sensors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#joint-states">Joint states</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#build-it">Build it</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gazebo-composition.html#marking-from-a-urdf">Marking from a URDF</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="spawn-and-drive.html">Spawn and drive</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#the-simulation-part">The simulation part</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#spawn-an-instance">Spawn an instance</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="spawn-and-drive.html#your-sim-launch-xml">Your <code class="docutils literal notranslate"><span class="pre">sim.launch.xml</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="spawn-and-drive.html#one-name-per-instance">One name per instance</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#what-the-launch-needs-from-a-vehicle">What the launch needs from a vehicle</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#the-bridge-configuration">The bridge configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#drive">Drive</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#change-the-sea-while-it-runs">Change the sea while it runs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spawn-and-drive.html#several-vehicles">Several vehicles</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="spawn-and-drive.html#other-vehicles">Other vehicles</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sensors.html">Add sensors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#what-the-world-provides">What the world provides</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#the-pattern">The pattern</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#a-camera">A camera</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#an-underwater-camera">An underwater camera</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#check-a-sensor">Check a sensor</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="several-vehicles.html">Several vehicles on one ocean</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="several-vehicles.html#bring-it-up">1. Bring it up</a></li>
+<li class="toctree-l4"><a class="reference internal" href="several-vehicles.html#one-name-each">2. One name each</a></li>
+<li class="toctree-l4"><a class="reference internal" href="several-vehicles.html#read-a-sensor">3. Read a sensor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="several-vehicles.html#command-an-actuator">4. Command an actuator</a></li>
+<li class="toctree-l4"><a class="reference internal" href="several-vehicles.html#drive-one-with-a-gamepad">5. Drive one with a gamepad</a></li>
+<li class="toctree-l4"><a class="reference internal" href="several-vehicles.html#add-a-second-boat">6. Add a second boat</a></li>
+<li class="toctree-l4"><a class="reference internal" href="several-vehicles.html#change-the-sea">7. Change the sea</a></li>
+<li class="toctree-l4"><a class="reference internal" href="several-vehicles.html#what-to-know">What to know</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="site-worlds.html">Sail the competition sites</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#sydney-international-regatta-centre">Sydney International Regatta Centre</a></li>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#nathan-benderson-park">Nathan Benderson Park</a></li>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#sand-island">Sand Island</a></li>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#la-spezia">La Spezia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#marina-bay">Marina Bay</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="site-worlds.html#robotx-2026">RobotX 2026</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="site-worlds.html#what-to-know">What to know</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="aquatic-centre.html">Dive in the aquatic centre</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="aquatic-centre.html#what-to-know">What to know</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="own-world.html">Use your own world</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#what-a-world-needs">What a world needs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#the-buoyancy-system">The buoyancy system</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#the-water-s-optics">The water’s optics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#the-world-name">The world name</a></li>
+<li class="toctree-l4"><a class="reference internal" href="own-world.html#adding-a-seabed">Adding a seabed</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="wind-and-current.html">Change and see the wind and the current</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="wind-and-current.html#steer-them-by-hand">Steer them by hand</a></li>
+<li class="toctree-l4"><a class="reference internal" href="wind-and-current.html#set-them-exactly">Set them exactly</a></li>
+<li class="toctree-l4"><a class="reference internal" href="wind-and-current.html#see-them">See them</a></li>
+<li class="toctree-l4"><a class="reference internal" href="wind-and-current.html#what-each-vehicle-meets">What each vehicle meets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="wind-and-current.html#wind-socks">Wind socks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="wind-and-current.html#scenarios-and-the-demo">Scenarios and the demo</a></li>
+<li class="toctree-l4"><a class="reference internal" href="wind-and-current.html#in-your-own-world">In your own world</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="lens-drops.html">Put rain on a camera’s lens</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="lens-drops.html#add-it-to-a-camera">Add it to a camera</a></li>
+<li class="toctree-l4"><a class="reference internal" href="lens-drops.html#how-much-rain-lands">How much rain lands</a></li>
+<li class="toctree-l4"><a class="reference internal" href="lens-drops.html#change-the-rain-while-it-runs">Change the rain while it runs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="lens-drops.html#ground-truth-for-perception">Ground truth for perception</a></li>
+<li class="toctree-l4"><a class="reference internal" href="lens-drops.html#things-to-know">Things to know</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="underwater-camera.html">See through the water</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="underwater-camera.html#give-a-world-its-water">Give a world its water</a></li>
+<li class="toctree-l4"><a class="reference internal" href="underwater-camera.html#set-how-far-you-can-see">Set how far you can see</a></li>
+<li class="toctree-l4"><a class="reference internal" href="underwater-camera.html#change-it-while-the-world-runs">Change it while the world runs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="underwater-camera.html#check-what-the-world-has">Check what the world has</a></li>
+<li class="toctree-l4"><a class="reference internal" href="underwater-camera.html#add-an-underwater-camera">Add an underwater camera</a></li>
+<li class="toctree-l4"><a class="reference internal" href="underwater-camera.html#see-its-image">See its image</a></li>
+<li class="toctree-l4"><a class="reference internal" href="underwater-camera.html#the-gui-view-and-every-camera-at-once">The GUI view, and every camera at once</a></li>
+<li class="toctree-l4"><a class="reference internal" href="underwater-camera.html#lights-at-depth">Lights at depth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="underwater-camera.html#check-it-against-real-footage">Check it against real footage</a></li>
+<li class="toctree-l4"><a class="reference internal" href="underwater-camera.html#more-of-the-water">More of the water</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sonar-imaging.html">Imaging (forward-looking) sonar from the ROV</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="sonar-imaging.html#launch">Launch</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-imaging.html#watch-the-sonar">Watch the sonar</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-imaging.html#read-the-sonar-in-ros-2">Read the sonar in ROS 2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-imaging.html#turn-the-rov">Turn the ROV</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sonar-survey.html">USV survey examples: profiling and sidescan sonar</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="sonar-survey.html#part-1-single-pass-over-the-undulating-seabed-with-discrete-targets">Part 1: Single pass over the undulating seabed with discrete targets</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="sonar-survey.html#launch">Launch</a></li>
+<li class="toctree-l5"><a class="reference internal" href="sonar-survey.html#watch-the-sonars">Watch the sonars</a></li>
+<li class="toctree-l5"><a class="reference internal" href="sonar-survey.html#drive-the-pass">Drive the pass</a></li>
+<li class="toctree-l5"><a class="reference internal" href="sonar-survey.html#what-to-look-for">What to look for</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-survey.html#part-2-map-a-shipwreck">Part 2: Map a shipwreck</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="sonar-survey.html#id1">Launch</a></li>
+<li class="toctree-l5"><a class="reference internal" href="sonar-survey.html#survey-and-record">Survey and record</a></li>
+<li class="toctree-l5"><a class="reference internal" href="sonar-survey.html#the-sidescan-mosaic">The sidescan mosaic</a></li>
+<li class="toctree-l5"><a class="reference internal" href="sonar-survey.html#the-soundings-as-a-point-cloud">The soundings as a point cloud</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Add a sonar to your vehicle</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#the-sensor">The sensor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#the-world">The world</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#the-bridge">The bridge</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sidescan-and-profiler">Sidescan and profiler</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#on-the-blue-robotics-vehicles">On the Blue Robotics vehicles</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#switch-it-off">Switch it off</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#check">Check</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sonar-features.html">Sonar features: acoustic properties and truth labels</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="sonar-features.html#acoustic-properties">Acoustic properties</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="sonar-features.html#mark-a-surface">Mark a surface</a></li>
+<li class="toctree-l5"><a class="reference internal" href="sonar-features.html#hide-a-surface">Hide a surface</a></li>
+<li class="toctree-l5"><a class="reference internal" href="sonar-features.html#name-the-seabed">Name the seabed</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-features.html#tune-the-image">Tune the image</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-features.html#repeatable-randomness-the-seed">Repeatable randomness: the seed</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sonar-features.html#truth-labels">Truth labels</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="acoustic-pingers.html">Find an acoustic pinger</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="acoustic-pingers.html#run-the-demo">Run the demo</a></li>
+<li class="toctree-l4"><a class="reference internal" href="acoustic-pingers.html#see-them-in-the-gui">See them in the GUI</a></li>
+<li class="toctree-l4"><a class="reference internal" href="acoustic-pingers.html#put-a-pinger-in-a-world">Put a pinger in a world</a></li>
+<li class="toctree-l4"><a class="reference internal" href="acoustic-pingers.html#give-your-vehicle-a-receiver">Give your vehicle a receiver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="acoustic-pingers.html#coming-from-vrx">Coming from VRX</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="faq.html">Troubleshooting</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#my-vehicle-sinks">My vehicle sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#my-vehicle-bumps-into-things-it-shouldn-t-or-sits-on-the-water-oddly">My vehicle bumps into things it shouldn’t, or sits on the water oddly</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#unsupported-collision-geometry-for-graded-buoyancy">“Unsupported collision geometry for graded buoyancy”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-vehicle-capsizes">The vehicle capsizes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-boat-moves-sideways-or-spins-instead-of-going-forward">The boat moves sideways, or spins, instead of going forward</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-boat-barely-moves-or-a-bigger-command-changes-nothing">The boat barely moves, or a bigger command changes nothing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-spawn-launch-stops-with-invalid-instance-name">The spawn launch stops with “invalid instance name”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-spawn-launch-returns-straight-away">The spawn launch returns straight away</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#two-boats-answer-the-same-command-or-rviz-shows-a-jumping-robot">Two boats answer the same command, or RViz shows a jumping robot</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#a-plugin-can-t-find-a-link">A plugin can’t find a link</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-server-stops-with-ode-internal-error-aabbbound">The server stops with “ODE INTERNAL ERROR … aabbBound”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-boat-falls-very-slowly-when-spawned-high">The boat falls very slowly when spawned high</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#rviz-shows-nothing-or-fixed-frame-does-not-exist">RViz shows nothing, or “Fixed Frame does not exist”</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#robot-state-publisher-warns-about-the-root-link-inertia">robot_state_publisher warns about the root link inertia</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-ocean-looks-flat-or-white-in-the-gui">The ocean looks flat or white in the GUI</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#camera-images-look-green-or-blue">Camera images look green or blue</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#two-simulations-interfere-with-each-other">Two simulations interfere with each other</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-underwater-image-is-the-same-as-the-plain-one">The underwater image is the same as the plain one</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-underwater-image-is-all-one-colour">The underwater image is all one colour</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-underwater-image-gets-black-at-depth">The underwater image gets black at depth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-gui-and-the-underwater-camera-differ">The GUI and the underwater camera differ</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/launch-and-world.html">Launch files, world and services</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#launch-files">Launch files</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-simulation-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">simulation.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-spawn-vehicle-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">spawn_vehicle.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-bringup-multi-vehicle-demo-launch-py"><code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code> <code class="docutils literal notranslate"><span class="pre">multi_vehicle_demo.launch.py</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-sim-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">sim.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-rviz-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">rviz.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#kai-custom-vehicle-display-launch-xml"><code class="docutils literal notranslate"><span class="pre">kai_custom_vehicle</span></code> <code class="docutils literal notranslate"><span class="pre">display.launch.xml</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#instantiate-vehicle-py"><code class="docutils literal notranslate"><span class="pre">instantiate_vehicle.py</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#instance-rviz-py"><code class="docutils literal notranslate"><span class="pre">instance_rviz.py</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#worlds">Worlds</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#the-open-water-sdf-world">The <code class="docutils literal notranslate"><span class="pre">open_water.sdf</span></code> world</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#buoyancy-markup">Buoyancy markup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#wind-markup">Wind markup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#wind-parameters">Wind parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#ocean-current-markup">Ocean current markup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#ocean-current-parameters">Ocean current parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#water-optics-parameters">Water optics parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#underwater-camera-parameters">Underwater camera parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#underwater-rendering">Underwater rendering</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#thruster-command">Thruster command</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#services">Services</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#examples">Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#wind">Wind</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#direction-and-units">Direction and units</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#ocean-current">Ocean current</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#id1">Direction and units</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#water-optics">Water optics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#topics">Topics</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../design/index.html">Design</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#the-waves">The waves</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#floating-vehicles-the-world-doesn-t-know">Floating vehicles the world doesn’t know</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#one-name-per-instance">One name per instance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#one-thruster-interface">One thruster interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#pingers-in-the-world-receivers-on-vehicles">Pingers in the world, receivers on vehicles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#buoyancy-that-follows-the-waves">Buoyancy that follows the waves</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#seeing-through-the-water">Seeing through the water</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#sonar">Sonar</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#related">Related</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../design/sonar.html">Sonar simulation design</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar.html#use-cases">Use cases</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar.html#sonars-in-scope">Sonars in scope</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#glossary">Glossary</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar.html#related-work">Related work</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar.html#theory-of-operation">Theory of operation</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#the-model-and-its-components">The model and its components</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="../design/sonar.html#geometry">Geometry</a></li>
+<li class="toctree-l6"><a class="reference internal" href="../design/sonar.html#transmission-loss">Transmission loss</a></li>
+<li class="toctree-l6"><a class="reference internal" href="../design/sonar.html#backscatter">Backscatter</a></li>
+<li class="toctree-l6"><a class="reference internal" href="../design/sonar.html#sonar">Sonar</a></li>
+<li class="toctree-l6"><a class="reference internal" href="../design/sonar.html#fluctuations">Fluctuations</a></li>
+<li class="toctree-l6"><a class="reference internal" href="../design/sonar.html#output">Output</a></li>
+</ul>
+</li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#acoustic-properties-of-the-scene">Acoustic properties of the scene</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#where-it-sits-among-the-alternatives">Where it sits among the alternatives</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#why-this-level-suits-the-use-cases">Why this level suits the use cases</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#imaging-sonar">Imaging sonar</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#profiling-sonar">Profiling sonar</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#sidescan">Sidescan</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar.html#interface">Interface</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#sdf">SDF</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#messages">Messages</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar.html#implementation">Implementation</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#packages">Packages</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#one-ping">One ping</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#design-choices">Design choices</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#known-limits">Known limits</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/sonar.html#performance">Performance</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar.html#testing">Testing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar.html#walkthroughs">Walkthroughs</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../design/render-a-ping.html">Render a ping without Gazebo</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../design/render-a-ping.html#what-this-tests">What this tests</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/render-a-ping.html#build-and-test-the-engine">Build and test the engine</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/render-a-ping.html#render-and-draw">Render and draw</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/render-a-ping.html#what-to-look-for">What to look for</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../design/render-a-ping.html#scene-a-a-sphere-in-open-water">Scene A: a sphere in open water</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/render-a-ping.html#scene-b-a-box-on-a-flat-seabed">Scene B: a box on a flat seabed</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/render-a-ping.html#scene-c-a-seabed-rising-to-starboard">Scene C: a seabed rising to starboard</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../design/render-a-ping.html#the-pass-sidescan-and-profiling">The pass: sidescan and profiling</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../design/render-a-ping.html#where-things-live">Where things live</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../design/sonar-performance.html">Sonar performance</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar-performance.html#the-case">The case</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar-performance.html#results">Results</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar-performance.html#why-the-gpu-matters-little">Why the GPU matters little</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../design/sonar-performance.html#recommendations">Recommendations</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../project/index.html">Project</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Gz Maritime</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">How to guides</a></li>
+      <li class="breadcrumb-item active">Add a sonar to your vehicle</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/docs/how-to/sonar-add.md" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="add-a-sonar-to-your-vehicle">
+<h1>Add a sonar to your vehicle<a class="headerlink" href="#add-a-sonar-to-your-vehicle" title="Link to this heading"></a></h1>
+<p>A sonar is a sensor on one of your vehicle’s links, driven by one world system and brought into ROS 2 by one bridge. This page adds an imaging sonar, then says what differs for a sidescan and a profiler. Every parameter, with its default and range, is in the <a class="reference internal" href="../design/sonar.html#sdf"><span class="std std-ref">design</span></a>.</p>
+<section id="the-sensor">
+<h2>The sensor<a class="headerlink" href="#the-sensor" title="Link to this heading"></a></h2>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;sensor</span><span class="w"> </span><span class="na">name=</span><span class="s">"sonar_forward"</span><span class="w"> </span><span class="na">type=</span><span class="s">"custom"</span><span class="w"> </span><span class="na">gz:type=</span><span class="s">"imaging_sonar"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;pose&gt;</span>0.25<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0.26<span class="w"> </span>0<span class="nt">&lt;/pose&gt;</span>
+<span class="w">  </span><span class="nt">&lt;update_rate&gt;</span>10<span class="nt">&lt;/update_rate&gt;</span>
+<span class="w">  </span><span class="nt">&lt;topic&gt;</span>my_vehicle/sonar_forward/image<span class="nt">&lt;/topic&gt;</span>
+<span class="w">  </span><span class="nt">&lt;gz:sonar&gt;</span>
+<span class="w">    </span><span class="nt">&lt;range_max&gt;</span>15<span class="nt">&lt;/range_max&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/gz:sonar&gt;</span>
+<span class="nt">&lt;/sensor&gt;</span>
+</pre></div>
+</div>
+<p>Put it in a <code class="docutils literal notranslate"><span class="pre">&lt;link&gt;</span></code>; the sensor looks along its own x axis, so the pose points it (here forward, pitched down 15°). An empty <code class="docutils literal notranslate"><span class="pre">&lt;gz:sonar/&gt;</span></code> gives the Sonoptix ECHO; the model file needs <code class="docutils literal notranslate"><span class="pre">xmlns:gz=&quot;http://gazebosim.org/schema&quot;</span></code> on its <code class="docutils literal notranslate"><span class="pre">&lt;sdf&gt;</span></code>.</p>
+</section>
+<section id="the-world">
+<h2>The world<a class="headerlink" href="#the-world" title="Link to this heading"></a></h2>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;plugin</span><span class="w"> </span><span class="na">filename=</span><span class="s">"gz-sim-sensors-system"</span><span class="w"> </span><span class="na">name=</span><span class="s">"gz::sim::systems::Sensors"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;render_engine&gt;</span>ogre2<span class="nt">&lt;/render_engine&gt;</span>
+<span class="nt">&lt;/plugin&gt;</span>
+<span class="nt">&lt;plugin</span><span class="w"> </span><span class="na">filename=</span><span class="s">"gz-maritime-sonar-system"</span><span class="w"> </span><span class="na">name=</span><span class="s">"gz::sim::maritime::Sonar"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;temperature&gt;</span>29<span class="nt">&lt;/temperature&gt;</span>
+<span class="w">  </span><span class="nt">&lt;salinity&gt;</span>30<span class="nt">&lt;/salinity&gt;</span>
+<span class="nt">&lt;/plugin&gt;</span>
+</pre></div>
+</div>
+<p>The sonar draws its view on the Sensors system’s rendering thread, and the sonar system owns the water; a world with no sonar pays nothing for it.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">kai_gazebo</span></code> worlds do not load the sonar system yet, and <code class="docutils literal notranslate"><span class="pre">kai_bringup</span></code>’s <code class="docutils literal notranslate"><span class="pre">spawn_vehicle.launch.xml</span></code> does not bridge a sonar: add the plugin above to the world and run the bridge below.</p>
+</section>
+<section id="the-bridge">
+<h2>The bridge<a class="headerlink" href="#the-bridge" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_sonar_bridge<span class="w"> </span>sonar_bridge.launch.xml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>gz_topics:<span class="o">=</span><span class="s2">"[/my_vehicle/sonar_forward/image]"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>ros_topics:<span class="o">=</span><span class="s2">"[/my_vehicle/sonar_forward/image]"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>frame_ids:<span class="o">=</span><span class="s2">"[my_vehicle/sonar_forward_acoustic]"</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">ros_gz_bridge</span></code> cannot convert the sonar’s message; this bridge publishes <code class="docutils literal notranslate"><span class="pre">marine_acoustic_msgs/ProjectedSonarImage</span></code>, and a <code class="docutils literal notranslate"><span class="pre">/view</span></code> image beside it. Each image is stamped with the frame in <code class="docutils literal notranslate"><span class="pre">frame_ids</span></code>, which TF must carry: <code class="docutils literal notranslate"><span class="pre">ProjectedSonarImage</span></code> puts Z along the beam and X up, so give the vehicle’s URDF a fixed frame on the sonar, rotated from the sensor’s by roll 180°, pitch −90° (<code class="docutils literal notranslate"><span class="pre">rpy=&quot;3.14159</span> <span class="pre">-1.5708</span> <span class="pre">0&quot;</span></code>). Without <code class="docutils literal notranslate"><span class="pre">frame_ids</span></code> the bridge warns and stamps the gz sensor’s name with <code class="docutils literal notranslate"><span class="pre">_acoustic</span></code> appended, which TF does not know.</p>
+<p>The bridge is lazy, as <code class="docutils literal notranslate"><span class="pre">ros_gz_bridge</span></code> is with <code class="docutils literal notranslate"><span class="pre">lazy</span></code>: it subscribes to a sonar’s gz topic only while one of that sonar’s ROS topics has a subscriber, checking every <code class="docutils literal notranslate"><span class="pre">subscription_heartbeat</span></code> (200 ms by default), so a bridge nobody listens to leaves the sonar idle. <code class="docutils literal notranslate"><span class="pre">lazy:=false</span></code> subscribes from the start. It publishes with a reliable QoS, keeping the last 5 messages; <code class="docutils literal notranslate"><span class="pre">reliability:=best_effort</span></code> and <code class="docutils literal notranslate"><span class="pre">depth</span></code> change that, for a lossy link where resending a large image costs more than losing it. A best-effort publisher does not reach a reliable subscriber, which RViz’s displays are by default.</p>
+</section>
+<section id="sidescan-and-profiler">
+<h2>Sidescan and profiler<a class="headerlink" href="#sidescan-and-profiler" title="Link to this heading"></a></h2>
+<p>A sidescan is one sensor per side, <code class="docutils literal notranslate"><span class="pre">gz:type=&quot;sidescan_sonar&quot;</span></code>, each posed to look out to its side and down; each side publishes its own line per ping. A profiler is <code class="docutils literal notranslate"><span class="pre">gz:type=&quot;profiling_sonar&quot;</span></code>, posed to look down with its fan across the track; it publishes its soundings (<code class="docutils literal notranslate"><span class="pre">gz.maritime.sonar.SonarDetections</span></code>) on its topic, and the bridge needs to be told so, with one <code class="docutils literal notranslate"><span class="pre">kinds</span></code> entry per sonar:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>launch<span class="w"> </span>kai_sonar_bridge<span class="w"> </span>sonar_bridge.launch.xml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>gz_topics:<span class="o">=</span><span class="s2">"[/my_boat/sidescan/port/image,/my_boat/sidescan/stbd/image,/my_boat/profiler/detections]"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>ros_topics:<span class="o">=</span><span class="s2">"[/my_boat/sidescan/port/image,/my_boat/sidescan/stbd/image,/my_boat/profiler/detections]"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>kinds:<span class="o">=</span><span class="s2">"[image,image,detections]"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>frame_ids:<span class="o">=</span><span class="s2">"[my_boat/sidescan_port_acoustic,my_boat/sidescan_stbd_acoustic,my_boat/profiler_beam_acoustic]"</span>
+</pre></div>
+</div>
+<p>The profiler’s soundings arrive as <code class="docutils literal notranslate"><span class="pre">marine_acoustic_msgs/SonarDetections</span></code>, and as a point cloud on <code class="docutils literal notranslate"><span class="pre">/points</span></code> beside them for viewing. They are stamped in an <code class="docutils literal notranslate"><span class="pre">_acoustic</span></code> frame too, the same fixed rotation from the sensor’s: for a profiler looking down it is north-east-down, X forward, Y starboard, Z down, in which <code class="docutils literal notranslate"><span class="pre">rx_angles</span></code> count positive to starboard.</p>
+</section>
+<section id="on-the-blue-robotics-vehicles">
+<h2>On the Blue Robotics vehicles<a class="headerlink" href="#on-the-blue-robotics-vehicles" title="Link to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">parts</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="nv">sonoptix_echo_multibeam</span><span class="p p-Indicator">,</span><span class="nt"> name</span><span class="p">:</span><span class="w"> </span><span class="nv">sonar_forward</span><span class="p p-Indicator">,</span><span class="nt"> xyz</span><span class="p">:</span><span class="w"> </span><span class="s">"0.25</span><span class="nv"> </span><span class="s">0</span><span class="nv"> </span><span class="s">0.12"</span><span class="p p-Indicator">,</span><span class="nt"> rpy</span><span class="p">:</span><span class="w"> </span><span class="s">"0</span><span class="nv"> </span><span class="s">0.2618</span><span class="nv"> </span><span class="s">0"</span><span class="p p-Indicator">,</span>
+<span class="nt">     sonar</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">range_max</span><span class="p">:</span><span class="w"> </span><span class="nv">15</span><span class="p p-Indicator">}}</span>
+</pre></div>
+</div>
+<p>In a BlueROV2 or BlueBoat config a sonar part emits its sensors, <code class="docutils literal notranslate"><span class="pre">sonar:</span></code> fills their <code class="docutils literal notranslate"><span class="pre">&lt;gz:sonar&gt;</span></code>, and the launch starts the bridge with the right topics, frames and kinds. Three parts are sonars: <code class="docutils literal notranslate"><span class="pre">sonoptix_echo_multibeam</span></code> (imaging), <code class="docutils literal notranslate"><span class="pre">omniscan_450_sidescan</span></code> (a sidescan bar with a beam to each side) and <code class="docutils literal notranslate"><span class="pre">surveyor_multibeam</span></code> (a profiler looking down). <code class="docutils literal notranslate"><span class="pre">bluerov2_sonar.yaml</span></code> in <code class="docutils literal notranslate"><span class="pre">bluerov2_description</span></code> and <code class="docutils literal notranslate"><span class="pre">blueboat_sonar.yaml</span></code> in <code class="docutils literal notranslate"><span class="pre">blueboat_description</span></code> are complete examples.</p>
+</section>
+<section id="switch-it-off">
+<h2>Switch it off<a class="headerlink" href="#switch-it-off" title="Link to this heading"></a></h2>
+<p>A sonar pings only while something subscribes to its gz topic, and the bridge subscribes only while a ROS node subscribes to one of that sonar’s topics, so a sonar nobody listens to does nothing, with the bridge running or not. To turn one off while subscribers stay connected, and back on:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gz<span class="w"> </span>service<span class="w"> </span>-s<span class="w"> </span>/my_vehicle/sonar_forward/image/enable<span class="w"> </span>--reqtype<span class="w"> </span>gz.msgs.Boolean<span class="w"> </span>--reptype<span class="w"> </span>gz.msgs.Empty<span class="w"> </span>--req<span class="w"> </span><span class="s1">'data: false'</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">data:</span> <span class="pre">true</span></code> turns it back on; <code class="docutils literal notranslate"><span class="pre">&lt;topic&gt;/set_rate</span></code> (a <code class="docutils literal notranslate"><span class="pre">gz.msgs.Double</span></code>) changes its rate.</p>
+<p>Whether anyone subscribes is gz-transport’s answer. If a subscriber gets no pings, run the server with <code class="docutils literal notranslate"><span class="pre">-v</span> <span class="pre">4</span></code>, where each sonar logs when it starts and stops pinging and why. To make a sonar ping whether or not anything subscribes:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;gz:sonar&gt;</span>
+<span class="w">  </span><span class="nt">&lt;always_ping&gt;</span>true<span class="nt">&lt;/always_ping&gt;</span>
+<span class="nt">&lt;/gz:sonar&gt;</span>
+</pre></div>
+</div>
+<p>It then costs its full rate with nobody listening, so set it only where it is needed. The <code class="docutils literal notranslate"><span class="pre">enable</span></code> service still turns it off.</p>
+<p>The answer can be wrong: a subscriber that dies without unsubscribing (killed with <code class="docutils literal notranslate"><span class="pre">SIGKILL</span></code>, or a script that ends by <code class="docutils literal notranslate"><span class="pre">os._exit</span></code>) still counts, so the sonar keeps pinging although <code class="docutils literal notranslate"><span class="pre">gz</span> <span class="pre">topic</span> <span class="pre">-i</span></code> lists no subscriber. The log then says <code class="docutils literal notranslate"><span class="pre">pinging</span></code> and never <code class="docutils literal notranslate"><span class="pre">no</span> <span class="pre">subscriber,</span> <span class="pre">not</span> <span class="pre">pinging</span></code>. Turn the sonar off with its <code class="docutils literal notranslate"><span class="pre">enable</span></code> service, or restart the server.</p>
+</section>
+<section id="check">
+<h2>Check<a class="headerlink" href="#check" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>topic<span class="w"> </span><span class="nb">echo</span><span class="w"> </span>--once<span class="w"> </span>/my_vehicle/sonar_forward/image<span class="w"> </span>--field<span class="w"> </span>image.beam_count
+</pre></div>
+</div>
+<p>256, the ECHO’s beams.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="sonar-survey.html" class="btn btn-neutral float-left" title="USV survey examples: profiling and sidescan sonar" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sonar-features.html" class="btn btn-neutral float-right" title="Sonar features: acoustic properties and truth labels" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Honu Robotics.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  
+<div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    <span class="fa fa-book"> Other Versions</span>
+    v: lyrical
+    <span class="fa fa-caret-down"></span>
+  </span>
+  <div class="rst-other-versions">
+    <dl id="honu-version-list">
+      <dt>Distributions</dt>
+      <dd><a href="/gz-maritime/lyrical/" data-version="lyrical">Lyrical</a></dd>
+    </dl>
+  </div>
+</div>
+<script>
+  (function () {
+    var current = "lyrical";
+    var base = "/gz-maritime/";
+
+    /* Keep the reader on the same page when switching versions; the
+       version root href stays as the fallback for pages a version lacks. */
+    function wire() {
+      document.querySelectorAll('.rst-other-versions a[data-version]').forEach(function (a) {
+        var target = a.getAttribute('data-version');
+        var path = window.location.pathname;
+        if (target !== current && path.indexOf('/' + current + '/') !== -1) {
+          a.href = path.replace('/' + current + '/', '/' + target + '/');
+        }
+      });
+    }
+
+    if (!window.fetch) { wire(); return; }
+
+    /* The deploy tool maintains versions.json at the site root; reading it
+       at runtime lets builds published before a new distribution existed
+       still offer it in the flyout. Offline or local preview builds fall
+       back to the build time list rendered above. */
+    fetch(base + 'versions.json', {cache: 'no-cache'}).then(function (response) {
+      if (!response.ok) { throw new Error(response.status); }
+      return response.json();
+    }).then(function (entries) {
+      var list = document.getElementById('honu-version-list');
+      if (!list || !entries.length) { return; }
+      list.querySelectorAll('dd').forEach(function (dd) { dd.remove(); });
+      entries.forEach(function (entry) {
+        var a = document.createElement('a');
+        a.href = entry.url;
+        a.setAttribute('data-version', entry.name);
+        a.textContent = entry.name.charAt(0).toUpperCase() + entry.name.slice(1);
+        var dd = document.createElement('dd');
+        dd.appendChild(a);
+        list.appendChild(dd);
+      });
+    }).catch(function () {}).finally(wire);
+  })();
+</script><script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

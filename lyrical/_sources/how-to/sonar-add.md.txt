@@ -1,0 +1,101 @@
+# Add a sonar to your vehicle
+
+A sonar is a sensor on one of your vehicle's links, driven by one world system and brought into ROS 2 by one bridge. This page adds an imaging sonar, then says what differs for a sidescan and a profiler. Every parameter, with its default and range, is in the [design](../design/sonar.md#sdf).
+
+## The sensor
+
+```xml
+<sensor name="sonar_forward" type="custom" gz:type="imaging_sonar">
+  <pose>0.25 0 0 0 0.26 0</pose>
+  <update_rate>10</update_rate>
+  <topic>my_vehicle/sonar_forward/image</topic>
+  <gz:sonar>
+    <range_max>15</range_max>
+  </gz:sonar>
+</sensor>
+```
+
+Put it in a `<link>`; the sensor looks along its own x axis, so the pose points it (here forward, pitched down 15°). An empty `<gz:sonar/>` gives the Sonoptix ECHO; the model file needs `xmlns:gz="http://gazebosim.org/schema"` on its `<sdf>`.
+
+## The world
+
+```xml
+<plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+  <render_engine>ogre2</render_engine>
+</plugin>
+<plugin filename="gz-maritime-sonar-system" name="gz::sim::maritime::Sonar">
+  <temperature>29</temperature>
+  <salinity>30</salinity>
+</plugin>
+```
+
+The sonar draws its view on the Sensors system's rendering thread, and the sonar system owns the water; a world with no sonar pays nothing for it.
+
+The `kai_gazebo` worlds do not load the sonar system yet, and `kai_bringup`'s `spawn_vehicle.launch.xml` does not bridge a sonar: add the plugin above to the world and run the bridge below.
+
+## The bridge
+
+```bash
+ros2 launch kai_sonar_bridge sonar_bridge.launch.xml \
+  gz_topics:="[/my_vehicle/sonar_forward/image]" \
+  ros_topics:="[/my_vehicle/sonar_forward/image]" \
+  frame_ids:="[my_vehicle/sonar_forward_acoustic]"
+```
+
+`ros_gz_bridge` cannot convert the sonar's message; this bridge publishes `marine_acoustic_msgs/ProjectedSonarImage`, and a `/view` image beside it. Each image is stamped with the frame in `frame_ids`, which TF must carry: `ProjectedSonarImage` puts Z along the beam and X up, so give the vehicle's URDF a fixed frame on the sonar, rotated from the sensor's by roll 180°, pitch −90° (`rpy="3.14159 -1.5708 0"`). Without `frame_ids` the bridge warns and stamps the gz sensor's name with `_acoustic` appended, which TF does not know.
+
+The bridge is lazy, as `ros_gz_bridge` is with `lazy`: it subscribes to a sonar's gz topic only while one of that sonar's ROS topics has a subscriber, checking every `subscription_heartbeat` (200 ms by default), so a bridge nobody listens to leaves the sonar idle. `lazy:=false` subscribes from the start. It publishes with a reliable QoS, keeping the last 5 messages; `reliability:=best_effort` and `depth` change that, for a lossy link where resending a large image costs more than losing it. A best-effort publisher does not reach a reliable subscriber, which RViz's displays are by default.
+
+## Sidescan and profiler
+
+A sidescan is one sensor per side, `gz:type="sidescan_sonar"`, each posed to look out to its side and down; each side publishes its own line per ping. A profiler is `gz:type="profiling_sonar"`, posed to look down with its fan across the track; it publishes its soundings (`gz.maritime.sonar.SonarDetections`) on its topic, and the bridge needs to be told so, with one `kinds` entry per sonar:
+
+```bash
+ros2 launch kai_sonar_bridge sonar_bridge.launch.xml \
+  gz_topics:="[/my_boat/sidescan/port/image,/my_boat/sidescan/stbd/image,/my_boat/profiler/detections]" \
+  ros_topics:="[/my_boat/sidescan/port/image,/my_boat/sidescan/stbd/image,/my_boat/profiler/detections]" \
+  kinds:="[image,image,detections]" \
+  frame_ids:="[my_boat/sidescan_port_acoustic,my_boat/sidescan_stbd_acoustic,my_boat/profiler_beam_acoustic]"
+```
+
+The profiler's soundings arrive as `marine_acoustic_msgs/SonarDetections`, and as a point cloud on `/points` beside them for viewing. They are stamped in an `_acoustic` frame too, the same fixed rotation from the sensor's: for a profiler looking down it is north-east-down, X forward, Y starboard, Z down, in which `rx_angles` count positive to starboard.
+
+## On the Blue Robotics vehicles
+
+```yaml
+parts:
+  - {type: sonoptix_echo_multibeam, name: sonar_forward, xyz: "0.25 0 0.12", rpy: "0 0.2618 0",
+     sonar: {range_max: 15}}
+```
+
+In a BlueROV2 or BlueBoat config a sonar part emits its sensors, `sonar:` fills their `<gz:sonar>`, and the launch starts the bridge with the right topics, frames and kinds. Three parts are sonars: `sonoptix_echo_multibeam` (imaging), `omniscan_450_sidescan` (a sidescan bar with a beam to each side) and `surveyor_multibeam` (a profiler looking down). `bluerov2_sonar.yaml` in `bluerov2_description` and `blueboat_sonar.yaml` in `blueboat_description` are complete examples.
+
+## Switch it off
+
+A sonar pings only while something subscribes to its gz topic, and the bridge subscribes only while a ROS node subscribes to one of that sonar's topics, so a sonar nobody listens to does nothing, with the bridge running or not. To turn one off while subscribers stay connected, and back on:
+
+```bash
+gz service -s /my_vehicle/sonar_forward/image/enable --reqtype gz.msgs.Boolean --reptype gz.msgs.Empty --req 'data: false'
+```
+
+`data: true` turns it back on; `<topic>/set_rate` (a `gz.msgs.Double`) changes its rate.
+
+Whether anyone subscribes is gz-transport's answer. If a subscriber gets no pings, run the server with `-v 4`, where each sonar logs when it starts and stops pinging and why. To make a sonar ping whether or not anything subscribes:
+
+```xml
+<gz:sonar>
+  <always_ping>true</always_ping>
+</gz:sonar>
+```
+
+It then costs its full rate with nobody listening, so set it only where it is needed. The `enable` service still turns it off.
+
+The answer can be wrong: a subscriber that dies without unsubscribing (killed with `SIGKILL`, or a script that ends by `os._exit`) still counts, so the sonar keeps pinging although `gz topic -i` lists no subscriber. The log then says `pinging` and never `no subscriber, not pinging`. Turn the sonar off with its `enable` service, or restart the server.
+
+## Check
+
+```bash
+ros2 topic echo --once /my_vehicle/sonar_forward/image --field image.beam_count
+```
+
+256, the ECHO's beams.
