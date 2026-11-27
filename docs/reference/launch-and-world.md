@@ -346,7 +346,8 @@ world applies only its own response while it is on. Only surfaces Ogre's PBS sha
 water: the sky, the background, the water surface, markers and terrain are
 drawn as in air. A spot or point light with `lamp` in its own name (up to
 four, the first by name) is a lamp: its light fades both ways through the
-water and its beam is drawn; other lights are lit as in air; set `<daylight>0` in
+water and its beam is drawn, and it casts no shadow, in air too; other
+lights are lit by Ogre and, under water, fade with the daylight; set `<daylight>0` in
 the water optics for night.
 
 ## Thruster command

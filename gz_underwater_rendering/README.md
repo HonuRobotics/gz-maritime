@@ -60,9 +60,11 @@ that scope it) contains `lamp`, in any case, is a lamp, up to four, the
 first by name; other lights are lit by Ogre as in air, with no beam, so a
 harbour light on a pier stays as it is. A lamp:
 
-- **It lights as Ogre would**: the diffuse term of Ogre's default BRDF,
-  with Ogre's attenuation, spot cone and range fade, so in air, or seen by a
-  camera above the water, a lamp looks as any other light.
+- **It lights as Ogre would**: Ogre's default BRDF, diffuse and specular
+  (metal included), with Ogre's attenuation, spot cone and range fade, so in
+  air, or seen by a camera above the water, a lamp looks as any other light,
+  but for its shadows: a lamp casts none while the renderer draws the water,
+  in air too.
 - **Its light fades both ways**: from the lamp to what it lights, and from
   there to the camera, `exp(−β^D (d_lamp + r))`.
 - **Its beam**: the light the water scatters back to the camera inside the
@@ -138,10 +140,12 @@ off, set its intensity to 0: it then costs nothing.
 - **Depth from the still water level**, not the wave surface, unlike the
   reference camera.
 - **Lamps**: lights named `lamp` only, up to four (the others are lit by
-  Ogre, with a warning); lit by Ogre's diffuse term (no specular), with no
-  shadows; their beams show only where something is drawn behind them (the
-  open water's background is not shaded). The reference camera has no
-  lamps.
+  Ogre, with a warning); lit by Ogre's default BRDF without clear coat, and
+  with no shadows, in air too; their beams show only where something is
+  drawn behind them (the open water's background is not shaded). The
+  reference camera has no lamps. A light that is not a lamp is lit by Ogre
+  and, under water, fades with the daylight: by its depth, not over its own
+  distance, so a torch 20 m down is much dimmer than a lamp there.
 - **ogre2 only, and gz-rendering 10.** The bridge chains its pieces into
   the pieces that define Ogre's hooks, in a copy kept in memory. With
   another render engine, its own pieces missing, a bridge of another
@@ -170,7 +174,12 @@ without a GPU.
 the limit, which Ogre lights as in air, and four that light nothing in view
 (one whose range lies wholly behind the camera, three aimed behind it) and
 draw no beam; a lamp on a vehicle removed while the world runs, its light
-and beam gone, then the world shut down.
+and beam gone, then the world shut down; the renderer's model removed, and
+the lamp given back to Ogre, which lights the plate with it.
+
+`lamp_air_test`, rendered, in a process of its own: a camera above the
+water and a lamp lighting a metal plate and a glossy one, with and without
+the GPU path: the same image, to the 8-bit step, specular included.
 
 `underwater_rendering_test`, rendered (needs a GPU): the same scene without
 and with the GPU path, in one process. The GPU image against the reference
