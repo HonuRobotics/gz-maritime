@@ -74,12 +74,17 @@ bool Resolve(const WaterOpticsSpec &_spec, WaterOpticsData &_out,
   Rgb b = type->scattering;
   Rgb kd = type->diffuseAttenuation;
 
-  if (_spec.visibility)
+  if (_spec.visibility && explicitWater)
+  {
+    _warning += std::string(_warning.empty() ? "" : "; ") +
+        "<visibility> is ignored: every coefficient is given explicitly";
+  }
+  else if (_spec.visibility)
   {
     const double v = *_spec.visibility;
-    if (!std::isfinite(v) || v <= 0.0)
+    if (!std::isfinite(v) || v < kMinVisibility)
     {
-      _error = "<visibility> must be a positive number of metres";
+      _error = "<visibility> must be at least 0.1 m";
       return false;
     }
     // Scale what the type has above pure water, which type I stands for,

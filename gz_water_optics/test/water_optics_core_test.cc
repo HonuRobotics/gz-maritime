@@ -16,6 +16,7 @@
  */
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <fstream>
@@ -24,6 +25,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include <gz/sim/EntityComponentManager.hh>
@@ -108,23 +110,45 @@ TEST(Jerlov, TableHasEveryType)
 // Spot checks against Solonenko and Mobley (2015), Tables 4-8.
 TEST(Jerlov, TableMatchesSource)
 {
-  const auto ii = water_optics::Jerlov("II");
-  ASSERT_TRUE(ii);
-  ExpectRgb(ii->absorption, Rgb(0.296, 0.0469, 0.0241));
-  ExpectRgb(ii->scattering, Rgb(0.288, 0.387, 0.504));
-  ExpectRgb(ii->diffuseAttenuation, Rgb(0.337, 0.0845, 0.062));
-
-  const auto c3 = water_optics::Jerlov("3C");
-  ASSERT_TRUE(c3);
-  ExpectRgb(c3->absorption, Rgb(0.307, 0.078, 0.154));
-  ExpectRgb(c3->scattering, Rgb(0.855, 1.15, 1.50));
-  ExpectRgb(c3->diffuseAttenuation, Rgb(0.456, 0.187, 0.319));
-
-  const auto c9 = water_optics::Jerlov("9C");
-  ASSERT_TRUE(c9);
-  ExpectRgb(c9->absorption, Rgb(0.436, 0.430, 0.943));
-  ExpectRgb(c9->scattering, Rgb(2.51, 3.38, 4.39));
-  ExpectRgb(c9->diffuseAttenuation, Rgb(0.763, 0.826, 1.56));
+  struct Row
+  {
+    const char *name;
+    Rgb a, b, kd;
+  };
+  // Solonenko and Mobley (2015), checked against the paper; 5C red from
+  // Williamson and Hollins (2022) and Jerlov (1976). See Jerlov.cc.
+  const Row rows[] = {
+    {"I", {0.295, 0.046, 0.018}, {0.00104, 0.00205, 0.00381},
+     {0.302, 0.049, 0.022}},
+    {"IA", {0.295, 0.0468, 0.0221}, {0.00256, 0.00402, 0.00631},
+     {0.303, 0.0503, 0.0264}},
+    {"IB", {0.296, 0.0469, 0.0235}, {0.0468, 0.0565, 0.068},
+     {0.310, 0.0572, 0.0342}},
+    {"II", {0.296, 0.0469, 0.0241}, {0.288, 0.387, 0.504},
+     {0.337, 0.0845, 0.062}},
+    {"III", {0.297, 0.0507, 0.0388}, {0.788, 1.06, 1.38},
+     {0.390, 0.129, 0.124}},
+    {"1C", {0.304, 0.068, 0.105}, {0.293, 0.395, 0.514},
+     {0.395, 0.121, 0.179}},
+    {"3C", {0.307, 0.078, 0.154}, {0.855, 1.15, 1.50},
+     {0.456, 0.187, 0.319}},
+    {"5C", {0.327, 0.127, 0.297}, {1.070, 1.44, 1.87},
+     {0.48, 0.277, 0.535}},
+    {"7C", {0.367, 0.233, 0.542}, {1.89, 2.54, 3.30},
+     {0.600, 0.470, 0.924}},
+    {"9C", {0.436, 0.430, 0.943}, {2.51, 3.38, 4.39},
+     {0.763, 0.826, 1.56}},
+  };
+  ASSERT_EQ(water_optics::JerlovTypes().size(), std::size(rows));
+  for (const Row &row : rows)
+  {
+    SCOPED_TRACE(row.name);
+    const auto type = water_optics::Jerlov(row.name);
+    ASSERT_TRUE(type);
+    ExpectRgb(type->absorption, row.a);
+    ExpectRgb(type->scattering, row.b);
+    ExpectRgb(type->diffuseAttenuation, row.kd);
+  }
 }
 
 /////////////////////////////////////////////////
@@ -239,6 +263,14 @@ TEST(Resolve, VisibilityScalesAbovePureWater)
     WaterOpticsSpec clearer = plain;
     clearer.visibility = 1.5 * a.Visibility();
     const auto c = MustResolve(clearer);
+
+    // K_d's excess over pure water shrinks by the same factor as c's
+    const auto pure = *water_optics::Jerlov("I");
+    const Rgb cPure = pure.absorption + pure.scattering;
+    const Rgb s = Div(c.attenuation - cPure, a.attenuation - cPure);
+    ExpectRgb(Div(c.diffuseAttenuation - pure.diffuseAttenuation,
+                  a.diffuseAttenuation - pure.diffuseAttenuation), s, 1e-9);
+    EXPECT_LT(s.Y(), 1.0) << name;
     EXPECT_GT(c.attenuation.X() / c.attenuation.Y(),
               a.attenuation.X() / a.attenuation.Y()) << name;
   }
@@ -343,7 +375,8 @@ TEST(Resolve, RejectsBadInput)
   EXPECT_NE(MustFail(s).find("4C"), std::string::npos);
 
   for (const double v : {0.0, -1.0, std::nan(""),
-                         std::numeric_limits<double>::infinity()})
+                         std::numeric_limits<double>::infinity(), 0.05,
+                         1e-300, 1e-320})
   {
     s = WaterOpticsSpec{};
     s.visibility = v;
@@ -593,6 +626,119 @@ TEST(Sampler, DepthBelowTheWaveFromTheRecipeAlone)
 }
 
 /////////////////////////////////////////////////
+// Sync on one thread, as a system's PreUpdate, while another asks, as a
+// renderer: the other thread never reads the source's engine, which the
+// first advances, but an engine of its own, and gets the wave at the time
+// it asks for. Run under the thread sanitizer, this is where a race shows.
+TEST(Sampler, AskedFromAnotherThread)
+{
+  std::atomic<int> built{0};
+  waves::RegisterWaveEngineFactory(kTestEngine,
+      [&built] { ++built; return std::make_shared<SineWave>(); });
+  waves::WavefieldData recipe;
+  recipe.algorithm = kTestEngine;
+  recipe.params.gain = 0.8;
+  recipe.generation = 1;
+  // The source's engine is in the component, as on the server
+  recipe.simulation =
+      waves::CreateWaveSimulation(recipe.algorithm, recipe.params);
+  built = 0;
+
+  WaterOpticsSpec spec;
+  spec.jerlov = "3C";
+  spec.waterLevel = 1.0;
+  EntityComponentManager ecm;
+  const Entity world = ecm.CreateEntity();
+  ecm.CreateComponent(world, components::World());
+  ecm.CreateComponent(world, components::WaterOptics(MustResolve(spec)));
+  ecm.CreateComponent(world, components::Wavefield(recipe));
+
+  water_optics::WaterOpticsSampler sampler;
+  ASSERT_TRUE(sampler.Sync(ecm));
+  EXPECT_EQ(0, built) << "an engine built before a depth was asked for";
+
+  std::atomic<bool> stop{false};
+  std::atomic<int> asked{0};
+  std::thread renderer([&]
+  {
+    for (int i = 0; !stop; ++i)
+    {
+      const double t = 0.01 * (i % 300);
+      const auto time = std::chrono::duration_cast<
+          std::chrono::steady_clock::duration>(
+              std::chrono::duration<double>(t));
+      const double depth = sampler.Depth({2.0, 0.0, -2.0}, time);
+      EXPECT_NEAR(depth, 1.0 + 0.8 * std::sin(1.0 - t) + 2.0, 1e-8)
+          << "t " << t;
+      EXPECT_EQ(sampler.Data().jerlov, "3C");
+      EXPECT_TRUE(sampler.Valid());
+      EXPECT_GT(sampler.Veil(depth).Y(), 0.0);
+      ++asked;
+    }
+  });
+
+  // The simulation: the source advances, the optics change
+  auto optics = MustResolve(spec);
+  for (int step = 0; step < 2000 || asked < 100; ++step)
+  {
+    waves::Advance(ecm.Component<components::Wavefield>(world)->Data(),
+                   0.001 * step);
+    if (step % 100 == 0)
+    {
+      optics.generation = 2 + step;
+      ecm.SetComponentData<components::WaterOptics>(world, optics);
+    }
+    sampler.Sync(ecm);
+    // The Sync thread reads the source's engine, at its own time
+    const double t = 0.001 * step;
+    EXPECT_NEAR(sampler.Depth({2.0, 0.0, -2.0},
+                    std::chrono::duration_cast<
+                        std::chrono::steady_clock::duration>(
+                            std::chrono::duration<double>(t))),
+                1.0 + 0.8 * std::sin(1.0 - t) + 2.0, 1e-9);
+  }
+  stop = true;
+  renderer.join();
+  EXPECT_GT(asked, 100);
+  EXPECT_EQ(1, built) << "the other thread builds one engine of its own";
+}
+
+/////////////////////////////////////////////////
+// An engine whose registrar loads after the first depth is asked for is
+// picked up when it comes.
+TEST(Sampler, EngineRegisteredLater)
+{
+  constexpr char kLate[] = "water_optics_test_late_wave";
+  waves::WavefieldData recipe;
+  recipe.algorithm = kLate;
+  recipe.params.gain = 0.5;
+  recipe.generation = 1;
+
+  EntityComponentManager ecm;
+  const Entity world = ecm.CreateEntity();
+  ecm.CreateComponent(world, components::World());
+  ecm.CreateComponent(world, components::WaterOptics(MustResolve(WaterOpticsSpec{})));
+  ecm.CreateComponent(world, components::Wavefield(recipe));
+
+  water_optics::WaterOpticsSampler sampler;
+  ASSERT_TRUE(sampler.Sync(ecm));
+  const auto t = std::chrono::seconds(1);
+  const math::Vector3d at(3.0, 0.0, -2.0);
+  EXPECT_DOUBLE_EQ(sampler.Depth(at, t), 2.0)
+      << "no engine yet: below the still water";
+
+  waves::RegisterWaveEngineFactory(kLate,
+      [] { return std::make_shared<SineWave>(); });
+  double depth = 2.0;
+  for (int i = 0; i < 30 && depth == 2.0; ++i)
+  {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    depth = sampler.Depth(at, t);
+  }
+  EXPECT_NEAR(depth, 0.5 * std::sin(1.5 - 1.0) + 2.0, 1e-12);
+}
+
+/////////////////////////////////////////////////
 // All four coefficients explicit: no type is used, and none is reported.
 TEST(Resolve, FullyExplicitUsesNoType)
 {
@@ -612,6 +758,16 @@ TEST(Resolve, FullyExplicitUsesNoType)
   EXPECT_EQ(out.jerlov, "");
   ExpectRgb(out.attenuation, Rgb(1.0, 0.5, 0.25));
   EXPECT_NE(warning.find("jerlov"), std::string::npos) << warning;
+
+  // So is a visibility, even one out of range
+  spec.jerlov.clear();
+  for (const double v : {8.0, 150.0, -1.0})
+  {
+    spec.visibility = v;
+    out = MustResolve(spec, &warning);
+    ExpectRgb(out.attenuation, Rgb(1.0, 0.5, 0.25));
+    EXPECT_NE(warning.find("visibility"), std::string::npos) << warning;
+  }
 }
 
 /////////////////////////////////////////////////
