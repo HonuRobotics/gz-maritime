@@ -225,8 +225,14 @@ off, set its intensity to 0: it then costs nothing.
   the water's surface is a flat level for each camera: the still level
   plus the wave over the camera, which the renderer asks the plugin's water
   optics sampler for in each pass, for any number of cameras and in the GUI
-  too (the sampler builds its own wave engine from the recipe). The wave
-  over each thing in view is not followed.
+  too (the sampler builds its own wave engine from the recipe), at the
+  instant of the frame being drawn. The wave over each thing in view is not
+  followed. That engine goes to the frame's exact time, while the reference
+  camera on the server reads the source's engine as last updated: on an FFT
+  sea at the default 30 Hz the two surfaces can be up to 7 cm apart, so a
+  camera within a few centimetres of the surface can be under water in one
+  and not in the other. With Gerstner waves, or `<update_rate>` 0, they
+  agree.
 - **Lamps**: lights named `lamp` only, up to four (the others are lit by
   Ogre, with a warning); lit by Ogre's default BRDF without clear coat, and
   with no shadows, in air too; their beams show only where something is
