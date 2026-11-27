@@ -218,6 +218,7 @@
 <li class="toctree-l4"><a class="reference internal" href="underwater-camera.html#add-an-underwater-camera">Add an underwater camera</a></li>
 <li class="toctree-l4"><a class="reference internal" href="underwater-camera.html#see-its-image">See its image</a></li>
 <li class="toctree-l4"><a class="reference internal" href="underwater-camera.html#the-gui-view-and-every-camera-at-once">The GUI view, and every camera at once</a></li>
+<li class="toctree-l4"><a class="reference internal" href="underwater-camera.html#lights-at-depth">Lights at depth</a></li>
 <li class="toctree-l4"><a class="reference internal" href="underwater-camera.html#what-comes-next">What comes next</a></li>
 </ul>
 </li>
@@ -519,8 +520,10 @@ clearer type, or a larger <code class="docutils literal notranslate"><span class
 <section id="the-underwater-image-gets-black-at-depth">
 <h2>The underwater image gets black at depth<a class="headerlink" href="#the-underwater-image-gets-black-at-depth" title="Link to this heading"></a></h2>
 <p>The daylight fades with depth, red first: in coastal water there is little
-left at 20 m. That is the water, not a bug. Vehicle lights come with a later
-step; meanwhile <code class="docutils literal notranslate"><span class="pre">&lt;exposure&gt;auto&lt;/exposure&gt;</span></code> brightens what light there is.</p>
+left at 20 m. That is the water, not a bug. Give the vehicle lamps (spot
+lights) and include the <code class="docutils literal notranslate"><span class="pre">underwater_optics</span></code> model
+(<a class="reference internal" href="underwater-camera.html#lights-at-depth"><span class="std std-ref">Lights at depth</span></a>), or use
+<code class="docutils literal notranslate"><span class="pre">&lt;exposure&gt;auto&lt;/exposure&gt;</span></code> to brighten what light there is.</p>
 </section>
 <section id="the-gui-and-the-underwater-camera-differ">
 <h2>The GUI and the underwater camera differ<a class="headerlink" href="#the-gui-and-the-underwater-camera-differ" title="Link to this heading"></a></h2>

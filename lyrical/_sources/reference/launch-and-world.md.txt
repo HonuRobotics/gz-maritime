@@ -279,6 +279,7 @@ What a world says to the water optics system,
 | `<veil>` | B∞, the veil just below the surface as a fraction of the daylight there, as `r g b`. Replaces b / c. |
 | `<diffuse_attenuation>` | K_d, how fast the daylight fades with depth, 1/m, as `r g b`. Replaces the type's K_d. |
 | `<water_level>` | World z of the still water, m, default 0. Under a wave field, depth is below the local wave surface. |
+| `<daylight>` | How strong the daylight is against the renderer's sun, default 1: it scales the veil. 0 at night, when only lamps light the water. |
 | `<publish_rate>` | Rate of the ground truth in wall time, 1 Hz by default, so it keeps coming while paused; a change is published at once. 0 publishes on a change only. |
 
 Any other element is warned about and ignored. An unknown type, a visibility
@@ -343,7 +344,11 @@ starts it off, and a `gz.msgs.Boolean` on
 above the water are untouched, and an underwater camera plugin in the same
 world applies only its own response while it is on. Only surfaces Ogre's PBS shades are drawn through the
 water: the sky, the background, the water surface, markers and terrain are
-drawn as in air.
+drawn as in air. A spot or point light with `lamp` in its own name (up to
+four, the first by name) is a lamp: its light fades both ways through the
+water and its beam is drawn, and it casts no shadow, in air too; other
+lights are lit by Ogre and, under water, fade with the daylight; set `<daylight>0` in
+the water optics for night.
 
 ## Thruster command
 
@@ -490,14 +495,14 @@ gz topic -e -t /world/default/ocean_current_info -n 1
 
 The water is set in the world file and changes while the simulation runs on
 the topic `/world/<world>/water_optics/set`: a `gz.msgs.Param` whose keys are
-the elements above. `jerlov` takes a string; `visibility` and `water_level`
-a number (or a string holding one); `attenuation`, `backscatter`, `veil` and
+the elements above. `jerlov` takes a string; `visibility`, `water_level` and
+`daylight` a number (or a string holding one); `attenuation`, `backscatter`, `veil` and
 `diffuse_attenuation` a string `"r g b"`. An empty string removes a
 visibility or an explicit value, going back to what the type gives. A
 message is applied whole or not at all. The resolved optics are published on
 `/world/<world>/water_optics_info` as `gz.msgs.Param`: `jerlov`,
-`visibility`, the four per-channel values as strings, `water_level` and
-`generation`.
+`visibility`, the four per-channel values as strings, `water_level`,
+`daylight` and `generation`.
 
 ```bash
 gz topic -t /world/default/water_optics/set -m gz.msgs.Param \

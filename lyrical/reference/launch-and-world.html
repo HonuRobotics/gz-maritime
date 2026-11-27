@@ -218,6 +218,7 @@
 <li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#add-an-underwater-camera">Add an underwater camera</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#see-its-image">See its image</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#the-gui-view-and-every-camera-at-once">The GUI view, and every camera at once</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#lights-at-depth">Lights at depth</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#what-comes-next">What comes next</a></li>
 </ul>
 </li>
@@ -898,7 +899,10 @@ integrates over its own extent with repeated queries.</p>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;water_level&gt;</span></code></p></td>
 <td><p>World z of the still water, m, default 0. Under a wave field, depth is below the local wave surface.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;publish_rate&gt;</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;daylight&gt;</span></code></p></td>
+<td><p>How strong the daylight is against the renderer’s sun, default 1: it scales the veil. 0 at night, when only lamps light the water.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;publish_rate&gt;</span></code></p></td>
 <td><p>Rate of the ground truth in wall time, 1 Hz by default, so it keeps coming while paused; a change is published at once. 0 publishes on a change only.</p></td>
 </tr>
 </tbody>
@@ -1057,7 +1061,11 @@ starts it off, and a <code class="docutils literal notranslate"><span class="pre
 above the water are untouched, and an underwater camera plugin in the same
 world applies only its own response while it is on. Only surfaces Ogre’s PBS shades are drawn through the
 water: the sky, the background, the water surface, markers and terrain are
-drawn as in air.</p>
+drawn as in air. A spot or point light with <code class="docutils literal notranslate"><span class="pre">lamp</span></code> in its own name (up to
+four, the first by name) is a lamp: its light fades both ways through the
+water and its beam is drawn, and it casts no shadow, in air too; other
+lights are lit by Ogre and, under water, fade with the daylight; set <code class="docutils literal notranslate"><span class="pre">&lt;daylight&gt;0</span></code> in
+the water optics for night.</p>
 </section>
 <section id="thruster-command">
 <h2>Thruster command<a class="headerlink" href="#thruster-command" title="Link to this heading"></a></h2>
@@ -1227,14 +1235,14 @@ gz<span class="w"> </span>topic<span class="w"> </span>-e<span class="w"> </span
 <h2>Water optics<a class="headerlink" href="#water-optics" title="Link to this heading"></a></h2>
 <p>The water is set in the world file and changes while the simulation runs on
 the topic <code class="docutils literal notranslate"><span class="pre">/world/&lt;world&gt;/water_optics/set</span></code>: a <code class="docutils literal notranslate"><span class="pre">gz.msgs.Param</span></code> whose keys are
-the elements above. <code class="docutils literal notranslate"><span class="pre">jerlov</span></code> takes a string; <code class="docutils literal notranslate"><span class="pre">visibility</span></code> and <code class="docutils literal notranslate"><span class="pre">water_level</span></code>
-a number (or a string holding one); <code class="docutils literal notranslate"><span class="pre">attenuation</span></code>, <code class="docutils literal notranslate"><span class="pre">backscatter</span></code>, <code class="docutils literal notranslate"><span class="pre">veil</span></code> and
+the elements above. <code class="docutils literal notranslate"><span class="pre">jerlov</span></code> takes a string; <code class="docutils literal notranslate"><span class="pre">visibility</span></code>, <code class="docutils literal notranslate"><span class="pre">water_level</span></code> and
+<code class="docutils literal notranslate"><span class="pre">daylight</span></code> a number (or a string holding one); <code class="docutils literal notranslate"><span class="pre">attenuation</span></code>, <code class="docutils literal notranslate"><span class="pre">backscatter</span></code>, <code class="docutils literal notranslate"><span class="pre">veil</span></code> and
 <code class="docutils literal notranslate"><span class="pre">diffuse_attenuation</span></code> a string <code class="docutils literal notranslate"><span class="pre">&quot;r</span> <span class="pre">g</span> <span class="pre">b&quot;</span></code>. An empty string removes a
 visibility or an explicit value, going back to what the type gives. A
 message is applied whole or not at all. The resolved optics are published on
 <code class="docutils literal notranslate"><span class="pre">/world/&lt;world&gt;/water_optics_info</span></code> as <code class="docutils literal notranslate"><span class="pre">gz.msgs.Param</span></code>: <code class="docutils literal notranslate"><span class="pre">jerlov</span></code>,
-<code class="docutils literal notranslate"><span class="pre">visibility</span></code>, the four per-channel values as strings, <code class="docutils literal notranslate"><span class="pre">water_level</span></code> and
-<code class="docutils literal notranslate"><span class="pre">generation</span></code>.</p>
+<code class="docutils literal notranslate"><span class="pre">visibility</span></code>, the four per-channel values as strings, <code class="docutils literal notranslate"><span class="pre">water_level</span></code>,
+<code class="docutils literal notranslate"><span class="pre">daylight</span></code> and <code class="docutils literal notranslate"><span class="pre">generation</span></code>.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gz<span class="w"> </span>topic<span class="w"> </span>-t<span class="w"> </span>/world/default/water_optics/set<span class="w"> </span>-m<span class="w"> </span>gz.msgs.Param<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-p<span class="w"> </span><span class="s1">'params {key: "jerlov" value {type: STRING string_value: "7C"}}'</span>
 gz<span class="w"> </span>topic<span class="w"> </span>-e<span class="w"> </span>-t<span class="w"> </span>/world/default/water_optics_info<span class="w"> </span>-n<span class="w"> </span><span class="m">1</span>

@@ -218,6 +218,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#add-an-underwater-camera">Add an underwater camera</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#see-its-image">See its image</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#the-gui-view-and-every-camera-at-once">The GUI view, and every camera at once</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#lights-at-depth">Lights at depth</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#what-comes-next">What comes next</a></li>
 </ul>
 </li>
@@ -492,9 +493,32 @@ underwater camera plugin in the same world passes its image through, so the
 water is not applied twice. The sky and the water surface are not drawn
 through the water yet: point the GUI at a seabed or a structure.</p>
 </section>
+<section id="lights-at-depth">
+<h2>Lights at depth<a class="headerlink" href="#lights-at-depth" title="Link to this heading"></a></h2>
+<p>At night, or deep, there is no daylight: set the world’s water to
+<code class="docutils literal notranslate"><span class="pre">&lt;daylight&gt;0&lt;/daylight&gt;</span></code> and give the vehicle spot lights. With the
+<code class="docutils literal notranslate"><span class="pre">underwater_optics</span></code> model in the world, a spot or point light with <code class="docutils literal notranslate"><span class="pre">lamp</span></code> in
+its name is a lamp, up to four: its light fades through the water both ways,
+and the water scatters its beam back to the camera. Other lights, a harbour
+light on a pier for one, are lit as in air:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;light</span><span class="w"> </span><span class="na">type=</span><span class="s">"spot"</span><span class="w"> </span><span class="na">name=</span><span class="s">"lamp_port"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;pose&gt;</span>0.3<span class="w"> </span>0.2<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="w"> </span>0<span class="nt">&lt;/pose&gt;</span>
+<span class="w">  </span><span class="nt">&lt;direction&gt;</span>1<span class="w"> </span>0.1<span class="w"> </span>-0.1<span class="nt">&lt;/direction&gt;</span>
+<span class="w">  </span><span class="nt">&lt;intensity&gt;</span>40<span class="nt">&lt;/intensity&gt;</span>
+<span class="w">  </span><span class="nt">&lt;attenuation&gt;&lt;range&gt;</span>40<span class="nt">&lt;/range&gt;&lt;quadratic&gt;</span>0.02<span class="nt">&lt;/quadratic&gt;&lt;/attenuation&gt;</span>
+<span class="w">  </span><span class="nt">&lt;spot&gt;&lt;inner_angle&gt;</span>0.5<span class="nt">&lt;/inner_angle&gt;&lt;outer_angle&gt;</span>1.0<span class="nt">&lt;/outer_angle&gt;&lt;falloff&gt;</span>1<span class="nt">&lt;/falloff&gt;&lt;/spot&gt;</span>
+<span class="w">  </span><span class="nt">&lt;cast_shadows&gt;</span>false<span class="nt">&lt;/cast_shadows&gt;</span>
+<span class="nt">&lt;/light&gt;</span>
+</pre></div>
+</div>
+<p>Turn a lamp off or move it while running with the world’s <code class="docutils literal notranslate"><span class="pre">light_config</span></code>
+service, like any light. Lamps cast no shadows here, and their beams show
+where something is drawn behind them (a seabed, a structure).</p>
+</section>
 <section id="what-comes-next">
 <h2>What comes next<a class="headerlink" href="#what-comes-next" title="Link to this heading"></a></h2>
-<p>The vehicle’s own lights. The plan is in
+<p>Forward scatter, marine snow, caustics, the surface from below and the
+camera’s port. The plan is in
 <a class="reference external" href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/UNDERWATER_CAMERA_PLAN.md">UNDERWATER_CAMERA_PLAN.md</a>.</p>
 </section>
 </section>
