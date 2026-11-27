@@ -14,6 +14,10 @@ It provides:
 - **`WaveParameters`** and the **`Wavefield` ECM component** (+ serialization) —
   the shared recipe and the world-entity channel that carries it (and the live
   engine) to every consumer.
+- **The `WaveCoupling` tag** — a world-entity component with no data, set by
+  the wave buoyancy where the physics follows the waves and read by whatever
+  damps against the water (`gz_hydrodynamics`); here so a reader depends on
+  the core alone.
 - **`Eval`** — the null-safe free-function query API consumers use; the engine
   interface stays opaque behind it.
 - **`WavesSystemBase`** — the base class each per-engine *source* system plugin

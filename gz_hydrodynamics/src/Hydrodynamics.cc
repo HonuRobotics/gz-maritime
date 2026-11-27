@@ -15,6 +15,7 @@
  *
  */
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <optional>
 #include <sstream>
@@ -40,6 +41,10 @@
 #include "gz/transport/Node.hh"
 
 #include "gz/sim/ocean_current/OceanCurrentSampler.hh"
+#include "gz/sim/components/OceanCurrentfield.hh"
+#include "gz/sim/components/WaveCoupling.hh"
+#include "gz/sim/components/Wavefield.hh"
+#include "gz/sim/waves/Eval.hh"
 
 #include "Hydrodynamics.hh"
 #include "HydrodynamicsUtils.hh"
@@ -648,6 +653,28 @@ void Hydrodynamics::PreUpdate(
   {
     std::lock_guard lock(this->dataPtr->mtx);
     currentVector = this->dataPtr->currentVector;
+  }
+
+  // In a world whose physics follows the waves, tagged by the wave
+  // buoyancy, the water also moves with them: their orbital velocity at the
+  // centre of pressure, fading with depth below the still water of the
+  // world's current recipe, so a vehicle near the surface is carried by the
+  // waves and one deep down hardly feels them. Where the waves are only
+  // drawn, the vehicle floats on flat water and nothing is added.
+  if (kNullEntity == this->dataPtr->world)
+    this->dataPtr->world = worldEntity(_ecm);
+  const Entity world = this->dataPtr->world;
+  const auto *field = _ecm.Component<components::Wavefield>(world);
+  if (field && field->Data().simulation &&
+      _ecm.EntityHasComponentType(world, components::WaveCoupling::typeId))
+  {
+    double waterLevel{0.0};
+    const auto *recipe = _ecm.Component<components::OceanCurrentfield>(world);
+    if (recipe)
+      waterLevel = recipe->Data().params.water_level;
+    currentVector += waves::WaterVelocity(field->Data(), waterLevel,
+        waterPosition.X(), waterPosition.Y(), waterPosition.Z(),
+        std::chrono::duration<double>(_info.simTime).count());
   }
 
   // The velocity of the centre of pressure: the origin's plus what the
