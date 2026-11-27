@@ -75,10 +75,12 @@ def test_world_keeps_the_contract(world):
     plugins = {p.get('filename') for p in w.findall('plugin')}
     assert set(REQUIRED_SYSTEMS) <= plugins, set(REQUIRED_SYSTEMS) - plugins
     assert any(f.startswith('gz-sim-waves-') for f in plugins), 'no wave source'
-    # The water's optics: a Jerlov type the system knows
+    # The water's optics: a Jerlov type the system knows. A copy of the
+    # names in gz_water_optics' table (src/Jerlov.cc), matched without case
+    # as the system does.
     optics = next(p for p in w.findall('plugin')
                   if p.get('filename') == 'gz-maritime-water-optics-system')
-    assert optics.findtext('jerlov') in (
+    assert (optics.findtext('jerlov') or '').upper() in (
         'I', 'IA', 'IB', 'II', 'III', '1C', '3C', '5C', '7C', '9C')
     buoyancy = next(p for p in w.findall('plugin')
                     if p.get('filename') == 'gz-maritime-buoyancy-system')

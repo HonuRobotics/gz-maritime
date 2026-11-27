@@ -87,7 +87,9 @@ for a murky lake, `I` for a pool. Pick the one closest to yours, or give a
 It applies everywhere below the water level (z = 0 by default), indoors
 too. Without it, the world has clear water. Cameras see through it only
 with the underwater camera plugin, or with `model://underwater_optics` in
-the world, which draws it in every rendered camera and the GUI.
+the world, which draws it in the GUI and in colour cameras (RGBD
+included). Depth, segmentation, thermal and lidar sensors stay as they
+are, by design, and orthographic cameras are drawn as in air.
 
 ## The world name
 
