@@ -15,7 +15,7 @@
 
 #include "gz/sim/systems/WavesSystemBase.hh"
 #include "gz/sim/waves/FFTWaveSimulation.hh"  // MakeFFTWaveField
-#include "gz/sim/waves/WaveSimulation.hh"  // RegisterWaveEngineFactory
+#include "gz/sim/waves/WaveSimulation.hh"  // WaveEngineFactory
 #include "gz/sim/waves/Wavefield.hh"          // WaveParameters
 
 namespace gz::sim::systems
@@ -95,28 +95,12 @@ class FftWaves : public WavesSystemBase
   protected: std::string EngineToken() const override { return "fft"; }
 
   // Documentation inherited
-  protected: std::shared_ptr<waves::IWaveField> MakeEngine(
-    const waves::WaveParameters &_params) const override
+  protected: waves::WaveEngineFactory EngineFactory() const override
   {
-    auto engine = waves::MakeFFTWaveField();
-    engine->SetParameters(_params);
-    return engine;
+    return &waves::MakeFFTWaveField;
   }
 };
 }  // namespace gz::sim::systems
-
-namespace
-{
-/// \brief Register the "fft" engine factory on the server too, so a
-/// consumer on another thread, such as a renderer, can build an engine of
-/// its own from the recipe instead of reading this system's.
-const bool kRegistered = []
-{
-  gz::sim::waves::RegisterWaveEngineFactory(
-    "fft", &gz::sim::waves::MakeFFTWaveField);
-  return true;
-}();
-}  // namespace
 
 GZ_ADD_PLUGIN(gz::sim::systems::FftWaves,
               gz::sim::System,

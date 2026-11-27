@@ -3,7 +3,10 @@
   With the GPU path: the shader lights with the lamp, hidden from Ogre.
   A camera above the water, 2 m up, and a spot light named "lamp" beside
   it, lighting two plates 3 m ahead: a metal one (left) and a glossy
-  painted one (right). No daylight, no ambient: only the lamp lights.
+  painted one (right), and a point lamp above and behind them. Each
+  lamp's specular is tinted unlike its diffuse, and the spot's falloff is
+  not 1, so the shader must take each as Ogre does. No daylight, no
+  ambient: only the lamps light.
 -->
 <sdf version="1.9">
   <world name="uwair">
@@ -27,10 +30,18 @@
       <pose>0 0.25 2.1 0 0 0</pose>
       <direction>1 0 0</direction>
       <diffuse>1 1 1 1</diffuse>
-      <specular>1 1 1 1</specular>
+      <specular>1 0.6 0.3 1</specular>
       <intensity>1</intensity>
       <attenuation><range>20</range><linear>0</linear><quadratic>0.05</quadratic></attenuation>
-      <spot><inner_angle>1.0</inner_angle><outer_angle>1.6</outer_angle><falloff>1</falloff></spot>
+      <spot><inner_angle>1.0</inner_angle><outer_angle>1.6</outer_angle><falloff>2</falloff></spot>
+      <cast_shadows>false</cast_shadows>
+    </light>
+    <light type="point" name="lamp_point">
+      <pose>1.5 0 3.2 0 0 0</pose>
+      <diffuse>0.6 0.8 1 1</diffuse>
+      <specular>0.3 1 0.5 1</specular>
+      <intensity>0.5</intensity>
+      <attenuation><range>10</range><linear>0.1</linear><quadratic>0.1</quadratic></attenuation>
       <cast_shadows>false</cast_shadows>
     </light>
     <model name="metal">

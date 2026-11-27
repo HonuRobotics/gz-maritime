@@ -214,7 +214,8 @@ def test_a_lost_chart_is_refused(tmp_path):
     real_png, chart = save_chart(tmp_path, 'real', real, boxes)
     sim_png, _ = save_chart(tmp_path, 'sim', chart_image('3C')[0], boxes)
     out = run_tool('--real', real_png, '--sim', sim_png, '--patches', chart)
-    assert out.returncode == 1
+    # Not 1, a comparison that failed: the images cannot be compared
+    assert out.returncode == 3
     assert 'lost in the water' in out.stderr
 
 

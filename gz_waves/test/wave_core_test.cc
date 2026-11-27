@@ -159,13 +159,11 @@ class StubWavesSystem : public gz::sim::systems::WavesSystemBase
 {
   /// \brief The engine token recorded in the component.
   protected: std::string EngineToken() const override { return "stub"; }
-  /// \brief Build and configure a StubWaveField from `_p`.
-  protected: std::shared_ptr<gsw::IWaveField> MakeEngine(
-    const gsw::WaveParameters &_p) const override
+  /// \brief A bare StubWaveField.
+  protected: gsw::WaveEngineFactory EngineFactory() const override
   {
-    auto engine = std::make_shared<StubWaveField>();
-    engine->SetParameters(_p);
-    return engine;
+    return [] { return std::static_pointer_cast<gsw::IWaveField>(
+                  std::make_shared<StubWaveField>()); };
   }
 };
 
@@ -859,8 +857,10 @@ TEST_F(WavesSystemTest, ConfigureAbortsWhenEngineCreationFails)
   class NullEngineSystem : public gz::sim::systems::WavesSystemBase
   {
     protected: std::string EngineToken() const override { return "null"; }
-    protected: std::shared_ptr<gsw::IWaveField> MakeEngine(
-      const gsw::WaveParameters &) const override { return nullptr; }
+    protected: gsw::WaveEngineFactory EngineFactory() const override
+    {
+      return [] { return std::shared_ptr<gsw::IWaveField>(nullptr); };
+    }
   };
   NullEngineSystem sys;
   sys.Configure(this->world,

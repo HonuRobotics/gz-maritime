@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2026 Open Source Robotics Foundation
+ * Copyright (C) 2026 Honu Robotics
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -123,7 +123,7 @@ std::vector<int> Plate(const Frame &_f, bool _left)
 }
 }  // namespace
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 TEST(LampInAir, LightsAsOgreDoesSpecularIncluded)
 {
   const Frame ogre = Capture("lamp_air_off.sdf");
