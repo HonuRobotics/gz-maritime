@@ -111,6 +111,31 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  # The drawn surface against the wave field, through a depth camera; it is
+  # skipped when the camera gives no image. The visual plugin, its bridge
+  # and the water model come from this tree, so the test runs before
+  # install, and it brings its own wave field: no engine is needed. Its main
+  # sets a GZ_PARTITION of its own, one per process.
+  ament_add_gtest(drawn_surface_test test/drawn_surface_test.cc TIMEOUT 300
+    SKIP_LINKING_MAIN_LIBRARIES)
+  if(TARGET drawn_surface_test)
+    target_compile_definitions(drawn_surface_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_include_directories(drawn_surface_test PRIVATE
+      ${gz_waves_INCLUDE_DIRS})
+    target_link_libraries(drawn_surface_test gz_waves::gz_waves gz-sim::core)
+    set(_drawn_surface_env
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH}"
+      "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH}"
+      "GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH}")
+    set_tests_properties(drawn_surface_test PROPERTIES
+      ENVIRONMENT "${_drawn_surface_env}")
+  endif()
+endif()
+
 # GZ_SIM_RESOURCE_PATH (water_surface model) + GZ_SIM_SYSTEM_PLUGIN_PATH hooks.
 ament_environment_hooks("hooks/hook.dsv.in")
 ament_environment_hooks("hooks/hook.sh.in")

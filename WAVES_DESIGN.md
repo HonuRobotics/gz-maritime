@@ -162,6 +162,7 @@ engine-agnostic (N1, N3).
 | `double Jacobian(double _x, double _y, double _t) const` | Horizontal-displacement Jacobian; low values ⇒ folding/whitecaps. |
 | `void SetParameters(const WaveParameters &_params)` | (Re)build all internal state from the recipe. |
 | `void Update(double _simTime)` | Advance time-dependent state (no-op default for stateless engines). |
+| `void Prepare(double _nextSimTime)` | A hint that the next `Update` is for this time, from a caller that knows its schedule; an engine whose update is costly may compute it ahead, off the caller's thread. Changes no result, hinted right or wrong; no-op default. |
 | `std::string_view Kind() const` | Engine token, e.g. `"gerstner"`, `"fft"`. |
 | `std::optional<TileSize> Bounds() const` | Periodic extent (grid engines); `nullopt` for unbounded analytic ones. |
 | `const WaveField2D *Field() const` | The renderable grid (see below); `nullptr` if the engine has none. |
@@ -182,7 +183,8 @@ struct WaveField2D {
 
 Arrays are **column-major N×N**, periodic over `tile`, owned by the engine, and
 valid until the next `SetParameters`; `Update` refreshes their contents in place.
-`TileSize` is `{double x, double y}` (a centred, periodic tile).
+`TileSize` is `{double x, double y}` (a periodic tile that starts at the world
+origin: element (i, j) is the water at (i·tile/N, j·tile/N)).
 
 ### 3.2 Engine registry — token → factory
 
@@ -243,6 +245,12 @@ touching `IWaveField`, so the engine type stays opaque (N3):
 - `Advance(WavefieldData&, double _t)` — drives `Update` if an engine is present.
 - `SurfaceElevation`, `ParticleVelocity`, `Normal`, `Jacobian`,
   `FoamMask(..., _threshold = 0.6)` — each takes `(const WavefieldData&, _x, _y, _t)`.
+- `SurfaceHeight(const WavefieldData&, _x, _y, _t)` — the height of the
+  surface *as drawn* over a world point: `SurfaceElevation` at the point whose
+  horizontal displacement (the render grid's `dx`/`dy`, `IWaveField::Field`)
+  carries it onto (x, y), found by a fixed-point iteration. Equals
+  `SurfaceElevation` for an engine with no grid or no chop. Physics that must
+  sit on the visible surface (buoyancy) uses this one.
 
 When `simulation` is null they return **still-water** defaults (elevation 0,
 velocity 0, normal +Z, Jacobian 1, foam 0), so a consumer that runs before the
@@ -278,9 +286,12 @@ builds the engine, writes the `Wavefield` component (with `generation = 1`), and
 advertises **`/world/<name>/wave/set_parameters`** (a `gz.msgs.Param` →
 `gz.msgs.Boolean` service). `PreUpdate` drains queued parameter updates
 (bumping `generation`), re-points the engine if an ECM deserialize cleared it,
-and throttles `Update()` to `updateRate`. The service applies on the ECM thread
-(updates are queued from the transport thread), so runtime reconfiguration (R5)
-is race-free.
+and throttles `Update()` to `updateRate`. After each update it hints the
+engine with the time of the next one (`Prepare`), found with the throttle's own
+arithmetic so the hint is exactly the time that update carries;
+`wave_core_test` checks the two agree at several rates and step sizes. The
+service applies on the ECM thread (updates are queued from the transport
+thread), so runtime reconfiguration (R5) is race-free.
 
 **One parameter table, four uses.** A single `GZ_WAVES_PARAM_TABLE` (in
 `Wavefield.hh`) lists every `WaveParameters` field once and drives all four
@@ -353,12 +364,24 @@ It rebuilds the private engine when `data.generation` changes, and each render
 frame pulls the grid via `Field()` and uploads it. The column-major
 `WaveField2D` grids flow to the Ogre bridge unchanged; the bridge's texel pack
 maps them so texture (u, v) = grid (x_u, y_v), preserving the physics
-orientation end to end.
+orientation end to end. The shaders sample that texture at
+`worldXY / tileSize` plus half a texel, where the texel of a grid point has
+its centre, so the surface drawn over a world point is the one the field
+reports there (`SurfaceHeight`), not one half a cell beside it. The sea is
+drawn at the time of the scene being rendered (`Scene::Time`, which
+`RenderUtil` sets from the state it applies), not at the latest time the
+simulation thread has reached, so a camera frame shows the sea of its own
+stamp. `drawn_surface_test` holds the drawn surface to the field: a depth
+camera looks down on a choppy sea and what it sees, frame after frame, is
+compared with the field at each frame's time. It has to render, in software
+if there is no GPU, and is skipped when the camera gives no image.
 
 ### 5.2 Engine-agnostic, via per-engine GUI registrars
 
 `gz_waves_rendering` depends on **`gz_waves` only** — no engine `find_package`,
-no engine link, no engine `<depend>` (N1). The factory registration that lets
+no engine link, no engine `<depend>` (N1). Its test brings a small wave
+field of its own, registered in the test, so the package needs no engine to
+be tested either. The factory registration that lets
 `WaterVisual` rebuild an engine in the GUI lives in **per-engine GUI plugins**
 shipped by the provider packages. The `water_surface` model loads them in the
 **same `<visual>`** as `WaterVisual`:
@@ -422,6 +445,18 @@ as little of the generation as it likes.
   output is calibrated so the RMS matches the Pierson–Moskowitz `Hs`. Periodic
   over `tileSize`; `Elevation` bilinearly samples the grid; `Field()` exposes
   height + x/y displacement + a folding (foam) metric.
+- **Grid layout.** Ehukai pads each of its grids with a wrapped border, N + 1
+  cells per row, and runs x along a row. `TileView` reads the N×N tile with
+  Ehukai's own row length and transposes it, so cell (i, j) of our grids is
+  the water at (i·L/N, j·L/N) and the waves run along +x, Ehukai's wind.
+  Every copy out of Ehukai goes through it.
+- **Prepared ahead.** `Prepare` propagates the hinted time on a worker
+  thread, in a TBB arena of at most four threads so the physics thread's core
+  is left alone, into a working set of its own. `Update` takes that result
+  only for exactly that time, waiting if it is not done, and computes as ever
+  for any other, so the field is bit for bit the synchronous one. The worker
+  starts on the first hint; `SetParameters` rebuilds the state and joins it.
+  The copy of the engine in the GUI is never hinted.
 - **Particle velocity** is computed by **time finite-difference**: Ehukai
   exposes no analytic velocity field, so a scratch state is propagated a small
   `dt` ahead and the displacement grids differenced (∂Dx/∂t, ∂Dy/∂t, ∂η/∂t).
@@ -440,8 +475,12 @@ as little of the generation as it likes.
   but not yet applied (Ehukai assumes wind along +X).
 - *Tests:* `fft_test.cc` covers finiteness/bounds, ramp-up, foam from the
   Jacobian, band-pass reshaping, spectrum selection, time evolution, `Field()`
-  views, determinism vs. seed, periodicity, unit normals, particle velocity, and
-  sea-state Hs.
+  views, determinism vs. seed, periodicity, unit normals, particle velocity,
+  sea-state Hs, the grid layout (the tile is not sheared, the waves travel
+  downwind, and the chop, the folding and the water's velocity sit where the
+  height puts them), and that a prepared update is the synchronous one,
+  whether the hint was right, wrong, repeated, replaced or overtaken by a
+  reconfigure.
 
 ### 6.2 GUI registrar pattern (per engine)
 
@@ -574,9 +613,11 @@ Subclass `IWaveField` (`#include "gz/sim/waves/WaveSimulation.hh"`) and implemen
 (return your token), and — to be renderable — `Update` + `Field()`. To render,
 `SetParameters` should allocate column-major N×N buffers and bind them into a
 `WaveField2D field_`; `Update` fills them for the given time; `Field()` returns
-`&field_`. Read whatever subset of `WaveParameters` you need (apply
-`WithSeaState`/`StartupRamp` for consistent sea-state and ramp behavior). Export
-the factory:
+`&field_`. `Prepare` is optional: the source system hints the time of the
+next `Update` through it, and an engine that wants to compute that update ahead
+may; leave the no-op default otherwise. Read whatever subset of
+`WaveParameters` you need (apply `WithSeaState`/`StartupRamp` for consistent
+sea-state and ramp behavior). Export the factory:
 
 ```cpp
 std::shared_ptr<IWaveField> Make<Name>WaveField();   // default-constructed engine
@@ -706,6 +747,8 @@ ros2 launch kai_bringup simulation.launch.xml
 ./build/gz_waves/wave_core_test
 ./build/gz_waves_provider_gerstner/gerstner_test
 ./build/gz_waves_provider_fft/fft_test
+# the drawn sea against the wave field, through a depth camera (needs a GPU):
+colcon test --packages-select gz_waves_rendering
 ```
 
 ---
@@ -713,7 +756,7 @@ ros2 launch kai_bringup simulation.launch.xml
 ## 11. Status notes
 
 - `<direction>` is parsed by the FFT system but not yet applied (Ehukai
-  assumes wind along +X).
+  assumes wind along +X), so the FFT sea travels towards +x in every world.
 - The FFT engine hands sim time to Ehukai in single precision (float
   API), so on multi-hour runs the float grid coarsens and gradually degrades
   the wave animation and the particle-velocity finite difference.
@@ -721,5 +764,9 @@ ros2 launch kai_bringup simulation.launch.xml
   the engine's folding (Jacobian) metric; the analytic Gerstner engine's
   Jacobian barely leaves 1.0, so it carries no usable folding signal and the
   shader's foam pass is skipped for it.
-- The wave-coupled `test_buoy` demo vessel and the `WaveBuoyancy` consumer ship
-  with `gz_waves_buoyancy`, which also adds the buoy to `open_water.sdf`.
+- `gz_waves_buoyancy` ships the `WaveBuoyancy` consumer: hydrostatic
+  buoyancy under a plane fitted through the drawn surface around each marked
+  shape (`Eval`'s `SurfaceHeight`, which undoes the horizontal displacement
+  of the engine's render grid), opt-in per world instead of the flat
+  buoyancy. It reads the field at the source system's `<update_rate>` and
+  never advances it. No `kai_gazebo` world runs it yet.

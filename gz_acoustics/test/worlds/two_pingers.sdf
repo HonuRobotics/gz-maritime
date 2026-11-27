@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<!--
+  Two pingers on one frequency and one period, 40 m apart, pinging in turn
+  (offsets 0 and 0.5 s), and a receiver half way between them, so their
+  pings reach it at the same delay. Moving b's offset to 0 makes them ping
+  together, and every reading is spoilt. A third pinger takes a's name and
+  is refused: it would share a's set topic.
+-->
+<sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
+  <world name="two_pingers">
+    <physics name="fast" type="dart">
+      <max_step_size>0.004</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-maritime-acoustics-system"
+            name="gz::sim::maritime::Acoustics">
+      <seed>3</seed>
+    </plugin>
+    <model name="a">
+      <static>true</static>
+      <pose>0 0 -2 0 0 0</pose>
+      <link name="link"/>
+      <plugin filename="gz-maritime-acoustic-pinger-system"
+              name="gz::sim::maritime::AcousticPinger">
+        <name>pinger_a</name>
+        <frequency>30000</frequency>
+        <period>1</period>
+        <offset>0</offset>
+      </plugin>
+    </model>
+    <model name="b">
+      <static>true</static>
+      <pose>0 40 -2 0 0 0</pose>
+      <link name="link"/>
+      <plugin filename="gz-maritime-acoustic-pinger-system"
+              name="gz::sim::maritime::AcousticPinger">
+        <name>pinger_b</name>
+        <frequency>30000</frequency>
+        <period>1</period>
+        <offset>0.5</offset>
+      </plugin>
+    </model>
+    <model name="c">
+      <static>true</static>
+      <pose>0 20 -30 0 0 0</pose>
+      <link name="link"/>
+      <plugin filename="gz-maritime-acoustic-pinger-system"
+              name="gz::sim::maritime::AcousticPinger">
+        <name>pinger_a</name>
+        <frequency>30000</frequency>
+        <period>0.1</period>
+      </plugin>
+    </model>
+    <model name="middle">
+      <static>true</static>
+      <pose>0 20 -2 0 0 0</pose>
+      <link name="link">
+        <sensor name="receiver" type="custom" gz:type="acoustic_receiver">
+          <topic>/middle</topic>
+          <gz:acoustic_receiver>
+            <emit_time>true</emit_time>
+          </gz:acoustic_receiver>
+        </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>

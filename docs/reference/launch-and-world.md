@@ -156,7 +156,7 @@ World name: `default`.
 | `gz-maritime-buoyancy-system` | Seawater 1025 kg/m³ below z = 0, air 1 kg/m³ above; `<enable_by_default>false</enable_by_default>`, no `<enable>` list |
 | `gz-maritime-wind-system` | Still air by default (`<speed>0</speed>`) at a 10 m reference height, falling off towards the water with a 0.0002 m roughness length, changed at run time on the wind topic; pushes only marked collisions, with air at 1.225 kg/m³ and a drag coefficient of 1 unless a shape sets its own |
 | `gz-maritime-ocean-current-system` | Slack water by default (`<speed>0</speed>`); a uniform, horizontal current set in the world file and changed at run time on the ocean current topic, kept on the world as a recipe any system can ask at a point and published as ground truth. A vehicle feels it through `gz-maritime-hydrodynamics-system`, or through collisions it marks, with seawater at 1025 kg/m³ and a drag coefficient of 1 unless a shape sets its own; gz-sim's own Hydrodynamics does not see it |
-| `gz-sim-waves-fft-system` | Sea state 1, updated at 30 Hz (Gerstner alternative in the file, commented out) |
+| `gz-sim-waves-fft-system` | Sea state 1, updated at 30 Hz; the waves travel towards +x (Gerstner alternative in the file, commented out) |
 | `model://water_surface` | Draws the sea |
 | `model://landing_pad` at (8, -8) | A static 4 m deck 1 m above the water, the only solid ground; spawn a quad on it at z = 1.25 |
 | `<spherical_coordinates>` | 36.693509° N, 121.936568° W, elevation 0, ENU |
