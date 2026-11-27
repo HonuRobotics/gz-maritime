@@ -550,7 +550,16 @@ What it settled:
   water and segmentation labels byte for byte unchanged; the reference
   camera passes through when the GPU path is on (an `UnderwaterRendering`
   marker component on the world).
-- **The GUI uses it**: checked with screenshots on a virtual display.
+- **The GUI uses it**: checked with screenshots on a virtual display. It
+  can load after the GUI's first state, which then lacks the water optics
+  component, never sent again unchanged; the plugin asks for the world's
+  state once and reads it until the component comes (on a virtual display,
+  8 starts of 8 draw the water; 2 of 8 without).
+- **Removed, added again, the next world**: a plugin going cannot reach the
+  render thread, so the bridge turns the water off itself at the next frame;
+  a new instance takes over the world's mark; and an install in a new Ogre
+  (the next world in the same process) forgets what was left in the old one.
+  Each has a test.
 - **Not done, against the plan**: the sky, the background, the water surface
   and unlit materials are drawn as in air (only PBS is shaded). The
   background needs a compositor listener; the surface is §4.5. Depth is from
@@ -562,8 +571,9 @@ What it settled:
 In the GPU path (`gz_underwater_rendering`), as the spike said it must be.
 
 - **Lamps** are the world's spot and point lights (up to four). The shader
-  lights with them itself, by their diffuse term with Ogre's own spot cone
-  and attenuation, faded `exp(−β^D d)` from lamp to fragment, then the
+  lights with them itself, by Ogre's own default BRDF (diffuse and
+  specular, metal included; no clear coat) with Ogre's spot cone and
+  attenuation, so a lamp above the water lights as Ogre would, faded `exp(−β^D d)` from lamp to fragment, then the
   water to the camera as for any light. To count them once, they are hidden
   from Ogre's lighting while the water is drawn. (Switching Forward+ off by
   property was tried first: Ogre still writes Forward+'s data into the pass
@@ -594,8 +604,10 @@ In the GPU path (`gz_underwater_rendering`), as the spike said it must be.
   whole ray for every lamp: 25.8 ms a frame to 14.8 ms with two lamps off,
   25.9 to 18.2 with two on; on an RTX 4090 Laptop the whole effect is about
   1 ms.
-- **Limits**: diffuse only, no shadows; four lamps; the beam shows where
-  something is drawn behind it; the reference camera has no lamps.
+- **Limits**: no shadows, in air too while the renderer draws; four lamps;
+  the beam shows where something is drawn behind it; the reference camera
+  has no lamps. Once the renderer's model is removed, the lamps are Ogre's
+  again.
 
 ## Open questions
 
