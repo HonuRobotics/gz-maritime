@@ -26,6 +26,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <gz/common/Console.hh>
 #include <gz/msgs/boolean.pb.h>
@@ -186,6 +187,11 @@ class UnderwaterRendering
                                     std::clamp(this->waveHeight / 0.5, 0.0, 1.0));
     v.snow = static_cast<float>(o.marineSnow);
     v.time = t;
+    // The surface over each camera, asked by the renderer for each pass:
+    // depth is below the wave there, as the reference camera measures it,
+    // in the GUI too (the sampler's own engine)
+    v.surface = &UnderwaterRendering::Surface;
+    v.surfaceContext = this;
     v.quality = this->quality;
     this->water = v;
   }
@@ -298,7 +304,15 @@ class UnderwaterRendering
     const std::lock_guard<std::mutex> lock(this->mutex);
     if (cameras > 0)
       this->cameraCentre = centre / cameras;
-    this->set(this->water && this->enabled ? &*this->water : nullptr);
+    // The water at the instant of the frame being drawn: the scene's own
+    // time, not the step PreUpdate last saw, which can be the next one
+    std::optional<UwWater> frame = this->water;
+    if (frame)
+    {
+      if (auto scene = rendering::sceneFromFirstRenderEngine())
+        frame->time = std::chrono::duration<double>(scene->Time()).count();
+    }
+    this->set(frame && this->enabled ? &*frame : nullptr);
     if (!this->announced || *this->announced != this->water.has_value())
     {
       gzmsg << "UnderwaterRendering: "
@@ -307,6 +321,17 @@ class UnderwaterRendering
             << "\n";
       this->announced = this->water.has_value();
     }
+  }
+
+  /// \brief The surface's height at a place and time, for the bridge.
+  private: static double Surface(void *_self, double _x, double _y,
+                                 double _time)
+  {
+    auto *self = static_cast<UnderwaterRendering *>(_self);
+    // The depth of a point at z = 0 is the surface's height there
+    return self->sampler.Depth(math::Vector3d(_x, _y, 0.0),
+        std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+            std::chrono::duration<double>(_time)));
   }
 
   /// \brief Going, e.g. with its model: the bridge draws nothing more. It

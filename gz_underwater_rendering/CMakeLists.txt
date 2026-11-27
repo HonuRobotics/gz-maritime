@@ -205,10 +205,24 @@ if(BUILD_TESTING)
       "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
     target_link_libraries(effects_test
       gz_underwater_camera::gz_underwater_camera
+      gz_water_optics::gz_water_optics
       gz-sim::core gz-transport::core gz-msgs::core)
     set_tests_properties(effects_test PROPERTIES
       ENVIRONMENT
       "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH}")
+  endif()
+
+  # An orthographic camera, the bridge driven through its C interface,
+  # without Gazebo. Needs a GPU; skips without one.
+  ament_add_gtest(orthographic_test test/orthographic_test.cc TIMEOUT 300)
+  if(TARGET orthographic_test)
+    target_compile_definitions(orthographic_test PRIVATE
+      "UW_PIECES_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater\"")
+    target_link_libraries(orthographic_test
+      gz-rendering::gz-rendering gz-common::gz-common ${CMAKE_DL_LIBS})
+    set_tests_properties(orthographic_test PROPERTIES
+      ENVIRONMENT
+      "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH}")
   endif()
 
   # Lamp edge cases: more than the shader takes, out of view, removed. A

@@ -39,6 +39,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <mutex>
 #include <memory>
 #include <regex>
 #include <set>
@@ -81,12 +82,15 @@
 #include <OgreMatrix4.h>
 #include <OgreMesh2.h>
 #include <OgreMeshManager2.h>
+#include <OgrePixelFormatGpuUtils.h>
+#include <OgreRenderPassDescriptor.h>
 #include <OgrePass.h>
 #include <OgreRenderSystem.h>
 #include <OgreSceneNode.h>
 #include <OgreString.h>
 #include <OgreSubItem.h>
 #include <OgreSubMesh2.h>
+#include <OgreTextureGpu.h>
 #include <OgreTechnique.h>
 #include <Vao/OgreVaoManager.h>
 
@@ -104,6 +108,13 @@ static_assert(GZ_RENDERING_MAJOR_VERSION == kGzRenderingMajor,
 const std::vector<std::string> kPbsHooks{"custom_passBuffer",
                                          "custom_ps_functions",
                                          "custom_ps_posExecution"};
+
+/// \brief The hooks of Ogre's unlit shaders we add to: the pass buffer
+/// block, what the vertex shader hands the pixel shader, the position, the
+/// pixel shader's uniforms, and the final colour.
+const std::vector<std::string> kUnlitHooks{
+    "custom_passBuffer", "custom_VStoPS", "custom_vs_posExecution",
+    "custom_ps_uniformStructDeclaration", "custom_ps_posExecution"};
 
 /// \brief A read only Ogre archive of files kept in memory: the pieces we
 /// change, with nothing written to disk.
@@ -253,6 +264,36 @@ constexpr float kBackdropBelow = 12000.0f;
 /// user value), which draws it for underwater cameras only.
 constexpr float kBackdropMark = 1977.0f;
 
+/// \brief The water's surface over the cameras, from the plugin's callback.
+/// Its own mutex: uw_ogre2_release clears the callback from the simulation
+/// thread while the render thread may be asking.
+class Surface
+{
+  /// \brief The surface's height over a place, world z: the plugin's
+  /// answer, or the still level without one.
+  public: float Level(const Ogre::Vector3 &_position, float _still,
+                      double _time)
+  {
+    const std::lock_guard<std::mutex> lock(this->mutex);
+    if (!this->fn)
+      return _still;
+    return static_cast<float>(this->fn(this->context, _position.x,
+                                       _position.y, _time));
+  }
+
+  /// \brief The plugin's callback, or none.
+  public: void Set(UwSurfaceFn _fn, void *_context)
+  {
+    const std::lock_guard<std::mutex> lock(this->mutex);
+    this->fn = _fn;
+    this->context = _context;
+  }
+
+  private: std::mutex mutex;
+  private: UwSurfaceFn fn{nullptr};
+  private: void *context{nullptr};
+};
+
 /// \brief Water behind everything: a black box around the world, seen from
 /// inside, drawn after the sky and at the far plane wherever nothing else
 /// is. Through the water it is the water's own colour, the veil, as open
@@ -261,15 +302,20 @@ constexpr float kBackdropMark = 1977.0f;
 /// clear (alpha 0) for cameras above the water.
 class Backdrop : public Ogre::Camera::Listener
 {
-  /// \brief Hidden while a camera that is not a colour camera renders
-  /// (bounding boxes, segmentation, thermal): those swap the materials of
-  /// gz-rendering's own items only, and would read the backdrop, which is
-  /// not one, as a thing filling the view. Before culling, as their own
-  /// material switchers work.
+  /// \brief Hidden while a camera renders that must not see it: one that is
+  /// not a colour camera (bounding boxes, segmentation, thermal; those swap
+  /// the materials of gz-rendering's own items only, and would read the
+  /// backdrop, which is not one, as a thing filling the view), or an
+  /// orthographic one, which is drawn as in air. Before culling, as their
+  /// own material switchers work.
   public: void cameraPreRenderScene(Ogre::Camera *_camera) override
   {
     const auto it = this->items.find(_camera->getSceneManager());
     if (it == this->items.end())
+      return;
+    this->hiding = _camera->getProjectionType() == Ogre::PT_ORTHOGRAPHIC ||
+        this->solid.count(_camera->getName()) > 0;
+    if (!this->hiding)
       return;
     this->wasVisible = it->second->getVisible();
     it->second->setVisible(false);
@@ -279,13 +325,14 @@ class Backdrop : public Ogre::Camera::Listener
   public: void cameraPostRenderScene(Ogre::Camera *_camera) override
   {
     const auto it = this->items.find(_camera->getSceneManager());
-    if (it != this->items.end())
+    if (it != this->items.end() && this->hiding)
       it->second->setVisible(this->wasVisible);
+    this->hiding = false;
   }
 
-  /// \brief Listen to the cameras that must not see the backdrop: the
-  /// bounding box, segmentation and thermal cameras of every scene, whose
-  /// Ogre camera carries the sensor's name. New ones are found as they come.
+  /// \brief Listen to every camera of every scene, new ones as they come,
+  /// and note which are not colour cameras: the bounding box, segmentation
+  /// and thermal sensors, whose Ogre camera carries the sensor's name.
   private: void WatchCameras()
   {
     if (!gz::rendering::isEngineLoaded("ogre2"))
@@ -302,20 +349,21 @@ class Backdrop : public Ogre::Camera::Listener
       for (unsigned int i = 0; i < scene->SensorCount(); ++i)
       {
         const auto sensor = scene->SensorByIndex(i);
-        if (!std::dynamic_pointer_cast<gz::rendering::BoundingBoxCamera>(
-                sensor) &&
-            !std::dynamic_pointer_cast<gz::rendering::SegmentationCamera>(
-                sensor) &&
-            !std::dynamic_pointer_cast<gz::rendering::ThermalCamera>(sensor))
+        if (std::dynamic_pointer_cast<gz::rendering::BoundingBoxCamera>(
+                sensor) ||
+            std::dynamic_pointer_cast<gz::rendering::SegmentationCamera>(
+                sensor) ||
+            std::dynamic_pointer_cast<gz::rendering::ThermalCamera>(sensor))
         {
-          continue;
+          this->solid.insert(sensor->Name());
         }
-        Ogre::Camera *camera = sm->findCameraNoThrow(sensor->Name());
-        if (camera && this->watched.insert({sm, sensor->Name(), camera})
-                          .second)
-        {
+      }
+      auto cameras = sm->getCameraIterator();
+      while (cameras.hasMoreElements())
+      {
+        Ogre::Camera *camera = cameras.getNext();
+        if (this->watched.insert({sm, camera->getName(), camera}).second)
           camera->addListener(this);
-        }
       }
     }
   }
@@ -582,22 +630,107 @@ class Backdrop : public Ogre::Camera::Listener
   /// \brief The backdrop's visibility before a camera hid it.
   private: bool wasVisible{false};
 
+  /// \brief Whether the camera rendering now hid it.
+  private: bool hiding{false};
+
+  /// \brief The names of the cameras that are not colour cameras.
+  private: std::set<std::string> solid;
+
   /// \brief Set when the box could not be made: not tried again.
   private: bool failed{false};
 };
 
-class UnderwaterListener : public Ogre::HlmsListener
+/// \brief A listener that wraps the one that was there (gz-rendering's):
+/// every hook goes to it first. The two below add only to the pass hash and
+/// the pass buffer; the rest is forwarded here.
+class ChainedListener : public Ogre::HlmsListener
 {
+  /// \brief The listener this one wraps, or none.
   public: Ogre::HlmsListener *previous{nullptr};
+
+  public: void propertiesMergedPreGenerationStep(
+      Ogre::Hlms *_hlms, const Ogre::HlmsCache &_passCache,
+      const Ogre::HlmsPropertyVec &_renderableProps,
+      const Ogre::PiecesMap _pieces[Ogre::NumShaderTypes],
+      const Ogre::HlmsPropertyVec &_properties,
+      const Ogre::QueuedRenderable &_queued) override
+  {
+    if (this->previous)
+    {
+      this->previous->propertiesMergedPreGenerationStep(
+          _hlms, _passCache, _renderableProps, _pieces, _properties, _queued);
+    }
+  }
+
+  public: Ogre::uint16 getNumExtraPassTextures(
+      const Ogre::HlmsPropertyVec &_properties, bool _caster) const override
+  {
+    return this->previous ?
+        this->previous->getNumExtraPassTextures(_properties, _caster) : 0u;
+  }
+
+  public: void setupRootLayout(Ogre::RootLayout &_layout,
+      const Ogre::HlmsPropertyVec &_properties) const override
+  {
+    if (this->previous)
+      this->previous->setupRootLayout(_layout, _properties);
+  }
+
+  public: void shaderCacheEntryCreated(const Ogre::String &_profile,
+      const Ogre::HlmsCache *_entry, const Ogre::HlmsCache &_passCache,
+      const Ogre::HlmsPropertyVec &_properties,
+      const Ogre::QueuedRenderable &_queued) override
+  {
+    if (this->previous)
+    {
+      this->previous->shaderCacheEntryCreated(_profile, _entry, _passCache,
+                                              _properties, _queued);
+    }
+  }
+
+  public: void hlmsTypeChanged(bool _caster, Ogre::CommandBuffer *_cmd,
+      const Ogre::HlmsDatablock *_db, size_t _texUnit) override
+  {
+    if (this->previous)
+      this->previous->hlmsTypeChanged(_caster, _cmd, _db, _texUnit);
+  }
+
+};
+
+/// \brief Write a float4 and move on.
+inline void Put4(float *&_ptr, float _a, float _b, float _c, float _d)
+{
+  *_ptr++ = _a; *_ptr++ = _b; *_ptr++ = _c; *_ptr++ = _d;
+}
+
+/// \brief The veil at a depth, per channel: daylight · B∞ exp(−K_d depth).
+inline void PutVeil(float *&_ptr, const Water &_w, float _depth)
+{
+  Put4(_ptr, _w.daylight * _w.veil[0] * std::exp(-_w.diffuse[0] * _depth),
+       _w.daylight * _w.veil[1] * std::exp(-_w.diffuse[1] * _depth),
+       _w.daylight * _w.veil[2] * std::exp(-_w.diffuse[2] * _depth), 0.0f);
+}
+
+class UnderwaterListener : public ChainedListener
+{
   public: Water water;
   public: Backdrop backdrop;
+  public: Surface surface;
 
   /// \brief Set from any thread when the plugin is gone: draw nothing, and
   /// on the next frame turn the water off as a plugin would.
   public: std::atomic<bool> released{false};
 
-  private: bool On(bool _caster) const
-  { return this->water.active && !this->released && !_caster; }
+  /// \brief Whether the water is drawn in a pass: not for an orthographic
+  /// camera (the GUI's orthographic view), whose fragments the model gets
+  /// wrong; it is drawn as in air, as the unlit shaders draw it.
+  private: bool On(bool _caster, Ogre::SceneManager *_sm) const
+  {
+    if (!this->water.active || this->released || _caster)
+      return false;
+    const Ogre::Camera *camera = _sm->getCamerasInProgress().renderingCamera;
+    return !camera || camera->getProjectionType() != Ogre::PT_ORTHOGRAPHIC;
+  }
 
   /// \brief The scene's lamps (spot and point lights), as of the last
   /// preparePassHash.
@@ -725,46 +858,6 @@ class UnderwaterListener : public Ogre::HlmsListener
     }
   }
 
-  public: void propertiesMergedPreGenerationStep(
-      Ogre::Hlms *_hlms, const Ogre::HlmsCache &_passCache,
-      const Ogre::HlmsPropertyVec &_renderableProps,
-      const Ogre::PiecesMap _pieces[Ogre::NumShaderTypes],
-      const Ogre::HlmsPropertyVec &_properties,
-      const Ogre::QueuedRenderable &_queued) override
-  {
-    if (this->previous)
-    {
-      this->previous->propertiesMergedPreGenerationStep(
-          _hlms, _passCache, _renderableProps, _pieces, _properties, _queued);
-    }
-  }
-
-  public: Ogre::uint16 getNumExtraPassTextures(
-      const Ogre::HlmsPropertyVec &_properties, bool _caster) const override
-  {
-    return this->previous ?
-        this->previous->getNumExtraPassTextures(_properties, _caster) : 0u;
-  }
-
-  public: void setupRootLayout(Ogre::RootLayout &_layout,
-      const Ogre::HlmsPropertyVec &_properties) const override
-  {
-    if (this->previous)
-      this->previous->setupRootLayout(_layout, _properties);
-  }
-
-  public: void shaderCacheEntryCreated(const Ogre::String &_profile,
-      const Ogre::HlmsCache *_entry, const Ogre::HlmsCache &_passCache,
-      const Ogre::HlmsPropertyVec &_properties,
-      const Ogre::QueuedRenderable &_queued) override
-  {
-    if (this->previous)
-    {
-      this->previous->shaderCacheEntryCreated(_profile, _entry, _passCache,
-                                              _properties, _queued);
-    }
-  }
-
   public: void preparePassHash(const Ogre::CompositorShadowNode *_shadow,
       bool _caster, bool _dual, Ogre::SceneManager *_sm,
       Ogre::Hlms *_hlms) override
@@ -772,7 +865,7 @@ class UnderwaterListener : public Ogre::HlmsListener
     if (this->previous)
       this->previous->preparePassHash(_shadow, _caster, _dual, _sm, _hlms);
     this->backdrop.BeforePass(_sm);
-    if (!this->On(_caster))
+    if (!this->On(_caster, _sm))
       return;
     _hlms->_setProperty("gz_underwater", 1);
     this->CollectLamps(_sm);
@@ -790,7 +883,7 @@ class UnderwaterListener : public Ogre::HlmsListener
         this->previous->getPassBufferSize(_shadow, _caster, _dual, _sm) : 0u;
     // Ogre aligns each listener's block to 16 bytes.
     size = (size + 15u) & ~15u;
-    return size + (this->On(_caster) ? kBlockBytes : 0u);
+    return size + (this->On(_caster, _sm) ? kBlockBytes : 0u);
   }
 
   public: float *preparePassBuffer(const Ogre::CompositorShadowNode *_shadow,
@@ -800,7 +893,7 @@ class UnderwaterListener : public Ogre::HlmsListener
     if (this->previous)
       _ptr = this->previous->preparePassBuffer(_shadow, _caster, _dual, _sm,
                                                _ptr);
-    if (!this->On(_caster))
+    if (!this->On(_caster, _sm))
       return _ptr;
     // Collect the lamps again for this pass: the block's size does not
     // depend on how many there are, so the data never depends on the order
@@ -815,12 +908,12 @@ class UnderwaterListener : public Ogre::HlmsListener
       camera->getDerivedOrientation().ToRotationMatrix(rot);
     }
     const auto &w = this->water;
-    const float depth = std::max(0.0f, w.level - static_cast<float>(pos.z));
+    // The water's surface over the camera: the still level and the wave.
+    const float level = this->surface.Level(pos, w.level, w.time);
+    const float depth = std::max(0.0f, level - static_cast<float>(pos.z));
     const auto put4 = [&_ptr](float _a, float _b, float _c, float _d)
-    {
-      *_ptr++ = _a; *_ptr++ = _b; *_ptr++ = _c; *_ptr++ = _d;
-    };
-    put4(pos.x, pos.y, pos.z, w.level);
+    { Put4(_ptr, _a, _b, _c, _d); };
+    put4(pos.x, pos.y, pos.z, level);
     for (int c = 0; c < 3; ++c)
     {
       const auto col = rot.GetColumn(c);
@@ -828,9 +921,7 @@ class UnderwaterListener : public Ogre::HlmsListener
     }
     put4(w.attenuation[0], w.attenuation[1], w.attenuation[2], 0.0f);
     put4(w.backscatter[0], w.backscatter[1], w.backscatter[2], 0.0f);
-    put4(w.daylight * w.veil[0] * std::exp(-w.diffuse[0] * depth),
-         w.daylight * w.veil[1] * std::exp(-w.diffuse[1] * depth),
-         w.daylight * w.veil[2] * std::exp(-w.diffuse[2] * depth), 0.0f);
+    PutVeil(_ptr, w, depth);
     put4(w.diffuse[0], w.diffuse[1], w.diffuse[2], 0.0f);
     // The scattering, b = veil c (the veil is b / c from the type), and the
     // phase function's asymmetry.
@@ -876,12 +967,126 @@ class UnderwaterListener : public Ogre::HlmsListener
     }
     return _ptr;
   }
+};
 
-  public: void hlmsTypeChanged(bool _caster, Ogre::CommandBuffer *_cmd,
-      const Ogre::HlmsDatablock *_db, size_t _texUnit) override
+/// \brief Bytes the underwater block adds to the unlit pass buffer: the
+/// camera, three of the water's colours and three vectors.
+constexpr Ogre::uint32 kUnlitBlockBytes = 7u * 4u * sizeof(float);
+
+/// \brief The water in Ogre's unlit shaders (particles): what nothing
+/// lights fades over the range and takes the veil, like everything else.
+/// The water and the cameras' levels are the PBS listener's.
+class UnlitListener : public ChainedListener
+{
+  public: UnderwaterListener *shared{nullptr};
+
+  /// \brief Whether the water is drawn in a pass. gz-rendering's pieces are
+  /// not in the unlit shaders (InstallUnlit), so what its listener adds to
+  /// the pass buffer (the lidar's spherical clipping) is not declared before
+  /// our block, which would then be read from the wrong place: such a pass,
+  /// which is not a colour image, is left alone.
+  private: bool On(const Ogre::CompositorShadowNode *_shadow, bool _caster,
+                   bool _dual, Ogre::SceneManager *_sm) const
+  {
+    // Not once the plugin is gone, as the PBS listener
+    if (!this->shared || !this->shared->water.active ||
+        this->shared->released || _caster)
+    {
+      return false;
+    }
+    return !this->previous ||
+        this->previous->getPassBufferSize(_shadow, _caster, _dual, _sm) == 0u;
+  }
+
+  public: void preparePassHash(const Ogre::CompositorShadowNode *_shadow,
+      bool _caster, bool _dual, Ogre::SceneManager *_sm,
+      Ogre::Hlms *_hlms) override
   {
     if (this->previous)
-      this->previous->hlmsTypeChanged(_caster, _cmd, _db, _texUnit);
+      this->previous->preparePassHash(_shadow, _caster, _dual, _sm, _hlms);
+    if (!this->On(_shadow, _caster, _dual, _sm))
+      return;
+    _hlms->_setProperty("gz_underwater", 1);
+    // Ogre's unlit shaders write a colour as it is and do not say whether
+    // the image keeps linear light (an sRGB image, as gz-rendering's are).
+    const Ogre::RenderPassDescriptor *pass = Ogre::Root::getSingleton()
+        .getRenderSystem()->getCurrentPassDescriptor();
+    if (pass && pass->getNumColourEntries() > 0u && pass->mColour[0].texture &&
+        Ogre::PixelFormatGpuUtils::isSRgb(
+            pass->mColour[0].texture->getPixelFormat()))
+    {
+      _hlms->_setProperty("gz_underwater_linear", 1);
+    }
+  }
+
+  public: Ogre::uint32 getPassBufferSize(
+      const Ogre::CompositorShadowNode *_shadow, bool _caster, bool _dual,
+      Ogre::SceneManager *_sm) const override
+  {
+    const Ogre::uint32 size = this->previous ?
+        this->previous->getPassBufferSize(_shadow, _caster, _dual, _sm) : 0u;
+    return size + (this->On(_shadow, _caster, _dual, _sm) ? kUnlitBlockBytes : 0u);
+  }
+
+  public: float *preparePassBuffer(const Ogre::CompositorShadowNode *_shadow,
+      bool _caster, bool _dual, Ogre::SceneManager *_sm,
+      float *_ptr) override
+  {
+    if (this->previous)
+      _ptr = this->previous->preparePassBuffer(_shadow, _caster, _dual, _sm,
+                                               _ptr);
+    if (!this->On(_shadow, _caster, _dual, _sm))
+      return _ptr;
+    const Ogre::Camera *camera = _sm->getCamerasInProgress().renderingCamera;
+    Ogre::Vector3 pos = Ogre::Vector3::ZERO;
+    // From the camera to a point, in the world, out of its clip-space x, y
+    // and w: for a perspective camera w is the depth along its axis, so
+    // the view-space point is ((x + P02 w) / P00, (y + P12 w) / P11, -w),
+    // whatever the depth buffer's convention. Zero for an orthographic
+    // camera, which then draws what is unlit as in air.
+    Ogre::Vector3 clipX = Ogre::Vector3::ZERO;
+    Ogre::Vector3 clipY = Ogre::Vector3::ZERO;
+    Ogre::Vector3 clipW = Ogre::Vector3::ZERO;
+    if (camera)
+    {
+      pos = camera->getDerivedPosition();
+      Ogre::Matrix4 projection = camera->getProjectionMatrixWithRSDepth();
+      // Images drawn to a texture are flipped, as Ogre's unlit shaders do.
+      const Ogre::RenderPassDescriptor *pass = Ogre::Root::getSingleton()
+          .getRenderSystem()->getCurrentPassDescriptor();
+      if (pass && pass->requiresTextureFlipping())
+      {
+        for (int c = 0; c < 4; ++c)
+          projection[1][c] = -projection[1][c];
+      }
+      if (camera->getProjectionType() == Ogre::PT_PERSPECTIVE &&
+          std::abs(projection[0][0]) > 1e-9f &&
+          std::abs(projection[1][1]) > 1e-9f)
+      {
+        Ogre::Matrix3 rot;
+        camera->getDerivedOrientation().ToRotationMatrix(rot);
+        const Ogre::Vector3 right = rot.GetColumn(0);
+        const Ogre::Vector3 up = rot.GetColumn(1);
+        const Ogre::Vector3 back = rot.GetColumn(2);
+        clipX = right / projection[0][0];
+        clipY = up / projection[1][1];
+        clipW = right * (projection[0][2] / projection[0][0]) +
+                up * (projection[1][2] / projection[1][1]) - back;
+      }
+    }
+    const auto &w = this->shared->water;
+    const float level = this->shared->surface.Level(pos, w.level, w.time);
+    const float depth = std::max(0.0f, level - static_cast<float>(pos.z));
+    const auto put4 = [&_ptr](float _a, float _b, float _c, float _d)
+    { Put4(_ptr, _a, _b, _c, _d); };
+    put4(pos.x, pos.y, pos.z, level);
+    put4(w.attenuation[0], w.attenuation[1], w.attenuation[2], 0.0f);
+    put4(w.backscatter[0], w.backscatter[1], w.backscatter[2], 0.0f);
+    PutVeil(_ptr, w, depth);
+    put4(clipX.x, clipX.y, clipX.z, 0.0f);
+    put4(clipY.x, clipY.y, clipY.z, 0.0f);
+    put4(clipW.x, clipW.y, clipW.z, 0.0f);
+    return _ptr;
   }
 };
 
@@ -905,6 +1110,10 @@ struct Installed
   UnderwaterListener listener;
   Settler settler;
   Ogre::ArchiveVec originalLibrary;
+  /// \brief Ogre's unlit shaders, when the water went into them too.
+  Ogre::Hlms *unlit{nullptr};
+  UnlitListener unlitListener;
+  Ogre::ArchiveVec originalUnlitLibrary;
   /// \brief The pieces we changed or added, read by the Hlms
   std::vector<std::unique_ptr<MemoryArchive>> archives;
   bool done{false};
@@ -942,6 +1151,10 @@ void Drop()
   s.listener.released = false;
   s.listener.Forget();
   s.listener.backdrop.Forget();
+  s.listener.surface.Set(nullptr, nullptr);
+  s.unlit = nullptr;
+  s.unlitListener.previous = nullptr;
+  s.originalUnlitLibrary.clear();
 }
 
 /// \brief The PBS of the Ogre running now.
@@ -988,6 +1201,7 @@ void SetWater(const UwWater *_v)
   w.caustics = _v->caustics;
   w.snow = _v->snow;
   w.time = _v->time;
+  s.listener.surface.Set(_v->surface, _v->surfaceContext);
 }
 
 /// \brief Where a piece is defined: "@piece( name )", any spacing.
@@ -1147,6 +1361,79 @@ bool Chain(Ogre::ArchiveVec &_library, const std::vector<std::string> &_hooks,
   }
   return true;
 }
+
+/// \brief Whether gz-rendering's own composite pieces are in a library.
+bool HasGzPbs(const Ogre::ArchiveVec &_library)
+{
+  for (const Ogre::Archive *archive : _library)
+  {
+    const std::string name = archive->getName();
+    if (name.size() >= 7 && name.compare(name.size() - 7, 7, "/Gz/Pbs") == 0)
+      return true;
+  }
+  return false;
+}
+
+/// \brief Put the water into Ogre's unlit shaders too (particles), chained
+/// like the PBS ones; the unlit pieces are in the folder next to the PBS
+/// ones, named with Unlit at the end. Without it the rest still works: what
+/// is unlit is drawn as in air.
+void InstallUnlit(const char *_piecesDir)
+try
+{
+  auto &s = State();
+  Ogre::Hlms *unlit = Ogre::Root::getSingleton().getHlmsManager()->getHlms(
+      Ogre::HLMS_UNLIT);
+  if (!unlit)
+  {
+    gzwarn << "[underwater] no unlit Hlms: unlit materials are drawn as in "
+           << "air\n";
+    return;
+  }
+  const std::string piecesDir = std::string(_piecesDir) + "Unlit";
+  Ogre::Archive *ours = Ogre::ArchiveManager::getSingleton().load(
+      piecesDir, "FileSystem", true);
+  if (!Defines(ours, kUnlitHooks, "underwater_unlit"))
+  {
+    gzwarn << "[underwater] the unlit pieces are not in [" << piecesDir
+           << "]: unlit materials are drawn as in air\n";
+    return;
+  }
+  Ogre::ArchiveVec library = unlit->getPiecesLibraryAsArchiveVec();
+  // gz-rendering 10 does not put its own pieces in the unlit shaders (it
+  // calls the base class's getDefaultPaths), so what its listener adds to
+  // the pass buffer is never declared there, and our block follows Ogre's.
+  // A version that does is not handled, and not guessed at: as in air.
+  if (HasGzPbs(library))
+  {
+    gzwarn << "[underwater] gz-rendering's pieces are in the unlit shaders, "
+           << "which this version does not handle: unlit materials are "
+           << "drawn as in air\n";
+    return;
+  }
+  std::vector<std::unique_ptr<MemoryArchive>> archives;
+  if (!Chain(library, kUnlitHooks, "underwater_unlit", archives))
+  {
+    gzwarn << "[underwater] unlit materials are drawn as in air\n";
+    return;
+  }
+  library.push_back(ours);
+
+  s.originalUnlitLibrary = unlit->getPiecesLibraryAsArchiveVec();
+  for (auto &archive : archives)
+    s.archives.push_back(std::move(archive));
+  s.unlitListener.shared = &s.listener;
+  s.unlitListener.previous = unlit->getListener();
+  unlit->setListener(&s.unlitListener);
+  unlit->reloadFrom(unlit->getDataFolder(), &library);
+  s.unlit = unlit;
+  gzmsg << "[underwater] installed in Ogre's unlit shaders\n";
+}
+catch (const std::exception &_e)
+{
+  gzwarn << "[underwater] not installed in the unlit shaders: " << _e.what()
+         << "\n";
+}
 }  // namespace
 
 extern "C"
@@ -1202,6 +1489,7 @@ try
   pbs->reloadFrom(pbs->getDataFolder(), &library);
   s.done = true;
   gzmsg << "[underwater] installed in Ogre's PBS shaders\n";
+  InstallUnlit(_piecesDir);
   return 1;
 }
 catch (const std::exception &_e)
@@ -1220,6 +1508,8 @@ int uw_ogre2_version()
 void uw_ogre2_release()
 {
   State().listener.released = true;
+  // Once this returns, the plugin's surface is not asked again
+  State().listener.surface.Set(nullptr, nullptr);
 }
 
 //////////////////////////////////////////////////
@@ -1230,6 +1520,7 @@ void uw_ogre2_set(const UwWater *_v)
   SetWater(_v);
 }
 
+//////////////////////////////////////////////////
 //////////////////////////////////////////////////
 /// \brief Put Ogre's PBS back as it was. Safe to call twice.
 void uw_ogre2_uninstall()
@@ -1243,8 +1534,14 @@ try
   {
     s.listener.HideLamps(false);
     s.listener.backdrop.Destroy();
+    s.listener.surface.Set(nullptr, nullptr);
     s.pbs->setListener(s.listener.previous);
     s.pbs->reloadFrom(s.pbs->getDataFolder(), &s.originalLibrary);
+    if (s.unlit)
+    {
+      s.unlit->setListener(s.unlitListener.previous);
+      s.unlit->reloadFrom(s.unlit->getDataFolder(), &s.originalUnlitLibrary);
+    }
     s.root->removeFrameListener(&s.settler);
   }
   Drop();

@@ -27,7 +27,12 @@
 extern "C"
 {
 /// \brief The version of this interface. Change it with the struct.
-#define UW_OGRE2_BRIDGE_VERSION 4
+#define UW_OGRE2_BRIDGE_VERSION 5
+
+/// \brief The water's surface height, world z, m, at a place and time:
+/// the still level and the waves there.
+typedef double (*UwSurfaceFn)(void *_context, double _x, double _y,
+                              double _time);
 
 /// \brief The water, as the plugin hands it to the bridge.
 struct UwWater
@@ -60,6 +65,12 @@ struct UwWater
 
   /// \brief 0 low, 1 medium, 2 high.
   int quality;
+
+  /// \brief The surface over each camera, asked on the render thread for
+  /// every pass, at `time`; null for the still level everywhere. The
+  /// plugin's: uw_ogre2_release clears it before the plugin goes.
+  UwSurfaceFn surface;
+  void *surfaceContext;
 };
 
 /// \brief The bridge's version of this interface.

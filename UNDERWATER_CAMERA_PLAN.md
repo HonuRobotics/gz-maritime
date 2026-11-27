@@ -562,10 +562,11 @@ What it settled:
   a new instance takes over the world's mark; and an install in a new Ogre
   (the next world in the same process) forgets what was left in the old one.
   Each has a test.
-- **Not done, against the plan**: unlit materials are drawn as in air (only
-  PBS is shaded). The sky, the background and the water surface were too,
-  until the fixes below. Depth is from
-  the still water level, not the waves. No throughput benchmark in CI yet
+- **Not done, against the plan**: unlit materials were drawn as in air (only
+  PBS was shaded) until the fix below. The sky, the background and the water surface were too,
+  until the fixes below. Depth was from
+  the still water level, not the waves, until the fix below. No throughput
+  benchmark in CI yet
   (the PBS change costs a few ALU instructions per fragment).
 
 ### Phase 4, vehicle lights and their beams: done, on `ahcorde/uw_phase4_lights`
@@ -714,6 +715,16 @@ below.** What this phase built is everything the comparison needs:
   (a fail, as it should). That example report is in the docs, labelled as
   not a validation.
 - Docs: how to shoot the footage, simulate it, mark the patches and compare.
+
+### After the phases: depth below the waves, and unlit materials, on `ahcorde/uw_wave_depth_and_unlit`
+
+The shader took the still level as the surface. Each camera now has the
+level of the wave over it: the bridge asks the plugin, on the render
+thread, at the camera's place and the frame's instant, and the plugin's
+water optics sampler answers from a wave engine of its own, built from the
+recipe, never the one the simulation advances. And Ogre's unlit shaders (in
+gz-rendering, a particle emitter's particles) get the fade and the veil:
+their own colour, no daylight, no lamps. Terrain is still drawn as in air.
 
 ## Open questions
 

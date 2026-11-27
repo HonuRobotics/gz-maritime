@@ -177,6 +177,15 @@ off, set its intensity to 0: it then costs nothing.
   by the `gz_underwater` property; never in shadow-caster or depth-only
   passes, nor on gz-rendering's solid colours (segmentation keeps its exact
   labels).
+- **Unlit shaders** (`share/hlms/UnderwaterUnlit`): a smaller block in the
+  unlit pass buffer and the fade and the veil at the end of the unlit pixel
+  shader. Those shaders have no world position, so the vertex shader works
+  out the ray from the camera from the clip-space position, and they do
+  not say whether the image keeps linear light, so the listener does.
+  gz-rendering 10 gives the unlit shaders no composite pieces of its own,
+  so these are the only ones; a gz-rendering that does is not handled, and
+  unlit is then drawn as in air, with a warning. Both listeners derive from
+  one that wraps gz-rendering's and forwards what they do not change.
 - **Chained, not replaced.** gz-rendering's own composite pieces
   (`Hlms/Gz/Pbs`) are read at run time and copied with one more
   `@insertpiece` each; gz-rendering's Hlms listener is called first and the
@@ -203,10 +212,27 @@ off, set its intensity to 0: it then costs nothing.
 
 ## Limits
 
-- **Only what PBS shades**, and the water surface (in its own shader).
-  Unlit materials (markers) and terrain are drawn as in air.
-- **Depth from the still water level**, not the wave surface, unlike the
-  reference camera.
+- **What PBS and the unlit shaders shade**, and the water surface (in its
+  own shader). Terrain (heightmaps) is drawn as in air.
+- **Unlit materials** (a particle emitter's particles; gz-rendering draws
+  markers, lines and the grid with PBS) keep their own colour, faded over
+  the range, with the veil: no daylight fades them and no lamp lights them.
+  The lamps' beams and marine snow in front of them are not drawn.
+- **An orthographic camera** (the GUI's orthographic view) is drawn as in
+  air, with no backdrop: the model's ranges do not fit it. The lamps, hidden
+  from Ogre while the water is drawn, are dark in it.
+- **Depth below the wave over the camera.** As in the reference camera,
+  the water's surface is a flat level for each camera: the still level
+  plus the wave over the camera, which the renderer asks the plugin's water
+  optics sampler for in each pass, for any number of cameras and in the GUI
+  too (the sampler builds its own wave engine from the recipe), at the
+  instant of the frame being drawn. The wave over each thing in view is not
+  followed. That engine goes to the frame's exact time, while the reference
+  camera on the server reads the source's engine as last updated: on an FFT
+  sea at the default 30 Hz the two surfaces can be up to 7 cm apart, so a
+  camera within a few centimetres of the surface can be under water in one
+  and not in the other. With Gerstner waves, or `<update_rate>` 0, they
+  agree.
 - **Lamps**: lights named `lamp` only, up to four (the others are lit by
   Ogre, with a warning); lit by Ogre's default BRDF without clear coat, and
   with no shadows, in air too; their beams show only where something is
@@ -248,7 +274,16 @@ surface drawn above the seabed not darkening it (caustics off, to the
 rounding); open water the veil, for a camera and an RGBD camera, without
 a sky and with one; marine snow
 specks fixed frame to frame, none once the snow is off, the depth image
-unchanged; at night with the lamps off, nothing to see.
+unchanged; at night with the lamps off, nothing to see. Under a wave of
+0.5 m, a camera 0.15 m above the still water is under water in 34 of 80
+frames (two periods; 32 expected) and one 0.15 m below it in 46 (48), and
+the higher one never while the lower is in air. A camera at the still
+level, away from the origin, checked frame by frame against the depth
+below the wave at its own place and instant, which the test follows with
+a sampler of its own: 76 frames clear of the surface, none wrong. A
+particle emitter's particles 2 m away, in water that fades and veils:
+0.3095 in linear light for 0.3092 from the formula and their colour in
+air; and as in air once the renderer's model is removed.
 
 `snell_test`, rendered: Snell's window's half-angle 48.5 degrees (Snell's
 law: 48.6), from 5 m below near-flat water; a camera above the still water
@@ -256,7 +291,10 @@ in a 1 m sea seeing the crests higher than itself from above, from 4 s
 on, once the surface has settled; a camera 2 m above a rippled sea seeing
 none of it from below, out to the horizon.
 
-`effects_test` also: `<quality>` low and high close to medium, an unknown
+`effects_test` also: a slow camera beside a fast one, each slow frame
+the fast one's of the same instant, under Gerstner waves and on an FFT sea;
+`<quality>` low and
+high close to medium, an unknown
 value the medium image; a lidar's scan, a thermal image and a bounding box
 camera's boxes the same with the GPU path and without (the backdrop is
 hidden from those cameras). `lamp_edges_test` also: four lamps at
@@ -264,6 +302,10 @@ hidden from those cameras). `lamp_edges_test` also: four lamps at
 rendered tests skip without a GPU, step the world themselves and take a
 transport partition with their process id. `bridge_pieces_test` also: the
 caustics' phase wrapped without a jump, to a million seconds.
+
+`orthographic_test`, rendered, the bridge driven through its C interface
+without Gazebo: a perspective camera sees a box through the water as the
+model has it, an orthographic one beside it as in air.
 
 `lamp_edges_test`, rendered, in a process of its own: five lamps, one past
 the limit, which Ogre lights as in air, and four that light nothing in view
