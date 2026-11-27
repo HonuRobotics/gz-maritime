@@ -271,9 +271,13 @@ specks fixed frame to frame, none once the snow is off, the depth image
 unchanged; at night with the lamps off, nothing to see. Under a wave of
 0.5 m, a camera 0.15 m above the still water is under water in 34 of 80
 frames (two periods; 32 expected) and one 0.15 m below it in 46 (48), and
-the higher one never while the lower is in air. A particle emitter's
-particles 2 m away, in water that fades and veils: 0.3095 in linear light
-for 0.3092 from the formula and their colour in air.
+the higher one never while the lower is in air. A camera at the still
+level, away from the origin, checked frame by frame against the depth
+below the wave at its own place and instant, which the test follows with
+a sampler of its own: 76 frames clear of the surface, none wrong. A
+particle emitter's particles 2 m away, in water that fades and veils:
+0.3095 in linear light for 0.3092 from the formula and their colour in
+air; and as in air once the renderer's model is removed.
 
 `snell_test`, rendered: Snell's window's half-angle 48.5 degrees (Snell's
 law: 48.6), from 5 m below near-flat water; a camera above the still water
@@ -282,7 +286,8 @@ on, once the surface has settled; a camera 2 m above a rippled sea seeing
 none of it from below, out to the horizon.
 
 `effects_test` also: a slow camera beside a fast one, each slow frame
-the fast one's of the same instant, under the waves; `<quality>` low and
+the fast one's of the same instant, under Gerstner waves and on an FFT sea;
+`<quality>` low and
 high close to medium, an unknown
 value the medium image; a lidar's scan, a thermal image and a bounding box
 camera's boxes the same with the GPU path and without (the backdrop is

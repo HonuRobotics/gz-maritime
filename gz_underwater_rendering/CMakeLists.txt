@@ -205,6 +205,7 @@ if(BUILD_TESTING)
       "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
     target_link_libraries(effects_test
       gz_underwater_camera::gz_underwater_camera
+      gz_water_optics::gz_water_optics
       gz-sim::core gz-transport::core gz-msgs::core)
     set_tests_properties(effects_test PROPERTIES
       ENVIRONMENT

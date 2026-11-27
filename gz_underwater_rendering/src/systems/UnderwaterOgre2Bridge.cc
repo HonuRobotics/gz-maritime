@@ -988,8 +988,12 @@ class UnlitListener : public ChainedListener
   private: bool On(const Ogre::CompositorShadowNode *_shadow, bool _caster,
                    bool _dual, Ogre::SceneManager *_sm) const
   {
-    if (!this->shared || !this->shared->water.active || _caster)
+    // Not once the plugin is gone, as the PBS listener
+    if (!this->shared || !this->shared->water.active ||
+        this->shared->released || _caster)
+    {
       return false;
+    }
     return !this->previous ||
         this->previous->getPassBufferSize(_shadow, _caster, _dual, _sm) == 0u;
   }
