@@ -575,6 +575,7 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#check-what-the-world-has">Check what the world has</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#add-an-underwater-camera">Add an underwater camera</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#see-its-image">See its image</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#the-gui-view-and-every-camera-at-once">The GUI view, and every camera at once</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#what-comes-next">What comes next</a></li>
 </ul>
 </li>
@@ -607,6 +608,7 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-underwater-image-is-the-same-as-the-plain-one">The underwater image is the same as the plain one</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-underwater-image-is-all-one-colour">The underwater image is all one colour</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-underwater-image-gets-black-at-depth">The underwater image gets black at depth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-gui-and-the-underwater-camera-differ">The GUI and the underwater camera differ</a></li>
 </ul>
 </li>
 </ul>
@@ -635,6 +637,7 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#ocean-current-parameters">Ocean current parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#water-optics-parameters">Water optics parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#underwater-camera-parameters">Underwater camera parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#underwater-rendering">Underwater rendering</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#thruster-command">Thruster command</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#services">Services</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#examples">Examples</a></li>
@@ -905,6 +908,15 @@ path would be (640×480 in about 22 ms) but exactly testable: its rendered
 test checks the published image against the model computed in the test from
 the in-air frame, pixel by pixel, and finds no difference. A GPU path, for
 every camera and the GUI, must match it.</p>
+<p><strong>The GPU path.</strong> A render pass in gz-rendering sees only the colour
+image, never depth: passes are chained between two colour textures, and the
+camera’s depth buffer is Ogre’s own. So the GPU path does not post-process:
+it adds the model to Ogre’s PBS pixel shader, where every fragment knows its
+view-space position and so its range (the technique POSIM uses; no code
+taken from it). gz-rendering’s own shader pieces and Hlms listener are
+chained, not replaced. It matches the reference camera to 0.01 of a step on
+average. What PBS does not shade (the sky, the water surface, markers) is
+drawn as in air.</p>
 <p><strong>Checked against itself first.</strong> Every step is tested against what the
 model predicts, generated from the same equations by
 <code class="docutils literal notranslate"><span class="pre">docs/_tools/underwater_camera_figures.py</span></code>: a grey target against range,

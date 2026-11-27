@@ -332,6 +332,19 @@ The water is the world's (`gz-maritime-water-optics-system`); without it, or
 above the water, only the camera's response applies, which by default
 changes nothing. The plugin works only while its output has a subscriber.
 
+## Underwater rendering
+
+Include `model://underwater_optics` (from `gz_underwater_rendering`) in a
+world with water optics, and every ogre2 camera, and the GUI's 3D view, sees
+through the water: the same model as the underwater camera, per fragment, on
+the GPU. The water is the world's; `<enabled>false</enabled>` in its plugin
+starts it off, and a `gz.msgs.Boolean` on
+`/world/<world>/underwater_rendering/enable` turns it off and on. Cameras
+above the water are untouched, and an underwater camera plugin in the same
+world applies only its own response while it is on. Only surfaces Ogre's PBS shades are drawn through the
+water: the sky, the background, the water surface, markers and terrain are
+drawn as in air.
+
 ## Thruster command
 
 What a vehicle's Thruster plugins expect, with `gz-maritime-thruster-system`

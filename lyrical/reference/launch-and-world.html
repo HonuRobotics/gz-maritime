@@ -217,6 +217,7 @@
 <li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#check-what-the-world-has">Check what the world has</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#add-an-underwater-camera">Add an underwater camera</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#see-its-image">See its image</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#the-gui-view-and-every-camera-at-once">The GUI view, and every camera at once</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#what-comes-next">What comes next</a></li>
 </ul>
 </li>
@@ -249,6 +250,7 @@
 <li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-underwater-image-is-the-same-as-the-plain-one">The underwater image is the same as the plain one</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-underwater-image-is-all-one-colour">The underwater image is all one colour</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-underwater-image-gets-black-at-depth">The underwater image gets black at depth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-gui-and-the-underwater-camera-differ">The GUI and the underwater camera differ</a></li>
 </ul>
 </li>
 </ul>
@@ -277,6 +279,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#ocean-current-parameters">Ocean current parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#water-optics-parameters">Water optics parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#underwater-camera-parameters">Underwater camera parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#underwater-rendering">Underwater rendering</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#thruster-command">Thruster command</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#services">Services</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#examples">Examples</a></li>
@@ -1042,6 +1045,19 @@ publishes <code class="docutils literal notranslate"><span class="pre">&lt;topic
 <p>The water is the world’s (<code class="docutils literal notranslate"><span class="pre">gz-maritime-water-optics-system</span></code>); without it, or
 above the water, only the camera’s response applies, which by default
 changes nothing. The plugin works only while its output has a subscriber.</p>
+</section>
+<section id="underwater-rendering">
+<h2>Underwater rendering<a class="headerlink" href="#underwater-rendering" title="Link to this heading"></a></h2>
+<p>Include <code class="docutils literal notranslate"><span class="pre">model://underwater_optics</span></code> (from <code class="docutils literal notranslate"><span class="pre">gz_underwater_rendering</span></code>) in a
+world with water optics, and every ogre2 camera, and the GUI’s 3D view, sees
+through the water: the same model as the underwater camera, per fragment, on
+the GPU. The water is the world’s; <code class="docutils literal notranslate"><span class="pre">&lt;enabled&gt;false&lt;/enabled&gt;</span></code> in its plugin
+starts it off, and a <code class="docutils literal notranslate"><span class="pre">gz.msgs.Boolean</span></code> on
+<code class="docutils literal notranslate"><span class="pre">/world/&lt;world&gt;/underwater_rendering/enable</span></code> turns it off and on. Cameras
+above the water are untouched, and an underwater camera plugin in the same
+world applies only its own response while it is on. Only surfaces Ogre’s PBS shades are drawn through the
+water: the sky, the background, the water surface, markers and terrain are
+drawn as in air.</p>
 </section>
 <section id="thruster-command">
 <h2>Thruster command<a class="headerlink" href="#thruster-command" title="Link to this heading"></a></h2>

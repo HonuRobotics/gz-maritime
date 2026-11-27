@@ -217,6 +217,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#check-what-the-world-has">Check what the world has</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#add-an-underwater-camera">Add an underwater camera</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#see-its-image">See its image</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#the-gui-view-and-every-camera-at-once">The GUI view, and every camera at once</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#what-comes-next">What comes next</a></li>
 </ul>
 </li>
@@ -249,6 +250,7 @@
 <li class="toctree-l4"><a class="reference internal" href="faq.html#the-underwater-image-is-the-same-as-the-plain-one">The underwater image is the same as the plain one</a></li>
 <li class="toctree-l4"><a class="reference internal" href="faq.html#the-underwater-image-is-all-one-colour">The underwater image is all one colour</a></li>
 <li class="toctree-l4"><a class="reference internal" href="faq.html#the-underwater-image-gets-black-at-depth">The underwater image gets black at depth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-gui-and-the-underwater-camera-differ">The GUI and the underwater camera differ</a></li>
 </ul>
 </li>
 </ul>
@@ -277,6 +279,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#ocean-current-parameters">Ocean current parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#water-optics-parameters">Water optics parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#underwater-camera-parameters">Underwater camera parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#underwater-rendering">Underwater rendering</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#thruster-command">Thruster command</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#services">Services</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#examples">Examples</a></li>
@@ -475,9 +478,23 @@ charts at 0.5 to 16 m in front of a camera, to see each water type:</p>
 </figcaption>
 </figure>
 </section>
+<section id="the-gui-view-and-every-camera-at-once">
+<h2>The GUI view, and every camera at once<a class="headerlink" href="#the-gui-view-and-every-camera-at-once" title="Link to this heading"></a></h2>
+<p>To see through the water in the GUI too, and in every camera without a
+plugin on each, include the <code class="docutils literal notranslate"><span class="pre">underwater_optics</span></code> model:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;include&gt;</span>
+<span class="w">  </span><span class="nt">&lt;uri&gt;</span>model://underwater_optics<span class="nt">&lt;/uri&gt;</span>
+<span class="nt">&lt;/include&gt;</span>
+</pre></div>
+</div>
+<p>The renderer then draws the water into every surface, on the GPU. An
+underwater camera plugin in the same world passes its image through, so the
+water is not applied twice. The sky and the water surface are not drawn
+through the water yet: point the GUI at a seabed or a structure.</p>
+</section>
 <section id="what-comes-next">
 <h2>What comes next<a class="headerlink" href="#what-comes-next" title="Link to this heading"></a></h2>
-<p>The same water in the GUI’s own view, then the vehicle’s own lights. The plan is in
+<p>The vehicle’s own lights. The plan is in
 <a class="reference external" href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/UNDERWATER_CAMERA_PLAN.md">UNDERWATER_CAMERA_PLAN.md</a>.</p>
 </section>
 </section>
