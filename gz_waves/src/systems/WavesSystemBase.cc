@@ -10,7 +10,9 @@
 
 #include "gz/sim/systems/WavesSystemBase.hh"
 
+#include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -337,6 +339,29 @@ void WavesSystemBase::PreUpdate(
   {
     waves::Advance(this->dataPtr->data, simTime);
     this->dataPtr->lastUpdateTime = simTime;
+
+    // Tell the backend when the next update falls: the first step whose
+    // time passes the throttle above, found with the same arithmetic so the
+    // hint is exactly the time that update will carry. A backend may then
+    // compute it in the background while the steps in between run.
+    if (_info.dt > std::chrono::steady_clock::duration::zero())
+    {
+      const double dt = std::chrono::duration<double>(_info.dt).count();
+      // Start a step short of the estimate and walk to the first that
+      // passes, so rounding never skips it.
+      auto steps = static_cast<std::int64_t>(updatePeriod / dt) - 1;
+      steps = std::max<std::int64_t>(steps, 1);
+      double next = simTime;
+      for (int i = 0; i < 4; ++i, ++steps)
+      {
+        next = std::chrono::duration<double>(
+            _info.simTime + steps * _info.dt).count();
+        if (next - simTime >= updatePeriod)
+          break;
+      }
+      if (next - simTime >= updatePeriod)
+        this->dataPtr->data.simulation->Prepare(next);
+    }
   }
 }
 
