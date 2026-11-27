@@ -133,6 +133,57 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   set(ament_cmake_uncrustify_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
+
+  find_package(ament_cmake_gtest REQUIRED)
+
+  # The drop model, without a world or a renderer.
+  ament_add_gtest(lens_drops_core_test test/lens_drops_core_test.cc)
+  if(TARGET lens_drops_core_test)
+    target_link_libraries(lens_drops_core_test ${PROJECT_NAME}_core)
+  endif()
+
+  # The drop map, on the CPU.
+  ament_add_gtest(drop_map_test test/drop_map_test.cc)
+  if(TARGET drop_map_test)
+    target_link_libraries(drop_map_test ${PROJECT_NAME}_core)
+  endif()
+
+  # The system in a world that does not render. The test sets a
+  # GZ_PARTITION of its own in its main, one per process.
+  ament_add_gtest(lens_drops_test test/lens_drops_test.cc TIMEOUT 120
+    SKIP_LINKING_MAIN_LIBRARIES)
+  if(TARGET lens_drops_test)
+    target_compile_definitions(lens_drops_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(lens_drops_test
+      gz-sim::core gz-transport::core gz-msgs::core)
+    # The system is loaded by name from the build tree, so the test runs
+    # before install.
+    # The pose world runs the world's wind too, from gz_wind's lib.
+    set_tests_properties(lens_drops_test PROPERTIES
+      ENVIRONMENT
+        "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:${gz_wind_DIR}/../../../lib")
+  endif()
+
+  # The drops show in a camera's images. Needs a GPU; skips without one,
+  # unless GZ_LENS_DROPS_EXPECT_GPU is set, when it fails.
+  # The bridge and the shaders are found in the build and source trees.
+  ament_add_gtest(lens_drops_camera_test test/lens_drops_camera_test.cc
+    TIMEOUT 300 SKIP_LINKING_MAIN_LIBRARIES)
+  if(TARGET lens_drops_camera_test)
+    target_compile_definitions(lens_drops_camera_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\""
+      "TEST_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/share/shaders\""
+      "TEST_BROKEN_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/broken_shaders\"")
+    target_link_libraries(lens_drops_camera_test
+      gz-sim::core gz-transport::core gz-msgs::core)
+    set(_camera_test_env
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}"
+      "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH}"
+      "GZ_LENS_DROPS_SHADER_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/shaders")
+    set_tests_properties(lens_drops_camera_test PROPERTIES
+      ENVIRONMENT "${_camera_test_env}")
+  endif()
 endif()
 
 ament_package()
