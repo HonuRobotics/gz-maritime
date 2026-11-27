@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2026 Open Source Robotics Foundation
+ * Copyright (C) 2026 Honu Robotics
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,9 +28,11 @@ namespace gz::sim::maritime
 /// \brief Keep the world's mark, which tells the reference cameras the
 /// renderer draws the water, true for one plugin instance.
 ///
-/// While it draws, the mark names it, also when the mark names another
-/// entity, such as an instance whose model was removed and that could not
-/// take the mark off. While it does not draw, it takes off a mark of its
+/// While it draws, the mark names it, unless it names another live
+/// instance: it takes over a mark whose entity is gone, such as an instance
+/// whose model was removed and that could not take the mark off, but two
+/// live instances do not pass it back and forth (each change is sent on
+/// the next state). While it does not draw, it takes off a mark of its
 /// own, or one whose entity is gone; it leaves one of another live
 /// instance.
 /// \param[in,out] _ecm The entity component manager.
@@ -47,7 +49,8 @@ inline void UpdateWorldMark(EntityComponentManager &_ecm, Entity _owner,
   {
     _ecm.CreateComponent(world, components::UnderwaterRendering(_owner));
   }
-  else if (_drawing && mark->Data() != _owner)
+  else if (_drawing && mark->Data() != _owner &&
+           !_ecm.HasEntity(mark->Data()))
   {
     mark->Data() = _owner;
     _ecm.SetChanged(world, components::UnderwaterRendering::typeId,

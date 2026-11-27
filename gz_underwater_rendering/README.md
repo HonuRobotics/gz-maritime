@@ -26,7 +26,8 @@ Include the `underwater_optics` model in a world that has water optics:
 
 The model is an invisible visual carrying the plugin, so it loads wherever
 the world is rendered: in the server's sensors and in every GUI. Cameras
-above the water are untouched.
+above the water see as in air, but for the lamps, which cast no shadows
+while the water is drawn (see the lamps below).
 
 ### Quality and speed
 
@@ -36,7 +37,7 @@ The plugin takes a `<quality>`: `low`, `medium` (the default) or `high`.
 |---|---|---|---|
 | Steps in each lamp's beam | 8 | 12 | 16 |
 | Marine snow drawn out to | 1.5 m | 3 m | 3 m |
-| Lamps used (the first in the scene) | 2 | 4 | 4 |
+| Lamps used (the first by name) | 2 | 4 | 4 |
 
 The `underwater_optics` model has no `<quality>`, so it is medium. For
 another, put the plugin on a visual of your own instead of including the
@@ -94,8 +95,8 @@ the camera's pose and the water come in the pass buffer.
 
 At depth, at night or in murky water, the vehicle's own lights are the only
 light. A spot or point light whose own name (after the model and link
-that scope it) contains `lamp`, in any case, is a lamp, up to four, the
-first by name; other lights are lit by Ogre as in air, with no beam, so a
+that scope it) contains `lamp`, in any case, is a lamp, up to four (two
+at `<quality>low`), the first by name; other lights are lit by Ogre as in air, with no beam, so a
 harbour light on a pier stays as it is. A lamp:
 
 - **It lights as Ogre would**: Ogre's default BRDF, diffuse and specular
@@ -109,7 +110,8 @@ harbour light on a pier stays as it is. A lamp:
   lamp's cone, ray-marched along each view ray (single scatter,
   Henyey–Greenstein phase function, g = 0.9). Each lamp is marched only
   over the part of the view ray it lights (inside its range and its cone),
-  in 12 steps spaced densely at the near end, over as far as light
+  in 8, 12 or 16 steps by `<quality>`, spaced densely at the near end,
+  over as far as light
   survives; a ray that misses the cone costs nothing.
 
 Lamps are ordinary SDF lights, on the vehicle or in the world:
@@ -233,8 +235,8 @@ off, set its intensity to 0: it then costs nothing.
   camera within a few centimetres of the surface can be under water in one
   and not in the other. With Gerstner waves, or `<update_rate>` 0, they
   agree.
-- **Lamps**: lights named `lamp` only, up to four (the others are lit by
-  Ogre, with a warning); lit by Ogre's default BRDF without clear coat, and
+- **Lamps**: lights named `lamp` only, up to four, two at `<quality>low`
+  (the others are lit by Ogre, with a warning); lit by Ogre's default BRDF without clear coat, and
   with no shadows, in air too; their beams show only where something is
   drawn behind them (the open water's background is not shaded). The
   reference camera has no lamps. A light that is not a lamp is lit by Ogre

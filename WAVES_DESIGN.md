@@ -120,7 +120,7 @@ GUI; each process/consumer rebuilds its own engine from it.
             ┌──────────────────────── server process ─────────────────────────┐
    SDF ───> gz-sim-waves-<engine>-system        (a WavesSystemBase subclass)    │
             │   • parses <wave>, reads world <gravity>                          │
-            │   • builds engine via MakeEngine()  ─────────┐                    │
+            │   • builds engine via EngineFactory() ───────┐                    │
             │   • advertises .../wave/set_parameters        v                   │
             │                                  components::Wavefield            │
             │                                  { algorithm, params,             │
@@ -280,12 +280,13 @@ protected virtuals:
 
 ```cpp
 protected: virtual std::string EngineToken() const = 0;                 // "fft", "gerstner", …
-protected: virtual std::shared_ptr<waves::IWaveField>
-             MakeEngine(const waves::WaveParameters &_params) const = 0; // build + SetParameters
+protected: virtual waves::WaveEngineFactory EngineFactory() const = 0;   // &Make<Name>WaveField
 ```
 
 The base: parses `<update_rate>` + the `<wave>` block, reads world `<gravity>`,
-builds the engine, writes the `Wavefield` component (with `generation = 1`), and
+registers the factory under the token (so any consumer on the server, such as
+a renderer on another thread, can build an engine of its own from the recipe),
+builds the engine through it, writes the `Wavefield` component (with `generation = 1`), and
 advertises **`/world/<name>/wave/set_parameters`** (a `gz.msgs.Param` →
 `gz.msgs.Boolean` service). `PreUpdate` drains queued parameter updates
 (bumping `generation`), re-points the engine if an ECM deserialize cleared it,
@@ -325,7 +326,7 @@ engine (no engine dependency, no cycle).
   tiles with no edge seams. `ω` and the steepness clamp are recomputed from the
   snapped wavenumber.
 - **Source system** `gz-sim-waves-gerstner-system` (`GerstnerWaves : WavesSystemBase`):
-  `EngineToken()` ⇒ `"gerstner"`, `MakeEngine()` ⇒ builds + configures the engine.
+  `EngineToken()` ⇒ `"gerstner"`, `EngineFactory()` ⇒ `&MakeGerstnerWaveField`.
   Its doc block documents the Gerstner SDF surface: `<model>` (PMS/CWR),
   `<number>`, `<period>`, `<amplitude>` (CWR), `<direction>`, `<angle>`,
   `<scale>`, `<steepness>`, `<phase>`, `<tau>`, `<gain>`, `<sea_state>`.
@@ -647,13 +648,12 @@ namespace gz::sim::systems {
 class <Name>Waves : public WavesSystemBase {
   // Documentation inherited
   protected: std::string EngineToken() const override { return "<name>"; }
-  // Documentation inherited
-  protected: std::shared_ptr<waves::IWaveField>
-    MakeEngine(const waves::WaveParameters &_params) const override {
-      auto e = waves::Make<Name>WaveField();
-      e->SetParameters(_params);
-      return e;
-    }
+  // Documentation inherited. The base registers it under the token on the
+  // server, so nothing else is needed there: a consumer that builds its own
+  // engine from the recipe finds it.
+  protected: waves::WaveEngineFactory EngineFactory() const override {
+    return &waves::Make<Name>WaveField;
+  }
 };
 }  // namespace gz::sim::systems
 GZ_ADD_PLUGIN(gz::sim::systems::<Name>Waves, gz::sim::System,

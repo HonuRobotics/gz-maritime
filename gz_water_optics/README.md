@@ -122,11 +122,21 @@ A camera at depth z sees an object of colour J (as lit) at range r as
 I = J · exp(−β^D r) + Veil(z) · (1 − exp(−β^B r))
 ```
 
-`Depth` is the same in every process. Where the wave field's engine is not
-there (the GUI and the sensors receive the wave recipe only), the sampler
-builds one of its own from the recipe, as the water's visual does; it needs
-the wave engine's plugin in that process, which the water surface model
-loads.
+`Depth` is the same in every process, up to the wave source's update
+rate. Where the wave field's engine is not there (the GUI and the sensors
+receive the wave recipe only), and on any thread but the one that calls
+`Sync`, the sampler builds one of its own from the recipe, as the water's
+visual does. That engine goes to the exact time, while the source's holds
+its last update: on a 1.2 m FFT sea updated at the default 30 Hz the two
+differ by up to 7 cm, so a camera on the server and the drawn water can
+sit that far apart. With Gerstner waves, or `update_rate` 0, they agree.
+It needs the wave engine registered in that process: the wave systems do
+it on the server, and the water surface model's plugin in the GUI. One
+registered later is picked up then.
+
+One thread calls `Sync`, always the same, at a time the simulation is not
+advancing the waves (a system's `PreUpdate` or `PostUpdate`); every other
+call is safe from any thread.
 
 A world without the system has clear water: nothing fades and there is no
 veil.

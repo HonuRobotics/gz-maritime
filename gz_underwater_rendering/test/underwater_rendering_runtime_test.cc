@@ -98,7 +98,7 @@ void Add(transport::Node &_node)
 }
 }  // namespace
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // <enabled>false from the start: as without the GPU path.
 TEST(UnderwaterRenderingRuntime, DisabledFromTheStart)
 {
@@ -108,7 +108,7 @@ TEST(UnderwaterRenderingRuntime, DisabledFromTheStart)
   ExpectAsWithout(off, CaptureWorld("gpu_disabled.sdf"), "disabled");
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The GPU path turned off and on while running, and its model removed. One
 // process, in order: once installed, the renderer stays installed for the
 // rest of the process, drawing nothing when told so.

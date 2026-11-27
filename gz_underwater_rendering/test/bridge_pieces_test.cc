@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2026 Open Source Robotics Foundation
+ * Copyright (C) 2026 Honu Robotics
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ std::string Text(const Ogre::ArchiveVec &_library)
 const std::vector<std::string> kHooks{"custom_a", "custom_b"};
 }  // namespace
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 TEST(Pieces, DefinitionsWithAnySpacing)
 {
   EXPECT_EQ(1u, Definitions("@piece( custom_a )", "custom_a").size());
@@ -69,7 +69,7 @@ TEST(Pieces, DefinitionsWithAnySpacing)
                             "custom_a").size());
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A piece that only inserts others takes our line before its @end; one
 // that does anything else is refused, as is one with no @end.
 TEST(Pieces, InsertOnlyIntoComposites)
@@ -96,7 +96,7 @@ TEST(Pieces, InsertOnlyIntoComposites)
   EXPECT_FALSE(InsertIntoComposite(open, 0, 18, line));
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Chaining: a hook gz-rendering defines gets our line in a copy of its
 // archive, the original untouched; a hook nobody defines is defined by us,
 // last.
@@ -121,7 +121,7 @@ TEST(Pieces, ChainCopiesAndDefines)
   EXPECT_EQ(2u, owned.size());
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A hook defined twice, in one archive or across two, or defined by code
 // we cannot extend: refused, the library unchanged.
 TEST(Pieces, ChainRefuses)
@@ -143,7 +143,7 @@ TEST(Pieces, ChainRefuses)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Our pieces must define each hook's piece, or nothing is installed.
 TEST(Pieces, OursMustDefineEveryHook)
 {
@@ -155,7 +155,7 @@ TEST(Pieces, OursMustDefineEveryHook)
   EXPECT_FALSE(Defines(some.get(), kHooks, "underwater"));
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The pieces shipped with the package define every hook the bridge uses.
 TEST(Pieces, ShippedPiecesDefineEveryHook)
 {
@@ -170,7 +170,7 @@ TEST(Pieces, ShippedPiecesDefineEveryHook)
   EXPECT_TRUE(Defines(ours.get(), kPbsHooks, "underwater"));
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The caustics' phases, wrapped in double before the shader's float: the
 // same pattern as the unwrapped phase however long the world has run, and
 // no jump from one frame to the next.

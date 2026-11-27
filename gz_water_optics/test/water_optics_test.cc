@@ -503,9 +503,17 @@ TEST(WaterOpticsSystem, BadWorldFileGivesClearWaterUntilAGoodMessage)
     EXPECT_FALSE(run.valid);
     EXPECT_EQ(run.sampler.Data().attenuation, Rgb::Zero);
 
+    // The reset forgot the message's water too: a message that names no
+    // type brings the default one, not the 5C sent before the reset
+    Send(node, "/world/" + world + "/water_optics/set",
+         SetNumber("water_level", 1.5));
+    ASSERT_TRUE(StepPast(run, 0));
+    EXPECT_EQ(run.optics.jerlov, "1C");
+    EXPECT_DOUBLE_EQ(run.optics.waterLevel, 1.5);
+
     // The same water as before the reset brings it back
     Send(node, "/world/" + world + "/water_optics/set", Set("jerlov", "5C"));
-    EXPECT_TRUE(StepPast(run, 0));
+    EXPECT_TRUE(StepPast(run, run.optics.generation));
     EXPECT_EQ(run.optics.jerlov, "5C");
   }
 }
@@ -523,6 +531,19 @@ TEST(WaterOpticsSystem, ExplicitColoursFromTheWorldFile)
   EXPECT_EQ(run.optics.backscatter, Rgb(0.9, 0.4, 0.2));
   EXPECT_EQ(run.optics.veil, Rgb(0.1, 0.2, 0.3));
   EXPECT_EQ(run.optics.diffuseAttenuation, Rgb(0.2, 0.1, 0.05));
+
+  // What was ignored is not kept: the world file's visibility of 150 m,
+  // clearer than any water, goes with all four coefficients given. With
+  // one of them taken away the type is used again, the default one, and
+  // the change is not refused for that visibility.
+  {
+    transport::Node node;
+    const std::uint64_t before = run.optics.generation;
+    Send(node, "/world/optics_explicit/water_optics/set",
+         Set("attenuation", ""));
+    ASSERT_TRUE(StepPast(run, before)) << "refused";
+    EXPECT_EQ(run.optics.jerlov, "1C");
+  }
 
   Sim veil("optics_veil.sdf");
   veil.Steps(2);

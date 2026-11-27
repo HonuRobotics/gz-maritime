@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2026 Open Source Robotics Foundation
+ * Copyright (C) 2026 Honu Robotics
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ struct World
 };
 }  // namespace
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 TEST(WorldMark, OnWhileDrawingOffWhenNot)
 {
   World w;
@@ -67,7 +67,7 @@ TEST(WorldMark, OnWhileDrawingOffWhenNot)
   EXPECT_EQ(kNullEntity, w.Mark());
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // An instance's model removed while it drew, and a new one: the mark is the
 // new one's as soon as it draws, even if its first update comes after.
 TEST(WorldMark, TakenOverFromARemovedInstance)
@@ -83,7 +83,27 @@ TEST(WorldMark, TakenOverFromARemovedInstance)
   EXPECT_EQ(w.b, w.Mark());
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
+// Two live instances both drawing: the mark stays with the first, and is
+// not passed back and forth, which would send the state on every step.
+TEST(WorldMark, TwoLiveInstancesDoNotTradeIt)
+{
+  World w;
+  UpdateWorldMark(w.ecm, w.a, true);
+  w.ecm.SetAllComponentsUnchanged();
+  for (int i = 0; i < 10; ++i)
+  {
+    UpdateWorldMark(w.ecm, w.b, true);
+    UpdateWorldMark(w.ecm, w.a, true);
+    EXPECT_EQ(w.a, w.Mark()) << "step " << i;
+  }
+  EXPECT_EQ(ComponentState::NoChange,
+            w.ecm.ComponentState(w.world,
+                components::UnderwaterRendering::typeId))
+      << "the mark changed hands";
+}
+
+//////////////////////////////////////////////////
 // Not drawing yet: a mark whose entity is gone comes off, one of another
 // live instance stays.
 TEST(WorldMark, NotDrawing)
