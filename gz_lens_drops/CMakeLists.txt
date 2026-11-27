@@ -121,6 +121,12 @@ target_link_libraries(gz-maritime-lens-drops-system PRIVATE
 install(TARGETS gz-maritime-lens-drops-system
   LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
 
+# GZ_SIM_SYSTEM_PLUGIN_PATH, so gz-sim finds the system in an isolated
+# colcon layout too, not only through another package's hook in a merged
+# one. The shaders' path is compiled in.
+ament_environment_hooks("hooks/hook.dsv.in")
+ament_environment_hooks("hooks/hook.sh.in")
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)

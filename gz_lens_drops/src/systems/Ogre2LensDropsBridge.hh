@@ -30,7 +30,7 @@
 #include <stdint.h>
 
 /// \brief The version of this ABI. Change it with any function below.
-#define LENS_DROPS_OGRE2_ABI 3
+#define LENS_DROPS_OGRE2_ABI 4
 
 extern "C"
 {
@@ -50,6 +50,13 @@ extern "C"
   typedef const float *(*lens_drops_pull_t)(void *_context, double _stamp,
       float *_focus, int *_enabled);
 
+  /// \brief Whether the pass is wanted for the next frame: the lens wet
+  /// and the drops enabled. Asked before the frame's passes are chained,
+  /// so the first wet frame has its drops. Render thread; cheap.
+  /// \param[in] _context The context given to lens_drops_ogre2_create.
+  /// \return Non-zero if wanted.
+  typedef int (*lens_drops_wanted_t)(void *_context);
+
   /// \brief The version of this ABI.
   /// \return LENS_DROPS_OGRE2_ABI.
   int lens_drops_ogre2_abi_version(void);
@@ -60,12 +67,14 @@ extern "C"
   /// \param[in] _mapWidth Texels across the drop map, in [1, 4096].
   /// \param[in] _mapHeight Texels down the drop map, in [1, 4096].
   /// \param[in] _pull Called right before each frame; not NULL.
-  /// \param[in] _context Passed to _pull.
+  /// \param[in] _wanted Asked whether the next frame needs the pass; not
+  /// NULL.
+  /// \param[in] _context Passed to _pull and _wanted.
   /// \return The handle, or NULL if an argument is NULL, empty or out of
   /// range.
   lens_drops_pass_t lens_drops_ogre2_create(const char *_vs, const char *_fs,
       int _mapWidth, int _mapHeight, lens_drops_pull_t _pull,
-      void *_context);
+      lens_drops_wanted_t _wanted, void *_context);
 
   /// \brief Add the pass to a camera, after the passes it already has. The
   /// camera then owns it. Render thread.
