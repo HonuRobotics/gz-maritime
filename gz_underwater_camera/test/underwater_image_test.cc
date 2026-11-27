@@ -713,6 +713,95 @@ TEST(Optics, ObjectsSpreadByTheirOwnRange)
 }
 
 /////////////////////////////////////////////////
+// The other side of a depth edge: a dark plate 0.5 m away beside a bright
+// wall 6 m away, or beside the bright sky seen through the surface. The far
+// light reaches the plate only through the water in front of the plate, so
+// it spreads into the plate no further than the plate's own range says.
+// Clear water, so the far light stays bright and its spread is wide.
+TEST(Optics, NearDarkTakesLittleFromFarBright)
+{
+  const Intrinsics k = Camera(200, 80, 1.0);
+  const RayTable rays(k);
+  Water clear;
+  clear.cameraDepth = 1.0;
+  Optics optics;
+  optics.forwardScatter = 0.02;
+  const double plateSigma = k.fx * optics.forwardScatter * 0.5;
+  // Look from 4 plate sigmas into the plate, away from the edge
+  const std::uint32_t to =
+      k.width / 2 - static_cast<std::uint32_t>(std::ceil(4 * plateSigma)) - 2;
+  ASSERT_GT(to, 20u);
+  for (const bool wall : {true, false})
+  {
+    std::vector<std::uint8_t> rgb;
+    std::vector<float> z;
+    Uniform(k, 10, 10, 10, 0.5f, rgb, z);
+    for (std::uint32_t v = 0; v < k.height; ++v)
+    {
+      for (std::uint32_t u = k.width / 2; u < k.width; ++u)
+      {
+        const std::size_t i = v * k.width + u;
+        z[i] = wall ? 6.0f : std::numeric_limits<float>::infinity();
+        for (int c = 0; c < 3; ++c)
+          rgb[3 * i + c] = 255;
+      }
+    }
+    std::mt19937 rng(1);
+    std::vector<std::uint8_t> blurred, sharp;
+    MakeUnderwater(rgb, z, rays, clear, Response{}, rng, blurred, optics);
+    MakeUnderwater(rgb, z, rays, clear, Response{}, rng, sharp);
+    // Beside the sky only above the horizon, where rays climb to the surface
+    const std::vector<std::uint32_t> rows = wall ?
+        std::vector<std::uint32_t>{8u, k.height / 2, k.height - 8} :
+        std::vector<std::uint32_t>{4u, 8u};
+    for (const std::uint32_t v : rows)
+    {
+      int worst = 0;
+      for (std::uint32_t u = 0; u < to; ++u)
+      {
+        for (int c = 0; c < 3; ++c)
+        {
+          const std::size_t i = 3 * (v * k.width + u) + c;
+          worst = std::max(worst, std::abs(int(blurred[i]) - int(sharp[i])));
+        }
+      }
+      EXPECT_LE(worst, 1) << (wall ? "wall" : "sky") << ", row " << v
+                          << ": far light spread into the near plate";
+    }
+    // The far side does take the plate's dark, at the edge
+    const std::size_t edge = 3 * (8 * k.width + k.width / 2 + 1);
+    EXPECT_LT(blurred[edge] + 5, sharp[edge]) << "no forward scatter at all";
+  }
+}
+
+/////////////////////////////////////////////////
+// One colour and only a depth step, in clear water: forward scatter has
+// nothing to show, and the image stays flat on both sides of the edge.
+TEST(Optics, DepthStepAloneStaysFlat)
+{
+  const Intrinsics k = Camera(200, 80, 1.0);
+  const RayTable rays(k);
+  Water clear;
+  clear.cameraDepth = 2.0;
+  Optics optics;
+  optics.forwardScatter = 0.02;
+  std::vector<std::uint8_t> rgb;
+  std::vector<float> z;
+  Uniform(k, 128, 128, 128, 0.5f, rgb, z);
+  for (std::uint32_t v = 0; v < k.height; ++v)
+    for (std::uint32_t u = k.width / 2; u < k.width; ++u)
+      z[v * k.width + u] = 3.0f;
+  std::mt19937 rng(1);
+  std::vector<std::uint8_t> blurred, sharp;
+  MakeUnderwater(rgb, z, rays, clear, Response{}, rng, blurred, optics);
+  MakeUnderwater(rgb, z, rays, clear, Response{}, rng, sharp);
+  int worst = 0;
+  for (std::size_t i = 0; i < blurred.size(); ++i)
+    worst = std::max(worst, std::abs(int(blurred[i]) - int(sharp[i])));
+  EXPECT_LE(worst, 1) << "a depth step alone changed the image";
+}
+
+/////////////////////////////////////////////////
 // A flat port: a point at radius r_src in the rendered image appears at the
 // radius the refraction model gives, within half a pixel; a dome port
 // changes nothing.
