@@ -112,10 +112,9 @@ python3 docs/_tools/underwater_camera_figures.py
 
 The waters in them are **illustrative** (clear, coastal, turbid) until PR 1
 brings the Jerlov table; the script then reads the table, and the figures
-are the expected results for each preset, as far as the table is right. It
-comes from a transcription of Solonenko and Mobley (2015) that is not yet
-checked against the printed paper, so until it is, the figures check the
-code against the table, not the water against the sea.
+are the expected results for each preset. The table is Solonenko and
+Mobley (2015), checked against the paper in review; its `II` and `III` are
+the paper's model, which scatters more than measured open ocean.
 
 ### Test scenes
 

@@ -16,6 +16,10 @@
  */
 #include "gz/sim/underwater_camera/UnderwaterImage.hh"
 
+#ifdef __linux__
+#include <sched.h>
+#endif
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -70,15 +74,29 @@ double Luminance(const Rgb &_c)
 /// \brief SetMaxThreads's value
 std::atomic<unsigned int> gMaxThreads{0};
 
+/// \brief The cores this process may run on: its CPU affinity, which a
+/// container's cpuset limits, or the machine's.
+unsigned int Cores()
+{
+#ifdef __linux__
+  cpu_set_t set;
+  if (sched_getaffinity(0, sizeof(set), &set) == 0)
+    return std::max(1, CPU_COUNT(&set));
+#endif
+  return std::max(1u, std::thread::hardware_concurrency());
+}
+
 /// \brief Threads kept for ParallelFor, made on first use: one fewer than
 /// the cores, at most 15, so a frame does not start threads of its own.
-/// Several callers (several cameras) can use it at once.
+/// Several callers (several cameras) can use it at once. Never destroyed:
+/// an object that makes a frame while the process exits, or a forked child
+/// that exits, finds it there, rather than joining threads that are gone.
 class Pool
 {
   public: static Pool &Instance()
   {
-    static Pool pool;
-    return pool;
+    static Pool *pool = new Pool();
+    return *pool;
   }
 
   /// \brief Queue a task.
@@ -109,7 +127,7 @@ class Pool
 
   private: Pool()
   {
-    const unsigned int cores = std::max(1u, std::thread::hardware_concurrency());
+    const unsigned int cores = Cores();
     for (unsigned int i = 0; i + 1 < std::min(cores, 16u); ++i)
     {
       try
@@ -124,17 +142,6 @@ class Pool
     }
   }
 
-  private: ~Pool()
-  {
-    {
-      const std::lock_guard<std::mutex> lock(this->mutex);
-      this->stop = true;
-    }
-    this->cv.notify_all();
-    for (auto &t : this->threads)
-      t.join();
-  }
-
   private: void Work()
   {
     for (;;)
@@ -142,9 +149,7 @@ class Pool
       std::function<void()> task;
       {
         std::unique_lock<std::mutex> lock(this->mutex);
-        this->cv.wait(lock, [this]() { return this->stop || !this->tasks.empty(); });
-        if (this->stop && this->tasks.empty())
-          return;
+        this->cv.wait(lock, [this]() { return !this->tasks.empty(); });
         task = std::move(this->tasks.front());
         this->tasks.pop_front();
       }
@@ -156,15 +161,13 @@ class Pool
   private: std::condition_variable cv;
   private: std::deque<std::function<void()>> tasks;
   private: std::vector<std::thread> threads;
-  private: bool stop{false};
 };
 
 void ParallelFor(std::size_t _n, std::size_t _grain,
                  const std::function<void(std::size_t, std::size_t)> &_work)
 {
   const unsigned int cap = gMaxThreads.load();
-  const std::size_t cores = cap > 0 ? cap :
-      std::max(1u, std::thread::hardware_concurrency());
+  const std::size_t cores = cap > 0 ? cap : Cores();
   const std::size_t pieces = std::min<std::size_t>(
       std::min<std::size_t>(cores, 16), _n / std::max<std::size_t>(1, _grain));
   if (pieces < 2)
@@ -200,11 +203,24 @@ void ParallelFor(std::size_t _n, std::size_t _grain,
       latch.cv.notify_all();
   };
   auto &pool = Pool::Instance();
-  for (std::size_t p = 1; p < pieces; ++p)
+  std::size_t queued = 1;
+  try
   {
-    const std::size_t begin = _n * p / pieces, end = _n * (p + 1) / pieces;
-    pool.Push([&run, begin, end]() { run(begin, end); });
+    for (; queued < pieces; ++queued)
+    {
+      const std::size_t begin = _n * queued / pieces;
+      const std::size_t end = _n * (queued + 1) / pieces;
+      pool.Push([&run, begin, end]() { run(begin, end); });
+    }
   }
+  catch (...)
+  {
+    // Out of memory for the queue: the pieces not queued run here, so every
+    // piece has run, and nothing on this stack is still used, before this
+    // returns or throws
+  }
+  for (std::size_t p = queued; p < pieces; ++p)
+    run(_n * p / pieces, _n * (p + 1) / pieces);
   run(0, _n / pieces);
   // Help with what is queued, this call's or another's, rather than wait
   // idle: nothing waits on a pool with no thread free
@@ -430,8 +446,12 @@ double FlatPortSource(double _r, double _f, double _n)
 
 namespace
 {
-/// \brief A blur whose sigma, in pixels, varies per pixel: a few levels,
-/// each pixel interpolating between the two around its sigma.
+/// \brief A blur whose sigma, in pixels, varies per pixel, spread from
+/// each source pixel with its own sigma: the light of a near object spreads
+/// as little as the near object's range says, onto open water or a far wall
+/// beside it alike, and no light is made or lost at a depth edge. A few
+/// levels of sigma; each pixel's light is shared between the two levels
+/// around its sigma, each level's share blurred once, and the shares added.
 void VariableBlur(std::vector<Rgb> &_img, std::uint32_t _w, std::uint32_t _h,
                   const std::vector<double> &_sigma)
 {
@@ -443,8 +463,9 @@ void VariableBlur(std::vector<Rgb> &_img, std::uint32_t _w, std::uint32_t _h,
   std::vector<double> levels{0.0};
   for (double s = 0.5; s < maxSigma * 1.25; s *= 1.25)
     levels.push_back(s);
-  // The level under each pixel's sigma: it reads that level and the next.
+  // The level under each pixel's sigma, and its share of the next
   std::vector<std::uint16_t> under(_sigma.size());
+  std::vector<float> share(_sigma.size(), 0.0f);
   std::vector<char> used(levels.size(), 0);
   for (std::size_t i = 0; i < _sigma.size(); ++i)
   {
@@ -453,49 +474,44 @@ void VariableBlur(std::vector<Rgb> &_img, std::uint32_t _w, std::uint32_t _h,
       ++k;
     under[i] = static_cast<std::uint16_t>(k);
     used[k] = 1;
+    if (k + 1 < levels.size())
+    {
+      share[i] = static_cast<float>(
+          std::clamp((_sigma[i] - levels[k]) / (levels[k + 1] - levels[k]),
+                     0.0, 1.0));
+      if (share[i] > 0.0f)
+        used[k + 1] = 1;
+    }
   }
-  // Two levels at a time, lowest first, from the image as it came: the
-  // pixels between them are done, then the upper level becomes the lower.
   const std::vector<Rgb> src = _img;
-  const auto blur = [&](std::size_t _k)
-  {
-    std::vector<Rgb> b = src;
-    if (_k > 0)
-      GaussianBlur(b, _w, _h, levels[_k]);
-    return b;
-  };
-  std::vector<Rgb> lo, hi;
-  std::size_t loLevel = levels.size();
+  std::fill(_img.begin(), _img.end(), Rgb(0, 0, 0));
+  std::vector<Rgb> part(src.size());
   for (std::size_t k = 0; k < levels.size(); ++k)
   {
     if (!used[k])
       continue;
-    if (loLevel != k)
-      lo = blur(k);
-    const bool top = k + 1 >= levels.size();
-    if (!top)
-      hi = blur(k + 1);
-    ParallelFor(_img.size(), 1 << 14,
+    // This level's share of every pixel
+    ParallelFor(src.size(), 1 << 14,
         [&](std::size_t _begin, std::size_t _end)
     {
       for (std::size_t i = _begin; i < _end; ++i)
       {
-        if (under[i] != k)
-          continue;
-        if (top)
-        {
-          _img[i] = lo[i];
-          continue;
-        }
-        const double t = (_sigma[i] - levels[k]) / (levels[k + 1] - levels[k]);
-        _img[i] = lo[i] * (1.0 - t) + hi[i] * t;
+        double w = 0.0;
+        if (under[i] == k)
+          w = 1.0 - share[i];
+        else if (under[i] + 1u == k)
+          w = share[i];
+        part[i] = src[i] * w;
       }
     });
-    if (!top)
+    if (k > 0)
+      GaussianBlur(part, _w, _h, levels[k]);
+    ParallelFor(src.size(), 1 << 14,
+        [&](std::size_t _begin, std::size_t _end)
     {
-      lo.swap(hi);
-      loLevel = k + 1;
-    }
+      for (std::size_t i = _begin; i < _end; ++i)
+        _img[i] += part[i];
+    });
   }
 }
 
@@ -559,6 +575,11 @@ FrameStats MakeUnderwater(const std::vector<std::uint8_t> &_rgb,
   const double inf = std::numeric_limits<double>::infinity();
   std::vector<Rgb> img(n);
   std::vector<double> ranges(n, 0.0);
+  // The veil of each pixel, kept apart where forward scatter spreads the
+  // light from the objects: the veil is light scattered already, not
+  // spread again
+  const bool scatter = _water.cameraDepth > 0 && _optics.forwardScatter > 0.0;
+  std::vector<Rgb> veils(scatter ? n : 0);
   // Two stages: the water, only under it; then the camera's own response,
   // always, so its gain and noise do not switch off above the water, or
   // when the renderer has drawn the water already.
@@ -607,25 +628,38 @@ FrameStats MakeUnderwater(const std::vector<std::uint8_t> &_rgb,
         // renderer drew it, seen through w of water.
         lit.Set(lin[_rgb[3 * i]], lin[_rgb[3 * i + 1]], lin[_rgb[3 * i + 2]]);
       }
-      Rgb out;
+      Rgb out, veil;
       for (int c = 0; c < 3; ++c)
       {
         const double t = std::isfinite(w)
             ? std::exp(-_water.attenuation[c] * w) : 0.0;
         const double b = std::isfinite(w)
             ? 1.0 - std::exp(-_water.backscatter[c] * w) : 1.0;
-        out[c] = lit[c] * t + _water.veil[c] * b;
+        out[c] = lit[c] * t;
+        veil[c] = _water.veil[c] * b;
       }
-      img[i] = out;
-      // Nothing hit and nothing behind: the veil, the same everywhere, is
-      // not blurred, so the objects around it do not bleed into it
+      if (scatter)
+      {
+        img[i] = out;
+        veils[i] = veil;
+      }
+      else
+      {
+        img[i] = out + veil;
+      }
+      // Forward scatter spreads each pixel's direct light by its own path
+      // through the water: an object's by its range, the sky's through the
+      // surface by the way up. Open water below has no direct light, only
+      // the veil, which is not spread: objects' light spreads onto it by
+      // their range, not by the water's.
       ranges[i] = std::isfinite(w) ? w : 0.0;
     }
   }
   });
 
-  // Forward scatter: a blur growing with the range through the water.
-  if (stats.underwater && _optics.forwardScatter > 0.0)
+  // Forward scatter: the light from the objects spread, each by its range
+  // through the water.
+  if (scatter)
   {
     std::vector<double> sigma(n);
     // At most 40 pixels: wider costs more levels and changes little, the
@@ -633,6 +667,8 @@ FrameStats MakeUnderwater(const std::vector<std::uint8_t> &_rgb,
     for (std::size_t i = 0; i < n; ++i)
       sigma[i] = std::min(40.0, k.fx * _optics.forwardScatter * ranges[i]);
     VariableBlur(img, k.width, k.height, sigma);
+    for (std::size_t i = 0; i < n; ++i)
+      img[i] += veils[i];
   }
   // The port: a flat one refracts; a dome centred on the lens does not.
   // Out of the water there is air on both sides: nothing to refract.

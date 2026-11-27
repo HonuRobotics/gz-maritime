@@ -148,7 +148,10 @@ struct Optics
 {
   /// \brief Forward scatter: a Gaussian blur whose width grows with range,
   /// sigma = forwardScatter * range radians (so fx * forwardScatter * range
-  /// pixels). Zero for none.
+  /// pixels), at most 40 pixels. Each object's light spreads by its own
+  /// range; open water, which hit nothing, does not spread. Through the
+  /// levels it is made of, a sigma under 1 pixel comes out smaller (0.40 px
+  /// as about 0.24), and from 1 pixel up within 13 %. Zero for none.
   double forwardScatter{0.0};
 
   /// \brief The port in front of the lens.
