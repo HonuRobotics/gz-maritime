@@ -49,6 +49,9 @@ inline constexpr double kMinRadius = 0.002;
 /// \brief Largest radius of a new drop, in image heights.
 inline constexpr double kMaxRadius = 0.05;
 
+/// \brief Largest rim wobble of a new drop, as a share of its radius.
+inline constexpr double kMaxWobble = 0.15;
+
 /// \brief A drop never grows past this radius by merging.
 inline constexpr double kMaxMergedRadius = 0.12;
 

@@ -347,7 +347,7 @@ void Drops::StepOnce(double _dt)
       d.x = x;
       d.y = y;
       d.radius = radius;
-      d.wobble = static_cast<float>(0.15 * w);
+      d.wobble = static_cast<float>(kMaxWobble * w);
       d.phaseA = static_cast<float>(kTwoPi * a);
       d.phaseB = static_cast<float>(kTwoPi * b);
       d.markX = x;
