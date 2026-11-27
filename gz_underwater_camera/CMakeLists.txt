@@ -116,7 +116,7 @@ if(BUILD_TESTING)
       gz-msgs::core)
     set_tests_properties(underwater_camera_test PROPERTIES
       ENVIRONMENT
-      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};GZ_PARTITION=gz_underwater_camera_test")
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH}")
   endif()
 
   # The plugin fed frames by the test, in worlds with nothing rendered: no
@@ -132,7 +132,7 @@ if(BUILD_TESTING)
       gz-msgs::core)
     set_tests_properties(underwater_camera_frames_test PROPERTIES
       ENVIRONMENT
-      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};GZ_PARTITION=gz_underwater_camera_frames_test")
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH}")
   endif()
 endif()
 

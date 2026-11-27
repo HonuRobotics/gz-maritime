@@ -40,6 +40,10 @@ using Rgb = math::Vector3d;
 /// camera, and an eye, is most sensitive in.
 constexpr double kVisibilityConstant{4.8};
 
+/// \brief The shortest visibility a world can ask for, m. Below it the
+/// water is mud, and the numbers lose their meaning.
+constexpr double kMinVisibility{0.1};
+
 /// \brief What a world asks for: a water type, a visibility, explicit
 /// coefficients, each optional. Resolve turns it into the water's optics.
 struct WaterOpticsSpec

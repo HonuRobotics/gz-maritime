@@ -33,8 +33,10 @@ namespace gz::sim::water_optics
 // and b reproduce. Taken from the transcription of those tables in
 // https://github.com/tishibashi-cpu/jerlov (Apache-2.0),
 // jerlov/data/solonenko2015_iop.csv, which checks the transcription against
-// the paper's own equations (its DATA.md); not yet checked against the
-// printed tables by us.
+// the paper's own equations (its DATA.md). Checked against the paper's
+// tables in review: a and b equal them, K_d equals its modelled column.
+// II and III scatter much more than measured ocean water, about two and
+// three and a half times: that is the paper's model, not a typo here.
 //
 // One exception, 5C at 625 nm: the printed row of Table 7 there is a
 // corrupted copy of the 300-400 nm rows (DATA.md section 1). a and b there

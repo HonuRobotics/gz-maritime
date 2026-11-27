@@ -19,8 +19,11 @@
 #include <gz/msgs/camera_info.pb.h>
 #include <gz/msgs/image.pb.h>
 
+#include <unistd.h>
+
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <functional>
 #include <cstring>
 #include <map>
@@ -44,6 +47,15 @@ namespace uc = underwater_camera;
 
 namespace
 {
+/// \brief A transport partition of this process's own, set before any
+/// node is made, so copies of the test run at once do not hear each other.
+const bool kOwnPartition = []
+{
+  const std::string partition =
+      "gz_underwater_camera_test_" + std::to_string(getpid());
+  return setenv("GZ_PARTITION", partition.c_str(), 1) == 0;
+}();
+
 /// \brief Frames of one camera, by stamp: in air, depth, under water.
 struct Frames
 {
@@ -97,7 +109,6 @@ class UnderwaterCameraTest : public ::testing::Test
     this->under.Listen(this->node, "/uwcam/under");
     this->pitched.Listen(this->node, "/uwcam/pitched");
     this->above.Listen(this->node, "/uwcam/above");
-    this->server->Run(false, 0, false);
   }
 
   protected: void TearDown() override
@@ -105,7 +116,9 @@ class UnderwaterCameraTest : public ::testing::Test
     this->server.reset();
   }
 
-  /// \brief Wait for a stamp with all three frames from a camera.
+  /// \brief Wait for a stamp with all three frames from a camera, stepping
+  /// the world: a server on a thread of its own can hang when it is
+  /// destroyed (gz-sim 10.5, in its Sensors system).
   /// \return The stamp; none if nothing came, and then `rendered` says
   /// whether the camera rendered at all (no GPU, if not).
   protected: std::optional<std::int64_t> WaitFor(Frames &_f)
@@ -114,7 +127,8 @@ class UnderwaterCameraTest : public ::testing::Test
     {
       if (auto s = _f.Matched())
         return s;
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      this->server->Run(true, 10, false);
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
       const std::lock_guard<std::mutex> lock(_f.mutex);
       if (i == 200 && _f.image.empty())
         break;

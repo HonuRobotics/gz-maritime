@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!--
   Open water: nothing but the surface above. One camera 6 m deep looks
-  ahead, one 2 m above the water looks ahead. The water is thick (4 m of
+  ahead, and an RGBD camera beside it; one 2 m above the water looks ahead. The water is thick (4 m of
   visibility in the green), the background nearly white.
 -->
 <sdf version="1.9">
@@ -25,6 +25,8 @@
     <model name="rig"><static>true</static>
       <link name="under"><pose>0 0 -6 0 0 0</pose><sensor name="cam" type="camera"><topic>uwopen/under</topic><update_rate>10</update_rate><always_on>1</always_on>
         <camera><horizontal_fov>1.4</horizontal_fov><image><width>160</width><height>120</height></image><clip><near>0.1</near><far>100</far></clip></camera></sensor></link>
+      <link name="rgbd"><pose>0 0 -6 0 0 0</pose><sensor name="rgbd" type="rgbd_camera"><topic>uwopen/rgbd</topic><update_rate>10</update_rate><always_on>1</always_on>
+        <camera><horizontal_fov>1.4</horizontal_fov><image><width>160</width><height>120</height></image><clip><near>0.1</near><far>100</far></clip><depth_camera><clip><near>0.1</near><far>100</far></clip></depth_camera></camera></sensor></link>
       <link name="above"><pose>0 0 2 0 0 0</pose><sensor name="cam" type="camera"><topic>uwopen/above</topic><update_rate>10</update_rate><always_on>1</always_on>
         <camera><horizontal_fov>1.4</horizontal_fov><image><width>160</width><height>120</height></image><clip><near>0.1</near><far>100</far></clip></camera></sensor></link>
     </model>
