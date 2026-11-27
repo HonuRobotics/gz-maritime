@@ -153,3 +153,35 @@ the dummy, and every plugin that refers to `base_link` would break.
 
 Give each simulation its own `GZ_PARTITION`, and each ROS graph its own
 `ROS_DOMAIN_ID`.
+
+## The underwater image is the same as the plain one
+
+- **The camera is above the water**: at or above the surface only the
+  camera's own exposure, white balance and noise apply, none by default.
+- **The world has no water optics**: add `gz-maritime-water-optics-system`
+  ([See through the water](underwater-camera.md)); without it the water is
+  clear.
+
+## The underwater image is all one colour
+
+That is the veil: everything farther than the water's visibility fades into
+it. In coastal water (`3C`) a black target is gone at about 4 m. Choose a
+clearer type, or a larger `<visibility>`.
+
+## The underwater image gets black at depth
+
+The daylight fades with depth, red first: in coastal water there is little
+left at 20 m. That is the water, not a bug. Give the vehicle lamps (spot
+lights) and include the `underwater_optics` model
+([Lights at depth](underwater-camera.md#lights-at-depth)), or use
+`<exposure>auto</exposure>` to brighten what light there is.
+
+## The GUI and the underwater camera differ
+
+The underwater camera plugin works on its own image; the GUI only sees
+through the water with the `underwater_optics` model in the world
+([See through the water](underwater-camera.md#the-gui-view-and-every-camera-at-once)).
+With the model, they agree on every surface and on open water, where both
+show the veil. Looking up at the surface, the GUI draws Snell's window,
+faded by the water, where the camera plugin shows the sky the renderer drew
+through the water up to the surface.

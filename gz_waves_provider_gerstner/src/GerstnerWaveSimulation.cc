@@ -204,7 +204,6 @@ void GerstnerWaveSimulation::SetParameters(const WaveParameters &_params)
   this->field.dz   = this->dzBuf.data();
   this->field.dx   = this->dxBuf.data();
   this->field.dy   = this->dyBuf.data();
-  this->field.foam = this->foamBuf.data();
   this->currentTime = -1.0;  // force the first Update to sample
   this->Update(0.0);
 }
@@ -357,6 +356,12 @@ void GerstnerWaveSimulation::Update(double _simTime)
 const WaveField2D *GerstnerWaveSimulation::Field() const
 {
   return &this->field;
+}
+
+//////////////////////////////////////////////////
+const double *GerstnerWaveSimulation::Foam() const
+{
+  return this->foamBuf.empty() ? nullptr : this->foamBuf.data();
 }
 
 //////////////////////////////////////////////////

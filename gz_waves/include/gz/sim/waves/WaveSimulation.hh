@@ -69,11 +69,9 @@ struct WaveField2D
   const double *dx{nullptr};
 
   /// \brief Final horizontal displacement y [m]; null ⇒ treat as 0. See dx.
+  /// The folding metric is not here: ask `IWaveField::Foam()`, which an
+  /// engine may compute only when asked.
   const double *dy{nullptr};
-
-  /// \brief Folding metric: 1 = flat, < 1 → folding (whitecaps); null ⇒ the
-  /// backend has no foam.
-  const double *foam{nullptr};
 };
 
 /// \brief Polymorphic backend for a wave field. Concrete implementations (an
@@ -172,6 +170,16 @@ class IWaveField
   /// `Update`; it stays valid until the next `SetParameters`.
   /// \return The renderable grid, or `nullptr` if the backend exposes none.
   public: virtual const WaveField2D *Field() const { return nullptr; }
+
+  /// \brief The folding metric of the grid `Field()` describes, column-major
+  /// N×N like its other arrays, for the renderer's foam: 1 = flat, < 1 →
+  /// folding (whitecaps). An engine may compute it here, for the time of the
+  /// last `Update`, so a consumer that reads `Field()` for the heights never
+  /// pays for foam. Like `ParticleVelocity`, it may fill a grid on the
+  /// caller's thread: not safe from two threads at once.
+  /// \return The folding metric, valid until the next `Update`, or
+  /// `nullptr` if the backend has none.
+  public: virtual const double *Foam() const { return nullptr; }
 };
 
 /// \brief Builds a default-constructed wave-field engine for a token. The

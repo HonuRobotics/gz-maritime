@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!-- A malformed vector: the world has clear water until a good message comes
+     on the set topic. -->
+<sdf version="1.9">
+  <world name="optics_badvec">
+    <physics name="fast" type="ignored">
+      <max_step_size>0.01</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-maritime-water-optics-system"
+            name="gz::sim::maritime::WaterOptics">
+      <jerlov>3C</jerlov>
+      <attenuation>1 2</attenuation>
+    </plugin>
+  </world>
+</sdf>
