@@ -280,6 +280,11 @@ class LensDropsPrivate
   /// \brief Maps drawn so far.
   public: std::uint64_t draws{0};
 
+  /// \brief Whether the pass was wanted the last time the renderer asked,
+  /// as it chained the frame's passes: on, or off with a dry lens or the
+  /// drops disabled.
+  public: bool drawing{false};
+
   /// \brief The drop map's width, texels. Set in Configure.
   public: int mapWidth{1};
 
@@ -587,6 +592,7 @@ void LensDrops::PostUpdate(const UpdateInfo &_info,
     SetInt(msg, "draws", static_cast<int>(this->dataPtr->draws));
     SetBool(msg, "enabled", this->dataPtr->enabled);
     SetBool(msg, "attached", this->dataPtr->attached);
+    SetBool(msg, "drawing", this->dataPtr->drawing);
   }
   this->dataPtr->statePub.Publish(msg);
 
@@ -828,7 +834,8 @@ int LensDropsPrivate::Wanted(void *_context)
   const std::lock_guard<std::mutex> lock(self->mutex);
   const bool wet =
       !self->drops.List().empty() || !self->drops.Trails().empty();
-  return self->enabled && wet ? 1 : 0;
+  self->drawing = self->enabled && wet;
+  return self->drawing ? 1 : 0;
 }
 
 //////////////////////////////////////////////////
@@ -890,6 +897,7 @@ void LensDropsPrivate::OnTeardown()
   this->failed = true;
   const std::lock_guard<std::mutex> lock(this->mutex);
   this->attached = false;
+  this->drawing = false;
 }
 }  // namespace gz::sim::maritime
 
