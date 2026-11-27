@@ -196,6 +196,7 @@
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Use your own world</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#what-a-world-needs">What a world needs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#the-buoyancy-system">The buoyancy system</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#the-water-s-optics">The water’s optics</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#the-world-name">The world name</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#adding-a-seabed">Adding a seabed</a></li>
 </ul>
@@ -382,7 +383,11 @@ resource path or a full path:</p>
 <td><p>IMU, magnetometer, GPS and rendered sensors</p></td>
 <td><p>see <a class="reference internal" href="sensors.html#what-the-world-provides"><span class="std std-ref">Add sensors</span></a></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;spherical_coordinates&gt;</span></code></p></td>
+<tr class="row-odd"><td><p>The water’s optics</p></td>
+<td><p>What the water does to light, for underwater cameras and the underwater rendering</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">gz-maritime-water-optics-system</span></code> with <code class="docutils literal notranslate"><span class="pre">&lt;jerlov&gt;IB&lt;/jerlov&gt;</span></code>; see <a class="reference internal" href="underwater-camera.html"><span class="std std-doc">Underwater camera</span></a></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;spherical_coordinates&gt;</span></code></p></td>
 <td><p>GPS origin and magnetic field location</p></td>
 <td><p>Portuguese Ledge, Monterey Bay</p></td>
 </tr>
@@ -446,6 +451,25 @@ edit, and takes names as spawned: <code class="docutils literal notranslate"><sp
 carried by <code class="docutils literal notranslate"><span class="pre">gz_buoyancy</span></code> until a Gazebo release ships it. When it does, the
 plugin line becomes <code class="docutils literal notranslate"><span class="pre">gz-sim-buoyancy-system</span></code> / <code class="docutils literal notranslate"><span class="pre">gz::sim::systems::Buoyancy</span></code>
 and nothing else changes.</p>
+</section>
+<section id="the-water-s-optics">
+<span id="the-waters-optics"></span><h2>The water’s optics<a class="headerlink" href="#the-water-s-optics" title="Link to this heading"></a></h2>
+<p>Every shipped world sets its water with a Jerlov type, the site’s: <code class="docutils literal notranslate"><span class="pre">IB</span></code>
+for open ocean, <code class="docutils literal notranslate"><span class="pre">1C</span></code> for a clear coast, <code class="docutils literal notranslate"><span class="pre">3C</span></code> for a harbour or a lake, <code class="docutils literal notranslate"><span class="pre">5C</span></code>
+for a murky lake, <code class="docutils literal notranslate"><span class="pre">I</span></code> for a pool. Pick the one closest to yours, or give a
+<code class="docutils literal notranslate"><span class="pre">&lt;visibility&gt;</span></code> in metres:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;plugin</span><span class="w"> </span><span class="na">filename=</span><span class="s">"gz-maritime-water-optics-system"</span>
+<span class="w">        </span><span class="na">name=</span><span class="s">"gz::sim::maritime::WaterOptics"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;jerlov&gt;</span>3C<span class="nt">&lt;/jerlov&gt;</span>
+<span class="nt">&lt;/plugin&gt;</span>
+</pre></div>
+</div>
+<p>It applies everywhere below the water level (z = 0 by default), indoors
+too. Without it, the world has clear water. Cameras see through it only
+with the underwater camera plugin, or with <code class="docutils literal notranslate"><span class="pre">model://underwater_optics</span></code> in
+the world, which draws it in the GUI and in colour cameras (RGBD
+included). Depth, segmentation, thermal and lidar sensors stay as they
+are, by design, and orthographic cameras are drawn as in air.</p>
 </section>
 <section id="the-world-name">
 <h2>The world name<a class="headerlink" href="#the-world-name" title="Link to this heading"></a></h2>
