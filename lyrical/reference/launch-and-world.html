@@ -209,6 +209,14 @@
 <li class="toctree-l4"><a class="reference internal" href="../how-to/wind-and-current.html#in-your-own-world">In your own world</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/underwater-camera.html">See through the water</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#give-a-world-its-water">Give a world its water</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#set-how-far-you-can-see">Set how far you can see</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#change-it-while-the-world-runs">Change it while the world runs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#check-what-the-world-has">Check what the world has</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#what-comes-next">What comes next</a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="../how-to/acoustic-pingers.html">Find an acoustic pinger</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/acoustic-pingers.html#run-the-demo">Run the demo</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/acoustic-pingers.html#see-them-in-the-gui">See them in the GUI</a></li>
@@ -261,6 +269,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#wind-parameters">Wind parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#ocean-current-markup">Ocean current markup</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#ocean-current-parameters">Ocean current parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#water-optics-parameters">Water optics parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#thruster-command">Thruster command</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#services">Services</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#examples">Examples</a></li>
@@ -274,6 +283,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#id1">Direction and units</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="#water-optics">Water optics</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#topics">Topics</a></li>
 </ul>
 </li>
@@ -286,6 +296,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html#one-thruster-interface">One thruster interface</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html#pingers-in-the-world-receivers-on-vehicles">Pingers in the world, receivers on vehicles</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html#buoyancy-that-follows-the-waves">Buoyancy that follows the waves</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html#seeing-through-the-water">Seeing through the water</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html#related">Related</a></li>
 </ul>
 </li>
@@ -845,6 +856,142 @@ library; <code class="docutils literal notranslate"><span class="pre">gz::sim::o
 call and suits an occasional query. The query is a point query: a consumer that spans a gradient
 integrates over its own extent with repeated queries.</p>
 </section>
+<section id="water-optics-parameters">
+<h2>Water optics parameters<a class="headerlink" href="#water-optics-parameters" title="Link to this heading"></a></h2>
+<p>What a world says to the water optics system,
+<code class="docutils literal notranslate"><span class="pre">gz-maritime-water-optics-system</span></code>. Without it, the world has clear water.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Markup</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;jerlov&gt;</span></code></p></td>
+<td><p>The Jerlov water type, below. Default <code class="docutils literal notranslate"><span class="pre">1C</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;visibility&gt;</span></code></p></td>
+<td><p>Horizontal visibility of a black target, m: scales what the type’s absorption, scattering and diffuse attenuation have above pure water’s (type <code class="docutils literal notranslate"><span class="pre">I</span></code>) by the same factor, so that 4.8 / c in the green comes out at this distance (Zaneveld and Pegau 2003). Clearer water turns bluer; beyond about 100 m, clearer than pure water, below 0.1 m, and for type <code class="docutils literal notranslate"><span class="pre">I</span></code>, it is an error. Ignored, with a warning, when all four coefficients are given.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;attenuation&gt;</span></code></p></td>
+<td><p>β^D, how fast an object’s light fades with range, 1/m, as <code class="docutils literal notranslate"><span class="pre">r</span> <span class="pre">g</span> <span class="pre">b</span></code>. Replaces c = a + b.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;backscatter&gt;</span></code></p></td>
+<td><p>β^B, how fast the veil builds with range, 1/m, as <code class="docutils literal notranslate"><span class="pre">r</span> <span class="pre">g</span> <span class="pre">b</span></code>. Replaces c.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;veil&gt;</span></code></p></td>
+<td><p>B∞, the veil just below the surface as a fraction of the daylight there, as <code class="docutils literal notranslate"><span class="pre">r</span> <span class="pre">g</span> <span class="pre">b</span></code>. Replaces b / c.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;diffuse_attenuation&gt;</span></code></p></td>
+<td><p>K_d, how fast the daylight fades with depth, 1/m, as <code class="docutils literal notranslate"><span class="pre">r</span> <span class="pre">g</span> <span class="pre">b</span></code>. Replaces the type’s K_d.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;water_level&gt;</span></code></p></td>
+<td><p>World z of the still water, m, default 0. Under a wave field, depth is below the local wave surface.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;publish_rate&gt;</span></code></p></td>
+<td><p>Rate of the ground truth in wall time, 1 Hz by default, so it keeps coming while paused; a change is published at once. 0 publishes on a change only.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Any other element is warned about and ignored. An unknown type, a visibility
+out of range or a negative value is one error, and the world has
+clear water. An explicit <code class="docutils literal notranslate"><span class="pre">&lt;attenuation&gt;</span></code> wins over <code class="docutils literal notranslate"><span class="pre">&lt;visibility&gt;</span></code>, with a
+warning.</p>
+<p>The Jerlov types, from Solonenko and Mobley (2015), at red 625 nm, green
+525 nm and blue 450 nm:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Type</p></th>
+<th class="head"><p>Water</p></th>
+<th class="head"><p>c = a + b (1/m)</p></th>
+<th class="head"><p>Veil b / c</p></th>
+<th class="head"><p>K_d (1/m)</p></th>
+<th class="head"><p>Visibility (m)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">I</span></code></p></td>
+<td><p>Clearest open ocean</p></td>
+<td><p>0.296, 0.0481, 0.0218</p></td>
+<td><p>0.00, 0.04, 0.17</p></td>
+<td><p>0.302, 0.049, 0.022</p></td>
+<td><p>99.9</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">IA</span></code></p></td>
+<td><p>Clear open ocean</p></td>
+<td><p>0.298, 0.0508, 0.0284</p></td>
+<td><p>0.01, 0.08, 0.22</p></td>
+<td><p>0.303, 0.0503, 0.0264</p></td>
+<td><p>94.5</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">IB</span></code></p></td>
+<td><p>Clear open ocean</p></td>
+<td><p>0.343, 0.103, 0.0915</p></td>
+<td><p>0.14, 0.55, 0.74</p></td>
+<td><p>0.31, 0.0572, 0.0342</p></td>
+<td><p>46.4</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">II</span></code></p></td>
+<td><p>Open ocean</p></td>
+<td><p>0.584, 0.434, 0.528</p></td>
+<td><p>0.49, 0.89, 0.95</p></td>
+<td><p>0.337, 0.0845, 0.062</p></td>
+<td><p>11.1</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">III</span></code></p></td>
+<td><p>Turbid open ocean</p></td>
+<td><p>1.08, 1.11, 1.42</p></td>
+<td><p>0.73, 0.95, 0.97</p></td>
+<td><p>0.39, 0.129, 0.124</p></td>
+<td><p>4.32</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">1C</span></code></p></td>
+<td><p>Clearest coastal</p></td>
+<td><p>0.597, 0.463, 0.619</p></td>
+<td><p>0.49, 0.85, 0.83</p></td>
+<td><p>0.395, 0.121, 0.179</p></td>
+<td><p>10.4</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">3C</span></code></p></td>
+<td><p>Coastal</p></td>
+<td><p>1.16, 1.23, 1.65</p></td>
+<td><p>0.74, 0.94, 0.91</p></td>
+<td><p>0.456, 0.187, 0.319</p></td>
+<td><p>3.91</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">5C</span></code></p></td>
+<td><p>Coastal</p></td>
+<td><p>1.4, 1.57, 2.17</p></td>
+<td><p>0.77, 0.92, 0.86</p></td>
+<td><p>0.48, 0.277, 0.535</p></td>
+<td><p>3.06</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">7C</span></code></p></td>
+<td><p>Turbid coastal</p></td>
+<td><p>2.26, 2.77, 3.84</p></td>
+<td><p>0.84, 0.92, 0.86</p></td>
+<td><p>0.6, 0.47, 0.924</p></td>
+<td><p>1.73</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">9C</span></code></p></td>
+<td><p>Most turbid coastal</p></td>
+<td><p>2.95, 3.81, 5.33</p></td>
+<td><p>0.85, 0.89, 0.82</p></td>
+<td><p>0.763, 0.826, 1.56</p></td>
+<td><p>1.26</p></td>
+</tr>
+</tbody>
+</table>
+<p>Each triple is red, green, blue. The values match the paper’s tables (5C in
+the red, whose printed row is corrupted, comes from Williamson and Hollins,
+2022, and Jerlov, 1976). <code class="docutils literal notranslate"><span class="pre">II</span></code> and <code class="docutils literal notranslate"><span class="pre">III</span></code> are the paper’s too, but its model
+gives them about two and three and a half times the scattering measured in
+open ocean, so <code class="docutils literal notranslate"><span class="pre">III</span></code> comes out as murky as a harbour. For open ocean use
+<code class="docutils literal notranslate"><span class="pre">IB</span></code>, with a <code class="docutils literal notranslate"><span class="pre">&lt;visibility&gt;</span></code> if it should be murkier; <code class="docutils literal notranslate"><span class="pre">1C</span></code> is the default. The optics are kept on the world entity as
+the <code class="docutils literal notranslate"><span class="pre">WaterOptics</span></code> component; a system that sees through water keeps a
+<code class="docutils literal notranslate"><span class="pre">gz::sim::water_optics::WaterOpticsSampler</span></code>, from the <code class="docutils literal notranslate"><span class="pre">gz_water_optics</span></code>
+library.</p>
+</section>
 <section id="thruster-command">
 <h2>Thruster command<a class="headerlink" href="#thruster-command" title="Link to this heading"></a></h2>
 <p>What a vehicle’s Thruster plugins expect, with <code class="docutils literal notranslate"><span class="pre">gz-maritime-thruster-system</span></code>
@@ -1008,6 +1155,24 @@ gz<span class="w"> </span>topic<span class="w"> </span>-e<span class="w"> </span
 </pre></div>
 </div>
 </section>
+</section>
+<section id="water-optics">
+<h2>Water optics<a class="headerlink" href="#water-optics" title="Link to this heading"></a></h2>
+<p>The water is set in the world file and changes while the simulation runs on
+the topic <code class="docutils literal notranslate"><span class="pre">/world/&lt;world&gt;/water_optics/set</span></code>: a <code class="docutils literal notranslate"><span class="pre">gz.msgs.Param</span></code> whose keys are
+the elements above. <code class="docutils literal notranslate"><span class="pre">jerlov</span></code> takes a string; <code class="docutils literal notranslate"><span class="pre">visibility</span></code> and <code class="docutils literal notranslate"><span class="pre">water_level</span></code>
+a number (or a string holding one); <code class="docutils literal notranslate"><span class="pre">attenuation</span></code>, <code class="docutils literal notranslate"><span class="pre">backscatter</span></code>, <code class="docutils literal notranslate"><span class="pre">veil</span></code> and
+<code class="docutils literal notranslate"><span class="pre">diffuse_attenuation</span></code> a string <code class="docutils literal notranslate"><span class="pre">&quot;r</span> <span class="pre">g</span> <span class="pre">b&quot;</span></code>. An empty string removes a
+visibility or an explicit value, going back to what the type gives. A
+message is applied whole or not at all. The resolved optics are published on
+<code class="docutils literal notranslate"><span class="pre">/world/&lt;world&gt;/water_optics_info</span></code> as <code class="docutils literal notranslate"><span class="pre">gz.msgs.Param</span></code>: <code class="docutils literal notranslate"><span class="pre">jerlov</span></code>,
+<code class="docutils literal notranslate"><span class="pre">visibility</span></code>, the four per-channel values as strings, <code class="docutils literal notranslate"><span class="pre">water_level</span></code> and
+<code class="docutils literal notranslate"><span class="pre">generation</span></code>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gz<span class="w"> </span>topic<span class="w"> </span>-t<span class="w"> </span>/world/default/water_optics/set<span class="w"> </span>-m<span class="w"> </span>gz.msgs.Param<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-p<span class="w"> </span><span class="s1">'params {key: "jerlov" value {type: STRING string_value: "7C"}}'</span>
+gz<span class="w"> </span>topic<span class="w"> </span>-e<span class="w"> </span>-t<span class="w"> </span>/world/default/water_optics_info<span class="w"> </span>-n<span class="w"> </span><span class="m">1</span>
+</pre></div>
+</div>
 </section>
 <section id="topics">
 <h2>Topics<a class="headerlink" href="#topics" title="Link to this heading"></a></h2>

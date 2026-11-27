@@ -567,6 +567,14 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/wind-and-current.html#in-your-own-world">In your own world</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="../how-to/underwater-camera.html">See through the water</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#give-a-world-its-water">Give a world its water</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#set-how-far-you-can-see">Set how far you can see</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#change-it-while-the-world-runs">Change it while the world runs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#check-what-the-world-has">Check what the world has</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#what-comes-next">What comes next</a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="../how-to/acoustic-pingers.html">Find an acoustic pinger</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/acoustic-pingers.html#run-the-demo">Run the demo</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/acoustic-pingers.html#see-them-in-the-gui">See them in the GUI</a></li>
@@ -619,6 +627,7 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#wind-parameters">Wind parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#ocean-current-markup">Ocean current markup</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#ocean-current-parameters">Ocean current parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#water-optics-parameters">Water optics parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#thruster-command">Thruster command</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#services">Services</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#examples">Examples</a></li>
@@ -632,6 +641,7 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#id1">Direction and units</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#water-optics">Water optics</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#topics">Topics</a></li>
 </ul>
 </li>
@@ -644,6 +654,7 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l2"><a class="reference internal" href="#one-thruster-interface">One thruster interface</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#pingers-in-the-world-receivers-on-vehicles">Pingers in the world, receivers on vehicles</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#buoyancy-that-follows-the-waves">Buoyancy that follows the waves</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#seeing-through-the-water">Seeing through the water</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#related">Related</a></li>
 </ul>
 </li>
@@ -841,6 +852,55 @@ surface as drawn.</p></li>
 displaced: no pressure change with depth under the wave, no horizontal wave
 force.</p></li>
 </ul>
+</section>
+<section id="seeing-through-the-water">
+<h2>Seeing through the water<a class="headerlink" href="#seeing-through-the-water" title="Link to this heading"></a></h2>
+<p>A camera under water sees the water as much as what is in it. The plan is in
+<a class="reference external" href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/UNDERWATER_CAMERA_PLAN.md">UNDERWATER_CAMERA_PLAN.md</a>;
+this section grows as it lands.</p>
+<figure class="align-default" id="id1">
+<img alt="../_images/uw-image-formation.svg" src="../_images/uw-image-formation.svg" />
+<figcaption>
+<p><span class="caption-text">What reaches the camera: the object’s light, faded with range; the veil the
+water adds; and the daylight, faded with depth before it lit anything.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p><strong>The model.</strong> Per colour channel, a camera at depth z sees an object of
+colour J (as lit) at range r as</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>I = J · exp(−β^D r) + B∞(z) · (1 − exp(−β^B r)),    B∞(z) = B∞ · exp(−K_d z)
+</pre></div>
+</div>
+<p>the revised underwater image formation model (Akkaynak and Treibitz, CVPR
+2018). The older “fog” model uses one coefficient for both terms; keeping
+β^D and β^B apart is what the revised model adds, and what lets a camera
+match real images (OceanSim’s colour-chart test).</p>
+<p><strong>The water belongs to the world.</strong> Like the waves, the wind and the
+current, the water’s optics are one recipe on the world entity
+(<code class="docutils literal notranslate"><span class="pre">gz_water_optics</span></code>), so every camera sees the same water, a change on the
+<code class="docutils literal notranslate"><span class="pre">water_optics/set</span></code> topic reaches all of them at once, and other sensors can
+read it later. Depth is measured below the wave field’s local surface, not a
+flat level.</p>
+<p><strong>Water types, not coefficients.</strong> A world names a Jerlov type, the
+oceanographers’ classification, and optionally a visibility in metres; the
+system derives the coefficients from published optical properties
+(Solonenko and Mobley 2015): β^D = β^B = c = a + b, B∞ = b / c, K_d as
+measured. Explicit coefficients are there for a matched data set.</p>
+<figure class="align-default" id="id2">
+<img alt="../_images/uw-jerlov-presets.svg" src="../_images/uw-jerlov-presets.svg" />
+<figcaption>
+<p><span class="caption-text">The presets.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p><strong>Checked against itself first.</strong> Every step is tested against what the
+model predicts, generated from the same equations by
+<code class="docutils literal notranslate"><span class="pre">docs/_tools/underwater_camera_figures.py</span></code>: a grey target against range,
+the scene against depth, a colour chart by range.</p>
+<figure class="align-default" id="id3">
+<img alt="../_images/uw-expected-range.svg" src="../_images/uw-expected-range.svg" />
+<figcaption>
+<p><span class="caption-text">What a camera must show: a 50 % grey target at each range, in three waters.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
 </section>
 <section id="related">
 <h2>Related<a class="headerlink" href="#related" title="Link to this heading"></a></h2>
