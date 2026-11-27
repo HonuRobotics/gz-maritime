@@ -167,6 +167,56 @@ Turn a lamp off or move it while running with the world's `light_config`
 service, like any light. Lamps cast no shadows here. A lamp set to an
 intensity of 0 costs nothing.
 
+## Check it against real footage
+
+To know how close the simulation is to your water, photograph a colour chart
+under water, and simulate the same shot:
+
+1. **Dive with a chart.** A ColorChecker (24 patches) facing the camera at a
+   measured range, close (half a metre to a metre; farther only in clear
+   water: in coastal water a chart 2 m away is all but lost in the veil),
+   at a measured depth, in daylight; note the water's visibility (or
+   measure its Jerlov type). Shoot a few frames at each range, with the
+   camera's exposure fixed and no white balance, as the simulation has
+   none: a 10 % white balance error is enough to pick the wrong water.
+2. **Simulate the shot**, in each water you think it may be. The tools are
+   installed in `lib/gz_underwater_camera`:
+
+   ```bash
+   ros2 run gz_underwater_camera make_chart_world.py --out chart_3c.sdf \
+     --range 0.5 --depth 2 --jerlov 3C --width 1280 --height 720 --hfov 1.2
+   gz sim -s -r chart_3c.sdf &
+   ros2 run gz_underwater_camera save_frame.py \
+     --topic /chart/camera/underwater/image --out sim_3c.png
+   ```
+
+   with your camera's resolution and field of view; the same for `5C` and so
+   on. `chart_3c.json` holds the patches' boxes in the render.
+3. **Mark the patches** in your photo: a `dive.json` of the 24 boxes, in
+   the same order (`chart_3c.json` shows the format). They need not line up
+   with the render's.
+4. **Compare.**
+
+   ```bash
+   ros2 run gz_underwater_camera chart_validation.py \
+     --real dive.png --real-patches dive.json \
+     --sim 3C=sim_3c.png --sim 5C=sim_5c.png --sim-patches chart_3c.json \
+     --report report.png
+   ```
+
+   It lists the waters by their mean angular error, closest first, with the
+   error per patch: hue and saturation, not brightness. OceanSim reports 8
+   to 14 degrees for its scenes. It also prints the luminance of each render
+   against the photo, for information: it does not enter the ranking. An
+   image whose patches barely differ (under 3 degrees between any two) is
+   refused: the chart is lost in the water, and every water would look
+   alike.
+
+The water with the smallest error is the nearest; refine it with
+`<visibility>` or explicit coefficients the same way. At half a metre, 2 m
+deep, neighbouring types are 7 to 13 degrees apart (1C and 3C 7, 3C and 5C
+8.5, 5C and 7C 11), so compare a few around your guess.
+
 ## More of the water
 
 - **Forward scatter** blurs what is far: `<forward_scatter>0.01</forward_scatter>`

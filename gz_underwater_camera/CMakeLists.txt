@@ -62,6 +62,11 @@ target_link_libraries(gz-maritime-underwater-camera-system
     gz-msgs::core)
 
 install(DIRECTORY include/ DESTINATION include)
+# The validation tools: a chart world to reproduce real footage, and the
+# comparison with it (UNDERWATER_CAMERA_PLAN.md, phase 6).
+install(PROGRAMS tools/chart_validation.py tools/make_chart_world.py
+  tools/save_frame.py
+  DESTINATION lib/${PROJECT_NAME})
 install(
   TARGETS ${PROJECT_NAME}
   EXPORT export_${PROJECT_NAME}
@@ -89,6 +94,12 @@ if(BUILD_TESTING)
       "DOCS_REFERENCE=\"${CMAKE_CURRENT_SOURCE_DIR}/../docs/reference/launch-and-world.md\""
       "PACKAGE_README=\"${CMAKE_CURRENT_SOURCE_DIR}/README.md\"")
   endif()
+
+  # The validation tools: the metric, a closed loop on synthetic charts, and
+  # the chart world.
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_chart_validation test/test_chart_validation.py
+    TIMEOUT 120)
 
   # The plugin in a rendered world: the published image against the model
   # computed here pixel by pixel from the in-air frame. Needs a GPU.

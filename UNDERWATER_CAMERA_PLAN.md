@@ -693,6 +693,28 @@ Found in review, and fixed here:
 - **At `<quality>low` two lamps were dark**: four were hidden from Ogre and
   two lit in the shader. Only those the shader lights are hidden now.
 
+### Phase 6, validation against reality: tools done, validation not done, on `ahcorde/uw_phase6_validation`
+
+**No real footage has been compared yet: that is still the open question
+below.** What this phase built is everything the comparison needs:
+
+- `make_chart_world.py`: a world reproducing a chart shot (a 24-patch
+  ColorChecker at a range and depth, in a Jerlov type or visibility, facing
+  the reference camera), and the patches' pixel boxes.
+- `chart_validation.py`: OceanSim's metric, the RGB angular error per patch
+  in linear light (brightness does not count), and the luminance ratio per
+  patch; one render per water, ranked closest first, each image with its own
+  boxes; a pass or fail only with `--threshold`.
+- `save_frame.py`: one frame of a camera topic as a PNG.
+- Tests: the metric's properties; a closed loop on synthetic charts (the
+  same water near 0, an exposure change near 0, another water far); the
+  command line; the chart world (valid SDF, patches in the image, in order).
+- End to end on renders: two renders of the same 3C scene compare at 0.00
+  degrees; a 5C render standing in for "real" against the 3C one at 13.4
+  (a fail, as it should). That example report is in the docs, labelled as
+  not a validation.
+- Docs: how to shoot the footage, simulate it, mark the patches and compare.
+
 ## Open questions
 
 - Which BlueROV2 camera settings (resolution, field of view, port type) match
