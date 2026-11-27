@@ -183,7 +183,6 @@ class WaterVisual::Implementation
   public: float foamThreshold{0.25f};     ///< Foam ramp half-width (grid foam)
   public: float fadeWidth{200.0f};        ///< Edge fade width [m], with fadeEdges
   public: float cachedTau{2.0f};          ///< guarded by mutex_
-  public: float currentSimTime{0.0f};     ///< guarded by mutex_
   public: float cachedTileSize{200.0f};   ///< grid cache, guarded by mutex_
   public: int tilesRadius{2};             ///< (2·r+1)² tiles; 0 disables
   public: int cachedGridSize{128};        ///< grid cache, guarded by mutex_
@@ -558,10 +557,16 @@ void WaterVisual::Implementation::OnSceneUpdate()
   {
     this->UploadUniforms();
   }
+  // The time of the scene being drawn: RenderUtil sets it from the state it
+  // applies, before this event. The simulation thread may be a step ahead
+  // of that state by now, so its own time would draw the sea of a later
+  // step than the frame's.
+  const double sceneTime =
+      std::chrono::duration<double>(this->scene->Time()).count();
   if (this->material)
   {
     auto vsParams = this->material->VertexShaderParams();
-    (*vsParams)["t"] = this->currentSimTime;
+    (*vsParams)["t"] = static_cast<float>(sceneTime);
     // The water between an underwater camera and the surface above it:
     // the buffers made once, and filled when the water changes.
     if (!this->uwUploaded || *this->uwUploaded != this->underwater)
@@ -595,7 +600,7 @@ void WaterVisual::Implementation::OnSceneUpdate()
   // upload must be serialised against the ECM thread rebuilding the engine.
   if (this->sim && this->heightMap && this->heightMap->Ready())
   {
-    this->sim->Update(static_cast<double>(this->currentSimTime));
+    this->sim->Update(sceneTime);
     const auto *f = this->sim->Field();
     bool ok = false;
     if (f && f->n > 0 && f->dz)
@@ -791,16 +796,13 @@ void WaterVisual::Configure(
 
 //////////////////////////////////////////////////
 void WaterVisual::PreUpdate(
-  const UpdateInfo &_info,
+  const UpdateInfo &/*_info*/,
   EntityComponentManager &_ecm)
 {
   GZ_PROFILE("WaterVisual::PreUpdate");
 
   if (!this->dataPtr->active)
     return;
-
-  // Snapshot sim time for the render thread.
-  const float t = std::chrono::duration<float>(_info.simTime).count();
 
   const Entity worldEnt = worldEntity(_ecm);
   const auto *wfComp =
@@ -829,7 +831,6 @@ void WaterVisual::PreUpdate(
   }
 
   const std::lock_guard<std::mutex> lock(this->dataPtr->mutex_);
-  this->dataPtr->currentSimTime = t;
 
   // When the renderer draws the water (gz_underwater_rendering marks the
   // world), the surface seen from below fades into it like everything else.

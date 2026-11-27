@@ -17,6 +17,8 @@
        sees through them. -->
   <exec_depend>gz_water_optics</exec_depend>
   <exec_depend>gz_underwater_camera</exec_depend>
+  <!-- The pingers and the acoustics of the acoustic demo world. -->
+  <exec_depend>gz_acoustics</exec_depend>
   <!-- The ocean current and wind panels in every world's GUI. -->
   <exec_depend>gz_maritime_gui</exec_depend>
   <exec_depend>gz_waves_provider_fft</exec_depend>

@@ -86,17 +86,18 @@ float ComputeFoamMask()
 {
   if (foamStrength <= 0.0)
     return 0.0;
-  vec2 heightUV = fract(inPs.baseXY / tileSize);
+  ivec2 texSize = textureSize(heightMap, 0);
+  // The texel of a grid point is centred half a texel in, as in the vertex
+  // shader.
+  vec2 heightUV = fract(inPs.baseXY / tileSize + 0.5 / vec2(texSize));
 
-  // Precomputed analytic folding metric in alpha (Encino path): one sample,
+  // Precomputed analytic folding metric in alpha (Ehukai path): one sample,
   // no finite differencing, resolution-independent. 1 = flat, < 1 → folding.
   if (useFoamMap != 0)
   {
     float J = texture(heightMap, heightUV).a;
     return 1.0 - smoothstep(-foamThreshold, foamThreshold, J);
   }
-
-  ivec2 texSize = textureSize(heightMap, 0);
 
   // Sample the chop derivatives over a FIXED PHYSICAL stencil
   // (~1 m), not one texel. A per-texel stencil makes the foam mask
