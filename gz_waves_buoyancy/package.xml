@@ -27,6 +27,8 @@
   <test_depend>gz_waves_provider_fft</test_depend>
   <!-- The flat buoyancy, to show the two never push together. -->
   <test_depend>gz_buoyancy</test_depend>
+  <!-- The waves' water velocity test: the system that damps against it. -->
+  <test_depend>gz_hydrodynamics</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
