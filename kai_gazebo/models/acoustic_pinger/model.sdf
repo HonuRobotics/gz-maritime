@@ -1,0 +1,91 @@
+<?xml version="1.0"?>
+<!--
+  A moored acoustic pinger (gz_acoustics): a spar buoy on the water, its line
+  and the pinger 1.5 m under it. The model is static, held by its mooring;
+  the pinger plugin puts the pinger on the link, so it is where the buoy is.
+
+  The pinger is named after the model, so include it under a name of your
+  own: that name scopes its set topic, /world/<world>/acoustics/<name>/set.
+  Its defaults are a RoboNation course pinger, 30 kHz once a second with a
+  300 m reach, pinging. Change them, and the buoy's colour, per instance:
+
+      <include>
+        <uri>model://acoustic_pinger</uri>
+        <name>pinger_red</name>
+        <pose>40 -15 0 0 0 0</pose>
+        <experimental:params>
+          <plugin element_id="gz::sim::maritime::AcousticPinger" action="modify">
+            <frequency>27000</frequency>
+            <active>false</active>
+          </plugin>
+          <visual element_id="link::body" action="modify">
+            <material><ambient>0.8 0.1 0.1 1</ambient><diffuse>0.8 0.1 0.1 1</diffuse></material>
+          </visual>
+          <visual element_id="link::top" action="modify">
+            <material><ambient>0.8 0.1 0.1 1</ambient><diffuse>0.8 0.1 0.1 1</diffuse></material>
+          </visual>
+        </experimental:params>
+      </include>
+
+  experimental:params needs SDFormat 1.9 or later in the including file.
+-->
+<sdf version="1.12">
+  <model name="acoustic_pinger">
+    <static>true</static>
+    <link name="link">
+      <!-- The buoy: a spar, half under the water, and its top mark. -->
+      <visual name="body">
+        <pose>0 0 0.25 0 0 0</pose>
+        <geometry><cylinder><radius>0.25</radius><length>1.0</length></cylinder></geometry>
+        <material>
+          <ambient>0.95 0.45 0.05 1</ambient>
+          <diffuse>0.95 0.45 0.05 1</diffuse>
+        </material>
+      </visual>
+      <visual name="top">
+        <pose>0 0 0.9 0 0 0</pose>
+        <geometry><sphere><radius>0.18</radius></sphere></geometry>
+        <material>
+          <ambient>0.95 0.45 0.05 1</ambient>
+          <diffuse>0.95 0.45 0.05 1</diffuse>
+        </material>
+      </visual>
+      <!-- The line down to the pinger, and the pinger. -->
+      <visual name="line">
+        <pose>0 0 -0.75 0 0 0</pose>
+        <geometry><cylinder><radius>0.01</radius><length>1.5</length></cylinder></geometry>
+        <material>
+          <ambient>0.2 0.2 0.2 1</ambient>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <visual name="pinger">
+        <pose>0 0 -1.5 0 0 0</pose>
+        <geometry><cylinder><radius>0.05</radius><length>0.25</length></cylinder></geometry>
+        <material>
+          <ambient>0.9 0.6 0.1 1</ambient>
+          <diffuse>0.9 0.6 0.1 1</diffuse>
+        </material>
+      </visual>
+      <!-- A vehicle bumps the spar. -->
+      <collision name="body_collision">
+        <pose>0 0 0.25 0 0 0</pose>
+        <geometry><cylinder><radius>0.25</radius><length>1.0</length></cylinder></geometry>
+      </collision>
+    </link>
+
+    <!-- The pulse is as long as the worlds' 4 ms step, which is fine: two
+         pings overlap on the times they arrive (sent plus the distance over
+         the speed of sound), not on the steps that notice them. -->
+    <plugin filename="gz-maritime-acoustic-pinger-system"
+            name="gz::sim::maritime::AcousticPinger">
+      <pose>0 0 -1.5 0 0 0</pose>
+      <frequency>30000</frequency>
+      <period>1</period>
+      <offset>0</offset>
+      <reach>300</reach>
+      <pulse_length>0.004</pulse_length>
+      <active>true</active>
+    </plugin>
+  </model>
+</sdf>

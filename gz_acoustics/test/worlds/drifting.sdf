@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<!--
+  A dynamic bias alone: a pinger every 0.25 s and a receiver 100 m away
+  whose amplitude has no spread and no fixed bias, only a dynamic bias:
+  0.3 dB/sqrt(s) with a 100 s correlation time (gz-sensors' units, a
+  density: it wanders to 0.3 * sqrt(100 / 2), 2.1 dB). Each reading's
+  amplitude less the true -40 dB is the bias, which must move by about
+  0.15 dB from one reading to the next, 0.25 s later.
+-->
+<sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
+  <world name="drifting">
+    <physics name="fast" type="dart">
+      <max_step_size>0.004</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-maritime-acoustics-system"
+            name="gz::sim::maritime::Acoustics">
+    </plugin>
+    <model name="buoy">
+      <static>true</static>
+      <link name="link"/>
+      <plugin filename="gz-maritime-acoustic-pinger-system"
+              name="gz::sim::maritime::AcousticPinger">
+        <pose>0 0 -2 0 0 0</pose>
+        <period>0.25</period>
+        <reach>200</reach>
+      </plugin>
+    </model>
+    <model name="listener">
+      <static>true</static>
+      <pose>100 0 -2 0 0 0</pose>
+      <link name="link">
+        <sensor name="receiver" type="custom" gz:type="acoustic_receiver">
+          <topic>/drifting</topic>
+          <gz:acoustic_receiver>
+            <amplitude_noise>
+              <noise type="gaussian">
+                <mean>0</mean>
+                <stddev>0</stddev>
+                <dynamic_bias_stddev>0.3</dynamic_bias_stddev>
+                <dynamic_bias_correlation_time>100</dynamic_bias_correlation_time>
+              </noise>
+            </amplitude_noise>
+          </gz:acoustic_receiver>
+        </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>
