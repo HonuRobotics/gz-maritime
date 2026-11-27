@@ -550,7 +550,16 @@ What it settled:
   water and segmentation labels byte for byte unchanged; the reference
   camera passes through when the GPU path is on (an `UnderwaterRendering`
   marker component on the world).
-- **The GUI uses it**: checked with screenshots on a virtual display.
+- **The GUI uses it**: checked with screenshots on a virtual display. It
+  can load after the GUI's first state, which then lacks the water optics
+  component, never sent again unchanged; the plugin asks for the world's
+  state once and reads it until the component comes (on a virtual display,
+  8 starts of 8 draw the water; 2 of 8 without).
+- **Removed, added again, the next world**: a plugin going cannot reach the
+  render thread, so the bridge turns the water off itself at the next frame;
+  a new instance takes over the world's mark; and an install in a new Ogre
+  (the next world in the same process) forgets what was left in the old one.
+  Each has a test.
 - **Not done, against the plan**: the sky, the background, the water surface
   and unlit materials are drawn as in air (only PBS is shaded). The
   background needs a compositor listener; the surface is §4.5. Depth is from
