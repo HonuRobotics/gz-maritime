@@ -219,6 +219,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#see-its-image">See its image</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#the-gui-view-and-every-camera-at-once">The GUI view, and every camera at once</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#lights-at-depth">Lights at depth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#check-it-against-real-footage">Check it against real footage</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#more-of-the-water">More of the water</a></li>
 </ul>
 </li>
@@ -514,6 +515,54 @@ light on a pier for one, are lit as in air:</p>
 <p>Turn a lamp off or move it while running with the world’s <code class="docutils literal notranslate"><span class="pre">light_config</span></code>
 service, like any light. Lamps cast no shadows here. A lamp set to an
 intensity of 0 costs nothing.</p>
+</section>
+<section id="check-it-against-real-footage">
+<h2>Check it against real footage<a class="headerlink" href="#check-it-against-real-footage" title="Link to this heading"></a></h2>
+<p>To know how close the simulation is to your water, photograph a colour chart
+under water, and simulate the same shot:</p>
+<ol class="arabic">
+<li><p><strong>Dive with a chart.</strong> A ColorChecker (24 patches) facing the camera at a
+measured range, close (half a metre to a metre; farther only in clear
+water: in coastal water a chart 2 m away is all but lost in the veil),
+at a measured depth, in daylight; note the water’s visibility (or
+measure its Jerlov type). Shoot a few frames at each range, with the
+camera’s exposure fixed and no white balance, as the simulation has
+none: a 10 % white balance error is enough to pick the wrong water.</p></li>
+<li><p><strong>Simulate the shot</strong>, in each water you think it may be. The tools are
+installed in <code class="docutils literal notranslate"><span class="pre">lib/gz_underwater_camera</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>run<span class="w"> </span>gz_underwater_camera<span class="w"> </span>make_chart_world.py<span class="w"> </span>--out<span class="w"> </span>chart_3c.sdf<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--range<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--depth<span class="w"> </span><span class="m">2</span><span class="w"> </span>--jerlov<span class="w"> </span>3C<span class="w"> </span>--width<span class="w"> </span><span class="m">1280</span><span class="w"> </span>--height<span class="w"> </span><span class="m">720</span><span class="w"> </span>--hfov<span class="w"> </span><span class="m">1</span>.2
+gz<span class="w"> </span>sim<span class="w"> </span>-s<span class="w"> </span>-r<span class="w"> </span>chart_3c.sdf<span class="w"> </span><span class="p">&amp;</span>
+ros2<span class="w"> </span>run<span class="w"> </span>gz_underwater_camera<span class="w"> </span>save_frame.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--topic<span class="w"> </span>/chart/camera/underwater/image<span class="w"> </span>--out<span class="w"> </span>sim_3c.png
+</pre></div>
+</div>
+<p>with your camera’s resolution and field of view; the same for <code class="docutils literal notranslate"><span class="pre">5C</span></code> and so
+on. <code class="docutils literal notranslate"><span class="pre">chart_3c.json</span></code> holds the patches’ boxes in the render.</p>
+</li>
+<li><p><strong>Mark the patches</strong> in your photo: a <code class="docutils literal notranslate"><span class="pre">dive.json</span></code> of the 24 boxes, in
+the same order (<code class="docutils literal notranslate"><span class="pre">chart_3c.json</span></code> shows the format). They need not line up
+with the render’s.</p></li>
+<li><p><strong>Compare.</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ros2<span class="w"> </span>run<span class="w"> </span>gz_underwater_camera<span class="w"> </span>chart_validation.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--real<span class="w"> </span>dive.png<span class="w"> </span>--real-patches<span class="w"> </span>dive.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--sim<span class="w"> </span><span class="nv">3C</span><span class="o">=</span>sim_3c.png<span class="w"> </span>--sim<span class="w"> </span><span class="nv">5C</span><span class="o">=</span>sim_5c.png<span class="w"> </span>--sim-patches<span class="w"> </span>chart_3c.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--report<span class="w"> </span>report.png
+</pre></div>
+</div>
+<p>It lists the waters by their mean angular error, closest first, with the
+error per patch: hue and saturation, not brightness. OceanSim reports 8
+to 14 degrees for its scenes. It also prints the luminance of each render
+against the photo, for information: it does not enter the ranking. An
+image whose patches barely differ (under 3 degrees between any two) is
+refused: the chart is lost in the water, and every water would look
+alike.</p>
+</li>
+</ol>
+<p>The water with the smallest error is the nearest; refine it with
+<code class="docutils literal notranslate"><span class="pre">&lt;visibility&gt;</span></code> or explicit coefficients the same way. At half a metre, 2 m
+deep, neighbouring types are 7 to 13 degrees apart (1C and 3C 7, 3C and 5C
+8.5, 5C and 7C 11), so compare a few around your guess.</p>
 </section>
 <section id="more-of-the-water">
 <h2>More of the water<a class="headerlink" href="#more-of-the-water" title="Link to this heading"></a></h2>
