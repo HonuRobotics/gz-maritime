@@ -28,6 +28,44 @@ The model is an invisible visual carrying the plugin, so it loads wherever
 the world is rendered: in the server's sensors and in every GUI. Cameras
 above the water are untouched.
 
+### Quality and speed
+
+The plugin takes a `<quality>`: `low`, `medium` (the default) or `high`.
+
+| | low | medium | high |
+|---|---|---|---|
+| Steps in each lamp's beam | 8 | 12 | 16 |
+| Marine snow drawn out to | 1.5 m | 3 m | 3 m |
+| Lamps used (the first in the scene) | 2 | 4 | 4 |
+
+The `underwater_optics` model has no `<quality>`, so it is medium. For
+another, put the plugin on a visual of your own instead of including the
+model:
+
+```xml
+<model name="underwater_optics">
+  <static>true</static>
+  <link name="link">
+    <visual name="underwater_optics">
+      <geometry><box><size>0.001 0.001 0.001</size></box></geometry>
+      <transparency>1</transparency>
+      <cast_shadows>false</cast_shadows>
+      <plugin filename="gz-maritime-underwater-rendering-system"
+              name="gz::sim::maritime::UnderwaterRendering">
+        <quality>low</quality>
+      </plugin>
+    </visual>
+  </link>
+</model>
+```
+
+What it costs, a 1920x1080 camera at a wreck at medium quality: on an
+Intel Iris Xe, nothing measurable for the water and the caustics, about
+3 ms a frame for two lamps' beams, 4 to 12 ms for marine snow (more with
+the lamps on and the denser it is); on an NVIDIA RTX 4090 Laptop, about
+1 ms for everything. Lamps that are off, and snow at 0, cost nothing. At
+low quality the snow costs the Intel 1 to 4 ms.
+
 With it, a reference underwater camera (`gz_underwater_camera`) in the same
 world applies only its own response: the renderer has already drawn the
 water.
@@ -97,6 +135,40 @@ brightest diffuse channel under 0.01) is left out, and with every lamp out
 the lamp code is not compiled into the shaders at all. So to switch a lamp
 off, set its intensity to 0: it then costs nothing.
 
+## Caustics, marine snow and the surface from below
+
+- **Caustics**: on what faces up under waves, a moving pattern of light
+  focused by the surface, its contrast fading with depth as `exp(−K_d z)`.
+  Its strength is the water's `<caustics>`, off by default, scaled by how
+  high the waves are: the significant height at 64 points around the
+  cameras, smoothed over 0.5 s, from the water optics sampler's surface, so
+  the GUI, whose wave field has no engine of its own, shows them too. None
+  on flat water. The pattern's phases are wrapped on the CPU in double, so
+  it moves on smoothly however long the simulation runs.
+- **Marine snow**: the water's `<marine_snow>` is the fraction of 25 cm
+  cells near the camera holding a speck. Specks are fixed in the world
+  (hashed per cell, found by walking the cells each view ray crosses, up to
+  3 m, as far as the first speck the ray touches), lit by the lamps and
+  faintly by the daylight.
+- **The surface from below**: `gz_waves_rendering`'s water surface is
+  two-sided and, seen from below (the view ray along the surface's up
+  normal, so a crest above a camera on a boat is still seen from above),
+  shows Snell's window: the sky through a
+  cone of 48.6 degrees about the vertical, refracted, and the water's mirror
+  outside it. With this package in the world the surface is seen through
+  the water like everything else: the mirror shows the water's own colour,
+  the sky dims with the `<daylight>`, and far away the surface fades into
+  the veil. The surface casts no shadow, so the sun reaches the seabed, and
+  the caustics, under it.
+- **Open water**: a camera under water that looks at nothing sees the
+  water's colour, not the sky or the scene's background. A black box around
+  the world (100 km wide, from 100 m above the water to 12 km below) is
+  drawn behind everything, at the far plane and after the sky; through the
+  water it is the veil. Bounding box, segmentation and thermal cameras do not see it:
+  it is hidden while they render. It is drawn after the opaque items, so the pixels
+  they cover are not shaded twice. Cameras above the water, depth images, lidars and
+  segmentation do not see it.
+
 ## How it works
 
 - **Shader pieces** (`share/hlms/Underwater`): the water in the pass
@@ -131,12 +203,8 @@ off, set its intensity to 0: it then costs nothing.
 
 ## Limits
 
-- **Only what PBS shades.** The sky (a skybox), the background colour, the
-  water surface (its own shader), unlit materials (markers) and terrain are
-  drawn as in air. Seen from under water, a camera looking up or out at
-  nothing still sees the sky; the reference camera turns those pixels into
-  the veil. Planned: the water surface seen from below (§4.5 of the plan),
-  and the background through a compositor listener.
+- **Only what PBS shades**, and the water surface (in its own shader).
+  Unlit materials (markers) and terrain are drawn as in air.
 - **Depth from the still water level**, not the wave surface, unlike the
   reference camera.
 - **Lamps**: lights named `lamp` only, up to four (the others are lit by
@@ -146,6 +214,9 @@ off, set its intensity to 0: it then costs nothing.
   reference camera has no lamps. A light that is not a lamp is lit by Ogre
   and, under water, fades with the daylight: by its depth, not over its own
   distance, so a torch 20 m down is much dimmer than a lamp there.
+- **ogre2 and GLSL only** (the pieces use GLSL's `fract`).
+- **Caustics** are a procedural pattern scaled by the wave height, not
+  traced from the actual surface; the snow does not drift.
 - **ogre2 only, and gz-rendering 10.** The bridge chains its pieces into
   the pieces that define Ogre's hooks, in a copy kept in memory. With
   another render engine, its own pieces missing, a bridge of another
@@ -169,6 +240,30 @@ named `torch`, not a lamp: Ogre lights the plate exactly as the lamp does
 (to 3 %; it is the same to the 8-bit step), and no beam. It waits for the
 water optics to publish each new water, not a fixed time, and skips
 without a GPU.
+
+`effects_test`, rendered: caustics' contrast at 8 m against 3 m deep is
+`exp(−K_d · 5)` within 10 % (time-averaged), the pattern a second later
+another pattern, none on flat water, none without `<caustics>`; the
+surface drawn above the seabed not darkening it (caustics off, to the
+rounding); open water the veil, for a camera and an RGBD camera, without
+a sky and with one; marine snow
+specks fixed frame to frame, none once the snow is off, the depth image
+unchanged; at night with the lamps off, nothing to see.
+
+`snell_test`, rendered: Snell's window's half-angle 48.5 degrees (Snell's
+law: 48.6), from 5 m below near-flat water; a camera above the still water
+in a 1 m sea seeing the crests higher than itself from above, from 4 s
+on, once the surface has settled; a camera 2 m above a rippled sea seeing
+none of it from below, out to the horizon.
+
+`effects_test` also: `<quality>` low and high close to medium, an unknown
+value the medium image; a lidar's scan, a thermal image and a bounding box
+camera's boxes the same with the GPU path and without (the backdrop is
+hidden from those cameras). `lamp_edges_test` also: four lamps at
+`<quality>low`, which lights two in the shader, each plate lit. The
+rendered tests skip without a GPU, step the world themselves and take a
+transport partition with their process id. `bridge_pieces_test` also: the
+caustics' phase wrapped without a jump, to a million seconds.
 
 `lamp_edges_test`, rendered, in a process of its own: five lamps, one past
 the limit, which Ogre lights as in air, and four that light nothing in view

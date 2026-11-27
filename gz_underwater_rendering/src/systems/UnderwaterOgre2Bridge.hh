@@ -27,7 +27,7 @@
 extern "C"
 {
 /// \brief The version of this interface. Change it with the struct.
-#define UW_OGRE2_BRIDGE_VERSION 3
+#define UW_OGRE2_BRIDGE_VERSION 4
 
 /// \brief The water, as the plugin hands it to the bridge.
 struct UwWater
@@ -48,6 +48,18 @@ struct UwWater
   /// \brief How strong the daylight is against the renderer's sun; scales
   /// the veil. 0 at night.
   float daylight;
+
+  /// \brief The caustics' strength, already scaled by the waves, 0 to 1.
+  float caustics;
+
+  /// \brief The marine snow's density, 0 to 1.
+  float snow;
+
+  /// \brief The caustics' time, s, simulation time, not wrapped.
+  double time;
+
+  /// \brief 0 low, 1 medium, 2 high.
+  int quality;
 };
 
 /// \brief The bridge's version of this interface.

@@ -16,6 +16,7 @@
  */
 #include "gz/sim/water_optics/WaterOptics.hh"
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 
@@ -73,6 +74,23 @@ bool Resolve(const WaterOpticsSpec &_spec, WaterOpticsData &_out,
   {
     _error = "<daylight> must be a number, 0 or more";
     return false;
+  }
+  // Strengths: a number is clamped to 0 to 1, with a warning; not a
+  // number is an error
+  for (const auto &[name, value] :
+       {std::make_pair("caustics", _spec.caustics),
+        std::make_pair("marine_snow", _spec.marineSnow)})
+  {
+    if (std::isnan(value))
+    {
+      _error = std::string("<") + name + "> must be a number, 0 to 1";
+      return false;
+    }
+    if (value < 0.0 || value > 1.0)
+    {
+      _warning += std::string(_warning.empty() ? "" : "; ") + "<" + name +
+                  "> " + std::to_string(value) + " is clamped to 0 to 1";
+    }
   }
 
   Rgb a = type->absorption;
@@ -135,6 +153,8 @@ bool Resolve(const WaterOpticsSpec &_spec, WaterOpticsData &_out,
   out.diffuseAttenuation = kd;
   out.waterLevel = _spec.waterLevel;
   out.daylight = _spec.daylight;
+  out.caustics = std::clamp(_spec.caustics, 0.0, 1.0);
+  out.marineSnow = std::clamp(_spec.marineSnow, 0.0, 1.0);
 
   struct Override
   {
@@ -182,6 +202,16 @@ const std::vector<NumberParam> &NumberParams()
      { _s.daylight = _v.value_or(1.0); },
      false,
      [](const WaterOpticsData &_d) { return _d.daylight; }},
+    {"caustics",
+     [](WaterOpticsSpec &_s, std::optional<double> _v)
+     { _s.caustics = _v.value_or(0.0); },
+     false,
+     [](const WaterOpticsData &_d) { return _d.caustics; }},
+    {"marine_snow",
+     [](WaterOpticsSpec &_s, std::optional<double> _v)
+     { _s.marineSnow = _v.value_or(0.0); },
+     false,
+     [](const WaterOpticsData &_d) { return _d.marineSnow; }},
   };
   return params;
 }

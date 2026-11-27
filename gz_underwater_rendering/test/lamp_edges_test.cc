@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -133,6 +134,48 @@ class WorldRun
           }
           _plate /= std::max(n, 1);
           return n > 50;
+        }
+      }
+      this->Step();
+    }
+    return false;
+  }
+
+  /// \brief Of the first frame with both images after a stamp: the mean
+  /// linear green of what is nearer than 4 m in each quarter of the image's
+  /// width, middle rows.
+  /// \return Whether there was one.
+  public: bool Quarters(std::int64_t _after, std::array<double, 4> &_mean)
+  {
+    for (int i = 0; i < 2000; ++i)
+    {
+      {
+        const std::lock_guard<std::mutex> lock(this->mutex);
+        for (const auto &[stamp, im] : this->images)
+        {
+          if (stamp <= _after || !this->depths.count(stamp))
+            continue;
+          const auto &dp = this->depths[stamp];
+          std::vector<float> z(dp.width() * dp.height());
+          std::memcpy(z.data(), dp.data().data(), z.size() * 4);
+          std::array<int, 4> n{};
+          _mean = {};
+          for (std::uint32_t v = im.height() / 3; v < 2 * im.height() / 3; ++v)
+          {
+            for (std::uint32_t u = 0; u < im.width(); ++u)
+            {
+              const std::size_t k = v * im.width() + u;
+              if (!(z[k] > 0 && z[k] < 4))
+                continue;
+              const std::size_t q = 4 * u / im.width();
+              _mean[q] += uc::SrgbToLinear(static_cast<std::uint8_t>(
+                  im.data()[v * im.step() + 3 * u + 1]));
+              ++n[q];
+            }
+          }
+          for (int q = 0; q < 4; ++q)
+            _mean[q] /= std::max(n[q], 1);
+          return true;
         }
       }
       this->Step();
@@ -257,4 +300,24 @@ TEST(LampEdges, LampsGoBackToOgreWhenTheRendererGoes)
                                     "nobody lights with it";
   EXPECT_LT(backdrop, 0.002) << "a beam with no renderer";
   run.server.reset();
+}
+
+/////////////////////////////////////////////////
+// Four lamps at <quality>low</quality>, which lights two in the shader:
+// the other two are left to Ogre, not hidden from it, so each of the four
+// plates is lit by its lamp.
+TEST(LampEdges, LowQualityLeavesTheRestToOgre)
+{
+  WorldRun run("lamps_low.sdf", "/uwlamplow/cam");
+  if (!Started(run))
+    GTEST_SKIP() << "nothing rendered: no GPU?";
+  std::array<double, 4> plate{};
+  ASSERT_TRUE(run.Quarters(1000000000LL, plate));
+  run.server.reset();
+  std::cout << "four lamps at low quality, plates:";
+  for (double p : plate)
+    std::cout << " " << p;
+  std::cout << "\n";
+  for (int q = 0; q < 4; ++q)
+    EXPECT_GT(plate[q], 0.02) << "plate " << q << " is dark";
 }

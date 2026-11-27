@@ -19,6 +19,7 @@
        the per-engine GUI plugins (gz-sim-waves-<engine>-gui) supply the
        factories at runtime, so no build dependency on any wave engine. -->
   <depend>gz_waves</depend>
+  <depend>gz_water_optics</depend>
   <depend>gz_sim_vendor</depend>
   <depend>gz_math_vendor</depend>
   <depend>gz_common_vendor</depend>

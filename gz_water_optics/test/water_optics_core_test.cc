@@ -875,3 +875,25 @@ TEST(Sampler, DaylightScalesTheVeil)
   spec.daylight = -1.0;
   EXPECT_NE(MustFail(spec).find("daylight"), std::string::npos);
 }
+
+/////////////////////////////////////////////////
+// Caustics and marine snow out of 0 to 1 are clamped, with a warning; not
+// a number is an error.
+TEST(Resolve, StrengthsClamped)
+{
+  WaterOpticsSpec spec;
+  spec.jerlov = "3C";
+  spec.caustics = 1.5;
+  spec.marineSnow = -0.2;
+  WaterOpticsData out;
+  std::string error, warning;
+  ASSERT_TRUE(Resolve(spec, out, error, warning)) << error;
+  EXPECT_DOUBLE_EQ(out.caustics, 1.0);
+  EXPECT_DOUBLE_EQ(out.marineSnow, 0.0);
+  EXPECT_NE(warning.find("<caustics>"), std::string::npos) << warning;
+  EXPECT_NE(warning.find("<marine_snow>"), std::string::npos) << warning;
+
+  spec.caustics = std::nan("");
+  EXPECT_FALSE(Resolve(spec, out, error, warning));
+  EXPECT_NE(error.find("caustics"), std::string::npos) << error;
+}

@@ -562,9 +562,9 @@ What it settled:
   a new instance takes over the world's mark; and an install in a new Ogre
   (the next world in the same process) forgets what was left in the old one.
   Each has a test.
-- **Not done, against the plan**: the sky, the background, the water surface
-  and unlit materials are drawn as in air (only PBS is shaded). The
-  background needs a compositor listener; the surface is §4.5. Depth is from
+- **Not done, against the plan**: unlit materials are drawn as in air (only
+  PBS is shaded). The sky, the background and the water surface were too,
+  until the fixes below. Depth is from
   the still water level, not the waves. No throughput benchmark in CI yet
   (the PBS change costs a few ALU instructions per fragment).
 
@@ -606,10 +606,92 @@ In the GPU path (`gz_underwater_rendering`), as the spike said it must be.
   whole ray for every lamp: 25.8 ms a frame to 14.8 ms with two lamps off,
   25.9 to 18.2 with two on; on an RTX 4090 Laptop the whole effect is about
   1 ms.
-- **Limits**: no shadows, in air too while the renderer draws; four lamps;
-  the beam shows where something is drawn behind it; the reference camera
-  has no lamps. Once the renderer's model is removed, the lamps are Ogre's
-  again.
+- **Limits**: no shadows, in air too while the renderer draws; four lamps
+  (two at `<quality>low`, below, the others left to Ogre); the reference
+  camera has no lamps. Once the renderer's model is removed, the lamps are
+  Ogre's again. (The beam used to show only where something was drawn
+  behind it; the backdrop of the fixes below ended that.)
+
+### Phase 5, what makes it look real: done, on `ahcorde/uw_phase5a_scatter_and_port` and `ahcorde/uw_phase5b_caustics_snow_snell`
+
+| Effect | Where | Result |
+|---|---|---|
+| Forward scatter | reference camera, `<forward_scatter>` | edge width at 2, 4, 8 m within 7 % of the Gaussian's (after the 0.8 px of a sharp pixel edge) |
+| The port | reference camera, `<port>` | flat: within 0.1 px of Snell's law; dome: no change |
+| Caustics | GPU path, water's `<caustics>` | none on flat water; contrast fades with depth as `exp(−K_d z)`, within 6 % (time-averaged) |
+| Marine snow | GPU path, water's `<marine_snow>` | fixed frame to frame, lit by the lamps, depth untouched |
+| The surface from below | `gz_waves_rendering`'s water shader | Snell's window at 48.5 degrees (48.6 by Snell's law) |
+
+What changed from the plan:
+
+- Forward scatter and the port are in the reference camera only (they need
+  the whole image); caustics and snow in the GPU path only (per fragment).
+- Caustics are procedural, scaled by the wave height the plugin estimates
+  from the wave field, not traced from the surface. A first estimator
+  sampled in step with the test wave and swung with its phase; 64 points on
+  a golden-angle spiral fixed it.
+- Marine snow is tested frame to frame with a still camera, not across two
+  cameras; it does not drift.
+- The surface from below is drawn in Snell's window. Since the fixes below
+  it is seen through the water too.
+- **The reference camera.** Its
+  loops run on a pool of threads the process keeps, and the sRGB encoding
+  is a lookup that gives the formula's own answer: 1920x1080 in 27 ms for
+  the water alone, 42 with noise. Forward scatter spreads each pixel's
+  direct light by its own path through the water (a scatter, not a gather;
+  the veil is not spread), so a near object does not bleed into open water
+  or onto a far wall beside it, and no light is lost at a depth edge: 160
+  ms at 1920x1080.
+
+Found later with a demo, a two-minute BlueROV2 dive at Sand Island over the
+site's bathymetry, and fixed here:
+
+- **The water's surface shaded the seabed.** With a sun that casts shadows,
+  the surface, an opaque mesh to the renderer, put everything under it in
+  shadow: a seabed a quarter as bright, and caustics too dim to see. The
+  surface casts no shadow now. This also explained caustics missing on a
+  bathymetry mesh: the mesh was fine, it was in that shadow.
+- **The surface from below was drawn as in air.** `gz_waves_rendering`'s
+  water visual now reads the water optics when the renderer draws the
+  water, and its shader fades the surface over the range to it and adds the
+  veil, with the same model as the PBS pieces. Outside Snell's window the
+  mirror is the veil's colour; the sky dims with the daylight.
+- **Open water was the sky.** Past the last thing in view an underwater
+  camera saw the sky or the background colour. A black box around the
+  world, drawn behind everything (depth clamped to the far plane, after the
+  sky, no depth written), is the veil through the water. The shader clears
+  it for cameras above the water and for gz-rendering's solid-colour
+  cameras, which also need their custom parameter set on it before every
+  pass (they take it off every renderable after each of theirs).
+- **Not reproduced**: Snell's window once drew black in a run with a
+  Gerstner sea. Fourteen runs since, with both seas, all drew the sky.
+- **What open water costs.** With the
+  backdrop, open water is shaded like any surface, so beams and snow are
+  paid on every pixel of an underwater view. At a wreck at night with snow
+  at 0.35, a 1920x1080 frame on the Intel went from 21.5 ms to 29.4. The
+  snow's walk now stops at the first speck the ray touches and lights it
+  once (28.2 ms; by day 26.3 to 22.0), and the plugin has a `<quality>`:
+  at `low` (8 beam steps, snow to 1.5 m, 2 lamps) that frame is 22.2 ms.
+- **A half-resolution pass for beams and snow: not possible from a
+  plugin.** It would compute them once per pixel from the depth buffer.
+  gz-rendering chains a camera's render passes on its colour image only
+  (`Ogre2RenderTarget` connects `rt0` and `rt1`); the depth is not handed
+  to an added pass, so this needs a change in gz-rendering first.
+
+Found in review, and fixed here:
+
+- **A speckled band at the horizon**, in every world with the surface: far
+  away, at grazing angles, the normal interpolated from a triangle's corners
+  disagrees with the triangle drawn, and parts of a surface seen from above
+  were shaded as seen from below. The side is now the drawn triangle's own
+  normal, from screen derivatives: from 2 m over a rippled sea, 106 pixels
+  of 768,000 seen from below, 14,078 before.
+- **An RGBD camera without a sky saw open water as the background
+  colour**: its colour pass paints whatever nothing was hit with it, and the
+  backdrop writes no depth. While the backdrop shows, the pass is told the
+  scene has a background; the depth is not touched.
+- **At `<quality>low` two lamps were dark**: four were hidden from Ogre and
+  two lit in the shader. Only those the shader lights are hidden now.
 
 ## Open questions
 

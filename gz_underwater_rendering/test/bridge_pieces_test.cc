@@ -169,3 +169,22 @@ TEST(Pieces, ShippedPiecesDefineEveryHook)
   }
   EXPECT_TRUE(Defines(ours.get(), kPbsHooks, "underwater"));
 }
+
+/////////////////////////////////////////////////
+// The caustics' phases, wrapped in double before the shader's float: the
+// same pattern as the unwrapped phase however long the world has run, and
+// no jump from one frame to the next.
+TEST(Caustics, PhaseWrapsWithoutAJump)
+{
+  for (const double rate : {0.8, 1.0, 0.9, 1.1})
+  {
+    for (const double t : {0.0, 999.95, 1000.0, 1000.05, 12345.678, 1e6 + 0.7})
+    {
+      const float p = CausticPhase(rate, t);
+      EXPECT_GE(p, 0.0f);
+      EXPECT_LT(p, 6.2832f);
+      EXPECT_NEAR(std::sin(p), std::sin(rate * t), 1e-5) << rate << " " << t;
+      EXPECT_NEAR(std::cos(p), std::cos(rate * t), 1e-5) << rate << " " << t;
+    }
+  }
+}

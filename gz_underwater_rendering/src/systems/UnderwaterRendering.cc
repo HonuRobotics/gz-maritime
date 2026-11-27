@@ -16,8 +16,11 @@
  */
 #include <dlfcn.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <memory>
 #include <mutex>
@@ -29,6 +32,8 @@
 #include <gz/msgs/serialized_map.pb.h>
 #include <gz/transport/Node.hh>
 #include <gz/plugin/Register.hh>
+#include <gz/math/Vector3.hh>
+#include <gz/rendering/Camera.hh>
 #include <gz/rendering/RenderEngine.hh>
 #include <gz/rendering/RenderingIface.hh>
 #include <gz/rendering/Scene.hh>
@@ -44,6 +49,7 @@
 #include "WorldMark.hh"
 #include "gz/sim/components/UnderwaterRendering.hh"
 #include "gz/sim/components/WaterOptics.hh"
+#include "gz/sim/components/Wavefield.hh"
 #include "gz/sim/water_optics/WaterOpticsSampler.hh"
 
 namespace gz::sim::maritime
@@ -85,6 +91,21 @@ class UnderwaterRendering
         [this](const msgs::Boolean &_msg) { this->enabled = _msg.data(); };
     this->node.Subscribe("/world/" + world + "/underwater_rendering/enable",
                          onEnable);
+    // <quality>: how finely the lamps' beams are marched, how far marine
+    // snow is drawn and how many lamps are used. low, medium or high.
+    if (_sdf && _sdf->HasElement("quality"))
+    {
+      const auto q = _sdf->Get<std::string>("quality");
+      if (q == "low")
+        this->quality = 0;
+      else if (q == "medium")
+        this->quality = 1;
+      else if (q == "high")
+        this->quality = 2;
+      else
+        gzerr << "UnderwaterRendering: <quality> is low, medium or high, "
+              << "not [" << q << "]; using medium\n";
+    }
     this->sceneUpdate = _eventMgr.Connect<events::SceneUpdate>(
         [this]() { this->OnSceneUpdate(); });
     this->teardown = _eventMgr.Connect<events::RenderTeardown>(
@@ -93,7 +114,7 @@ class UnderwaterRendering
     this->piecesDir = dir ? dir : UW_PIECES_DIR;
   }
 
-  public: void PreUpdate(const UpdateInfo &, EntityComponentManager &_ecm) override
+  public: void PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm) override
   {
     const Entity world = worldEntity(_ecm);
     this->SyncOptics(_ecm, world);
@@ -110,6 +131,46 @@ class UnderwaterRendering
       return;
     }
     const auto &o = this->sampler.Data();
+    // How high the waves are, for the caustics: Hs = 4 sigma of the surface
+    // at 64 points on a golden-angle spiral out to 50 m around the cameras,
+    // which spans many wavelengths and phases. The surface is the sampler's:
+    // in the GUI too, where the replicated wave field has no engine, it
+    // builds one from the recipe. Smoothed over 0.5 s of simulation time,
+    // whatever the step.
+    const double t = std::chrono::duration<double>(_info.simTime).count();
+    // Only for caustics: with none, the default, nothing to sample
+    if (o.caustics > 0.0 && _ecm.Component<components::Wavefield>(world))
+    {
+      const math::Vector3d centre = this->cameraCentre;
+      double sum = 0, sum2 = 0;
+      const int n = 64;
+      for (int i = 0; i < n; ++i)
+      {
+        const double r = 50.0 * std::sqrt((i + 0.5) / n);
+        const double a = i * 2.399963229728653;
+        // The surface's height there: the depth of a point at z = 0
+        const double e = this->sampler.Depth(
+            math::Vector3d(centre.X() + r * std::cos(a),
+                           centre.Y() + r * std::sin(a), 0.0),
+            _info.simTime) - o.waterLevel;
+        sum += e;
+        sum2 += e * e;
+      }
+      const double mean = sum / n;
+      const double hs = 4.0 * std::sqrt(std::max(0.0, sum2 / n - mean * mean));
+      const double dt = t - this->waveHeightTime;
+      if (!this->waveHeightSet || dt < 0.0)
+        this->waveHeight = hs;
+      else
+        this->waveHeight += (hs - this->waveHeight) * (1.0 - std::exp(-dt / 0.5));
+      this->waveHeightSet = true;
+      this->waveHeightTime = t;
+    }
+    else
+    {
+      this->waveHeight = 0.0;
+      this->waveHeightSet = false;
+    }
     UwWater v{};
     for (int c = 0; c < 3; ++c)
     {
@@ -120,6 +181,12 @@ class UnderwaterRendering
     }
     v.level = static_cast<float>(o.waterLevel);
     v.daylight = static_cast<float>(o.daylight);
+    // Caustics need waves: full strength from a 0.5 m sea.
+    v.caustics = static_cast<float>(o.caustics *
+                                    std::clamp(this->waveHeight / 0.5, 0.0, 1.0));
+    v.snow = static_cast<float>(o.marineSnow);
+    v.time = t;
+    v.quality = this->quality;
     this->water = v;
   }
 
@@ -213,7 +280,24 @@ class UnderwaterRendering
       }
       this->installed = true;
     }
+    // Where the cameras are, for the wave height around them
+    math::Vector3d centre;
+    int cameras = 0;
+    if (auto scene = rendering::sceneFromFirstRenderEngine())
+    {
+      for (unsigned int i = 0; i < scene->SensorCount(); ++i)
+      {
+        if (auto cam = std::dynamic_pointer_cast<rendering::Camera>(
+                scene->SensorByIndex(i)))
+        {
+          centre += cam->WorldPosition();
+          ++cameras;
+        }
+      }
+    }
     const std::lock_guard<std::mutex> lock(this->mutex);
+    if (cameras > 0)
+      this->cameraCentre = centre / cameras;
     this->set(this->water && this->enabled ? &*this->water : nullptr);
     if (!this->announced || *this->announced != this->water.has_value())
     {
@@ -273,6 +357,18 @@ class UnderwaterRendering
   private: std::atomic<bool> installed{false};
   private: bool failed{false};
   private: std::optional<bool> announced;
+  /// \brief <quality>: 0 low, 1 medium, 2 high.
+  private: int quality{1};
+  /// \brief The waves' significant height around the cameras, smoothed
+  private: double waveHeight{0.0};
+  private: bool waveHeightSet{false};
+
+  /// \brief The simulation time of waveHeight, s
+  private: double waveHeightTime{0.0};
+
+  /// \brief The cameras' mean position, from the render thread; guarded by
+  /// mutex
+  private: math::Vector3d cameraCentre;
   private: common::ConnectionPtr sceneUpdate;
   private: common::ConnectionPtr teardown;
 };

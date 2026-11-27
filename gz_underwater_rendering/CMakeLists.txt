@@ -24,6 +24,8 @@ find_package(gz-common REQUIRED)
 find_package(gz_rendering_vendor REQUIRED)
 find_package(gz-rendering REQUIRED COMPONENTS ogre2)
 find_package(gz_water_optics REQUIRED)
+# The Wavefield component, for whether the world has waves
+find_package(gz_waves REQUIRED)
 find_package(gz_transport_vendor REQUIRED)
 find_package(gz-transport REQUIRED)
 find_package(gz_msgs_vendor REQUIRED)
@@ -72,6 +74,7 @@ add_library(gz-maritime-underwater-rendering-system SHARED
 target_link_libraries(gz-maritime-underwater-rendering-system
   PRIVATE
     gz_water_optics::gz_water_optics
+    gz_waves::gz_waves
     gz-transport::core
     gz-msgs::core
     gz-sim::core
@@ -179,6 +182,31 @@ if(BUILD_TESTING)
       gz-transport::core
       gz-msgs::core)
     set_tests_properties(lamps_test PROPERTIES
+      ENVIRONMENT
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH}")
+  endif()
+
+  # The surface from below: Snell's window, in gz_waves_rendering's water
+  # shader. Needs a GPU.
+  ament_add_gtest(snell_test test/snell_test.cc TIMEOUT 300)
+  if(TARGET snell_test)
+    target_compile_definitions(snell_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(snell_test gz-sim::core gz-transport::core gz-msgs::core)
+    set_tests_properties(snell_test PROPERTIES
+      ENVIRONMENT
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH}")
+  endif()
+
+  # Caustics and marine snow. Needs a GPU.
+  ament_add_gtest(effects_test test/effects_test.cc TIMEOUT 600)
+  if(TARGET effects_test)
+    target_compile_definitions(effects_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(effects_test
+      gz_underwater_camera::gz_underwater_camera
+      gz-sim::core gz-transport::core gz-msgs::core)
+    set_tests_properties(effects_test PROPERTIES
       ENVIRONMENT
       "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH}")
   endif()

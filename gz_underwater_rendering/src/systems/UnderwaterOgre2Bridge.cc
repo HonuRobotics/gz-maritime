@@ -43,18 +43,25 @@
 #include <regex>
 #include <set>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 #include "UnderwaterOgre2Bridge.hh"
 
 #include <gz/common/Console.hh>
+#include <gz/rendering/BoundingBoxCamera.hh>
+#include <gz/rendering/DepthCamera.hh>
 #include <gz/rendering/Light.hh>
+#include <gz/rendering/Material.hh>
 #include <gz/rendering/RenderEngine.hh>
 #include <gz/rendering/RenderingIface.hh>
 #include <gz/rendering/Scene.hh>
+#include <gz/rendering/SegmentationCamera.hh>
+#include <gz/rendering/ThermalCamera.hh>
 #include <gz/rendering/config.hh>
 #include <gz/rendering/ogre2/Ogre2Light.hh>
+#include <gz/rendering/ogre2/Ogre2Scene.hh>
 
 #include <OgreArchive.h>
 #include <OgreArchiveManager.h>
@@ -67,10 +74,21 @@
 #include <OgreRoot.h>
 #include <OgreSceneManager.h>
 #include <OgreHlmsPbs.h>
+#include <OgreHlmsPbsDatablock.h>
+#include <OgreItem.h>
 #include <OgreLight.h>
+#include <OgreMaterialManager.h>
 #include <OgreMatrix4.h>
+#include <OgreMesh2.h>
+#include <OgreMeshManager2.h>
+#include <OgrePass.h>
+#include <OgreRenderSystem.h>
 #include <OgreSceneNode.h>
 #include <OgreString.h>
+#include <OgreSubItem.h>
+#include <OgreSubMesh2.h>
+#include <OgreTechnique.h>
+#include <Vao/OgreVaoManager.h>
 
 namespace
 {
@@ -174,6 +192,10 @@ struct Water
   float diffuse[3]{0, 0, 0};
   float level{0};
   float daylight{1};
+  float caustics{0};
+  float snow{0};
+  double time{0};
+  int quality{1};
   bool active{false};
 };
 
@@ -186,25 +208,389 @@ constexpr int kMaxLamps = 4;
 constexpr int kLampFloat4 = 5;
 
 /// \brief Bytes the underwater block adds: the water (8 float4), the beam
-/// (2) and the lamps.
+/// (2), the effects (2) and the lamps.
 constexpr Ogre::uint32 kBlockBytes =
-    (10u + kMaxLamps * kLampFloat4) * 4u * sizeof(float);
+    (12u + kMaxLamps * kLampFloat4) * 4u * sizeof(float);
 
 /// \brief Henyey-Greenstein asymmetry of the water's scattering, and the
 /// beam's ray march.
 constexpr float kPhaseG = 0.9f;
-constexpr float kBeamSteps = 12.0f;
 constexpr float kBeamRange = 20.0f;
+
+/// \brief What the plugin's <quality> sets, for low, medium and high: the
+/// steps of each lamp's beam march, how far from the camera marine snow is
+/// drawn, m, and how many lamps are used (the first in the scene).
+constexpr float kBeamSteps[3] = {8.0f, 12.0f, 16.0f};
+constexpr float kSnowRange[3] = {1.5f, 3.0f, 3.0f};
+constexpr int kQualityLamps[3] = {2, 4, 4};
+
+/// \brief A caustic wave's phase at a time: its rate times the time,
+/// wrapped to [0, 2 pi) in double before it becomes a float, so the shader's
+/// float keeps its precision however long the world runs, with no jump.
+/// \param[in] _rate Its angular rate, rad/s.
+/// \param[in] _time Simulation time, s.
+/// \return The phase, rad.
+float CausticPhase(double _rate, double _time)
+{
+  double phase = std::fmod(_rate * _time, 6.283185307179586);
+  if (phase < 0.0)
+    phase += 6.283185307179586;
+  return static_cast<float>(phase);
+}
 
 /// \brief A lamp dimmer than this (its power scale times its brightest
 /// diffuse channel) counts as off: the shader neither lights with it nor
 /// marches its beam. With every lamp off the lamp code is compiled out.
 constexpr float kLampMinPower = 0.01f;
 
+/// \brief The backdrop's size, m: its half width, how far above the water
+/// its top is and how far below its bottom. Farther than any camera sees.
+constexpr float kBackdropHalfWidth = 50000.0f;
+constexpr float kBackdropAbove = 100.0f;
+constexpr float kBackdropBelow = 12000.0f;
+
+/// \brief What marks the backdrop's material for the shader (its first
+/// user value), which draws it for underwater cameras only.
+constexpr float kBackdropMark = 1977.0f;
+
+/// \brief Water behind everything: a black box around the world, seen from
+/// inside, drawn after the sky and at the far plane wherever nothing else
+/// is. Through the water it is the water's own colour, the veil, as open
+/// water is; without it a camera under water would see the sky or the
+/// background colour past the last thing in view. The shader makes it
+/// clear (alpha 0) for cameras above the water.
+class Backdrop : public Ogre::Camera::Listener
+{
+  /// \brief Hidden while a camera that is not a colour camera renders
+  /// (bounding boxes, segmentation, thermal): those swap the materials of
+  /// gz-rendering's own items only, and would read the backdrop, which is
+  /// not one, as a thing filling the view. Before culling, as their own
+  /// material switchers work.
+  public: void cameraPreRenderScene(Ogre::Camera *_camera) override
+  {
+    const auto it = this->items.find(_camera->getSceneManager());
+    if (it == this->items.end())
+      return;
+    this->wasVisible = it->second->getVisible();
+    it->second->setVisible(false);
+  }
+
+  /// \brief Shown again as it was, after such a camera.
+  public: void cameraPostRenderScene(Ogre::Camera *_camera) override
+  {
+    const auto it = this->items.find(_camera->getSceneManager());
+    if (it != this->items.end())
+      it->second->setVisible(this->wasVisible);
+  }
+
+  /// \brief Listen to the cameras that must not see the backdrop: the
+  /// bounding box, segmentation and thermal cameras of every scene, whose
+  /// Ogre camera carries the sensor's name. New ones are found as they come.
+  private: void WatchCameras()
+  {
+    if (!gz::rendering::isEngineLoaded("ogre2"))
+      return;
+    gz::rendering::RenderEngine *engine = gz::rendering::engine("ogre2");
+    for (unsigned int s = 0; engine && s < engine->SceneCount(); ++s)
+    {
+      const auto scene = engine->SceneByIndex(s);
+      const auto *ogreScene =
+          dynamic_cast<const gz::rendering::Ogre2Scene *>(scene.get());
+      if (!ogreScene)
+        continue;
+      Ogre::SceneManager *sm = ogreScene->OgreSceneManager();
+      for (unsigned int i = 0; i < scene->SensorCount(); ++i)
+      {
+        const auto sensor = scene->SensorByIndex(i);
+        if (!std::dynamic_pointer_cast<gz::rendering::BoundingBoxCamera>(
+                sensor) &&
+            !std::dynamic_pointer_cast<gz::rendering::SegmentationCamera>(
+                sensor) &&
+            !std::dynamic_pointer_cast<gz::rendering::ThermalCamera>(sensor))
+        {
+          continue;
+        }
+        Ogre::Camera *camera = sm->findCameraNoThrow(sensor->Name());
+        if (camera && this->watched.insert({sm, sensor->Name(), camera})
+                          .second)
+        {
+          camera->addListener(this);
+        }
+      }
+    }
+  }
+
+  /// \brief Tell each RGBD camera's colour pass, while the backdrop
+  /// shows, that the scene has a background, so it keeps the backdrop
+  /// where nothing was hit: without a sky, that pass paints those pixels
+  /// with the scene's background colour, and the backdrop writes no depth.
+  /// Hidden, the camera has gz-rendering's own setting back: a background
+  /// only with a sky. The depth is not touched.
+  /// \param[in] _show Whether the backdrop shows.
+  private: void MarkDepthCameras(bool _show)
+  {
+    if (!gz::rendering::isEngineLoaded("ogre2"))
+      return;
+    gz::rendering::RenderEngine *engine = gz::rendering::engine("ogre2");
+    auto &materials = Ogre::MaterialManager::getSingleton();
+    for (unsigned int s = 0; engine && s < engine->SceneCount(); ++s)
+    {
+      const auto scene = engine->SceneByIndex(s);
+      if (!scene)
+        continue;
+      const auto sky = scene->BackgroundMaterial();
+      const int own = sky && !sky->EnvironmentMap().empty() ? 1 : 0;
+      for (unsigned int i = 0; i < scene->SensorCount(); ++i)
+      {
+        const auto sensor = scene->SensorByIndex(i);
+        if (!std::dynamic_pointer_cast<gz::rendering::DepthCamera>(sensor))
+          continue;
+        const Ogre::MaterialPtr material =
+            materials.getByName(sensor->Name() + "_DepthCamera");
+        if (!material || !material->getNumTechniques() ||
+            !material->getTechnique(0)->getNumPasses())
+        {
+          continue;
+        }
+        Ogre::Pass *pass = material->getTechnique(0)->getPass(0);
+        if (!pass->hasFragmentProgram())
+          continue;
+        auto params = pass->getFragmentProgramParameters();
+        if (params->_findNamedConstantDefinition("hasBackground"))
+          params->setNamedConstant("hasBackground", _show ? 1 : own);
+      }
+    }
+  }
+
+  /// \brief Show it in every scene, around the water level, or hide it.
+  public: void Update(bool _show, float _level)
+  {
+    this->WatchCameras();
+    this->MarkDepthCameras(_show && !this->failed);
+    Ogre::Root *root = Ogre::Root::getSingletonPtr();
+    if (!root)
+      return;
+    auto managers = root->getSceneManagerIterator();
+    while (managers.hasMoreElements())
+    {
+      Ogre::SceneManager *sm = managers.getNext();
+      auto it = this->items.find(sm);
+      if (it == this->items.end())
+      {
+        if (!_show || this->failed || !this->Create(root, sm))
+          continue;
+        it = this->items.find(sm);
+      }
+      const float half = 0.5f * (kBackdropAbove + kBackdropBelow);
+      Ogre::SceneNode *node = it->second->getParentSceneNode();
+      node->setPosition(0.0f, 0.0f, _level + kBackdropAbove - half);
+      node->setScale(kBackdropHalfWidth, kBackdropHalfWidth, half);
+      it->second->setVisible(_show);
+    }
+  }
+
+  /// \brief Call before each pass of a scene. gz-rendering's solid-colour
+  /// cameras (segmentation, thermal, selection) read custom parameter 1
+  /// from every renderable, set it on the visuals they know and take it
+  /// off all of them afterwards, so the backdrop gets its own here; the
+  /// shader makes the backdrop clear for those cameras.
+  public: void BeforePass(Ogre::SceneManager *_sm)
+  {
+    const auto it = this->items.find(_sm);
+    if (it == this->items.end())
+      return;
+    for (std::size_t i = 0; i < it->second->getNumSubItems(); ++i)
+    {
+      it->second->getSubItem(i)->setCustomParameter(1u,
+                                                    Ogre::Vector4::ZERO);
+    }
+  }
+
+  /// \brief Take it out of the scenes that are still there.
+  public: void Destroy()
+  {
+    this->MarkDepthCameras(false);
+    Ogre::Root *root = Ogre::Root::getSingletonPtr();
+    if (root)
+    {
+      auto managers = root->getSceneManagerIterator();
+      while (managers.hasMoreElements())
+      {
+        Ogre::SceneManager *sm = managers.getNext();
+        auto it = this->items.find(sm);
+        if (it == this->items.end())
+          continue;
+        Ogre::SceneNode *node = it->second->getParentSceneNode();
+        node->detachObject(it->second);
+        sm->destroyItem(it->second);
+        sm->destroySceneNode(node);
+      }
+    }
+    this->items.clear();
+    // Stop listening to the cameras still there
+    if (gz::rendering::isEngineLoaded("ogre2"))
+    {
+      for (const auto &[sm, name, camera] : this->watched)
+      {
+        if (root && Alive(root, sm) &&
+            sm->findCameraNoThrow(name) == camera)
+        {
+          camera->removeListener(this);
+        }
+      }
+    }
+    this->watched.clear();
+  }
+
+  /// \brief Forget the boxes and the cameras, touching none: the Ogre
+  /// they were in may be gone.
+  public: void Forget()
+  {
+    this->items.clear();
+    this->watched.clear();
+    this->failed = false;
+  }
+
+  /// \brief Whether a scene manager is still Ogre's.
+  private: static bool Alive(Ogre::Root *_root, Ogre::SceneManager *_sm)
+  {
+    auto managers = _root->getSceneManagerIterator();
+    while (managers.hasMoreElements())
+    {
+      if (managers.getNext() == _sm)
+        return true;
+    }
+    return false;
+  }
+
+  /// \brief The box in one scene.
+  private: bool Create(Ogre::Root *_root, Ogre::SceneManager *_sm)
+  try
+  {
+    const char *name = "gz_underwater_backdrop";
+    Ogre::MeshPtr mesh = Ogre::MeshManager::getSingleton().getByName(name);
+    if (!mesh)
+      mesh = this->Mesh(_root, name);
+    auto *pbs = static_cast<Ogre::HlmsPbs *>(
+        _root->getHlmsManager()->getHlms(Ogre::HLMS_PBS));
+    Ogre::HlmsDatablock *datablock = pbs->getDatablock(name);
+    if (!datablock)
+    {
+      // Seen from inside, whichever way its faces wind, and past the far
+      // plane: clamped onto it instead of clipped.
+      Ogre::HlmsMacroblock macroblock;
+      macroblock.mCullMode = Ogre::CULL_NONE;
+      macroblock.mDepthClamp = true;
+      macroblock.mDepthWrite = false;
+      // Blended by alpha: the shader writes 1 for a camera under water and
+      // 0 for any other, which then sees through it.
+      Ogre::HlmsBlendblock blendblock;
+      blendblock.setBlendType(Ogre::SBT_TRANSPARENT_ALPHA);
+      auto *block = static_cast<Ogre::HlmsPbsDatablock *>(
+          pbs->createDatablock(name, name, macroblock, blendblock,
+                               Ogre::HlmsParamVec()));
+      block->setDiffuse(Ogre::Vector3::ZERO);
+      block->setSpecular(Ogre::Vector3::ZERO);
+      block->setUserValue(0, Ogre::Vector4(kBackdropMark, 0, 0, 0));
+      datablock = block;
+    }
+    Ogre::Item *item = _sm->createItem(mesh, Ogre::SCENE_DYNAMIC);
+    item->setDatablock(datablock);
+    item->setCastShadows(false);
+    // gz-rendering's own queue (10), after the sky, which it draws between
+    // its queues 1 and 2 wherever the depth is still the far plane's. Being
+    // blended, Ogre draws it after the queue's opaque items, so the depth
+    // test rejects the pixels they cover and the beams and the snow are not
+    // run there twice; and, the farthest, first of the blended ones, which
+    // still blend over it.
+    item->setRenderQueueGroup(10u);
+    _sm->getRootSceneNode()->createChildSceneNode()->attachObject(item);
+    this->items[_sm] = item;
+    return true;
+  }
+  catch (const std::exception &_e)
+  {
+    gzerr << "[underwater] no backdrop: " << _e.what() << "\n";
+    this->failed = true;
+    return false;
+  }
+
+  /// \brief A box from -1 to 1, with normals facing in.
+  private: Ogre::MeshPtr Mesh(Ogre::Root *_root, const char *_name)
+  {
+    Ogre::VaoManager *vao = _root->getRenderSystem()->getVaoManager();
+    Ogre::MeshPtr mesh = Ogre::MeshManager::getSingleton().createManual(
+        _name, Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
+    Ogre::SubMesh *sub = mesh->createSubMesh();
+    Ogre::VertexElement2Vec elements;
+    elements.push_back(Ogre::VertexElement2(Ogre::VET_FLOAT3,
+                                            Ogre::VES_POSITION));
+    elements.push_back(Ogre::VertexElement2(Ogre::VET_FLOAT3,
+                                            Ogre::VES_NORMAL));
+    // Six faces of four vertices: the face's axis, then its two others.
+    auto *vertices = reinterpret_cast<float *>(OGRE_MALLOC_SIMD(
+        sizeof(float) * 6 * 24, Ogre::MEMCATEGORY_GEOMETRY));
+    auto *indices = reinterpret_cast<Ogre::uint16 *>(OGRE_MALLOC_SIMD(
+        sizeof(Ogre::uint16) * 36, Ogre::MEMCATEGORY_GEOMETRY));
+    float *v = vertices;
+    Ogre::uint16 *ix = indices;
+    for (int face = 0; face < 6; ++face)
+    {
+      const int axis = face / 2;
+      const float side = (face % 2) ? 1.0f : -1.0f;
+      const int a = (axis + 1) % 3, b = (axis + 2) % 3;
+      const float corners[4][2] = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+      for (const auto &c : corners)
+      {
+        float pos[3], normal[3] = {0, 0, 0};
+        pos[axis] = side;
+        pos[a] = c[0];
+        pos[b] = c[1];
+        normal[axis] = -side;
+        for (float f : pos)
+          *v++ = f;
+        for (float f : normal)
+          *v++ = f;
+      }
+      const Ogre::uint16 base = static_cast<Ogre::uint16>(4 * face);
+      for (int k : {0, 1, 2, 0, 2, 3})
+        *ix++ = static_cast<Ogre::uint16>(base + k);
+    }
+    Ogre::VertexBufferPacked *vertexBuffer = vao->createVertexBuffer(
+        elements, 24, Ogre::BT_IMMUTABLE, vertices, true);
+    Ogre::IndexBufferPacked *indexBuffer = vao->createIndexBuffer(
+        Ogre::IndexBufferPacked::IT_16BIT, 36, Ogre::BT_IMMUTABLE, indices,
+        true);
+    Ogre::VertexBufferPackedVec buffers;
+    buffers.push_back(vertexBuffer);
+    Ogre::VertexArrayObject *object = vao->createVertexArrayObject(
+        buffers, indexBuffer, Ogre::OT_TRIANGLE_LIST);
+    sub->mVao[Ogre::VpNormal].push_back(object);
+    sub->mVao[Ogre::VpShadow].push_back(object);
+    mesh->_setBounds(Ogre::Aabb(Ogre::Vector3::ZERO,
+                                Ogre::Vector3::UNIT_SCALE), false);
+    mesh->_setBoundingSphereRadius(1.7320508f);
+    return mesh;
+  }
+
+  private: std::map<Ogre::SceneManager *, Ogre::Item *> items;
+
+  /// \brief The cameras listened to: scene, name, camera.
+  private: std::set<std::tuple<Ogre::SceneManager *, std::string,
+                               Ogre::Camera *>> watched;
+
+  /// \brief The backdrop's visibility before a camera hid it.
+  private: bool wasVisible{false};
+
+  /// \brief Set when the box could not be made: not tried again.
+  private: bool failed{false};
+};
+
 class UnderwaterListener : public Ogre::HlmsListener
 {
   public: Ogre::HlmsListener *previous{nullptr};
   public: Water water;
+  public: Backdrop backdrop;
 
   /// \brief Set from any thread when the plugin is gone: draw nothing, and
   /// on the next frame turn the water off as a plugin would.
@@ -224,8 +610,8 @@ class UnderwaterListener : public Ogre::HlmsListener
   /// \brief The scene's lamps: its spot and point lights whose own name,
   /// after the model and link that scope it, contains "lamp" (any case).
   /// Other lights are not lamps: Ogre lights with them as in air. At most
-  /// kMaxLamps, the first by name; a warning, once, for the others, which
-  /// are left to Ogre too.
+  /// as many as the quality lights in the shader, the first by name; a
+  /// warning, once, for the others, which are left to Ogre too.
   /// \param[out] _alive Every light of the scenes, lamp or not.
   /// \return The lamps.
   private: std::set<Ogre::Light *> Lamps(std::set<Ogre::Light *> &_alive)
@@ -262,17 +648,18 @@ class UnderwaterListener : public Ogre::HlmsListener
       }
     }
     std::sort(named.begin(), named.end());
-    if (static_cast<int>(named.size()) > kMaxLamps && !this->warnedLamps)
+    const int limit = kQualityLamps[this->water.quality];
+    if (static_cast<int>(named.size()) > limit && this->warnedLamps != limit)
     {
-      gzwarn << "[underwater] " << named.size() << " lamps, more than "
-             << kMaxLamps << ": the lamps after " << named[kMaxLamps - 1].first
-             << " are lit by Ogre, as in air\n";
-      this->warnedLamps = true;
+      gzwarn << "[underwater] " << named.size() << " lamps, more than the "
+             << limit << " this quality lights: the lamps after "
+             << named[limit - 1].first << " are lit by Ogre, as in air\n";
+      this->warnedLamps = limit;
     }
     std::set<Ogre::Light *> lamps;
     for (const auto &[name, l] : named)
     {
-      if (static_cast<int>(lamps.size()) < kMaxLamps)
+      if (static_cast<int>(lamps.size()) < limit)
         lamps.insert(l);
     }
     return lamps;
@@ -306,8 +693,9 @@ class UnderwaterListener : public Ogre::HlmsListener
     this->hidden.clear();
   }
 
-  /// \brief Whether there were more lamps than the shader takes, warned
-  private: bool warnedLamps{false};
+  /// \brief The limit last warned about, when there were more lamps than
+  /// the shader takes; 0 for none
+  private: int warnedLamps{0};
 
   private: void CollectLamps(Ogre::SceneManager *_sm)
   {
@@ -315,7 +703,8 @@ class UnderwaterListener : public Ogre::HlmsListener
     auto it = _sm->getMovableObjectIterator(
         Ogre::LightFactory::FACTORY_TYPE_NAME);
     while (it.hasMoreElements() &&
-           static_cast<int>(this->lamps.size()) < kMaxLamps)
+           static_cast<int>(this->lamps.size()) <
+               kQualityLamps[this->water.quality])
     {
       auto *light = static_cast<Ogre::Light *>(it.getNext());
       if (!this->hidden.count(light) || !light->getParentNode())
@@ -382,6 +771,7 @@ class UnderwaterListener : public Ogre::HlmsListener
   {
     if (this->previous)
       this->previous->preparePassHash(_shadow, _caster, _dual, _sm, _hlms);
+    this->backdrop.BeforePass(_sm);
     if (!this->On(_caster))
       return;
     _hlms->_setProperty("gz_underwater", 1);
@@ -446,8 +836,11 @@ class UnderwaterListener : public Ogre::HlmsListener
     // phase function's asymmetry.
     put4(w.veil[0] * w.attenuation[0], w.veil[1] * w.attenuation[1],
          w.veil[2] * w.attenuation[2], kPhaseG);
-    put4(static_cast<float>(this->lamps.size()), kBeamSteps, kBeamRange,
-         1.0f);
+    put4(static_cast<float>(this->lamps.size()), kBeamSteps[w.quality],
+         kBeamRange, 1.0f);
+    put4(w.caustics, w.snow, 0.0f, kSnowRange[w.quality]);
+    put4(CausticPhase(0.8, w.time), CausticPhase(1.0, w.time),
+         CausticPhase(0.9, w.time), CausticPhase(1.1, w.time));
     // The lamps, in view space, as Ogre's own light buffer has them.
     Ogre::Matrix4 view = Ogre::Matrix4::IDENTITY;
     if (camera)
@@ -548,6 +941,7 @@ void Drop()
   s.listener.water = Water{};
   s.listener.released = false;
   s.listener.Forget();
+  s.listener.backdrop.Forget();
 }
 
 /// \brief The PBS of the Ogre running now.
@@ -575,10 +969,14 @@ void SetWater(const UwWater *_v)
   auto &s = State();
   auto &w = s.listener.water;
   w.active = nullptr != _v;
+  // The quality first: it says how many lamps the shader lights
+  if (_v)
+    w.quality = std::clamp(_v->quality, 0, 2);
   // The lamps hidden while the water is drawn, given back when it is not.
   // Lamps that appear later (a vehicle spawned with its lights) are hidden
   // on the frame they appear.
   s.listener.HideLamps(w.active);
+  s.listener.backdrop.Update(s.done && w.active, _v ? _v->level : 0.0f);
   if (!_v)
     return;
   std::memcpy(w.attenuation, _v->attenuation, sizeof(w.attenuation));
@@ -587,6 +985,9 @@ void SetWater(const UwWater *_v)
   std::memcpy(w.diffuse, _v->diffuse, sizeof(w.diffuse));
   w.level = _v->level;
   w.daylight = _v->daylight;
+  w.caustics = _v->caustics;
+  w.snow = _v->snow;
+  w.time = _v->time;
 }
 
 /// \brief Where a piece is defined: "@piece( name )", any spacing.
@@ -841,6 +1242,7 @@ try
   if (Live(CurrentPbs()))
   {
     s.listener.HideLamps(false);
+    s.listener.backdrop.Destroy();
     s.pbs->setListener(s.listener.previous);
     s.pbs->reloadFrom(s.pbs->getDataFolder(), &s.originalLibrary);
     s.root->removeFrameListener(&s.settler);

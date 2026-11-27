@@ -75,6 +75,15 @@ struct WaterOpticsSpec
   /// \brief How strong the daylight is, against the renderer's sun: it
   /// scales the veil. 1 by day, 0 at night (only lamps light the water).
   double daylight{1.0};
+
+  /// \brief Strength of the caustics the waves cast on what faces up, 0 to
+  /// 1; scaled by how high the waves are (none on flat water). Off unless
+  /// asked for.
+  double caustics{0.0};
+
+  /// \brief Marine snow: the fraction of 25 cm cells near the camera that
+  /// hold a speck, 0 to 1. 0, none.
+  double marineSnow{0.0};
 };
 
 /// \brief The water's optics, resolved: what every consumer reads.
@@ -108,6 +117,12 @@ struct WaterOpticsData
   /// \brief How strong the daylight is, against the renderer's sun; scales
   /// the veil. 0 at night.
   double daylight{1.0};
+
+  /// \brief Caustics strength, 0 to 1.
+  double caustics{0.0};
+
+  /// \brief Marine snow density, 0 to 1.
+  double marineSnow{0.0};
 
   /// \brief Goes up on every change, so a consumer knows to re-read.
   std::uint64_t generation{0};
@@ -205,7 +220,8 @@ inline std::ostream &operator<<(std::ostream &_os, const WaterOpticsData &_d)
 {
   const auto old = _os.precision(std::numeric_limits<double>::max_digits10);
   _os << std::quoted(_d.jerlov) << ' ' << _d.generation << ' '
-      << _d.waterLevel << ' ' << _d.daylight;
+      << _d.waterLevel << ' ' << _d.daylight << ' ' << _d.caustics << ' '
+      << _d.marineSnow;
   for (const Rgb *v : {&_d.attenuation, &_d.backscatter, &_d.veil,
                        &_d.diffuseAttenuation})
   {
@@ -222,7 +238,7 @@ inline std::ostream &operator<<(std::ostream &_os, const WaterOpticsData &_d)
 inline std::istream &operator>>(std::istream &_is, WaterOpticsData &_d)
 {
   _is >> std::quoted(_d.jerlov) >> _d.generation >> _d.waterLevel
-      >> _d.daylight;
+      >> _d.daylight >> _d.caustics >> _d.marineSnow;
   for (Rgb *v : {&_d.attenuation, &_d.backscatter, &_d.veil,
                  &_d.diffuseAttenuation})
   {
