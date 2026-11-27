@@ -23,6 +23,7 @@ cp $(ros2 pkg prefix --share kai_gazebo)/worlds/open_water.sdf my_world.sdf
 | A wave source | The moving sea: its state, the `set_parameters` service, and `<tiles_radius>` for how far the sea is drawn | `gz-sim-waves-fft-system` (or `gz-sim-waves-gerstner-system`) |
 | The `water_surface` model | Draws the sea | `<include><uri>model://water_surface</uri></include>` |
 | Sensor systems | IMU, magnetometer, GPS and rendered sensors | see [Add sensors](sensors.md#what-the-world-provides) |
+| The water's optics | What the water does to light, for underwater cameras and the underwater rendering | `gz-maritime-water-optics-system` with `<jerlov>IB</jerlov>`; see [Underwater camera](underwater-camera.md) |
 | `<spherical_coordinates>` | GPS origin and magnetic field location | Portuguese Ledge, Monterey Bay |
 
 Leave out what you don't need. A world without waves, for example, still
@@ -68,6 +69,25 @@ This is Gazebo's own buoyancy system plus the marked-collision change
 carried by `gz_buoyancy` until a Gazebo release ships it. When it does, the
 plugin line becomes `gz-sim-buoyancy-system` / `gz::sim::systems::Buoyancy`
 and nothing else changes.
+
+## The water's optics
+
+Every shipped world sets its water with a Jerlov type, the site's: `IB`
+for open ocean, `1C` for a clear coast, `3C` for a harbour or a lake, `5C`
+for a murky lake, `I` for a pool. Pick the one closest to yours, or give a
+`<visibility>` in metres:
+
+```xml
+<plugin filename="gz-maritime-water-optics-system"
+        name="gz::sim::maritime::WaterOptics">
+  <jerlov>3C</jerlov>
+</plugin>
+```
+
+It applies everywhere below the water level (z = 0 by default), indoors
+too. Without it, the world has clear water. Cameras see through it only
+with the underwater camera plugin, or with `model://underwater_optics` in
+the world, which draws it in every rendered camera and the GUI.
 
 ## The world name
 

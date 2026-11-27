@@ -50,7 +50,7 @@ REQUIRED_SYSTEMS = (
     'gz-sim-imu-system', 'gz-sim-magnetometer-system', 'gz-sim-navsat-system',
     'gz-sim-air-pressure-system', 'gz-maritime-buoyancy-system',
     'gz-maritime-wind-system', 'gz-maritime-ocean-current-system',
-    'gz-maritime-acoustics-system',
+    'gz-maritime-acoustics-system', 'gz-maritime-water-optics-system',
 )
 # The gz_maritime_gui panels every world docks, drawing off (but in the
 # acoustic demo, whose point is the acoustics panel's drawing).
@@ -75,6 +75,11 @@ def test_world_keeps_the_contract(world):
     plugins = {p.get('filename') for p in w.findall('plugin')}
     assert set(REQUIRED_SYSTEMS) <= plugins, set(REQUIRED_SYSTEMS) - plugins
     assert any(f.startswith('gz-sim-waves-') for f in plugins), 'no wave source'
+    # The water's optics: a Jerlov type the system knows
+    optics = next(p for p in w.findall('plugin')
+                  if p.get('filename') == 'gz-maritime-water-optics-system')
+    assert optics.findtext('jerlov') in (
+        'I', 'IA', 'IB', 'II', 'III', '1C', '3C', '5C', '7C', '9C')
     buoyancy = next(p for p in w.findall('plugin')
                     if p.get('filename') == 'gz-maritime-buoyancy-system')
     assert buoyancy.find('enable_by_default').text == 'false'
