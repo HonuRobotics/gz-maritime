@@ -860,9 +860,10 @@ TEST_F(SonarSystem, PingsOnlyWhileSubscribed)
   ASSERT_TRUE(StepUntil([&]() { return quiet() == 2; }));
 
   // A subscriber again: pings again, numbered as if they had never stopped.
+  // Waited for in the log, not by a first ping: the last ping made for the
+  // labels' subscriber may still be on its way and arrive here.
   pings = std::make_unique<Pings>(kTopic);
-  ASSERT_TRUE(StepUntil([&]() { return pings->Latest() >= 0; }));
-  EXPECT_EQ(2u, pinging());
+  ASSERT_TRUE(StepUntil([&]() { return pinging() == 2; }));
   const auto got = Window(*pings, 1000);
   EXPECT_EQ(25u, got.size());
   EXPECT_EQ("", OnGrid(got, kRate));
