@@ -15,6 +15,12 @@ in vec2 uv;
 out vec4 fragColor;
 
 const float kIor = 1.333;
+// What is left of the view where the light is totally reflected
+const float kTotalReflection = 0.15;
+// How much of a frame beyond its border a drop shows, at most, darkened
+const float kOutsideDarkening = 0.35;
+// Water height, in image heights, over which a texel turns from film to drop
+const float kDropEdge = 0.0015;
 const vec2 kTaps[12] = vec2[12](
   vec2(-0.326, -0.406), vec2(-0.840, -0.074), vec2(-0.696, 0.457),
   vec2(-0.203, 0.621), vec2(0.962, -0.195), vec2(0.473, -0.480),
@@ -69,8 +75,8 @@ void main()
   if (dot(r, r) < 1e-6 || r.z > -1e-4)
   {
     // Total internal reflection at the rim, or a ray that leaves sideways:
-    // a blurred view at 15 %.
-    seen = Blur(uv, spread) * 0.15;
+    // a dim blurred view.
+    seen = Blur(uv, spread) * kTotalReflection;
   }
   else
   {
@@ -79,7 +85,7 @@ void main()
     // Beyond the frame the drop shows what the camera does not see: darken
     // a little rather than smear the border.
     float outside = length(max(abs(at - 0.5) - 0.5, 0.0));
-    seen = Blur(at, spread) * (1.0 - clamp(outside * 2.0, 0.0, 0.35));
+    seen = Blur(at, spread) * (1.0 - clamp(outside * 2.0, 0.0, kOutsideDarkening));
     // What reflects at the water's surface goes back into the camera's
     // housing, which is dark: Fresnel, from water to air, by Schlick with
     // the angle on the air side.
@@ -89,6 +95,6 @@ void main()
     seen *= 1.0 - fresnel;
   }
 
-  float cover = smoothstep(0.0, 0.0015, h);
+  float cover = smoothstep(0.0, kDropEdge, h);
   fragColor = vec4(mix(filmed, seen, cover), 1.0);
 }
