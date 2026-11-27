@@ -676,6 +676,21 @@ site's bathymetry, and fixed here:
   (`Ogre2RenderTarget` connects `rt0` and `rt1`); the depth is not handed
   to an added pass, so this needs a change in gz-rendering first.
 
+Found in review, and fixed here:
+
+- **A speckled band at the horizon**, in every world with the surface: far
+  away, at grazing angles, the normal interpolated from a triangle's corners
+  disagrees with the triangle drawn, and parts of a surface seen from above
+  were shaded as seen from below. The side is now the drawn triangle's own
+  normal, from screen derivatives: from 2 m over a rippled sea, 106 pixels
+  of 768,000 seen from below, 14,078 before.
+- **An RGBD camera without a sky saw open water as the background
+  colour**: its colour pass paints whatever nothing was hit with it, and the
+  backdrop writes no depth. While the backdrop shows, the pass is told the
+  scene has a background; the depth is not touched.
+- **At `<quality>low` two lamps were dark**: four were hidden from Ogre and
+  two lit in the shader. Only those the shader lights are hidden now.
+
 ## Open questions
 
 - Which BlueROV2 camera settings (resolution, field of view, port type) match
