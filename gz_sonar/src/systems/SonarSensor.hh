@@ -110,7 +110,13 @@ class SonarSensor : public sensors::Sensor
   /// \return The layout.
   public: const gz::maritime::sonar::CameraLayout &Layout() const;
 
-  /// \brief Pings per second.
+  /// \brief The slowest a sonar pings, Hz: one ping in a thousand seconds.
+  /// A slower <update_rate> or set_rate is held here.
+  public: static constexpr double kMinRate = 0.001;
+
+  /// \brief Pings per second: the <update_rate> or the last set_rate, no
+  /// faster than echoes return from the far range and no slower than
+  /// kMinRate.
   /// \return The rate, Hz.
   public: double Rate() const;
 

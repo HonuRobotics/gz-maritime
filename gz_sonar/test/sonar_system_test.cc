@@ -763,6 +763,11 @@ TEST_F(SonarSystem, EnableStopsAndResumes)
   request.set_data(false);
   ASSERT_TRUE(node->Request(kTopic + "/enable", request));
   Step(1000);
+  // Turned on at a time that is not due: at a due time, the last frame of
+  // the off period can still be on the rendering thread when the request
+  // lands, and the first ping is then stamped exactly `on`.
+  if (Now() == LastDue(Now(), kRate))
+    Step(1);
   const auto on = Now();
   request.set_data(true);
   ASSERT_TRUE(node->Request(kTopic + "/enable", request));
@@ -793,6 +798,30 @@ TEST_F(SonarSystem, SetRateChangesTheRate)
   rate.set_data(kRate);
   ASSERT_TRUE(node->Request(kTopic + "/set_rate", rate));
   got = Window(*pings, 1000);
+  EXPECT_EQ(25u, got.size());
+  EXPECT_EQ("", OnGrid(got, kRate));
+}
+
+//////////////////////////////////////////////////
+// A rate too small to schedule is held at the floor, 0.001 Hz: the server
+// keeps stepping, where 1e-11 Hz once overflowed the due times and hung it;
+// and the sonar comes back on the grid when a rate is set again.
+TEST_F(SonarSystem, ATinyRateDoesNotHangTheServer)
+{
+  Step(100);
+  Settle(*pings);
+  msgs::Double rate;
+  for (const double tiny : {1e-11, 1e-300, 0.0005})
+  {
+    rate.set_data(tiny);
+    ASSERT_TRUE(node->Request(kTopic + "/set_rate", rate));
+    const auto before = Now();
+    Step(200);
+    EXPECT_EQ(before + 200'000'000, Now()) << "at " << tiny << " Hz";
+  }
+  rate.set_data(kRate);
+  ASSERT_TRUE(node->Request(kTopic + "/set_rate", rate));
+  const auto got = Window(*pings, 1000, 100);
   EXPECT_EQ(25u, got.size());
   EXPECT_EQ("", OnGrid(got, kRate));
 }
@@ -841,6 +870,17 @@ TEST_F(SonarSystem, PingsOnlyWhileSubscribed)
     return log->Count({name, kPinging}) - pingingBefore;
   };
 
+  // The tests after this one read `pings`: put a subscriber back however
+  // this test ends, so one failure here does not take the rest down.
+  struct Restore
+  {
+    ~Restore()
+    {
+      if (!pings)
+        pings = std::make_unique<Pings>(kTopic);
+    }
+  } restore;
+
   // The only subscriber goes.
   pings.reset();
   ASSERT_TRUE(StepUntil([&]() { return quiet() == 1; }));
@@ -871,8 +911,8 @@ TEST_F(SonarSystem, PingsOnlyWhileSubscribed)
 }
 
 //////////////////////////////////////////////////
-// <always_ping> in <gz:sonar>: the sonar pings with no subscriber, for the
-// subscriber gz-transport does not report. Its enable service still turns
+// <always_ping> in <gz:sonar>: the sonar pings with no subscriber. Its
+// enable service still turns
 // it off. A value that is neither true nor false refuses the sonar.
 TEST_F(SonarSystem, AlwaysPingNeedsNoSubscriber)
 {

@@ -165,6 +165,12 @@ bool SonarSensor::Load(const sdf::Sensor &_sdf, const std::string &_type,
         << " m, " << l.yaws.size() << " camera(s) of " << l.width << "x"
         << l.height << (this->alwaysPing ? ", pinging with no subscriber too" :
           "") << "\n";
+  if (this->UpdateRate() > 0.0 && this->UpdateRate() < kMinRate)
+  {
+    gzwarn << "Sonar [" << this->Name() << "]: <update_rate> "
+           << this->UpdateRate() << " Hz is slower than the slowest rate, "
+           << kMinRate << " Hz; pinging at that\n";
+  }
   if (this->UpdateRate() > this->Rate())
   {
     gzwarn << "Sonar [" << this->Name() << "]: <update_rate> "
@@ -207,7 +213,10 @@ double SonarSensor::Rate() const
   const double asked = this->UpdateRate() > 0.0 ? this->UpdateRate() : 10.0;
   // One ping's echoes must return before the next: no faster than c / 2R.
   const double cap = this->water.soundSpeed / (2.0 * this->config.rangeMax);
-  return std::min(asked, cap);
+  // And no slower than kMinRate, whether from <update_rate> or set_rate:
+  // below about 1e-10 Hz a ping's due time in nanoseconds overflows, and
+  // the schedule never ends.
+  return std::max(std::min(asked, cap), kMinRate);
 }
 
 //////////////////////////////////////////////////
