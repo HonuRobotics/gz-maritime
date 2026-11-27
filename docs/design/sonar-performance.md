@@ -10,15 +10,16 @@ This page is a rough assessment from one representative case, to inform how you 
 
 ## The case
 
-The shipwreck world (`sonar_shipwreck.sdf`), with a BlueROV2 4 m down beside the wreck and a BlueBoat on the surface near it, both in view of the wreck. Five sets of sonars, each at its default 10 Hz:
+The shipwreck world (`sonar_shipwreck.sdf`), with a BlueROV2 4 m down beside the wreck and a BlueBoat on the surface near it, both in view of the wreck. Six sets of sonars, each sonar at its default 10 Hz and, except in the last, with a subscriber on its topic, since a sonar pings only while something listens:
 
 - none;
 - the ROV's imaging sonar (Sonoptix ECHO, 768 samples to 15 m);
 - the BlueBoat's sidescan (Omniscan 450 SS, both sides);
 - a profiling sonar on the ROV (Surveyor 240-16, looking down);
-- all three at once.
+- all three at once;
+- all three at once, with nobody subscribed.
 
-Each ran headless for 30 s, once with the GPU and once with llvmpipe, Mesa's software renderer on the CPU, on a workstation with 24 CPU cores and an NVIDIA RTX 2070 SUPER, inside [drydock](https://github.com/HonuRobotics/drydock)'s `maritime` container.
+Each ran headless for 30 s, once with the GPU and once with llvmpipe, Mesa's software renderer on the CPU, on a workstation with 12 CPU cores (24 threads) and an NVIDIA RTX 2070 SUPER, inside [drydock](https://github.com/HonuRobotics/drydock)'s `maritime` container.
 
 ## Results
 
@@ -29,8 +30,9 @@ The shipwreck world's real time factor for each set of sonars, with a GPU and wi
 ```
 
 - The imaging sonar costs the most: it alone takes the world to 0.78 of real time. Its fan is wide and tall, so it draws far more pixels per ping than the sidescan's and profiler's thin fans.
-- The costs add up: all three together run at about two thirds of real time.
-- A GPU makes little difference: llvmpipe is within 0.05 of the GPU in every case, and the same within the noise for the sidescan and the profiler.
+- The costs add up: all three together run at about 0.7 of real time (0.71 with the GPU, 0.64 without).
+- A sonar nobody listens to costs almost nothing: with all three fitted and no subscriber, the world runs at 0.99, as it does with no sonar.
+- A GPU makes little difference: llvmpipe is within 0.05 of the GPU for each sonar alone and 0.07 behind with all three, and the same within the noise for the sidescan and the profiler.
 
 
 ## Why the GPU matters little
@@ -51,7 +53,7 @@ The software involved:
 
 ## Recommendations
 
-- All sonar sims are computationally costly, so activate a sonar only where the scenario uses it.
+- All sonar sims are computationally costly, so activate a sonar only where the scenario uses it. A sonar with no subscriber does not ping, so one that is fitted but not listened to is nearly free.
 - Imaging sonar (wide beam) sim is more costly than the profiling and side scan (narrow beam).  A single imaging sonar costs about a fifth of real time, a sidescan about a tenth, a profiler less.
 - A GPU is not required for scenes of this size. Without one, expect about the same real time factor.
 - More CPU cores help more than a faster GPU: most of each ping's work is on the CPU. The engine step of all the sonars together uses at most eight of them; each sonar's worker and the simulation use the others.

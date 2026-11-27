@@ -14,13 +14,14 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, '..', 'images', 'sonar-rtf')
-CASES = [('No sonar', 1.000, 0.999),
-         ('ROV profiler', 0.940, 0.940),
-         ('USV sidescan', 0.904, 0.910),
-         ('ROV imaging', 0.783, 0.730),
-         ('All three', 0.664, 0.640)]
+CASES = [('No sonar', 0.992, 0.993),
+         ('All three, no subscriber', 0.993, 0.993),
+         ('ROV profiler', 0.916, 0.932),
+         ('USV sidescan', 0.885, 0.900),
+         ('ROV imaging', 0.780, 0.738),
+         ('All three', 0.709, 0.640)]
 
-fig, ax = plt.subplots(figsize=(7.5, 3.4))
+fig, ax = plt.subplots(figsize=(7.5, 3.9))
 h = 0.36
 for i, (name, gpu, cpu) in enumerate(reversed(CASES)):
     for dy, v, color, label in ((h / 2, gpu, '#3b6ea5', 'With a GPU'), (-h / 2, cpu, '#a8a8a8', 'llvmpipe (CPU only)')):
