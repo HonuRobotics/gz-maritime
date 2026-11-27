@@ -85,12 +85,16 @@ For each pixel, from the in-air frame's colour J and z-depth:
    units of a white surface lit by the surface daylight. A pixel that hits
    nothing sees the open water: the veil, or the sky through the surface.
 5. **Forward scatter**, a blur of the light from the objects (not the
-   veil), each pixel's spread by its own path through the water: a near
-   object's light spreads little, onto open water or a far wall beside it
-   alike, and none is made or lost at a depth edge (recursive Gaussian
-   levels, each pixel's light shared between the two around its sigma; a
-   sigma under a pixel comes out smaller, 0.40 as about 0.24, and from one
-   pixel up within 13 %), and the
+   veil). Light goes from one pixel to another blurred by the smaller of
+   their two paths through the water, since it reaches a pixel only
+   through the water in front of what that pixel sees: a near object's
+   light spreads little onto open water or a far wall beside it, and a far
+   bright one's spreads little onto a near dark object. Each pixel is
+   divided by what the same blur gives an image of ones, so one colour
+   stays flat across a depth edge, and light is kept there to within
+   0.5 %. Recursive Gaussian levels, each pixel's light shared between the
+   two around its sigma: a sigma under 0.5 pixel comes out smaller, 0.40
+   as about 0.24, and from 0.5 pixel up within 13 %. And the
    **port**: a flat one maps each output radius r to the rendered radius
    f tan(asin(sin(atan(r / f)) / n)). Under water only.
 6. **The camera.** Noise on the light caught, then exposure and white
@@ -106,9 +110,12 @@ The image pipeline runs on the CPU, its rows on up to 16 cores. A
 1920x1080 frame on a 13th generation Core laptop: 27 ms for the water
 alone, 32 ms with auto exposure and white balance, 42 ms with noise (drawn
 per row, from generators one draw per frame seeds, so a seed gives the same
-frame on any number of threads), 59 ms with a flat port, 160 ms with forward
-scatter. The threads are a pool the process keeps, as many as the cores it
-may run on, at most 16. For every
+frame on any number of threads), 59 ms with a flat port. Forward scatter
+takes two blurs per level of sigma in use: on a 20-thread desktop, 290 ms
+for a few objects over open water and 420 ms for a depth that changes
+across the whole frame (51 and 64 ms at 640x480). The threads are a pool
+the process keeps, one fewer than the cores it may run on, at most 15;
+the calling thread makes up the rest. For every
 camera at full frame rate, use the GPU path
 ([`gz_underwater_rendering`](../gz_underwater_rendering/README.md)).
 

@@ -38,6 +38,7 @@
 #include <vector>
 
 #include <gz/math/Helpers.hh>
+#include <gz/math/Vector4.hh>
 
 namespace gz::sim::underwater_camera
 {
@@ -376,9 +377,13 @@ void SetMaxThreads(unsigned int _n)
   gMaxThreads = _n;
 }
 
-//////////////////////////////////////////////////
-void GaussianBlur(std::vector<Rgb> &_img, std::uint32_t _w, std::uint32_t _h,
-                  double _sigma)
+namespace
+{
+/// \brief GaussianBlur for any pixel type with + and * by a number: an
+/// Rgb, or an Rgb with a weight beside it.
+template <typename T>
+void RecursiveBlur(std::vector<T> &_img, std::uint32_t _w, std::uint32_t _h,
+                   double _sigma)
 {
   if (_sigma < 0.5 || _w < 2 || _h < 2)
     return;
@@ -398,24 +403,24 @@ void GaussianBlur(std::vector<Rgb> &_img, std::uint32_t _w, std::uint32_t _h,
   // blurred as if the edge went on, not pulled towards the filter's start.
   const std::size_t pad = static_cast<std::size_t>(std::ceil(3.0 * _sigma));
   const auto line = [&](std::size_t _start, std::size_t _stride,
-                        std::size_t _n, std::vector<Rgb> &tmp)
+                        std::size_t _n, std::vector<T> &tmp)
   {
     const std::size_t m = _n + 2 * pad;
     tmp.resize(m);
-    const Rgb first = _img[_start], last = _img[_start + (_n - 1) * _stride];
-    Rgb w1 = first, w2 = w1, w3 = w1;
+    const T first = _img[_start], last = _img[_start + (_n - 1) * _stride];
+    T w1 = first, w2 = w1, w3 = w1;
     for (std::size_t i = 0; i < m; ++i)
     {
-      const Rgb x = i < pad ? first : i >= pad + _n ? last :
+      const T x = i < pad ? first : i >= pad + _n ? last :
           _img[_start + (i - pad) * _stride];
-      const Rgb y = x * B + w1 * b1 + w2 * b2 + w3 * b3;
+      const T y = x * B + w1 * b1 + w2 * b2 + w3 * b3;
       tmp[i] = y;
       w3 = w2; w2 = w1; w1 = y;
     }
     w1 = w2 = w3 = last;
     for (std::size_t i = m; i-- > 0;)
     {
-      const Rgb y = tmp[i] * B + w1 * b1 + w2 * b2 + w3 * b3;
+      const T y = tmp[i] * B + w1 * b1 + w2 * b2 + w3 * b3;
       if (i >= pad && i < pad + _n)
         _img[_start + (i - pad) * _stride] = y;
       w3 = w2; w2 = w1; w1 = y;
@@ -424,16 +429,24 @@ void GaussianBlur(std::vector<Rgb> &_img, std::uint32_t _w, std::uint32_t _h,
   // Rows, then columns: each line reads and writes only itself.
   ParallelFor(_h, 32, [&](std::size_t _begin, std::size_t _end)
   {
-    std::vector<Rgb> tmp;
+    std::vector<T> tmp;
     for (std::size_t v = _begin; v < _end; ++v)
       line(v * _w, 1, _w, tmp);
   });
   ParallelFor(_w, 32, [&](std::size_t _begin, std::size_t _end)
   {
-    std::vector<Rgb> tmp;
+    std::vector<T> tmp;
     for (std::size_t u = _begin; u < _end; ++u)
       line(u, _w, _h, tmp);
   });
+}
+}  // namespace
+
+//////////////////////////////////////////////////
+void GaussianBlur(std::vector<Rgb> &_img, std::uint32_t _w, std::uint32_t _h,
+                  double _sigma)
+{
+  RecursiveBlur(_img, _w, _h, _sigma);
 }
 
 //////////////////////////////////////////////////
@@ -446,12 +459,18 @@ double FlatPortSource(double _r, double _f, double _n)
 
 namespace
 {
-/// \brief A blur whose sigma, in pixels, varies per pixel, spread from
-/// each source pixel with its own sigma: the light of a near object spreads
-/// as little as the near object's range says, onto open water or a far wall
-/// beside it alike, and no light is made or lost at a depth edge. A few
-/// levels of sigma; each pixel's light is shared between the two levels
-/// around its sigma, each level's share blurred once, and the shares added.
+/// \brief A blur whose sigma, in pixels, varies per pixel. Light goes from
+/// one pixel to another blurred by the smaller of their two sigmas: forward
+/// scatter reaches a pixel only from the water in front of what it sees, so
+/// a near object neither spreads its light far onto open water or a far
+/// wall beside it, nor takes in a far bright one's light from far. Each
+/// pixel is divided by what the same blur gives an image of ones, so a
+/// scene of one colour stays flat across a depth edge.
+///
+/// A few levels of sigma; a pixel's sigma falls between two, and its light
+/// and its weight are shared between them. A pixel at level m takes the
+/// light of narrower pixels each at its own level, and all the light at
+/// level m or wider blurred at m.
 void VariableBlur(std::vector<Rgb> &_img, std::uint32_t _w, std::uint32_t _h,
                   const std::vector<double> &_sigma)
 {
@@ -464,55 +483,96 @@ void VariableBlur(std::vector<Rgb> &_img, std::uint32_t _w, std::uint32_t _h,
   for (double s = 0.5; s < maxSigma * 1.25; s *= 1.25)
     levels.push_back(s);
   // The level under each pixel's sigma, and its share of the next
-  std::vector<std::uint16_t> under(_sigma.size());
-  std::vector<float> share(_sigma.size(), 0.0f);
+  const std::size_t n = _sigma.size();
+  std::vector<std::uint16_t> under(n);
+  std::vector<float> share(n, 0.0f);
+  std::size_t top = 0;
   std::vector<char> used(levels.size(), 0);
-  for (std::size_t i = 0; i < _sigma.size(); ++i)
+  for (std::size_t i = 0; i < n; ++i)
   {
     std::size_t k = 0;
     while (k + 1 < levels.size() && levels[k + 1] < _sigma[i])
       ++k;
     under[i] = static_cast<std::uint16_t>(k);
-    used[k] = 1;
     if (k + 1 < levels.size())
     {
       share[i] = static_cast<float>(
           std::clamp((_sigma[i] - levels[k]) / (levels[k + 1] - levels[k]),
                      0.0, 1.0));
-      if (share[i] > 0.0f)
-        used[k + 1] = 1;
     }
+    top = std::max(top, k + (share[i] > 0.0f ? 1 : 0));
+    used[k] = 1;
+    if (share[i] > 0.0f)
+      used[k + 1] = 1;
   }
-  const std::vector<Rgb> src = _img;
-  std::fill(_img.begin(), _img.end(), Rgb(0, 0, 0));
-  std::vector<Rgb> part(src.size());
-  for (std::size_t k = 0; k < levels.size(); ++k)
+  // A pixel's weight at level k, and the part of it at k or wider
+  const auto at = [&](std::size_t _i, std::size_t _k)
   {
+    return under[_i] == _k ? 1.0 - share[_i] :
+        under[_i] + 1u == _k ? static_cast<double>(share[_i]) : 0.0;
+  };
+  const auto wide = [&](std::size_t _i, std::size_t _k)
+  {
+    return _k <= under[_i] ? 1.0 :
+        under[_i] + 1u == _k ? static_cast<double>(share[_i]) : 0.0;
+  };
+
+  const std::vector<Rgb> src = _img;
+  // Light (x, y, z) and its weight (w) from narrower levels so far; and the
+  // sum of the weights taken
+  std::vector<math::Vector4d> below(n, math::Vector4d::Zero);
+  std::vector<double> weight(n, 0.0);
+  std::fill(_img.begin(), _img.end(), Rgb(0, 0, 0));
+  // This level's own light, and all the light at it or wider, each with
+  // its weight
+  std::vector<math::Vector4d> own(n), wider(n);
+  const auto with = [](const Rgb &_c, double _w)
+  {
+    return math::Vector4d(_c.X() * _w, _c.Y() * _w, _c.Z() * _w, _w);
+  };
+  for (std::size_t k = 0; k <= top; ++k)
+  {
+    // A level no pixel is at adds no light and has no pixel to take any
     if (!used[k])
       continue;
-    // This level's share of every pixel
-    ParallelFor(src.size(), 1 << 14,
-        [&](std::size_t _begin, std::size_t _end)
+    // Nothing is wider than the top level to take its own light
+    const bool last = k == top;
+    ParallelFor(n, 1 << 14, [&](std::size_t _begin, std::size_t _end)
     {
       for (std::size_t i = _begin; i < _end; ++i)
       {
-        double w = 0.0;
-        if (under[i] == k)
-          w = 1.0 - share[i];
-        else if (under[i] + 1u == k)
-          w = share[i];
-        part[i] = src[i] * w;
+        if (!last)
+          own[i] = with(src[i], at(i, k));
+        wider[i] = with(src[i], wide(i, k));
       }
     });
     if (k > 0)
-      GaussianBlur(part, _w, _h, levels[k]);
-    ParallelFor(src.size(), 1 << 14,
-        [&](std::size_t _begin, std::size_t _end)
+    {
+      if (!last)
+        RecursiveBlur(own, _w, _h, levels[k]);
+      RecursiveBlur(wider, _w, _h, levels[k]);
+    }
+    ParallelFor(n, 1 << 14, [&](std::size_t _begin, std::size_t _end)
     {
       for (std::size_t i = _begin; i < _end; ++i)
-        _img[i] += part[i];
+      {
+        const double r = at(i, k);
+        if (r > 0.0)
+        {
+          const math::Vector4d sum = below[i] + wider[i];
+          _img[i] += Rgb(sum.X(), sum.Y(), sum.Z()) * r;
+          weight[i] += sum.W() * r;
+        }
+        if (!last)
+          below[i] += own[i];
+      }
     });
   }
+  ParallelFor(n, 1 << 14, [&](std::size_t _begin, std::size_t _end)
+  {
+    for (std::size_t i = _begin; i < _end; ++i)
+      _img[i] = weight[i] > 1e-12 ? _img[i] / weight[i] : src[i];
+  });
 }
 
 /// \brief A flat port's refraction: each output pixel samples the image at
@@ -650,9 +710,9 @@ FrameStats MakeUnderwater(const std::vector<std::uint8_t> &_rgb,
       // Forward scatter spreads each pixel's direct light by its own path
       // through the water: an object's by its range, the sky's through the
       // surface by the way up. Open water below has no direct light, only
-      // the veil, which is not spread: objects' light spreads onto it by
-      // their range, not by the water's.
-      ranges[i] = std::isfinite(w) ? w : 0.0;
+      // the veil, which is not spread; as the widest receiver it takes
+      // each object's light by that object's range, not by the water's.
+      ranges[i] = std::isfinite(w) ? w : std::numeric_limits<double>::infinity();
     }
   }
   });
