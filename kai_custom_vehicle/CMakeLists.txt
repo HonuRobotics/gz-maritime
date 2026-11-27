@@ -28,7 +28,8 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ros_gz_bridge.yaml
 
 install(DIRECTORY urdf models config rviz launch
   DESTINATION share/${PROJECT_NAME})
-install(PROGRAMS scripts/instance_rviz.py DESTINATION lib/${PROJECT_NAME})
+install(PROGRAMS scripts/instance_rviz.py scripts/pinger_homing.py
+  DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -43,6 +44,8 @@ if(BUILD_TESTING)
   # spawned later drifts the same, and one holds station against it with the
   # thrust its surge damping predicts.
   ament_add_pytest_test(test_ocean_current test/test_ocean_current.py
+    TIMEOUT 600 NOCAPTURE)
+  ament_add_pytest_test(test_acoustic_demo test/test_acoustic_demo.py
     TIMEOUT 600 NOCAPTURE)
 endif()
 

@@ -254,9 +254,9 @@ try
   // column-major WaveField2D grids (element (i, j) = world (x_i, y_j) at index
   // i + j*N), so the contiguous slice [row*N, row*N + N) is the fixed-y_row
   // line of the field, and texel (u=col, v=row) receives grid value
-  // (x_col, y_row) — the orientation the vertex shader's
-  // uv = worldXY / tileSize sampling expects. Null dx/dy/foam channels pack
-  // as zeros.
+  // (x_col, y_row) — the orientation the shaders expect: they sample at
+  // worldXY / tileSize plus half a texel, the centre of that texel. Null
+  // dx/dy/foam channels pack as zeros.
   for (int row = 0; row < N; ++row)
   {
     auto *dst = reinterpret_cast<float *>(box.at(0, row, 0));

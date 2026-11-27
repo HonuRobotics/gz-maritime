@@ -1,0 +1,26 @@
+# ros_gz_bridge configuration for the acoustic demo world's own topics: the
+# pingers of kai_gazebo's acoustic_demo.sdf. The vehicles' receivers are in
+# each vehicle's own bridge.
+
+# Switch a pinger on or off, or change it: active (boolean), frequency (Hz),
+# period and offset (s), reach (m) and pulse_length (s), as named
+# parameters. Every world here is named default.
+- topic_name: "/world/default/acoustics/pinger_green/set"
+  ros_type_name: "ros_gz_interfaces/msg/ParamVec"
+  gz_type_name: "gz.msgs.Param"
+  direction: ROS_TO_GZ
+- topic_name: "/world/default/acoustics/pinger_red/set"
+  ros_type_name: "ros_gz_interfaces/msg/ParamVec"
+  gz_type_name: "gz.msgs.Param"
+  direction: ROS_TO_GZ
+- topic_name: "/world/default/acoustics/pinger_yellow/set"
+  ros_type_name: "ros_gz_interfaces/msg/ParamVec"
+  gz_type_name: "gz.msgs.Param"
+  direction: ROS_TO_GZ
+
+# Ground truth: every pinger, where it is and how it is set, once a second;
+# pinger i's keys arrive as child_<i>/name, child_<i>/x and so on.
+- topic_name: "/world/default/acoustics/pingers"
+  ros_type_name: "ros_gz_interfaces/msg/ParamVec"
+  gz_type_name: "gz.msgs.Param"
+  direction: GZ_TO_ROS

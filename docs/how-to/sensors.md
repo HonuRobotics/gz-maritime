@@ -12,6 +12,7 @@ already has its half; this page is about yours.
 | `gz-sim-magnetometer-system` | `magnetometer` sensors |
 | `gz-sim-navsat-system` | `navsat` (GPS) sensors |
 | `gz-maritime-wind-system` | `anemometer` sensors: `type="custom"` with `gz:type="anemometer"` |
+| `gz-maritime-acoustics-system` | `acoustic_receiver` sensors: `type="custom"` with `gz:type="acoustic_receiver"`; see [Find an acoustic pinger](acoustic-pingers.md) |
 | `gz-sim-sensors-system` | Rendered sensors: `camera`, `depth_camera`, `gpu_lidar` and so on. These need a GPU. |
 
 The world also sets `<spherical_coordinates>`: where on Earth the origin is
