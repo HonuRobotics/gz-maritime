@@ -104,13 +104,11 @@ class FFTWaveSimulation final : public IWaveField
 
   // ---- Accessors for unit tests + visual heightmap upload ----------------
 
-  /// \brief How many times the folding metric was computed: once per
-  /// update at most, whoever asks. For tests.
+  /// \brief How many times the folding metric was computed since the last
+  /// SetParameters: once per update at most, whoever asks, and never by
+  /// Update itself, on either path. For tests.
   /// \return The count.
-  public: std::uint64_t FoamComputations() const
-  {
-    return this->foamComputations;
-  }
+  public: std::uint64_t FoamComputations() const;
 
   /// \brief Grid resolution per axis (power of two).
   public: std::size_t GridSize() const { return this->gridSize; }
@@ -191,8 +189,6 @@ class FFTWaveSimulation final : public IWaveField
   /// \brief Sim time the folding metric was computed for; stale whenever it
   /// differs from lastUpdateT.
   private: mutable double foamTime{-1.0};
-  /// \brief How many times EnsureFoam computed the metric.
-  private: mutable std::uint64_t foamComputations{0};
 
   /// \brief Water-particle velocity grids [m/s] — the Eulerian time derivative
   /// of the displacement field (∂Dx/∂t, ∂Dy/∂t, ∂η/∂t). Filled lazily by the

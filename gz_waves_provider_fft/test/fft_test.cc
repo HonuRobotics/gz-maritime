@@ -429,6 +429,17 @@ TEST(FFTWaveSimulation, FoamOnRequest)
   for (std::size_t i = 0; i < sim.GridSize() * sim.GridSize(); ++i)
     ASSERT_EQ(fresh[i], now[i]) << i;
 
+  // Time going back: that earlier update's foam, computed again, not the
+  // later one kept
+  auto earlier = MakeSim(/*seed=*/3);
+  earlier.Update(6.0);
+  sim.Update(6.0);
+  const double *back = sim.Foam();
+  EXPECT_EQ(sim.FoamComputations(), 3u) << "the later foam kept";
+  const double *then = earlier.Foam();
+  for (std::size_t i = 0; i < sim.GridSize() * sim.GridSize(); ++i)
+    ASSERT_EQ(then[i], back[i]) << i;
+
   // A reconfigure, then an update at the very time of the last one: the new
   // recipe's foam, not the old one kept for that time.
   gsw::WaveParameters p = DefaultParams();
@@ -444,6 +455,41 @@ TEST(FFTWaveSimulation, FoamOnRequest)
   const double *b = plain.Foam();
   for (std::size_t i = 0; i < sim.GridSize() * sim.GridSize(); ++i)
     ASSERT_EQ(b[i], a[i]) << i;
+}
+
+//////////////////////////////////////////////////
+/// The foam handed out is the folding metric, not another grid: at each
+/// grid point it is what Jacobian() samples there, it is not the heights,
+/// and it folds below 1 somewhere on a rough sea. A prepared update, like a
+/// synchronous one, computes none of it.
+TEST(FFTWaveSimulation, FoamIsTheFoldingMetric)
+{
+  auto sim = MakeSim(/*seed=*/5);
+  sim.Prepare(8.0);
+  sim.Update(8.0);
+  EXPECT_EQ(sim.FoamComputations(), 0u) << "computed by a prepared update";
+  const double *foam = sim.Foam();
+  ASSERT_NE(foam, nullptr);
+  EXPECT_NE(foam, sim.HeightGrid().data()) << "the heights handed out";
+  const std::size_t n = sim.GridSize();
+  const double cell = sim.TileSizeMeters() / static_cast<double>(n);
+  double lowest = 1.0;
+  int heightsLike = 0;
+  for (std::size_t j = 0; j < n; j += 7)
+  {
+    for (std::size_t i = 0; i < n; i += 5)
+    {
+      const double f = foam[i + j * n];
+      EXPECT_NEAR(f, sim.Jacobian(i * cell, j * cell, 8.0), 1e-9)
+          << i << " " << j;
+      lowest = std::min(lowest, f);
+      heightsLike += f == sim.HeightGrid()(static_cast<Eigen::Index>(i),
+                                            static_cast<Eigen::Index>(j));
+    }
+  }
+  EXPECT_LT(lowest, 1.0) << "nothing folds";
+  EXPECT_LT(heightsLike, 3) << "the values are the heights";
+  EXPECT_EQ(sim.FoamComputations(), 1u);
 }
 
 //////////////////////////////////////////////////
