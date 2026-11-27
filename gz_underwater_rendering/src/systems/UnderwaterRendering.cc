@@ -304,7 +304,15 @@ class UnderwaterRendering
     const std::lock_guard<std::mutex> lock(this->mutex);
     if (cameras > 0)
       this->cameraCentre = centre / cameras;
-    this->set(this->water && this->enabled ? &*this->water : nullptr);
+    // The water at the instant of the frame being drawn: the scene's own
+    // time, not the step PreUpdate last saw, which can be the next one
+    std::optional<UwWater> frame = this->water;
+    if (frame)
+    {
+      if (auto scene = rendering::sceneFromFirstRenderEngine())
+        frame->time = std::chrono::duration<double>(scene->Time()).count();
+    }
+    this->set(frame && this->enabled ? &*frame : nullptr);
     if (!this->announced || *this->announced != this->water.has_value())
     {
       gzmsg << "UnderwaterRendering: "

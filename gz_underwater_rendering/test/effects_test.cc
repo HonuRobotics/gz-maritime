@@ -681,6 +681,7 @@ void SlowBesideFast(const std::string &_world)
   EXPECT_GE(distinct.size(), 2u) << "the wave did not move the water";
 }
 
+/////////////////////////////////////////////////
 TEST(WaveDepth, ASlowCameraBesideAFastOne)
 {
   SlowBesideFast("wave_depth_rates.sdf");
@@ -835,6 +836,67 @@ TEST(Unlit, FadesAndTakesTheVeil)
             << ", in air " << centre(air[0]) << "\n";
   EXPECT_NEAR(centre(water[0]), centre(air[0]), 0.02)
       << "the water is still drawn on what is unlit";
+}
+
+/////////////////////////////////////////////////
+// What nothing lights is seen through the water by the wave's depth too,
+// not the still level's: particles beside a camera 0.15 m above the still
+// level, under a wave of amplitude 0.5 m, are faded in some frames, as the
+// crest passes over it, and as in air in others. Compared frame by frame
+// with the same particles seen in air.
+TEST(Unlit, UnderTheWaveNotTheStillLevel)
+{
+  Capture c("unlit_wave.sdf", {"/uwunlitwave/air", "/uwunlitwave/water"});
+  const auto centre = [](const msgs::Image &_m)
+  {
+    double sum = 0;
+    int n = 0;
+    for (std::uint32_t v = _m.height() / 2 - 4; v < _m.height() / 2 + 4; ++v)
+      for (std::uint32_t u = _m.width() / 2 - 4; u < _m.width() / 2 + 4;
+           ++u, ++n)
+        sum += G(_m, u, v);
+    return sum / n;
+  };
+  // Wait for the first particle, up to 30 s of the clock
+  for (int i = 0; i < 300; ++i)
+  {
+    const auto air = c.Next("/uwunlitwave/air", 1);
+    ASSERT_EQ(air.size(), 1u);
+    if (centre(air[0]) > 0.1)
+      break;
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+  // Eight seconds, two periods
+  c.Next("/uwunlitwave/air", 80);
+  c.Next("/uwunlitwave/water", 1);
+  c.server.reset();
+  const auto air = c.Last("/uwunlitwave/air", 80);
+  const auto water = c.Last("/uwunlitwave/water", 80);
+  const auto stamp = [](const msgs::Image &_m)
+  {
+    return _m.header().stamp().sec() * 1000000000LL +
+           _m.header().stamp().nsec();
+  };
+  std::map<long long, double> inAir;
+  for (const auto &m : air)
+    inAir[stamp(m)] = centre(m);
+  int both = 0, faded = 0, clear = 0;
+  for (const auto &m : water)
+  {
+    const auto it = inAir.find(stamp(m));
+    if (it == inAir.end() || it->second < 0.1)
+      continue;
+    ++both;
+    const double ratio = centre(m) / it->second;
+    faded += ratio < 0.8;
+    clear += ratio > 0.9;
+  }
+  std::cout << "unlit beside a camera under the wave: " << faded
+            << " frames faded, " << clear << " as in air, of " << both
+            << "\n";
+  EXPECT_GE(both, 40);
+  EXPECT_GE(faded, both / 10) << "never under the crest";
+  EXPECT_GE(clear, both / 10) << "never above the trough";
 }
 
 /////////////////////////////////////////////////
