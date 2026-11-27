@@ -112,10 +112,9 @@ python3 docs/_tools/underwater_camera_figures.py
 
 The waters in them are **illustrative** (clear, coastal, turbid) until PR 1
 brings the Jerlov table; the script then reads the table, and the figures
-are the expected results for each preset, as far as the table is right. It
-comes from a transcription of Solonenko and Mobley (2015) that is not yet
-checked against the printed paper, so until it is, the figures check the
-code against the table, not the water against the sea.
+are the expected results for each preset. The table is Solonenko and
+Mobley (2015), checked against the paper in review; its `II` and `III` are
+the paper's model, which scatters more than measured open ocean.
 
 ### Test scenes
 
@@ -211,11 +210,11 @@ ground truth on `water_optics_info`, and a sampler any system asks.
   can be seen horizontally, through the standard relation
   `visibility ≈ 4.8 / c_green` (Zaneveld and Pegau 2003), c taken in the
   green, the band cameras are most sensitive in. With a Jerlov type, the
-  type gives the colour balance (the ratio between channels) and
-  `<visibility>` scales its strength: every channel's a and b are scaled by
-  `4.8 / (visibility · c_green)`, and so is K_d, so the colour of the water
-  is kept and only its murkiness changes. Alone, it scales the default type (oceanic
-  II). Explicit coefficients override it.
+  type gives the water and `<visibility>` its strength: what a, b and K_d
+  have above pure water's (type I) is scaled, every channel by the same
+  factor, so that `4.8 / c_green` comes out at the visibility. Clearer
+  water turns bluer and none is clearer than pure water (about 100 m).
+  Alone, it scales the default type (coastal 1C). Explicit coefficients override it.
 - **The water level comes from the wave field** when there is one (the
   `WaveCoupling` level, `SurfaceElevation` above the point), not a fixed
   z = 0.
@@ -230,8 +229,8 @@ ground truth on `water_optics_info`, and a sampler any system asks.
 | β^D, β^B, B∞, K_d derived from a, b as the plan's formulas say | unit | equal to a hand-computed value for 3 presets |
 | Explicit tags override a preset, tag by tag | unit | only the given tags change |
 | `<visibility>` sets the strength: `4.8 / c_green` of the result | unit | equals the given visibility to 1e-6, for 3 types and 1, 5, 20 m |
-| `<visibility>` keeps the type's colour balance | unit | the ratios c_red : c_green : c_blue and b : c per channel are unchanged |
-| `<visibility>` alone; with explicit coefficients | unit | alone, it scales oceanic II; explicit coefficients win, with a warning |
+| `<visibility>` scales what the type has above pure water | unit | at the type's own visibility nothing changes; clearer water is bluer; beyond pure water, or for type I, an error |
+| `<visibility>` alone; with explicit coefficients | unit | alone, it scales coastal 1C; explicit coefficients win, with a warning |
 | `<visibility>` zero, negative or missing | unit | an error naming the tag for zero or negative; missing leaves the type as it is |
 | Unknown type, negative or missing values | unit | an error naming the tag; the world keeps clear water |
 | `water_optics/set` changes the recipe while running; `water_optics_info` reports it | integration | the sampler returns the new values within one step |
@@ -474,6 +473,33 @@ Brown–Conrady distortion).
 What we do differently: water from the world recipe, not hardcoded; the
 water level from the waves; per-sensor settings; the revised model (β^D ≠
 β^B) on linear colour; validation.
+
+## Progress
+
+### Phase 1, water optics the world owns: done, on `ahcorde/uw_phase1_water_optics`
+
+What it settled, beyond this plan:
+
+- **The Jerlov table** (`gz_water_optics/src/Jerlov.cc`): a, b and K_d of
+  all ten types at red 625, green 525, blue 450 nm, from Solonenko and
+  Mobley (2015) Tables 4–8, through the Apache-2.0 transcription in
+  `tishibashi-cpu/jerlov`, which checks it against the paper's equations.
+  Not yet checked against the printed paper by us. 5C at 625 nm uses
+  Williamson and Hollins (2022) and Jerlov (1976), the printed row being
+  corrupted.
+- **From a type**, β^D = β^B = c = a + b at each channel's wavelength; the
+  revised model's β^D ≠ β^B is reached through explicit values. B∞ = b / c,
+  the single-scattering albedo, as a fraction of the daylight: the veil
+  matches a white target lit by the same daylight when b / c = 1.
+- **`<visibility>`** scales K_d along with a and b.
+- **Ground truth** at 1 Hz by default; any unknown element is warned about.
+- **Figures** now read the real table: the IB, 3C and 7C waters, and a new
+  `uw-jerlov-presets.svg`.
+- **Docs**: `gz_water_optics/README.md`, `docs/how-to/underwater-camera.md`,
+  the reference's water optics parameters (with the presets table) and
+  topics, a design section, the `AGENTS.md` row; a test checks every element
+  and preset is in the reference and the README; Sphinx builds with no
+  warnings.
 
 ## Open questions
 

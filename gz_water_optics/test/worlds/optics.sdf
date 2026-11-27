@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!-- Coastal water, Jerlov 3C, with the ground truth at 10 Hz. -->
+<sdf version="1.9">
+  <world name="optics">
+    <physics name="fast" type="ignored">
+      <max_step_size>0.01</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-maritime-water-optics-system"
+            name="gz::sim::maritime::WaterOptics">
+      <jerlov>3C</jerlov>
+      <water_level>0.5</water_level>
+      <publish_rate>10</publish_rate>
+    </plugin>
+  </world>
+</sdf>

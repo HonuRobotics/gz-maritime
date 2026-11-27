@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!-- Water optics under one long wave, 0.3 m high: depth is measured below
+     the local wave surface. -->
+<sdf version="1.9">
+  <world name="optics_waves">
+    <physics name="fast" type="ignored">
+      <max_step_size>0.01</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-waves-gerstner-system"
+            name="gz::sim::systems::GerstnerWaves">
+      <update_rate>30</update_rate>
+      <wave>
+        <model>CWR</model>
+        <number>1</number>
+        <amplitude>0.3</amplitude>
+        <period>4</period>
+        <direction>0</direction>
+        <steepness>0</steepness>
+        <tau>0.5</tau>
+      </wave>
+    </plugin>
+    <plugin filename="gz-maritime-water-optics-system"
+            name="gz::sim::maritime::WaterOptics">
+      <jerlov>II</jerlov>
+      <visibility>8</visibility>
+    </plugin>
+  </world>
+</sdf>
