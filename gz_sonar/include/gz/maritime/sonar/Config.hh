@@ -87,7 +87,9 @@ enum class ProfilingDetection
 
 /// \brief Most threads a ping runs on, the pinging thread included: the
 /// engines of a process share one fewer worker threads than this, or than
-/// the machine has cores if that is less, however many engines there are.
+/// the machine has hardware threads if that is less, however many engines
+/// there are. A cap, whatever its name says: SonarConfig::threads asks for
+/// fewer, never more.
 inline constexpr std::size_t kDefaultMaxEngineThreads = 8;
 
 /// \brief Everything that describes one sonar. The defaults are a generic
@@ -237,14 +239,15 @@ struct SonarConfig
   double angleNoise{0.009};
 
   /// \brief Most threads a ping of this sonar runs on, the pinging thread
-  /// included; 0 for all that the engines share (one per core up to
+  /// included; 0 for all that the engines share (one per hardware thread up to
   /// kDefaultMaxEngineThreads), which is also the most a larger value
   /// gets. The worker threads belong to the process, not to the sonar, and
   /// sonars whose pings coincide take turns at them, so this only limits
   /// how many of them this sonar's ping uses: 1 keeps it on the pinging
   /// thread, which then waits for no other sonar. Beyond about 8 a ping
-  /// gets no faster, and the cores are better left to the simulation. Not
-  /// settable from SDF. The result is the same whatever the number.
+  /// gets no faster, and the cores are better left to the simulation.
+  /// <threads> in <gz:sonar> sets it. The result is the same whatever the
+  /// number.
   std::size_t threads{0};
 
   /// \brief The assumed sound speed, falling back to the water's.

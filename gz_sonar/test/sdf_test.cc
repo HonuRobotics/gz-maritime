@@ -111,6 +111,24 @@ TEST(SonarSdf, EmptyBlockGivesEachExemplar)
 }
 
 //////////////////////////////////////////////////
+TEST(SonarSdf, ThreadsOfOnePing)
+{
+  // Unset, a ping uses the shared pool; <threads> asks for fewer, and 1
+  // keeps a small sonar's ping on its own worker.
+  std::string error;
+  ASSERT_TRUE(Load("profiling_sonar", "", error)) << error;
+  EXPECT_EQ(Load("profiling_sonar", "", error)->threads, 0u);
+  const auto one = Load("profiling_sonar", "<threads>1</threads>", error);
+  ASSERT_TRUE(one) << error;
+  EXPECT_EQ(one->threads, 1u);
+  for (const char *bad : {"<threads>0</threads>", "<threads>-1</threads>",
+                          "<threads>1.5</threads>", "<threads>all</threads>"})
+  {
+    EXPECT_FALSE(Load("profiling_sonar", bad, error)) << bad;
+  }
+}
+
+//////////////////////////////////////////////////
 TEST(SonarSdf, ElementsOverrideTheDefaults)
 {
   std::string error;

@@ -37,17 +37,6 @@ namespace
 constexpr double kContinuous = 0.02;
 
 /// \brief How far 1/z may bend over the pixels around a ray, relative to
-/// 1/z there, whatever its gradient: the floor under kSmooth, for a surface
-/// seen square on along one axis of the image, where 1/z barely changes and
-/// rounding is all a second difference holds. Float depth rounds to 6e-8 of
-/// its value, so rounding alone moves a second difference by a few 1e-7; a
-/// depth buffer whose precision falls off with distance can leave a few
-/// 1e-5 at the far end of the window, still well inside. A read is off by
-/// about this fraction of the depth at most, 3 mm at 30 m, a tenth of an
-/// ECHO sample.
-constexpr double kPlanar = 1e-4;
-
-/// \brief How far 1/z may bend over the pixels around a ray, relative to
 /// its change from one pixel to the next there: second differences up to
 /// half the largest first difference. A plane has none; the creases of a
 /// seabed mesh, an undulation and a curved hull seen at a slant have second
@@ -275,9 +264,11 @@ bool CameraSampler::Smooth(const float *_depth, long _u0, long _v0,
   const Line u1 = line(ue < _u0, qu1, q01, q11);
   const Line v0 = line(ve < _v0, q0v, q00, q01);
   const Line v1 = line(ve < _v0, q1v, q10, q11);
-  const double tol = std::max(
-    kPlanar * std::max({q00, q10, q01, q11}),
-    kSmooth * std::max({u0.first, u1.first, v0.first, v1.first}));
+  // No floor under this: where 1/z barely changes, a surface seen square
+  // on, the neighboring depths are within kContinuous of each other and the
+  // read interpolates on that ground before this test is asked.
+  const double tol =
+    kSmooth * std::max({u0.first, u1.first, v0.first, v1.first});
   return u0.second <= tol && u1.second <= tol && v0.second <= tol &&
     v1.second <= tol && std::abs(q00 + q11 - q10 - q01) <= tol;
 }

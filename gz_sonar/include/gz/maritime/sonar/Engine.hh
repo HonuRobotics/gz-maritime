@@ -97,7 +97,9 @@ double VerticalPattern(const SonarConfig &_config, double _elevation);
 ///
 /// The engine keeps its per-ping buffers and beam weights, and every engine
 /// of the process shares one set of worker threads: kDefaultMaxEngineThreads
-/// less one at most, however many engines there are. They start with the
+/// less one, however many engines there are (for a moment there can be two
+/// sets, when the last engine of one goes while another thread makes the
+/// first of the next). They start with the
 /// first engine that uses more than one thread and are joined when the last
 /// such engine is destroyed, so a ping starts no threads and allocates
 /// little, and no thread outlives the engines. Pings on one engine run one

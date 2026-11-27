@@ -49,7 +49,7 @@ The software involved:
 
 - [gz-sim's Sensors system](https://gazebosim.org/api/sim/10/classgz_1_1sim_1_1systems_1_1Sensors.html), which every vehicle world loads, owns the rendering thread; gz-sim waits for it whenever a sensor is due, so its time is what slows the world.
 - gz-rendering (Ogre 2) draws the images, on the GPU if there is one.
-- `gz-maritime-sonar-system`, the sonar plugin, asks for each ping's render and gives every sonar sensor a worker thread of its own (the sidescan's two sides are two sensors, so two workers). On each ping the worker runs the `gz_sonar` model, and for the engine step it hands the work to one pool of threads shared by every sonar in the process: one per CPU core, at most eight in all, the worker included. Sonars whose pings coincide take turns at the pool. The worker runs alongside the simulation and slows it only if pings arrive faster than it finishes them.
+- `gz-maritime-sonar-system`, the sonar plugin, asks for each ping's render and gives every sonar sensor a worker thread of its own (the sidescan's two sides are two sensors, so two workers). On each ping the worker runs the `gz_sonar` model, and for the engine step it hands the work to one pool of threads shared by every sonar in the process: one per hardware thread, at most eight in all, the worker included. Sonars whose pings coincide take turns at the pool, so a small ping can wait for a large one; `<threads>1</threads>` in a sonar's `<gz:sonar>` keeps its pings on its own worker, with no wait. The worker runs alongside the simulation and slows it only if pings arrive faster than it finishes them.
 
 ## Recommendations
 

@@ -225,6 +225,8 @@ std::optional<sonar::SonarConfig> LoadSonarConfig(const std::string &_type,
     r.Count("rays_per_beam", 32, c.raysPerBeam) &&
     r.Count("elevation_rays", 2048, c.elevationRays) &&
     r.Count("max_soundings", 1024, c.maxSoundings) &&
+    // More than the shared pool has gets the pool; see SonarConfig::threads.
+    r.Count("threads", 1024, c.threads) &&
     r.Number("elevation_span", c.elevationSpan) &&
     r.Number("beam_width", c.beamWidth) &&
     r.Number("sidelobe_level", c.sidelobeLevelDb) &&
@@ -389,7 +391,7 @@ std::optional<sonar::SonarConfig> LoadSonarConfig(const std::string &_type,
     "gain_time_constant", "horizontal_fov", "labels", "max_soundings",
     "noise_floor", "pulse_length", "range", "range_max", "range_min",
     "range_noise", "rays_per_beam", "samples", "sidelobe_level",
-    "sound_speed", "speckle", "tvg", "tvg_spreading", "vertical_fov",
+    "sound_speed", "speckle", "threads", "tvg", "tvg_spreading", "vertical_fov",
     "water_column"};
   for (auto e = _block->GetFirstElement(); e; e = e->GetNextElement())
   {
