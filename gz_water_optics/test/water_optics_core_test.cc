@@ -16,10 +16,12 @@
  */
 #include <gtest/gtest.h>
 
+
 #include <atomic>
 #include <chrono>
 #include <cmath>
 #include <fstream>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <sstream>
@@ -727,15 +729,184 @@ TEST(Sampler, EngineRegisteredLater)
   EXPECT_DOUBLE_EQ(sampler.Depth(at, t), 2.0)
       << "no engine yet: below the still water";
 
+  // However long after: picked up on the next call, as soon as the
+  // registry changes, not on a clock
   waves::RegisterWaveEngineFactory(kLate,
       [] { return std::make_shared<SineWave>(); });
-  double depth = 2.0;
-  for (int i = 0; i < 30 && depth == 2.0; ++i)
+  EXPECT_NEAR(sampler.Depth(at, t), 0.5 * std::sin(1.5 - 1.0) + 2.0, 1e-12);
+}
+
+namespace
+{
+/// \brief The token of a second test engine.
+constexpr char kOtherEngine[] = "water_optics_test_flat_wave";
+
+/// \brief A second engine: the surface the recipe's gain above the level,
+/// flat.
+class RaisedWater : public waves::IWaveField
+{
+  public: double Elevation(double, double, double) const override
   {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    depth = sampler.Depth(at, t);
+    return this->height;
   }
-  EXPECT_NEAR(depth, 0.5 * std::sin(1.5 - 1.0) + 2.0, 1e-12);
+
+  public: math::Vector3d ParticleVelocity(double, double, double) const
+      override
+  {
+    return math::Vector3d::Zero;
+  }
+
+  public: math::Vector3d Normal(double, double, double) const override
+  {
+    return math::Vector3d::UnitZ;
+  }
+
+  public: double Jacobian(double, double, double) const override
+  {
+    return 1.0;
+  }
+
+  public: void SetParameters(const waves::WaveParameters &_params) override
+  {
+    this->height = _params.gain;
+  }
+
+  public: void Update(double) override {}
+
+  public: std::string_view Kind() const override { return kOtherEngine; }
+
+  public: const waves::WaveField2D *Field() const override { return nullptr; }
+
+  private: double height{0.0};
+};
+
+/// \brief A duration from seconds.
+/// \param[in] _t Seconds.
+/// \return The duration.
+std::chrono::steady_clock::duration At(double _t)
+{
+  return std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+      std::chrono::duration<double>(_t));
+}
+}  // namespace
+
+/////////////////////////////////////////////////
+// On the thread that calls Sync, depth comes from the source's own engine,
+// as it was last advanced, not from an engine of the sampler's at the time
+// asked: the reference camera and the simulation see the same water.
+TEST(Sampler, SyncThreadReadsTheSourcesEngine)
+{
+  waves::RegisterWaveEngineFactory(kTestEngine,
+      [] { return std::make_shared<SineWave>(); });
+  waves::WavefieldData recipe;
+  recipe.algorithm = kTestEngine;
+  recipe.params.gain = 0.8;
+  recipe.generation = 1;
+  recipe.simulation =
+      waves::CreateWaveSimulation(recipe.algorithm, recipe.params);
+  EntityComponentManager ecm;
+  const Entity world = ecm.CreateEntity();
+  ecm.CreateComponent(world, components::World());
+  ecm.CreateComponent(world,
+      components::WaterOptics(MustResolve(WaterOpticsSpec{})));
+  ecm.CreateComponent(world, components::Wavefield(recipe));
+  waves::Advance(ecm.Component<components::Wavefield>(world)->Data(), 1.0);
+
+  water_optics::WaterOpticsSampler sampler;
+  ASSERT_TRUE(sampler.Sync(ecm));
+  // Asked for 1.3 s, the source holds 1.0 s: its wave, not the exact one
+  const double held = 0.8 * std::sin(1.0 - 1.0) + 2.0;
+  const double exact = 0.8 * std::sin(1.0 - 1.3) + 2.0;
+  ASSERT_GT(std::abs(held - exact), 0.1);
+  EXPECT_NEAR(sampler.Depth({2.0, 0.0, -2.0}, At(1.3)), held, 1e-12);
+  // Off the Sync thread: an engine of its own, at the time asked
+  double other = 0.0;
+  std::thread([&] { other = sampler.Depth({2.0, 0.0, -2.0}, At(1.3)); })
+      .join();
+  EXPECT_NEAR(other, exact, 1e-12);
+}
+
+/////////////////////////////////////////////////
+// The recipe names another engine at the same generation: the sampler's
+// own engine is built again for it, not kept.
+TEST(Sampler, AnotherAlgorithmGetsItsOwnEngine)
+{
+  waves::RegisterWaveEngineFactory(kTestEngine,
+      [] { return std::make_shared<SineWave>(); });
+  waves::RegisterWaveEngineFactory(kOtherEngine,
+      [] { return std::make_shared<RaisedWater>(); });
+  waves::WavefieldData recipe;
+  recipe.algorithm = kTestEngine;
+  recipe.params.gain = 0.5;
+  recipe.generation = 4;
+  EntityComponentManager ecm;
+  const Entity world = ecm.CreateEntity();
+  ecm.CreateComponent(world, components::World());
+  ecm.CreateComponent(world,
+      components::WaterOptics(MustResolve(WaterOpticsSpec{})));
+  ecm.CreateComponent(world, components::Wavefield(recipe));
+
+  water_optics::WaterOpticsSampler sampler;
+  ASSERT_TRUE(sampler.Sync(ecm));
+  EXPECT_NEAR(sampler.Depth({3.0, 0.0, -2.0}, At(1.0)),
+              0.5 * std::sin(1.5 - 1.0) + 2.0, 1e-12);
+
+  recipe.algorithm = kOtherEngine;
+  ecm.SetComponentData<components::Wavefield>(world, recipe);
+  sampler.Sync(ecm);
+  EXPECT_NEAR(sampler.Depth({3.0, 0.0, -2.0}, At(1.0)), 0.5 + 2.0, 1e-12)
+      << "the old engine kept for another algorithm";
+}
+
+/////////////////////////////////////////////////
+// Four readers while the recipe changes: each change builds one engine,
+// not one per reader that still held the recipe from before it.
+TEST(Sampler, OneBuildPerChangeWithManyReaders)
+{
+  std::atomic<int> built{0};
+  waves::RegisterWaveEngineFactory(kTestEngine,
+      [&built] { ++built; return std::make_shared<SineWave>(); });
+  waves::WavefieldData recipe;
+  recipe.algorithm = kTestEngine;
+  recipe.params.gain = 0.5;
+  recipe.generation = 1;
+  EntityComponentManager ecm;
+  const Entity world = ecm.CreateEntity();
+  ecm.CreateComponent(world, components::World());
+  ecm.CreateComponent(world,
+      components::WaterOptics(MustResolve(WaterOpticsSpec{})));
+  ecm.CreateComponent(world, components::Wavefield(recipe));
+  water_optics::WaterOpticsSampler sampler;
+  ASSERT_TRUE(sampler.Sync(ecm));
+
+  std::atomic<bool> stop{false};
+  std::vector<std::thread> readers;
+  for (int r = 0; r < 4; ++r)
+  {
+    readers.emplace_back([&, r]
+    {
+      for (int i = 0; !stop; ++i)
+        sampler.Depth({1.0 * r, 0.0, -2.0}, At(0.01 * (i % 100)));
+    });
+  }
+  const int changes = 50;
+  for (int c = 0; c < changes; ++c)
+  {
+    // Let every reader ask with this recipe first
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    recipe.generation = 2 + c;
+    recipe.params.gain = 0.5 + 0.01 * c;
+    ecm.SetComponentData<components::Wavefield>(world, recipe);
+    sampler.Sync(ecm);
+  }
+  std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  stop = true;
+  for (auto &t : readers)
+    t.join();
+  std::cout << "engines built: " << built << " for " << changes + 1
+            << " recipes\n";
+  EXPECT_LE(built, changes + 1);
+  EXPECT_GE(built, 2);
 }
 
 /////////////////////////////////////////////////

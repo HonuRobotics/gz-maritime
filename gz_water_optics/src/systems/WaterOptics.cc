@@ -227,7 +227,7 @@ bool WaterOpticsPrivate::Apply(const msgs::Param &_msg)
   }
   if (!warning.empty())
     gzwarn << "WaterOptics: " << warning << "\n";
-  this->spec = spec;
+  this->spec = water_optics::WithoutIgnored(spec);
   // The same water, e.g. an empty message or the values it has: nothing
   // to replicate or publish.
   if (this->valid && water_optics::SameWater(optics, this->optics))
@@ -350,6 +350,7 @@ void WaterOptics::Configure(const Entity &_entity,
   }
   if (!warning.empty())
     gzwarn << "WaterOptics: " << warning << "\n";
+  spec = water_optics::WithoutIgnored(spec);
   d.initialSpec = spec;
   d.initialValid = true;
   d.valid = true;

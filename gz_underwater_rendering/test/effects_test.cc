@@ -230,6 +230,9 @@ double Contrast(const msgs::Image &_m)
 /// A frame brighter or darker all over, as when the camera bobs under a
 /// wave and its veil changes, is as alike as itself; a pattern that moved
 /// is not.
+/// \param[in] _a One frame.
+/// \param[in] _b The other.
+/// \return The correlation, 1 for the same pattern.
 double Alike(const msgs::Image &_a, const msgs::Image &_b)
 {
   std::vector<double> a, b;
@@ -262,7 +265,7 @@ double Alike(const msgs::Image &_a, const msgs::Image &_b)
 }
 }  // namespace
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // With waves, the caustics' contrast (averaged over time) on a seabed 8 m
 // deep is
 // exp(-K_d (8 - 3)) of the contrast 3 m deep, within 10 %, and the pattern
@@ -327,7 +330,7 @@ TEST(Caustics, FadeWithDepthAndNeedWaves)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The water's surface is drawn above the seabed and the sun casts shadows:
 // the seabed is as bright as without the surface, which lets the sunlight
 // through.
@@ -370,7 +373,7 @@ TEST(Caustics, TheSurfaceDoesNotShadeTheSeabed)
   EXPECT_NEAR(covered, open, 0.02 * open);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Open water, 6 m down, nothing in view but the surface above: every pixel
 // is the water's own colour, the veil at the camera's depth, whether the
 // ray ends on the surface or on nothing at all. Above the water the
@@ -434,7 +437,43 @@ TEST(OpenWater, TheWatersColourUnderItTheBackgroundAboveIt)
   }
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
+// An RGBD camera above the water, with no sky: nothing past its far plane
+// shows in its colour image, with the renderer as without it. Only the
+// cameras under the water keep the backdrop.
+TEST(OpenWater, AnRgbdCameraInAirSeesNothingPastItsFarPlane)
+{
+  const auto red = [](const msgs::Image &_m)
+  {
+    std::size_t n = 0;
+    for (std::uint32_t v = 0; v < _m.height(); ++v)
+    {
+      const auto *row = reinterpret_cast<const std::uint8_t *>(
+          _m.data().data() + v * _m.step());
+      for (std::uint32_t u = 0; u < _m.width(); ++u)
+        n += row[3 * u] > 100 && row[3 * u + 1] < 60;
+    }
+    return n;
+  };
+  std::size_t seen[2]{0, 0};
+  for (const bool gpu : {false, true})
+  {
+    Capture c(gpu ? "rgbd_air.sdf" : "rgbd_air_off.sdf",
+              {"/uwrgbdair/rgbd/image"});
+    const auto frames = c.Next("/uwrgbdair/rgbd/image", 3);
+    if (!c.Rendered())
+      GTEST_SKIP() << "nothing rendered: no GPU?";
+    c.server.reset();
+    ASSERT_EQ(frames.size(), 3u);
+    seen[gpu] = red(frames.back());
+  }
+  std::cout << "red pixels past the far plane: " << seen[0]
+            << " without the renderer, " << seen[1] << " with it\n";
+  EXPECT_EQ(seen[0], 0u);
+  EXPECT_EQ(seen[1], seen[0]);
+}
+
+//////////////////////////////////////////////////
 // Marine snow at night: lamps on, specks, fixed in the world (the same in
 // two frames of a still camera); lamps off, nothing to see; the depth image
 // the same with and without snow.
@@ -491,7 +530,7 @@ TEST(MarineSnow, LitByLampsFixedInTheWorld)
       << "the snow changed the depth image";
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A lamp too dim to matter is left out of the shader (its beam's march is
 // the costliest part). In the dark, a seabed under such a lamp stays black;
 // lit by it, it would be about 30 of 255.
@@ -512,7 +551,7 @@ TEST(Lamps, OneThatGivesNoLightIsLeftOut)
   EXPECT_LE(brightest, 1);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // <quality>: low and high are close to medium, the default, each with its
 // marine snow; a value it does not know is medium, the same image.
 TEST(Quality, LowAndHighCloseToMediumUnknownIsMedium)
@@ -555,7 +594,7 @@ TEST(Quality, LowAndHighCloseToMediumUnknownIsMedium)
   EXPECT_EQ(pixels[3], pixels[0]) << "an unknown quality is not medium";
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // At night with the lamps off there is no light for the snow to show.
 TEST(MarineSnow, DarkWithoutLamps)
 {
@@ -571,7 +610,7 @@ TEST(MarineSnow, DarkWithoutLamps)
   EXPECT_EQ(bright, 0) << "something glows with no light";
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Depth is measured below the wave over the camera, not below the still
 // water: under a wave of amplitude 0.5 m a camera 0.15 m above the still
 // level is under water for part of each period (40 % of it) and one 0.15 m
@@ -638,7 +677,7 @@ TEST(WaveDepth, TheCameraIsUnderTheWaveNotTheStillLevel)
   EXPECT_EQ(wrong, 0);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A slow camera beside a fast one, at the same place under the waves: each
 // frame of the slow one is, pixel for pixel, the fast one's of the same
 // instant. The surface over a camera is asked for each pass, whatever the
@@ -681,13 +720,13 @@ void SlowBesideFast(const std::string &_world)
   EXPECT_GE(distinct.size(), 2u) << "the wave did not move the water";
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 TEST(WaveDepth, ASlowCameraBesideAFastOne)
 {
   SlowBesideFast("wave_depth_rates.sdf");
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The same on an FFT sea, whose grid the simulation advances while the
 // cameras render: the renderer asks an engine of its own, never the one
 // being advanced, so the slow camera's frames are still the fast one's.
@@ -696,7 +735,7 @@ TEST(WaveDepth, ASlowCameraBesideAFastOneOnAnFftSea)
   SlowBesideFast("wave_depth_rates_fft.sdf");
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A camera at the still level, away from the origin, under a wave along x:
 // the test follows the depth below the wave at the camera at every step,
 // with a sampler of its own on the simulation thread, and each frame is
@@ -782,7 +821,7 @@ TEST(WaveDepth, EachFrameAtTheDepthOfItsInstantAndPlace)
   EXPECT_EQ(wrong, 0);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // What nothing lights (Ogre's unlit shaders: a particle emitter's particles)
 // is seen through the water too: particles 2 m away have the colour they
 // have in air, faded over the 2 m, plus the veil built over them.
@@ -838,7 +877,7 @@ TEST(Unlit, FadesAndTakesTheVeil)
       << "the water is still drawn on what is unlit";
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // What nothing lights is seen through the water by the wave's depth too,
 // not the still level's: particles beside a camera 0.15 m above the still
 // level, under a wave of amplitude 0.5 m, are faded in some frames, as the
@@ -899,7 +938,7 @@ TEST(Unlit, UnderTheWaveNotTheStillLevel)
   EXPECT_GE(clear, both / 10) << "never above the trough";
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Sensors that are not colour cameras do not see the water, nor the
 // backdrop drawn around the world: a lidar's scan (open water out of range),
 // a thermal image and a bounding box camera's boxes are the same with the

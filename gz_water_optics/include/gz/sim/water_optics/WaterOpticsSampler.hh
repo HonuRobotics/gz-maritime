@@ -38,14 +38,24 @@ class WaterOpticsSamplerPrivate;
 /// optics system has clear water: nothing attenuates, there is no veil, and
 /// the daylight does not fade.
 ///
-/// Every call is safe from any thread, while Sync runs on another. Depth
-/// reads the wave source's own engine only on the thread that calls Sync,
-/// which is the simulation thread when Sync is called from a system; on any
+/// Threads. One thread calls Sync, always the same one, and while it does
+/// the simulation is not advancing the waves: a system's PreUpdate or
+/// PostUpdate qualifies, since gz-sim holds the simulation meanwhile, even
+/// though PostUpdate runs on another thread than PreUpdate. Two threads
+/// calling Sync on one sampler, or the Sync role moving between threads, is
+/// not supported. Every other call is safe from any thread, while Sync runs.
+///
+/// Depth reads the wave source's own engine only on the Sync thread; on any
 /// other thread, and in a process without the source (a GUI, or a sensor
 /// process, receives the recipe only), it asks an engine of its own, built
 /// from the recipe the first time a depth is asked for, as the water's
 /// visual does. So a renderer never reads a grid the simulation is
-/// advancing.
+/// advancing. The two agree up to the source's update rate: the source's
+/// engine holds its last update, its own goes to the exact time (on a
+/// 1.2 m FFT sea updated at 30 Hz, up to 7 cm apart; with Gerstner waves or
+/// update_rate 0 they agree). With no engine registered for the recipe's
+/// algorithm it tries again whenever one is registered, and until then
+/// measures depth below the still water level.
 class WaterOpticsSampler
 {
   /// \brief Constructor.

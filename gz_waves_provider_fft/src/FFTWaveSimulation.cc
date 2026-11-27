@@ -11,6 +11,7 @@
 #include "gz/sim/waves/FFTWaveSimulation.hh"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <condition_variable>
 #include <mutex>
@@ -283,6 +284,24 @@ void ApplyEhukaiParams(ehukai::Parametersf &_ep, const WaveParameters &_p)
 //-----------------------------------------------------------------------------
 struct FFTWaveSimulation::EhukaiState
 {
+  /// Propagate a state to a time with Ehukai, the folding metric only when
+  /// asked. Every computation of the metric is counted, by whoever makes
+  /// it, so a test sees one that Update makes by mistake.
+  /// \param[in] _propagation The propagation scratch to use.
+  /// \param[out] _out The state.
+  /// \param[in] _t Time, s.
+  /// \param[in] _foam Whether to compute the folding metric too.
+  void Propagate(ehukai::Propagationf &_propagation,
+                 ehukai::PropagatedStatef &_out, float _t, bool _foam)
+  {
+    _propagation.propagate(this->params, *this->initial, _out, _t, _foam);
+    if (_foam)
+      ++this->foamPasses;
+  }
+
+  /// How many times the folding metric was computed, on any thread.
+  std::atomic<std::uint64_t> foamPasses{0};
+
   ehukai::Parametersf params;
   std::unique_ptr<ehukai::InitialStatef> initial;
   std::unique_ptr<ehukai::Propagationf>   propagation;
@@ -363,9 +382,8 @@ struct FFTWaveSimulation::EhukaiState
       {
         // Without the folding metric: foam is computed on request, by
         // whoever asks for it, from the state this becomes.
-        this->aheadPropagation->propagate(
-            this->params, *this->initial, out, static_cast<float>(t),
-            /*i_computeMinE=*/false);
+        this->Propagate(*this->aheadPropagation, out, static_cast<float>(t),
+                        /*_foam=*/false);
       });
       ToGrids(out, scale, chopScale, this->aheadGrids.height,
               this->aheadGrids.dispX, this->aheadGrids.dispY);
@@ -479,9 +497,8 @@ void FFTWaveSimulation::SetParameters(const WaveParameters &_params)
   // Hs = 0.21 * V19.5^2 / g, i.e. sigma = Hs/4. The selected spectrum still
   // sets the spectral *shape*; this only fixes the overall energy.
   {
-    this->ehukai->propagation->propagate(
-        this->ehukai->params, *this->ehukai->initial,
-        *this->ehukai->state, 10.0f, /*i_computeMinE=*/false);
+    this->ehukai->Propagate(*this->ehukai->propagation, *this->ehukai->state,
+                            10.0f, /*_foam=*/false);
     const double sigmaEhukai = std::sqrt(
         TileView(this->ehukai->state->Height).cast<double>().array()
             .square().mean());
@@ -552,9 +569,8 @@ void FFTWaveSimulation::Update(double _simTime)
     }
   }
 
-  e.propagation->propagate(
-      e.params, *e.initial, *e.state, static_cast<float>(_simTime),
-      /*i_computeMinE=*/false);
+  e.Propagate(*e.propagation, *e.state, static_cast<float>(_simTime),
+              /*_foam=*/false);
   const double scale = this->AmplitudeScale(_simTime);
   ToGrids(*e.state, scale, scale * this->choppiness,
           this->heightGrid, this->dispXGrid, this->dispYGrid);
@@ -595,7 +611,7 @@ void FFTWaveSimulation::EnsureFoam() const
   ToFoamGrid(*e.state, this->AmplitudeScale(this->lastUpdateT),
              this->minEGrid);
   this->foamTime = this->lastUpdateT;
-  ++this->foamComputations;
+  ++e.foamPasses;
 }
 
 //////////////////////////////////////////////////
@@ -693,12 +709,9 @@ gz::math::Vector3d FFTWaveSimulation::ParticleVelocity(
   if (this->ehukai && this->ehukai->propagation &&
       this->velTime != this->lastUpdateT)
   {
-    this->ehukai->propagation->propagate(
-        this->ehukai->params,
-        *this->ehukai->initial,
-        *this->ehukai->scratch,
-        static_cast<float>(this->lastUpdateT + kVelDt),
-        /*i_computeMinE=*/false);
+    this->ehukai->Propagate(*this->ehukai->propagation, *this->ehukai->scratch,
+                            static_cast<float>(this->lastUpdateT + kVelDt),
+                            /*_foam=*/false);
     const double scale = StartupRamp(this->lastUpdateT, this->tau) *
                          this->ehukaiScale * this->gain;
     const double velK = scale / kVelDt;
@@ -768,6 +781,12 @@ const WaveField2D *FFTWaveSimulation::Field() const
   this->field.dx   = this->dispXGrid.data();
   this->field.dy   = this->dispYGrid.data();
   return &this->field;
+}
+
+//////////////////////////////////////////////////
+std::uint64_t FFTWaveSimulation::FoamComputations() const
+{
+  return this->ehukai ? this->ehukai->foamPasses.load() : 0u;
 }
 
 //////////////////////////////////////////////////

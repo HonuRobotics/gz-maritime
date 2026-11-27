@@ -48,7 +48,12 @@ namespace
 /// \brief Step a world until _n frames of a camera from _from s on have
 /// come. The test steps it: a server on a thread of its own can hang when
 /// it is destroyed (gz-sim 10.5, in its Sensors system).
+/// \param[in] _world The world's file, in the test worlds.
+/// \param[in] _topic The camera's topic.
+/// \param[in] _n How many frames.
+/// \param[in] _from From this simulation time on, s.
 /// \param[out] _rendered Whether any frame came at all: none means no GPU.
+/// \return The frames.
 std::vector<msgs::Image> Frames(const std::string &_world,
     const std::string &_topic, std::size_t _n, int _from, bool &_rendered)
 {
@@ -86,6 +91,8 @@ std::vector<msgs::Image> Frames(const std::string &_world,
 
 /// \brief Pixels green as the test worlds' veil, which only the surface
 /// seen from below fades into.
+/// \param[in] _m The frame.
+/// \return How many.
 std::size_t Green(const msgs::Image &_m)
 {
   std::size_t n = 0;
@@ -102,6 +109,7 @@ std::size_t Green(const msgs::Image &_m)
 }
 }  // namespace
 
+//////////////////////////////////////////////////
 TEST(Snell, WindowAt48Point6Degrees)
 {
   bool rendered = false;
@@ -148,7 +156,7 @@ TEST(Snell, WindowAt48Point6Degrees)
   EXPECT_NEAR(angle, std::asin(1 / 1.333) * 180 / GZ_PI, 1.0);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A camera above the still water, below the crests: the crests higher than
 // the camera face it and are seen from above, reflecting the sky. Drawn as
 // if from below, with the water drawn, they would fade into the veil, here
@@ -204,7 +212,7 @@ TEST(Snell, CrestsAboveACameraOnABoatAreSeenFromAbove)
   EXPECT_LT(dark, above / 250) << "crests above the camera drawn from below";
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A camera 2 m above a rippled sea, looking at the horizon: all of the
 // surface is below it, and none of it is shaded as seen from below, even
 // far away, where the view grazes it and a normal interpolated from the

@@ -10,6 +10,8 @@
 
 #include "gz/sim/waves/WaveSimulation.hh"
 
+#include <atomic>
+#include <cstdint>
 #include <map>
 #include <mutex>
 #include <string>
@@ -40,14 +42,38 @@ std::mutex &RegistryMutex()
   static std::mutex m;
   return m;
 }
+
+//////////////////////////////////////////////////
+std::atomic<std::uint64_t> &RegistryVersion()
+{
+  static std::atomic<std::uint64_t> version{0};
+  return version;
+}
 }  // namespace
 
 //////////////////////////////////////////////////
 void RegisterWaveEngineFactory(const std::string &_token,
                                WaveEngineFactory _factory)
 {
+  {
+    const std::lock_guard<std::mutex> lock(RegistryMutex());
+    Registry()[_token] = std::move(_factory);
+  }
+  ++RegistryVersion();
+}
+
+//////////////////////////////////////////////////
+bool HasWaveEngineFactory(const std::string &_token)
+{
   const std::lock_guard<std::mutex> lock(RegistryMutex());
-  Registry()[_token] = std::move(_factory);
+  const auto it = Registry().find(_token);
+  return it != Registry().end() && static_cast<bool>(it->second);
+}
+
+//////////////////////////////////////////////////
+std::uint64_t WaveEngineRegistryVersion()
+{
+  return RegistryVersion().load();
 }
 
 //////////////////////////////////////////////////

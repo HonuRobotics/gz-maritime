@@ -225,7 +225,6 @@ if(BUILD_TESTING)
       "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH}")
   endif()
 
-  # Lamp edge cases: more than the shader takes, out of view, removed. A
   # A lamp seen from above the water lights as Ogre lights it, specular
   # included. A process of its own.
   ament_add_gtest(lamp_air_test test/lamp_air_test.cc TIMEOUT 300)
@@ -241,6 +240,7 @@ if(BUILD_TESTING)
       "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH}")
   endif()
 
+  # Lamp edge cases: more than the shader takes, out of view, removed. A
   # process of its own.
   ament_add_gtest(lamp_edges_test test/lamp_edges_test.cc TIMEOUT 600)
   if(TARGET lamp_edges_test)

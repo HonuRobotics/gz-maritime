@@ -212,6 +212,15 @@ bool SameWater(const WaterOpticsData &_a, const WaterOpticsData &_b);
 bool Resolve(const WaterOpticsSpec &_spec, WaterOpticsData &_out,
              std::string &_error, std::string &_warning);
 
+/// \brief The spec without what Resolve ignores: with all four
+/// coefficients explicit, the Jerlov type and the visibility are dropped. A
+/// system keeps this, so a coefficient removed later brings back the
+/// default type, not a value that was ignored, and never checked, when it
+/// was given.
+/// \param[in] _spec A spec.
+/// \return The spec as Resolve uses it.
+WaterOpticsSpec WithoutIgnored(const WaterOpticsSpec &_spec);
+
 /// \brief Write the optics at full precision.
 /// \param[in] _os Stream.
 /// \param[in] _d Optics.

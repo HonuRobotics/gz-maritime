@@ -67,7 +67,7 @@ Capture UnderwaterRenderingTest::off;
 Capture UnderwaterRenderingTest::on;
 }  // namespace
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The GPU path's image against the reference camera's, per pixel: the
 // renderer's own colour output with the GPU path, against the reference
 // camera's underwater image without it.
@@ -97,7 +97,7 @@ TEST_F(UnderwaterRenderingTest, MatchesTheReferenceCamera)
   EXPECT_NE(on.underImage, off.underImage);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The optics change colour, never depth.
 TEST_F(UnderwaterRenderingTest, DepthUntouched)
 {
@@ -105,7 +105,7 @@ TEST_F(UnderwaterRenderingTest, DepthUntouched)
   EXPECT_EQ(on.depth, off.depth);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // A camera above the water is untouched.
 TEST_F(UnderwaterRenderingTest, AboveWaterUntouched)
 {
@@ -113,7 +113,7 @@ TEST_F(UnderwaterRenderingTest, AboveWaterUntouched)
   EXPECT_EQ(on.aboveImage, off.aboveImage);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // Segmentation labels keep their exact values.
 TEST_F(UnderwaterRenderingTest, SegmentationUntouched)
 {
@@ -121,7 +121,7 @@ TEST_F(UnderwaterRenderingTest, SegmentationUntouched)
   EXPECT_EQ(on.labels, off.labels);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // With the GPU path on, the reference camera passes its image through,
 // rather than apply the water a second time.
 TEST_F(UnderwaterRenderingTest, ReferenceCameraPassesThrough)
@@ -130,7 +130,7 @@ TEST_F(UnderwaterRenderingTest, ReferenceCameraPassesThrough)
   EXPECT_EQ(on.underWater, on.underImage);
 }
 
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // The model is in the reference docs.
 TEST(Docs, Documented)
 {
