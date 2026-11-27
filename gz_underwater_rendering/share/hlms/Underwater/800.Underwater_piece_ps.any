@@ -6,8 +6,9 @@
 //   I   = lit exp(-beta^D w) + B-inf(z_camera) (1 - exp(-beta^B w)) + beams
 //
 // J is the fragment lit by daylight; L_i is lamp i's light on it, which this
-// piece computes itself: the diffuse term of Ogre's default BRDF, with its
-// spot cone and attenuation, so a lamp lights as Ogre would in air. The
+// piece computes itself: Ogre's default BRDF, diffuse and specular, with its
+// spot cone and attenuation, so a lamp lights as Ogre would in air (but for
+// shadows, which a lamp does not cast). The
 // lamps are hidden from Ogre's own lighting (the bridge's HideLamps), so
 // they count once. Faded over the lamp's distance d_i. w is the range through the water: up to where a climbing ray leaves
 // it. The beams are each lamp's light scattered back to the camera by the
@@ -23,26 +24,46 @@
 	{
 		return dot( f, axis ) >= cosOuter * length( f );
 	}
-	// The diffuse part of Ogre's default BRDF (normalised Disney, times one
-	// minus the Fresnel), as it lights a fragment from lightDir: what Ogre
-	// itself would give the lamp. Ogre does not declare its BRDF in a pass
-	// without lights of its own, so it is written out here.
-	float3 uwDiffuseBrdf( float3 lightDir, PixelData pixelData )
+	// Ogre's default BRDF (GGX specular, normalised Disney diffuse), as it
+	// lights a fragment from lightDir: what Ogre itself would give the lamp.
+	// Ogre does not declare its BRDF in a pass without lights of its own, so
+	// it is written out here, with Ogre's own Fresnel pieces. Clear coat is
+	// left out.
+	float3 uwBrdf( float3 lightDir, float3 lightDiffuse, float3 lightSpecular,
+	               PixelData pixelData )
 	{
 		float3 halfWay = normalize( lightDir + pixelData.viewDir );
 		float NdotL = saturate( dot( pixelData.normal, lightDir ) );
+		float NdotH = saturate( dot( pixelData.normal, halfWay ) );
 		float VdotH = saturate( dot( pixelData.viewDir, halfWay ) );
+		float sqR = pixelData.roughness * pixelData.roughness;
+		float f = ( NdotH * sqR - NdotH ) * NdotH + 1.0;
+		float R = sqR / ( f * f );
+	@property( GGX_height_correlated )
+		float Lambda_GGXV = NdotL * sqrt( ( -pixelData.NdotV * sqR + pixelData.NdotV ) * pixelData.NdotV + sqR );
+		float Lambda_GGXL = pixelData.NdotV * sqrt( ( -NdotL * sqR + NdotL ) * NdotL + sqR );
+		float G = 0.5 / ( ( Lambda_GGXV + Lambda_GGXL + 1e-6f ) * 3.141592654 );
+	@else
+		float gL = NdotL * ( 1.0 - sqR ) + sqR;
+		float gV = pixelData.NdotV * ( 1.0 - sqR ) + sqR;
+		float G = 1.0 / ( ( gL * gV + 1e-4f ) * 4.0 * 3.141592654 );
+	@end
+		float_fresnel fresnelS = @insertpiece( getSpecularFresnel );
+		float3 Rs = ( fresnelS * ( R * G ) ) * pixelData.specular.xyz;
 		float pr = pixelData.perceptualRoughness;
 		float energyBias = pr * 0.5;
 		float energyFactor = lerp( 1.0, 1.0 / 1.51, pr );
 		float fd90 = energyBias + 2.0 * VdotH * VdotH * pr;
 		float lightScatter = 1.0 + ( fd90 - 1.0 ) * pow( 1.0 - NdotL, 5.0 );
 		float viewScatter = 1.0 + ( fd90 - 1.0 ) * pow( 1.0 - pixelData.NdotV, 5.0 );
-		float3 F0 = float3( 1.0, 1.0, 1.0 ) * pixelData.F0;
-		float3 fresnelS = F0 + pow( 1.0 - VdotH, 5.0 ) * ( float3( 1.0, 1.0, 1.0 ) - F0 );
-		float fresnelD = 1.0 - max( fresnelS.x, max( fresnelS.y, fresnelS.z ) );
-		return NdotL * ( lightScatter * viewScatter * energyFactor * fresnelD ) *
-		       pixelData.diffuse.xyz;
+	@property( fresnel_separate_diffuse )
+		float_fresnel fresnelD = @insertpiece( getDiffuseFresnel );
+	@else
+		float fresnelD = 1.0f - @insertpiece( getMaxFresnelS );
+	@end
+		float3 Rd = ( lightScatter * viewScatter * energyFactor * fresnelD ) *
+		            pixelData.diffuse.xyz;
+		return NdotL * ( Rs * lightSpecular + Rd * lightDiffuse );
 	}
 @end
 @piece( custom_ps_posExecution_underwater )
@@ -65,9 +86,9 @@
 		float3 uwBeams = float3( 0.0, 0.0, 0.0 );
 		bool uwFragUnder = uwWorld.z < uwLevel;
 	@property( gz_underwater_lamps )
-		// Each lamp's light on the fragment (its diffuse term, with Ogre's
-		// spot cone and attenuation), faded over the lamp's distance when the
-		// fragment is under water.
+		// Each lamp's light on the fragment (Ogre's BRDF, spot cone and
+		// attenuation), faded over the lamp's distance when the fragment is
+		// under water.
 		int uwCount = int( passBuf.uwLampInfo.x );
 		for( int i = 0; i < uwCount; ++i )
 		{
@@ -91,7 +112,8 @@
 				// Forward+ does
 				float atten = 1.0 / ( 0.5 + ( lc.w + ls.w * dist ) * dist ) *
 				              max( ( ld.w - dist ) / ld.w, 0.0 );
-				float3 light = uwDiffuseBrdf( lightDir, pixelData ) * lc.xyz *
+				float3 light = uwBrdf( lightDir, lc.xyz,
+				                       passBuf.uwLamp[i * 5 + 4].xyz, pixelData ) *
 				               ( atten * spotAtten );
 				if( uwFragUnder )
 					light *= exp( -passBuf.uwAttenuation.xyz * dist );

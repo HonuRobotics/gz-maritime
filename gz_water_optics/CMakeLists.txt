@@ -113,11 +113,11 @@ if(BUILD_TESTING)
       gz-transport::core
       gz-msgs::core)
     # The plugin library is loaded by name from the build tree so the test
-    # runs before install; the wave engine comes from the install. A
-    # partition of its own keeps its topics apart from other tests'.
+    # runs before install; the wave engine comes from the install. The test
+    # takes a transport partition of its own, with its process id.
     set_tests_properties(water_optics_test PROPERTIES
       ENVIRONMENT
-      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};GZ_PARTITION=gz_water_optics_test")
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH}")
   endif()
 
   # The plan's figures, regenerated from the Jerlov table, are the committed

@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!-- Every coefficient explicit: no type, and the visibility, even one out
+     of range, is ignored with a warning. -->
+<sdf version="1.9">
+  <world name="optics_explicit">
+    <physics name="fast" type="ignored">
+      <max_step_size>0.01</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-maritime-water-optics-system"
+            name="gz::sim::maritime::WaterOptics">
+      <visibility>150</visibility>
+      <attenuation>1.0 0.5 0.25</attenuation>
+      <backscatter>0.9 0.4 0.2</backscatter>
+      <veil>0.1 0.2 0.3</veil>
+      <diffuse_attenuation>0.2 0.1 0.05</diffuse_attenuation>
+    </plugin>
+  </world>
+</sdf>

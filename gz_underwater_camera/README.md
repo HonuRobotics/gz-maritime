@@ -109,8 +109,8 @@ camera at full frame rate, use the GPU path
 
 - The water's surface between the camera and an object above it is treated
   as clear: Snell's window and the surface seen from below come later.
-- The camera's pose is the one of the last simulation step, not of the
-  frame's exact render.
+- The camera's pose and the water are those of the frame's own simulation
+  step, kept for 2 s; a frame older than that gets the oldest kept.
 - The sensor's own `<noise>` and `<distortion>` apply to its in-air image,
   before the water.
 - No vehicle lights, caustics or marine snow: those are drawn by the GPU
