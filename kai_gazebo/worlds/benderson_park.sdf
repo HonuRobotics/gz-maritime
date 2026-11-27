@@ -189,6 +189,16 @@
       <direction>0</direction>
     </plugin>
 
+    <!-- The water's optics (gz_water_optics): Jerlov 5C, a murky lake, about 3 m visibility.
+         Cameras with the underwater camera plugin see through it; add
+         model://underwater_optics to draw it in the sensors' cameras and the
+         GUI's view too. -->
+    <plugin
+      filename="gz-maritime-water-optics-system"
+      name="gz::sim::maritime::WaterOptics">
+      <jerlov>5C</jerlov>
+    </plugin>
+
     <!-- Acoustics (gz_acoustics): pingers ping, receivers hear them, both
          found on any model (a pinger is the gz-maritime-acoustic-pinger-system
          plugin on a link, model://acoustic_pinger is one ready made; a
@@ -210,7 +220,7 @@
          the comment directly above each block.
          ================================================================== -->
 
-    <!-- Wave source. Two engines are available: FFT (EncinoWaves spectral,
+    <!-- Wave source. Two engines are available: FFT (Ehukai spectral,
          higher fidelity) is active here; Gerstner (analytic sum of component
          waves) is the commented alternative below. Full parameter lists and the
          <sea_state> precedence rules live in each plugin's documentation.
@@ -240,7 +250,8 @@
              intentionally unphysical, ~1.0 = physical Hs); <tile_size> and
              <grid_size> are the periodic domain and FFT resolution; <choppiness>
              sharpens crests; <direction> is parsed but not yet applied
-             (EncinoWaves assumes wind along +X). -->
+             (Ehukai assumes wind along +X, so the waves travel
+             towards +x). -->
         <!--
         <period>3.2</period>
         <gain>9.5</gain>

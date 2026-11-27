@@ -88,6 +88,34 @@ if(BUILD_TESTING)
     set_tests_properties(wave_buoyancy_test PROPERTIES
       ENVIRONMENT "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH}")
   endif()
+
+  # The water moves with the waves: a damped body is carried by them in a
+  # world whose physics follows the waves (this system tags it), and not in
+  # one whose waves are drawn only. It runs gz_hydrodynamics, so the test
+  # lives here and that package depends on the wave core alone. The engine,
+  # the flat buoyancy and the hydrodynamics are found where their packages
+  # install them (the lib folder beside each package's share folder), so the
+  # path does not depend on the shell that ran CMake.
+  find_package(gz_waves_provider_gerstner REQUIRED)
+  find_package(gz_buoyancy REQUIRED)
+  find_package(gz_hydrodynamics REQUIRED)
+  string(JOIN ":" _waves_plugin_path
+    "${CMAKE_CURRENT_BINARY_DIR}"
+    "${gz_waves_provider_gerstner_DIR}/../../../lib"
+    "${gz_buoyancy_DIR}/../../../lib"
+    "${gz_hydrodynamics_DIR}/../../../lib")
+  ament_add_gtest(hydrodynamics_waves_test test/hydrodynamics_waves_test.cc
+    TIMEOUT 300)
+  if(TARGET hydrodynamics_waves_test)
+    target_compile_definitions(hydrodynamics_waves_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(hydrodynamics_waves_test
+      gz-sim::core
+      gz-common::gz-common)
+    set_tests_properties(hydrodynamics_waves_test PROPERTIES
+      ENVIRONMENT
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${_waves_plugin_path};GZ_PARTITION=gz_hydrodynamics_waves_test")
+  endif()
 endif()
 
 ament_environment_hooks("hooks/hook.dsv.in")

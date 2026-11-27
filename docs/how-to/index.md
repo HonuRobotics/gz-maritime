@@ -33,6 +33,7 @@ Imaging, sidescan and profiling sonars, from watching one to labeled training da
 - [Dive in the aquatic centre](aquatic-centre.md)
 - [Use your own world](own-world.md)
 - [Change and see the wind and the current](wind-and-current.md)
+- [Put rain on a camera's lens](lens-drops.md)
 - [Find an acoustic pinger](acoustic-pingers.md)
 - [Troubleshooting](faq.md)
 
@@ -50,6 +51,8 @@ site-worlds
 aquatic-centre
 own-world
 wind-and-current
+lens-drops
+underwater-camera
 sonar-imaging
 sonar-survey
 sonar-add

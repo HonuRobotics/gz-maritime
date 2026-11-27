@@ -25,6 +25,7 @@ find_package(ament_cmake REQUIRED)
 find_package(gz_sim_vendor REQUIRED)
 find_package(gz-sim REQUIRED)
 find_package(gz_waves REQUIRED)   # IWaveField + WaveField2D + Wavefield component
+find_package(gz_water_optics REQUIRED)   # the water an underwater camera sees the surface through
 find_package(gz_math_vendor REQUIRED)
 find_package(gz-math REQUIRED)
 find_package(gz_common_vendor REQUIRED)
@@ -38,47 +39,10 @@ find_package(gz-rendering REQUIRED COMPONENTS ogre2)
 # registry (CreateWaveSimulation); the GUI-side factory registration lives in
 # the per-engine GUI plugins (gz-sim-waves-<engine>-gui), loaded by the world.
 
-# Discover the Ogre Next headers. We must compile against the SAME Ogre Next the
-# resolved gz-rendering-ogre2 uses (mixing patch versions silently swaps in slow
-# Hlms/barrier paths). The previous approach parsed gz-rendering::ogre2's
-# LOCATION, but that property is empty for imported/interface targets (it is
-# NOTFOUND on the ROS gz vendor + Gazebo Jetty), so it wrongly fell back to a
-# hardcoded /usr/include/OGRE-2.3. Instead, search for the OGRE-Next headers,
-# seeded by the ogre2 target's own interface include dirs. PATH_SUFFIXES exclude
-# a bare "OGRE" so we never pick up classic Ogre 1.x (/usr/include/OGRE,
-# rviz_ogre_vendor), whose ABI-incompatible headers would break the build.
-get_target_property(_ogre2_incs gz-rendering::ogre2 INTERFACE_INCLUDE_DIRECTORIES)
-
-# A cached OGRE_NEXT_INCLUDE_DIR can go stale (e.g. the vendor was uninstalled);
-# find_path would keep the old value even though the dir is gone. Drop it first
-# so the search below re-runs whenever OgreRoot.h is no longer where we cached.
-if(OGRE_NEXT_INCLUDE_DIR AND NOT EXISTS "${OGRE_NEXT_INCLUDE_DIR}/OgreRoot.h")
-  unset(OGRE_NEXT_INCLUDE_DIR CACHE)
-endif()
-
-# Pass 1: vendor / target-hinted headers only. NO_DEFAULT_PATH skips the system
-# dirs so a stray /usr/include/OGRE-2.x (a plain libogre-next-dev) can't shadow
-# the gz vendor copy that gz-rendering-ogre2 was actually built against — mixing
-# patch versions silently swaps in the slow Hlms/barrier paths.
-find_path(OGRE_NEXT_INCLUDE_DIR
-  NAMES OgreRoot.h
-  HINTS ${_ogre2_incs}
-  PATHS /opt/ros/$ENV{ROS_DISTRO}/opt/gz_ogre_next_vendor/include
-  PATH_SUFFIXES OGRE-Next OGRE-2.4 OGRE-2.3
-  NO_DEFAULT_PATH
-)
-# Pass 2: fall back to the system paths (a plain libogre-next-dev with no vendor
-# present). Only runs when pass 1 left OGRE_NEXT_INCLUDE_DIR unset.
-find_path(OGRE_NEXT_INCLUDE_DIR
-  NAMES OgreRoot.h
-  PATH_SUFFIXES OGRE-Next OGRE-2.4 OGRE-2.3
-)
-if(NOT OGRE_NEXT_INCLUDE_DIR)
-  message(FATAL_ERROR
-    "OGRE-Next headers (OgreRoot.h) not found. Install libogre-next-dev or the "
-    "gz_ogre_next_vendor package.")
-endif()
-message(STATUS "Ogre Next headers: ${OGRE_NEXT_INCLUDE_DIR}")
+# The Ogre Next headers, found as every package that talks to Ogre directly
+# finds them: cmake/gz_ogre_next-extras.cmake, installed for them.
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/gz_ogre_next-extras.cmake)
+gz_find_ogre_next()
 
 # The Ogre Next dynamic heightmap-texture helper lives in a SEPARATE shared
 # library. Linking it directly into WaterVisual would force the plugin's
@@ -129,6 +93,7 @@ target_link_libraries(gz-sim-water-visual-system
   PRIVATE
     gz_waves::gz_waves        # IWaveField + Field() + Wavefield component +
                               # CreateWaveSimulation (engine-agnostic registry)
+    gz_water_optics::gz_water_optics
     gz-sim::core
     gz-math::gz-math
     gz-plugin::register
@@ -148,8 +113,33 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  # The drawn surface against the wave field, through a depth camera; it is
+  # skipped when the camera gives no image. The visual plugin, its bridge
+  # and the water model come from this tree, so the test runs before
+  # install, and it brings its own wave field: no engine is needed. Its main
+  # sets a GZ_PARTITION of its own, one per process.
+  ament_add_gtest(drawn_surface_test test/drawn_surface_test.cc TIMEOUT 300
+    SKIP_LINKING_MAIN_LIBRARIES)
+  if(TARGET drawn_surface_test)
+    target_compile_definitions(drawn_surface_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_include_directories(drawn_surface_test PRIVATE
+      ${gz_waves_INCLUDE_DIRS})
+    target_link_libraries(drawn_surface_test gz_waves::gz_waves gz-sim::core)
+    set(_drawn_surface_env
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH}"
+      "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH}"
+      "GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH}")
+    set_tests_properties(drawn_surface_test PROPERTIES
+      ENVIRONMENT "${_drawn_surface_env}")
+  endif()
+endif()
+
 # GZ_SIM_RESOURCE_PATH (water_surface model) + GZ_SIM_SYSTEM_PLUGIN_PATH hooks.
 ament_environment_hooks("hooks/hook.dsv.in")
 ament_environment_hooks("hooks/hook.sh.in")
 
-ament_package()
+ament_package(CONFIG_EXTRAS cmake/gz_ogre_next-extras.cmake)

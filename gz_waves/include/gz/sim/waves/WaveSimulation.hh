@@ -13,6 +13,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -31,9 +32,9 @@ struct TileSize
   /// \brief Tile extent along x in metres.
   double x{0.0};
 
-  /// \brief Tile extent along y in metres. The tile is centred at the world
-  /// origin; samples outside (-x/2, +x/2) × (-y/2, +y/2) are interpreted modulo
-  /// the tile size.
+  /// \brief Tile extent along y in metres. The field is periodic: a tile
+  /// starts at the world origin and samples outside [0, x) × [0, y) are
+  /// interpreted modulo the tile size.
   double y{0.0};
 };
 
@@ -44,8 +45,9 @@ struct TileSize
 /// draws one backend-agnostic surface, so it never needs to know which backend
 /// is active.
 ///
-/// All arrays are column-major N×N — element (i, j) is at index `i + j*N` —
-/// and periodic over the tile. The pointers are owned by the wave-field
+/// All arrays are column-major N×N — element (i, j) is at index `i + j*N` and
+/// holds the water at world (i·tile/N, j·tile/N) — and periodic over the
+/// tile. The pointers are owned by the wave-field
 /// implementation and remain valid until the next `SetParameters`; the values
 /// they reference are refreshed by `Update`.
 struct WaveField2D
@@ -68,11 +70,9 @@ struct WaveField2D
   const double *dx{nullptr};
 
   /// \brief Final horizontal displacement y [m]; null ⇒ treat as 0. See dx.
+  /// The folding metric is not here: ask `IWaveField::Foam()`, which an
+  /// engine may compute only when asked.
   const double *dy{nullptr};
-
-  /// \brief Folding metric: 1 = flat, < 1 → folding (whitecaps); null ⇒ the
-  /// backend has no foam.
-  const double *foam{nullptr};
 };
 
 /// \brief Polymorphic backend for a wave field. Concrete implementations (an
@@ -171,6 +171,16 @@ class IWaveField
   /// `Update`; it stays valid until the next `SetParameters`.
   /// \return The renderable grid, or `nullptr` if the backend exposes none.
   public: virtual const WaveField2D *Field() const { return nullptr; }
+
+  /// \brief The folding metric of the grid `Field()` describes, column-major
+  /// N×N like its other arrays, for the renderer's foam: 1 = flat, < 1 →
+  /// folding (whitecaps). An engine may compute it here, for the time of the
+  /// last `Update`, so a consumer that reads `Field()` for the heights never
+  /// pays for foam. Like `ParticleVelocity`, it may fill a grid on the
+  /// caller's thread: not safe from two threads at once.
+  /// \return The folding metric, valid until the next `Update`, or
+  /// `nullptr` if the backend has none.
+  public: virtual const double *Foam() const { return nullptr; }
 };
 
 /// \brief Builds a default-constructed wave-field engine for a token. The
@@ -192,6 +202,18 @@ using WaveEngineFactory =
 /// \param[in] _factory Factory that builds a default-constructed engine.
 void RegisterWaveEngineFactory(const std::string &_token,
                                WaveEngineFactory _factory);
+
+/// \brief Whether an engine is registered under a token, without building
+/// one or logging. Thread-safe.
+/// \param[in] _token Engine identifier.
+/// \return True if `RegisterWaveEngineFactory` was called with it.
+bool HasWaveEngineFactory(const std::string &_token);
+
+/// \brief A number that changes every time a factory is registered: a
+/// consumer that found no engine tries again when it changes, not on a
+/// clock. Thread-safe and cheap.
+/// \return The registry's version.
+std::uint64_t WaveEngineRegistryVersion();
 
 /// \brief Construct and configure the wave-field engine named by `_algorithm`
 /// (e.g. "gerstner", "fft"): look the token up in the registry populated by

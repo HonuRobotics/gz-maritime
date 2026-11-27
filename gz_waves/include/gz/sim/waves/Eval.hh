@@ -68,6 +68,26 @@ double SurfaceHeight(const WavefieldData &_wf,
 gz::math::Vector3d ParticleVelocity(const WavefieldData &_wf,
                                  double _x, double _y, double _t);
 
+/// \brief Water velocity at a point under the surface [m/s]: the surface
+/// particle velocity above it, faded with the depth below the drawn surface
+/// over it (`SurfaceHeight`, the one the wave buoyancy floats on) as
+/// e^(-k d), k the deep-water wavenumber of the sea's peak period
+/// (`WithSeaState(params).period`), as linear wave theory gives for one
+/// wave. A sea of many wave lengths fades its short waves faster, so this
+/// overstates their reach at depth. At or above the surface: the surface
+/// velocity. It is the velocity of the particle at rest at (x, y), while the
+/// depth is from the surface drawn over (x, y): apart, in a choppy sea, by
+/// the horizontal displacement, an error of the order of the steepness.
+/// \param[in] _wf Wave-field state to query.
+/// \param[in] _waterLevel World z of the still water [m].
+/// \param[in] _x  World-frame x coordinate [m].
+/// \param[in] _y  World-frame y coordinate [m].
+/// \param[in] _z  World-frame z coordinate [m].
+/// \param[in] _t  Simulation time [s].
+/// \return Water velocity [m/s]; zero if `_wf` holds no engine.
+gz::math::Vector3d WaterVelocity(const WavefieldData &_wf, double _waterLevel,
+                                 double _x, double _y, double _z, double _t);
+
 /// \brief Outward-pointing unit surface normal at (x, y, t).
 /// \param[in] _wf Wave-field state to query.
 /// \param[in] _x  World-frame x coordinate [m].

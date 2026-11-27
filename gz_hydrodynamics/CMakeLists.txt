@@ -31,6 +31,7 @@ find_package(gz-transport REQUIRED)
 find_package(gz_msgs_vendor REQUIRED)
 find_package(gz-msgs REQUIRED)
 find_package(gz_ocean_current REQUIRED)
+find_package(gz_waves REQUIRED)
 
 # --------------------------------------------------------------------------
 # The hydrodynamics system (gz-maritime-hydrodynamics-system). Upstream builds
@@ -48,6 +49,7 @@ target_include_directories(gz-maritime-hydrodynamics-system PRIVATE
 target_link_libraries(gz-maritime-hydrodynamics-system
   PRIVATE
     gz_ocean_current::gz_ocean_current
+    gz_waves::gz_waves
     gz-sim::core
     gz-plugin::register
     gz-math::gz-math
@@ -102,6 +104,10 @@ if(BUILD_TESTING)
 
   # The centre of pressure: a change of reference point for the whole model.
   gz_hydrodynamics_gtest(hydrodynamics_center_of_pressure_test)
+
+  # The waves' water velocity is tested from gz_waves_buoyancy
+  # (hydrodynamics_waves_test), whose system tags the world; this package
+  # depends on the wave core alone.
 endif()
 
 # GZ_SIM_SYSTEM_PLUGIN_PATH hook so gz-sim finds this package's system plugin

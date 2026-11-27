@@ -11,6 +11,7 @@
 #include "gz/sim/waves/FFTWaveSimulation.hh"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <condition_variable>
 #include <mutex>
@@ -38,10 +39,13 @@ constexpr double kVelDt = 0.05;
 /// EhukaiState::Run).
 constexpr int kAheadThreads = 4;
 
-/// Row-major float matrix view of Ehukai's spatial buffers (Ehukai stores
-/// row-major float; our grids are column-major double).
+/// Row-major float matrix, the layout of Ehukai's spatial buffers (our grids
+/// are column-major double).
 using RowMatF = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic,
                               Eigen::RowMajor>;
+
+/// One of Ehukai's padded spatial buffers, read with its own row length.
+using TileMap = Eigen::Map<const RowMatF, 0, Eigen::OuterStride<>>;
 
 /// \brief The grids one update fills: what the queries and the renderer
 /// read.
@@ -53,46 +57,66 @@ struct Grids
   Eigen::MatrixXd dispX;
   /// \brief Final horizontal displacement y [m].
   Eigen::MatrixXd dispY;
-  /// \brief Minimum eigenvalue of the displacement Jacobian; 1 = flat.
-  Eigen::MatrixXd minE;
 };
 
 //////////////////////////////////////////////////
-/// \brief Ehukai's propagated state as our grids: float to double, row to
-/// column major, at our calibrated amplitude.
+/// \brief The tile of one of Ehukai's spatial grids, indexed as our grids
+/// are: element (i, j) is the cell at x index i, y index j.
+///
+/// Ehukai pads each grid with a wrapped border, so a row holds n + 1 cells,
+/// of which the first n are the tile; read as n cells per row, every row
+/// would be shifted one cell more than the one before. Its x runs along a
+/// row, ours along the first index, so the view is transposed.
+/// \param[in] _field The padded grid.
+/// \return A view of the n x n tile, valid while `_field` is.
+Eigen::Transpose<const TileMap> TileView(
+    const ehukai::RealSpatialField2D<float> &_field)
+{
+  const Eigen::Index n = _field.unpaddedWidth();
+  return Eigen::Transpose<const TileMap>(TileMap(
+      _field.cdata(), n, n,
+      Eigen::OuterStride<>(static_cast<Eigen::Index>(_field.stride()))));
+}
+
+//////////////////////////////////////////////////
+/// \brief Ehukai's propagated state as our grids: float to double, at our
+/// calibrated amplitude. The folding metric is not among them: ToFoamGrid,
+/// on request.
 /// \param[in] _state The propagated state.
-/// \param[in] _n Grid resolution per axis.
 /// \param[in] _scale Amplitude scale: ramp, calibration and gain.
 /// \param[in] _chopScale The same times the choppiness.
 /// \param[out] _height Surface elevation.
 /// \param[out] _dispX Final horizontal displacement x.
 /// \param[out] _dispY Final horizontal displacement y.
-/// \param[out] _minE Folding metric.
-void ToGrids(const ehukai::PropagatedStatef &_state, int _n, double _scale,
+void ToGrids(const ehukai::PropagatedStatef &_state, double _scale,
              double _chopScale, Eigen::MatrixXd &_height,
-             Eigen::MatrixXd &_dispX, Eigen::MatrixXd &_dispY,
-             Eigen::MatrixXd &_minE)
+             Eigen::MatrixXd &_dispX, Eigen::MatrixXd &_dispY)
 {
-  // Map+cast assignment lets Eigen vectorize the float→double conversion and
-  // row→column layout swap; the scale folds into the same expression.
-  _height = Eigen::Map<const RowMatF>(
-      _state.Height.cdata(), _n, _n).cast<double>() * _scale;
+  // View+cast assignment lets Eigen vectorize the float→double conversion;
+  // the scale folds into the same expression.
+  _height = TileView(_state.Height).cast<double>() * _scale;
   // WaveField2D carries the FINAL horizontal displacement, so the Tessendorf
   // choppiness multiplier folds in here (the shader applies dx/dy as-is; a
   // shader-side chopFactor would invert the Gerstner engine's baked chop).
-  _dispX = Eigen::Map<const RowMatF>(
-      _state.Dx.cdata(), _n, _n).cast<double>() * _chopScale;
-  _dispY = Eigen::Map<const RowMatF>(
-      _state.Dy.cdata(), _n, _n).cast<double>() * _chopScale;
+  _dispX = TileView(_state.Dx).cast<double>() * _chopScale;
+  _dispY = TileView(_state.Dy).cast<double>() * _chopScale;
+}
 
-  // Foam: Ehukai computes MinE = -(min eigenvalue of the displacement
-  // Jacobian) at its internal amplitude. At our calibrated amplitude the
-  // minimum eigenvalue is 1 - scale*(MinE + 1). Jacobian() bilinear-samples
-  // this; Eval::FoamMask turns values below its threshold into whitecaps. At
-  // t=0 (scale=0) the surface is flat -> eigenvalue 1 -> no foam.
+//////////////////////////////////////////////////
+/// \brief Ehukai's folding metric as our grid. Ehukai computes MinE = -(min
+/// eigenvalue of the displacement Jacobian) at its internal amplitude. At
+/// our calibrated amplitude the minimum eigenvalue is 1 - scale*(MinE + 1).
+/// Jacobian() bilinear-samples this; Eval::FoamMask turns values below its
+/// threshold into whitecaps. At t=0 (scale=0) the surface is flat ->
+/// eigenvalue 1 -> no foam.
+/// \param[in] _state The propagated state, its MinE filled for this time.
+/// \param[in] _scale Amplitude scale: ramp, calibration and gain.
+/// \param[out] _minE Folding metric, 1 = flat.
+void ToFoamGrid(const ehukai::PropagatedStatef &_state, double _scale,
+                Eigen::MatrixXd &_minE)
+{
   _minE = (1.0 - _scale *
-      (Eigen::Map<const RowMatF>(_state.MinE.cdata(), _n, _n)
-          .cast<double>().array() + 1.0)).matrix();
+      (TileView(_state.MinE).cast<double>().array() + 1.0)).matrix();
 }
 
 //////////////////////////////////////////////////
@@ -260,6 +284,24 @@ void ApplyEhukaiParams(ehukai::Parametersf &_ep, const WaveParameters &_p)
 //-----------------------------------------------------------------------------
 struct FFTWaveSimulation::EhukaiState
 {
+  /// Propagate a state to a time with Ehukai, the folding metric only when
+  /// asked. Every computation of the metric is counted, by whoever makes
+  /// it, so a test sees one that Update makes by mistake.
+  /// \param[in] _propagation The propagation scratch to use.
+  /// \param[out] _out The state.
+  /// \param[in] _t Time, s.
+  /// \param[in] _foam Whether to compute the folding metric too.
+  void Propagate(ehukai::Propagationf &_propagation,
+                 ehukai::PropagatedStatef &_out, float _t, bool _foam)
+  {
+    _propagation.propagate(this->params, *this->initial, _out, _t, _foam);
+    if (_foam)
+      ++this->foamPasses;
+  }
+
+  /// How many times the folding metric was computed, on any thread.
+  std::atomic<std::uint64_t> foamPasses{0};
+
   ehukai::Parametersf params;
   std::unique_ptr<ehukai::InitialStatef> initial;
   std::unique_ptr<ehukai::Propagationf>   propagation;
@@ -312,8 +354,7 @@ struct FFTWaveSimulation::EhukaiState
   }
 
   /// \brief The worker: propagate each job into the ahead working set.
-  /// \param[in] _n Grid resolution per axis.
-  void Run(int _n)
+  void Run()
   {
     // Ehukai runs its loops and transforms on TBB, by default on every
     // core. Here that crowds the thread being spared: with the update off
@@ -339,12 +380,13 @@ struct FFTWaveSimulation::EhukaiState
       lock.unlock();
       arena.execute([&]
       {
-        this->aheadPropagation->propagate(
-            this->params, *this->initial, out, static_cast<float>(t));
+        // Without the folding metric: foam is computed on request, by
+        // whoever asks for it, from the state this becomes.
+        this->Propagate(*this->aheadPropagation, out, static_cast<float>(t),
+                        /*_foam=*/false);
       });
-      ToGrids(out, _n, scale, chopScale, this->aheadGrids.height,
-              this->aheadGrids.dispX, this->aheadGrids.dispY,
-              this->aheadGrids.minE);
+      ToGrids(out, scale, chopScale, this->aheadGrids.height,
+              this->aheadGrids.dispX, this->aheadGrids.dispY);
       lock.lock();
       this->pending = false;
       this->ready = true;
@@ -384,8 +426,9 @@ void FFTWaveSimulation::SetParameters(const WaveParameters &_params)
   this->gain       = p.gain;
   this->tau        = p.tau;
   this->choppiness = p.choppiness;
-  // Never serve velocity grids computed under the previous recipe.
+  // Never serve velocity or foam grids computed under the previous recipe.
   this->velTime    = -1.0;
+  this->foamTime   = -1.0;
   const std::uint32_t seed = p.seed;
 
   // Ehukai requires a power-of-two grid; round up if the SDF asks for
@@ -444,7 +487,6 @@ void FFTWaveSimulation::SetParameters(const WaveParameters &_params)
   this->ehukai->aheadGrids.height = Eigen::MatrixXd::Zero(N, N);
   this->ehukai->aheadGrids.dispX  = Eigen::MatrixXd::Zero(N, N);
   this->ehukai->aheadGrids.dispY  = Eigen::MatrixXd::Zero(N, N);
-  this->ehukai->aheadGrids.minE   = Eigen::MatrixXd::Constant(N, N, 1.0);
 
   // --- Physics-based amplitude calibration -------------------------------
   // Ehukai's amplitudeGain only feeds its (here unused) normal computation,
@@ -455,13 +497,10 @@ void FFTWaveSimulation::SetParameters(const WaveParameters &_params)
   // Hs = 0.21 * V19.5^2 / g, i.e. sigma = Hs/4. The selected spectrum still
   // sets the spectral *shape*; this only fixes the overall energy.
   {
-    this->ehukai->propagation->propagate(
-        this->ehukai->params, *this->ehukai->initial,
-        *this->ehukai->state, 10.0f);
-    const int M = ep.resolution();
+    this->ehukai->Propagate(*this->ehukai->propagation, *this->ehukai->state,
+                            10.0f, /*_foam=*/false);
     const double sigmaEhukai = std::sqrt(
-        Eigen::Map<const RowMatF>(this->ehukai->state->Height.cdata(),
-                                  M, M).cast<double>().array()
+        TileView(this->ehukai->state->Height).cast<double>().array()
             .square().mean());
     const double sigmaTarget =
         0.21 / (4.0 * p.gravity) * this->windSpeed * this->windSpeed;
@@ -501,7 +540,11 @@ void FFTWaveSimulation::Update(double _simTime)
   if (!this->ehukai || !this->ehukai->propagation)
     return;  // default-constructed, not yet configured
 
-  const int N = static_cast<int>(this->gridSize);
+  // The folding metric is not computed here, by either path below: three
+  // of the six transforms, which only the renderer reads. Jacobian() and
+  // Foam() compute it on request, for this time (foamTime no longer matches
+  // it, lastUpdateT having moved).
+
   auto &e = *this->ehukai;
 
   // The update computed ahead, when Prepare was given this very time: wait
@@ -521,17 +564,16 @@ void FFTWaveSimulation::Update(double _simTime)
       this->heightGrid = e.aheadGrids.height;
       this->dispXGrid = e.aheadGrids.dispX;
       this->dispYGrid = e.aheadGrids.dispY;
-      this->minEGrid = e.aheadGrids.minE;
       e.ready = false;
       return;
     }
   }
 
-  e.propagation->propagate(
-      e.params, *e.initial, *e.state, static_cast<float>(_simTime));
+  e.Propagate(*e.propagation, *e.state, static_cast<float>(_simTime),
+              /*_foam=*/false);
   const double scale = this->AmplitudeScale(_simTime);
-  ToGrids(*e.state, N, scale, scale * this->choppiness,
-          this->heightGrid, this->dispXGrid, this->dispYGrid, this->minEGrid);
+  ToGrids(*e.state, scale, scale * this->choppiness,
+          this->heightGrid, this->dispXGrid, this->dispYGrid);
 
   // The particle-velocity grids are NOT refreshed here: their finite
   // difference needs a second full propagation at t+dt, which would double
@@ -550,6 +592,26 @@ double FFTWaveSimulation::AmplitudeScale(double _simTime) const
   //  * this->gain        — the SDF <gain> user multiplier (a no-op via Ehukai's
   //                   amplitudeGain, so we apply it here to make it work).
   return StartupRamp(_simTime, this->tau) * this->ehukaiScale * this->gain;
+}
+
+//////////////////////////////////////////////////
+void FFTWaveSimulation::EnsureFoam() const
+{
+  // Lazily, on the caller's thread, like ParticleVelocity: Ehukai's three
+  // derivative transforms for the last Update's time, from the state that
+  // update left (the worker's, after a prepared one), into the live grid.
+  if (!this->ehukai || !this->ehukai->propagation ||
+      this->foamTime == this->lastUpdateT)
+  {
+    return;
+  }
+  auto &e = *this->ehukai;
+  e.propagation->propagateMinE(*e.initial, *e.state,
+                               static_cast<float>(this->lastUpdateT));
+  ToFoamGrid(*e.state, this->AmplitudeScale(this->lastUpdateT),
+             this->minEGrid);
+  this->foamTime = this->lastUpdateT;
+  ++e.foamPasses;
 }
 
 //////////////////////////////////////////////////
@@ -575,8 +637,7 @@ void FFTWaveSimulation::Prepare(double _nextSimTime)
   // posted.
   if (!e.worker.joinable())
   {
-    e.worker = std::thread(&EhukaiState::Run, &e,
-                           static_cast<int>(this->gridSize));
+    e.worker = std::thread(&EhukaiState::Run, &e);
   }
   e.ready = false;
   e.jobTime = _nextSimTime;
@@ -648,12 +709,9 @@ gz::math::Vector3d FFTWaveSimulation::ParticleVelocity(
   if (this->ehukai && this->ehukai->propagation &&
       this->velTime != this->lastUpdateT)
   {
-    const int N = static_cast<int>(this->gridSize);
-    this->ehukai->propagation->propagate(
-        this->ehukai->params,
-        *this->ehukai->initial,
-        *this->ehukai->scratch,
-        static_cast<float>(this->lastUpdateT + kVelDt));
+    this->ehukai->Propagate(*this->ehukai->propagation, *this->ehukai->scratch,
+                            static_cast<float>(this->lastUpdateT + kVelDt),
+                            /*_foam=*/false);
     const double scale = StartupRamp(this->lastUpdateT, this->tau) *
                          this->ehukaiScale * this->gain;
     const double velK = scale / kVelDt;
@@ -661,17 +719,14 @@ gz::math::Vector3d FFTWaveSimulation::ParticleVelocity(
     // tracks the surface's actual motion.
     const double velKxy = velK * this->choppiness;
     this->velZGrid = velK *
-        (Eigen::Map<const RowMatF>(this->ehukai->scratch->Height.cdata(), N, N)
-           - Eigen::Map<const RowMatF>(
-                 this->ehukai->state->Height.cdata(), N, N)).cast<double>();
+        (TileView(this->ehukai->scratch->Height)
+           - TileView(this->ehukai->state->Height)).cast<double>();
     this->velXGrid = velKxy *
-        (Eigen::Map<const RowMatF>(this->ehukai->scratch->Dx.cdata(), N, N)
-           - Eigen::Map<const RowMatF>(
-                 this->ehukai->state->Dx.cdata(), N, N)).cast<double>();
+        (TileView(this->ehukai->scratch->Dx)
+           - TileView(this->ehukai->state->Dx)).cast<double>();
     this->velYGrid = velKxy *
-        (Eigen::Map<const RowMatF>(this->ehukai->scratch->Dy.cdata(), N, N)
-           - Eigen::Map<const RowMatF>(
-                 this->ehukai->state->Dy.cdata(), N, N)).cast<double>();
+        (TileView(this->ehukai->scratch->Dy)
+           - TileView(this->ehukai->state->Dy)).cast<double>();
     this->velTime = this->lastUpdateT;
   }
 
@@ -708,6 +763,7 @@ double FFTWaveSimulation::Jacobian(double _x, double _y, double /*_t*/) const
   // Bilinear-sample the per-cell minimum eigenvalue of the displacement
   // Jacobian (1 = flat, < 1 → folding). Eval::FoamMask turns values below its
   // threshold into whitecap intensity, so foam appears on the pinched crests.
+  this->EnsureFoam();
   return this->BilinearSample(this->minEGrid, _x, _y);
 }
 
@@ -724,8 +780,20 @@ const WaveField2D *FFTWaveSimulation::Field() const
   this->field.dz   = this->heightGrid.data();
   this->field.dx   = this->dispXGrid.data();
   this->field.dy   = this->dispYGrid.data();
-  this->field.foam = this->minEGrid.data();
   return &this->field;
+}
+
+//////////////////////////////////////////////////
+std::uint64_t FFTWaveSimulation::FoamComputations() const
+{
+  return this->ehukai ? this->ehukai->foamPasses.load() : 0u;
+}
+
+//////////////////////////////////////////////////
+const double *FFTWaveSimulation::Foam() const
+{
+  this->EnsureFoam();
+  return this->minEGrid.size() > 0 ? this->minEGrid.data() : nullptr;
 }
 
 //////////////////////////////////////////////////

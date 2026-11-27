@@ -66,6 +66,8 @@ class GerstnerWaveSimulation final : public IWaveField
   // Documentation inherited
   public: const WaveField2D *Field() const override;
   // Documentation inherited
+  public: const double *Foam() const override;
+  // Documentation inherited
   public: std::string_view Kind() const override { return "gerstner"; }
 
   // ---- Engine-specific introspection accessors (exercised by the unit
@@ -141,7 +143,7 @@ class GerstnerWaveSimulation final : public IWaveField
   private: std::vector<double> dxBuf;
   /// \brief Column-major y-chop buffer for `field.dy`.
   private: std::vector<double> dyBuf;
-  /// \brief Column-major folding/foam buffer for `field.foam`.
+  /// \brief Column-major folding/foam buffer, handed out by `Foam()`.
   private: std::vector<double> foamBuf;
   /// \brief The rendering contract returned by Field().
   private: WaveField2D field;

@@ -41,8 +41,9 @@ extern "C"
   /// y-displacement grids into the RGB channels of the RGBA32F heightmap
   /// texture. Each grid is the column-major `WaveField2D` layout: element
   /// (i, j) — world position (x_i, y_j) — at index `i + j*rows`. That layout
-  /// packs so texel (u, v) holds grid value (x_u, y_v), matching the water
-  /// shaders' `uv = worldXY / tileSize` sampling. `disp_*_grid` and
+  /// packs so texel (u, v) holds grid value (x_u, y_v), which the water
+  /// shaders sample at `worldXY / tileSize` plus half a texel, the texel's
+  /// centre. `disp_*_grid` and
   /// `foam_grid` may be null (channels pack as zeros); foam is a per-cell
   /// folding metric (the displacement Jacobian's minimum eigenvalue; 1 =
   /// flat, < 1 → folding) read as the alpha channel. Returns 1 on success,

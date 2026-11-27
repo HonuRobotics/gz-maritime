@@ -100,6 +100,31 @@ gz::math::Vector3d ParticleVelocity(const WavefieldData &_wf,
 }
 
 //////////////////////////////////////////////////
+gz::math::Vector3d WaterVelocity(const WavefieldData &_wf, double _waterLevel,
+                                 double _x, double _y, double _z, double _t)
+{
+  if (!_wf.simulation)
+    return gz::math::Vector3d::Zero;
+  // The velocity of the particle at rest at (x, y), while the depth below
+  // is measured from the surface drawn over (x, y), the one the wave
+  // buoyancy floats on. In a choppy sea the two are apart by the horizontal
+  // displacement, an error of the order of the wave steepness.
+  const gz::math::Vector3d surface =
+      _wf.simulation->ParticleVelocity(_x, _y, _t);
+  const double depth = _waterLevel + SurfaceHeight(_wf, _x, _y, _t) - _z;
+  if (depth <= 0.0)
+    return surface;
+
+  // Deep-water dispersion, omega^2 = g k, at the peak period.
+  const WaveParameters p = WithSeaState(_wf.params);
+  if (!(p.period > 0.0) || !(p.gravity > 0.0))
+    return surface;
+  const double omega = 2.0 * GZ_PI / p.period;
+  const double k = omega * omega / p.gravity;
+  return surface * std::exp(-k * depth);
+}
+
+//////////////////////////////////////////////////
 gz::math::Vector3d Normal(const WavefieldData &_wf,
                           double _x, double _y, double _t)
 {

@@ -15,6 +15,7 @@
 #include <string>
 
 #include <gz/sim/System.hh>
+#include "gz/sim/waves/WaveSimulation.hh"
 #include <gz/utils/ImplPtr.hh>
 
 namespace gz::sim::waves
@@ -97,12 +98,13 @@ namespace gz::sim::systems
     /// \return The engine's registration token.
     protected: virtual std::string EngineToken() const = 0;
 
-    /// \brief Build and fully configure (i.e. call `SetParameters`) the engine
-    /// for this system from `_params`. Runs once, on the server, in Configure.
-    /// \param[in] _params Wave parameters to build and configure the engine with.
-    /// \return The configured engine instance.
-    protected: virtual std::shared_ptr<waves::IWaveField> MakeEngine(
-      const waves::WaveParameters &_params) const = 0;
+    /// \brief The factory of a bare engine (no parameters set), such as
+    /// `waves::MakeFFTWaveField`. In Configure the base registers it under
+    /// `EngineToken()`, so any consumer in the server's process can build an
+    /// engine of its own from the recipe, and then builds this system's
+    /// engine through it.
+    /// \return The factory.
+    protected: virtual waves::WaveEngineFactory EngineFactory() const = 0;
 
     GZ_UTILS_UNIQUE_IMPL_PTR(dataPtr)
   };

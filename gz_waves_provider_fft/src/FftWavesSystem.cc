@@ -15,6 +15,7 @@
 
 #include "gz/sim/systems/WavesSystemBase.hh"
 #include "gz/sim/waves/FFTWaveSimulation.hh"  // MakeFFTWaveField
+#include "gz/sim/waves/WaveSimulation.hh"  // WaveEngineFactory
 #include "gz/sim/waves/Wavefield.hh"          // WaveParameters
 
 namespace gz::sim::systems
@@ -67,7 +68,8 @@ namespace gz::sim::systems
 ///   spectrum/spreading/dispersion tags, ...) is independent of `<sea_state>`
 ///   and applies in both modes — combine freely.
 ///
-/// `<direction>` is parsed but not applied — Ehukai assumes wind along +X.
+/// `<direction>` is parsed but not applied — Ehukai assumes wind along +X, so
+/// the waves travel towards +x.
 ///
 /// \verbatim
 /// <plugin filename="gz-sim-waves-fft-system" name="gz::sim::systems::FftWaves">
@@ -93,12 +95,9 @@ class FftWaves : public WavesSystemBase
   protected: std::string EngineToken() const override { return "fft"; }
 
   // Documentation inherited
-  protected: std::shared_ptr<waves::IWaveField> MakeEngine(
-    const waves::WaveParameters &_params) const override
+  protected: waves::WaveEngineFactory EngineFactory() const override
   {
-    auto engine = waves::MakeFFTWaveField();
-    engine->SetParameters(_params);
-    return engine;
+    return &waves::MakeFFTWaveField;
   }
 };
 }  // namespace gz::sim::systems

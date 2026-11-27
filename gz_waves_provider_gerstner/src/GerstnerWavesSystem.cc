@@ -15,6 +15,7 @@
 
 #include "gz/sim/systems/WavesSystemBase.hh"
 #include "gz/sim/waves/GerstnerWaveSimulation.hh"  // MakeGerstnerWaveField
+#include "gz/sim/waves/WaveSimulation.hh"  // WaveEngineFactory
 #include "gz/sim/waves/Wavefield.hh"               // WaveParameters
 
 namespace gz::sim::systems
@@ -84,12 +85,9 @@ class GerstnerWaves : public WavesSystemBase
   protected: std::string EngineToken() const override { return "gerstner"; }
 
   // Documentation inherited
-  protected: std::shared_ptr<waves::IWaveField> MakeEngine(
-    const waves::WaveParameters &_params) const override
+  protected: waves::WaveEngineFactory EngineFactory() const override
   {
-    auto engine = waves::MakeGerstnerWaveField();
-    engine->SetParameters(_params);
-    return engine;
+    return &waves::MakeGerstnerWaveField;
   }
 };
 }  // namespace gz::sim::systems

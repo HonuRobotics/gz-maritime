@@ -253,7 +253,13 @@ void WavesSystemBase::Configure(
 
   // The engine is determined by this concrete system, not by SDF.
   this->dataPtr->data.algorithm = this->EngineToken();
-  this->dataPtr->data.simulation = this->MakeEngine(this->dataPtr->data.params);
+  // Registered on the server too, so a consumer on another thread, such
+  // as a renderer, can build an engine of its own from the recipe instead
+  // of reading this one.
+  waves::RegisterWaveEngineFactory(this->dataPtr->data.algorithm,
+                                   this->EngineFactory());
+  this->dataPtr->data.simulation = waves::CreateWaveSimulation(
+    this->dataPtr->data.algorithm, this->dataPtr->data.params);
   if (!this->dataPtr->data.simulation)
   {
     gzerr << "[Waves] failed to create '" << this->dataPtr->data.algorithm
