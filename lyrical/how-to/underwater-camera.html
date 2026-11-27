@@ -162,6 +162,7 @@
 <li class="toctree-l4"><a class="reference internal" href="sensors.html#what-the-world-provides">What the world provides</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sensors.html#the-pattern">The pattern</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sensors.html#a-camera">A camera</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sensors.html#an-underwater-camera">An underwater camera</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sensors.html#check-a-sensor">Check a sensor</a></li>
 </ul>
 </li>
@@ -214,6 +215,8 @@
 <li class="toctree-l4"><a class="reference internal" href="#set-how-far-you-can-see">Set how far you can see</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#change-it-while-the-world-runs">Change it while the world runs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#check-what-the-world-has">Check what the world has</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#add-an-underwater-camera">Add an underwater camera</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#see-its-image">See its image</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#what-comes-next">What comes next</a></li>
 </ul>
 </li>
@@ -243,6 +246,9 @@
 <li class="toctree-l4"><a class="reference internal" href="faq.html#the-ocean-looks-flat-or-white-in-the-gui">The ocean looks flat or white in the GUI</a></li>
 <li class="toctree-l4"><a class="reference internal" href="faq.html#camera-images-look-green-or-blue">Camera images look green or blue</a></li>
 <li class="toctree-l4"><a class="reference internal" href="faq.html#two-simulations-interfere-with-each-other">Two simulations interfere with each other</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-underwater-image-is-the-same-as-the-plain-one">The underwater image is the same as the plain one</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-underwater-image-is-all-one-colour">The underwater image is all one colour</a></li>
+<li class="toctree-l4"><a class="reference internal" href="faq.html#the-underwater-image-gets-black-at-depth">The underwater image gets black at depth</a></li>
 </ul>
 </li>
 </ul>
@@ -270,6 +276,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#ocean-current-markup">Ocean current markup</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#ocean-current-parameters">Ocean current parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#water-optics-parameters">Water optics parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#underwater-camera-parameters">Underwater camera parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#thruster-command">Thruster command</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../reference/launch-and-world.html#services">Services</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="../reference/launch-and-world.html#examples">Examples</a></li>
@@ -332,8 +339,8 @@
 <h1>See through the water<a class="headerlink" href="#see-through-the-water" title="Link to this heading"></a></h1>
 <p>Under water, a camera sees the water as much as what is in it: far objects
 fade into a veil of the water’s colour, red goes first, and everything gets
-darker the deeper you go. This page grows with the underwater camera work:
-for now it covers the first step, giving a world its water.</p>
+darker the deeper you go. Give the world its water, then give a vehicle an
+underwater camera.</p>
 <section id="give-a-world-its-water">
 <h2>Give a world its water<a class="headerlink" href="#give-a-world-its-water" title="Link to this heading"></a></h2>
 <p>Add the water optics system to the world and name the kind of water, by its
@@ -416,10 +423,61 @@ and <code class="docutils literal notranslate"><span class="pre">water_level</sp
 uses. The <a class="reference internal" href="../reference/launch-and-world.html#water-optics-parameters"><span class="std std-ref">reference</span></a>
 lists every element and the presets.</p>
 </section>
+<section id="add-an-underwater-camera">
+<h2>Add an underwater camera<a class="headerlink" href="#add-an-underwater-camera" title="Link to this heading"></a></h2>
+<p>Use an <code class="docutils literal notranslate"><span class="pre">rgbd_camera</span></code> sensor, which renders colour and depth together, give
+it a <code class="docutils literal notranslate"><span class="pre">&lt;topic&gt;</span></code>, and put the underwater camera plugin inside it:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;sensor</span><span class="w"> </span><span class="na">name=</span><span class="s">"camera"</span><span class="w"> </span><span class="na">type=</span><span class="s">"rgbd_camera"</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;topic&gt;</span>rov/camera<span class="nt">&lt;/topic&gt;</span>
+<span class="w">  </span><span class="nt">&lt;update_rate&gt;</span>15<span class="nt">&lt;/update_rate&gt;</span>
+<span class="w">  </span><span class="nt">&lt;camera&gt;</span>
+<span class="w">    </span><span class="nt">&lt;horizontal_fov&gt;</span>1.2<span class="nt">&lt;/horizontal_fov&gt;</span>
+<span class="w">    </span><span class="nt">&lt;image&gt;&lt;width&gt;</span>640<span class="nt">&lt;/width&gt;&lt;height&gt;</span>480<span class="nt">&lt;/height&gt;&lt;/image&gt;</span>
+<span class="w">    </span><span class="nt">&lt;clip&gt;&lt;near&gt;</span>0.1<span class="nt">&lt;/near&gt;&lt;far&gt;</span>60<span class="nt">&lt;/far&gt;&lt;/clip&gt;</span>
+<span class="w">    </span><span class="nt">&lt;depth_camera&gt;&lt;clip&gt;&lt;near&gt;</span>0.1<span class="nt">&lt;/near&gt;&lt;far&gt;</span>60<span class="nt">&lt;/far&gt;&lt;/clip&gt;&lt;/depth_camera&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/camera&gt;</span>
+<span class="w">  </span><span class="nt">&lt;plugin</span><span class="w"> </span><span class="na">filename=</span><span class="s">"gz-maritime-underwater-camera-system"</span>
+<span class="w">          </span><span class="na">name=</span><span class="s">"gz::sim::maritime::UnderwaterCamera"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;exposure&gt;</span>auto<span class="nt">&lt;/exposure&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/plugin&gt;</span>
+<span class="nt">&lt;/sensor&gt;</span>
+</pre></div>
+</div>
+<p>The far clip is where the camera stops seeing anything but water: past it,
+every pixel is the veil. Keep it beyond the water’s visibility.</p>
+</section>
+<section id="see-its-image">
+<h2>See its image<a class="headerlink" href="#see-its-image" title="Link to this heading"></a></h2>
+<p>The camera publishes <code class="docutils literal notranslate"><span class="pre">rov/camera/underwater/image</span></code> beside the plain
+<code class="docutils literal notranslate"><span class="pre">rov/camera/image</span></code>. In the GUI, add an Image Display and pick the topic; in
+ROS, bridge it like any camera:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">gz_topic_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rov/camera/underwater/image</span>
+<span class="w">  </span><span class="nt">ros_topic_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rov/camera/underwater/image</span>
+<span class="w">  </span><span class="nt">ros_type_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sensor_msgs/msg/Image</span>
+<span class="w">  </span><span class="nt">gz_type_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gz.msgs.Image</span>
+<span class="w">  </span><span class="nt">direction</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GZ_TO_ROS</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">gz_topic_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rov/camera/underwater/camera_info</span>
+<span class="w">  </span><span class="nt">ros_topic_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rov/camera/underwater/camera_info</span>
+<span class="w">  </span><span class="nt">ros_type_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sensor_msgs/msg/CameraInfo</span>
+<span class="w">  </span><span class="nt">gz_type_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gz.msgs.CameraInfo</span>
+<span class="w">  </span><span class="nt">direction</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GZ_TO_ROS</span>
+</pre></div>
+</div>
+<p>The demo world <code class="docutils literal notranslate"><span class="pre">kai_gazebo/worlds/underwater_camera_demo.sdf</span></code> has colour
+charts at 0.5 to 16 m in front of a camera, to see each water type:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gz<span class="w"> </span>sim<span class="w"> </span>underwater_camera_demo.sdf
+</pre></div>
+</div>
+<figure class="align-default" id="id2">
+<img alt="../_images/uw-expected-chart.png" src="../_images/uw-expected-chart.png" />
+<figcaption>
+<p><span class="caption-text">What the chart must look like from 3 m deep, by range, in three waters.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
 <section id="what-comes-next">
 <h2>What comes next<a class="headerlink" href="#what-comes-next" title="Link to this heading"></a></h2>
-<p>A camera that sees through this water, then the same water in the GUI, then
-the vehicle’s own lights. The plan is in
+<p>The same water in the GUI’s own view, then the vehicle’s own lights. The plan is in
 <a class="reference external" href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/UNDERWATER_CAMERA_PLAN.md">UNDERWATER_CAMERA_PLAN.md</a>.</p>
 </section>
 </section>

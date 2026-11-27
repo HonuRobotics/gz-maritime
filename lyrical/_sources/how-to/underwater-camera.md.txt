@@ -2,8 +2,8 @@
 
 Under water, a camera sees the water as much as what is in it: far objects
 fade into a veil of the water's colour, red goes first, and everything gets
-darker the deeper you go. This page grows with the underwater camera work:
-for now it covers the first step, giving a world its water.
+darker the deeper you go. Give the world its water, then give a vehicle an
+underwater camera.
 
 ## Give a world its water
 
@@ -72,8 +72,62 @@ prints the water type, the visibility, and per channel the numbers a camera
 uses. The [reference](../reference/launch-and-world.md#water-optics-parameters)
 lists every element and the presets.
 
+## Add an underwater camera
+
+Use an `rgbd_camera` sensor, which renders colour and depth together, give
+it a `<topic>`, and put the underwater camera plugin inside it:
+
+```xml
+<sensor name="camera" type="rgbd_camera">
+  <topic>rov/camera</topic>
+  <update_rate>15</update_rate>
+  <camera>
+    <horizontal_fov>1.2</horizontal_fov>
+    <image><width>640</width><height>480</height></image>
+    <clip><near>0.1</near><far>60</far></clip>
+    <depth_camera><clip><near>0.1</near><far>60</far></clip></depth_camera>
+  </camera>
+  <plugin filename="gz-maritime-underwater-camera-system"
+          name="gz::sim::maritime::UnderwaterCamera">
+    <exposure>auto</exposure>
+  </plugin>
+</sensor>
+```
+
+The far clip is where the camera stops seeing anything but water: past it,
+every pixel is the veil. Keep it beyond the water's visibility.
+
+## See its image
+
+The camera publishes `rov/camera/underwater/image` beside the plain
+`rov/camera/image`. In the GUI, add an Image Display and pick the topic; in
+ROS, bridge it like any camera:
+
+```yaml
+- gz_topic_name: rov/camera/underwater/image
+  ros_topic_name: rov/camera/underwater/image
+  ros_type_name: sensor_msgs/msg/Image
+  gz_type_name: gz.msgs.Image
+  direction: GZ_TO_ROS
+- gz_topic_name: rov/camera/underwater/camera_info
+  ros_topic_name: rov/camera/underwater/camera_info
+  ros_type_name: sensor_msgs/msg/CameraInfo
+  gz_type_name: gz.msgs.CameraInfo
+  direction: GZ_TO_ROS
+```
+
+The demo world `kai_gazebo/worlds/underwater_camera_demo.sdf` has colour
+charts at 0.5 to 16 m in front of a camera, to see each water type:
+
+```bash
+gz sim underwater_camera_demo.sdf
+```
+
+```{figure} ../design/images/uw-expected-chart.png
+What the chart must look like from 3 m deep, by range, in three waters.
+```
+
 ## What comes next
 
-A camera that sees through this water, then the same water in the GUI, then
-the vehicle's own lights. The plan is in
+The same water in the GUI's own view, then the vehicle's own lights. The plan is in
 [UNDERWATER_CAMERA_PLAN.md](https://github.com/HonuRobotics/gz-maritime/blob/lyrical/UNDERWATER_CAMERA_PLAN.md).

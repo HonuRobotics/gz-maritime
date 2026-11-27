@@ -312,6 +312,26 @@ the `WaterOptics` component; a system that sees through water keeps a
 `gz::sim::water_optics::WaterOpticsSampler`, from the `gz_water_optics`
 library.
 
+## Underwater camera parameters
+
+What the underwater camera plugin, `gz-maritime-underwater-camera-system`,
+takes. It goes inside an `rgbd_camera` sensor that has a `<topic>`, and
+publishes `<topic>/underwater/image` (`gz.msgs.Image`, RGB 8 bit) and
+`<topic>/underwater/camera_info`; the sensor's own topics are unchanged.
+
+| Markup | Default | Meaning |
+|---|---|---|
+| `<output_topic>` | `<topic>/underwater` | Base of the output topics. |
+| `<exposure>` | `1` | A gain on linear light, or `auto`, aiming the mean luminance at 0.18. |
+| `<max_gain>` | `16` | With `auto`, the gain stays within 1/max and max. |
+| `<white_balance>` | `none` | `none`, or `grey_world`, which takes the water's tint out. |
+| `<shot_noise>`, `<read_noise>` | `0` | Gaussian noise on the light the sensor caught, variance shot_noise · signal + read_noise², before the gain. |
+| `<seed>` | `1` | The noise's seed, mixed with the sensor's scoped name, so each camera gets its own noise. |
+
+The water is the world's (`gz-maritime-water-optics-system`); without it, or
+above the water, only the camera's response applies, which by default
+changes nothing. The plugin works only while its output has a subscriber.
+
 ## Thruster command
 
 What a vehicle's Thruster plugins expect, with `gz-maritime-thruster-system`

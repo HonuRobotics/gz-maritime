@@ -162,6 +162,7 @@
 <li class="toctree-l4"><a class="reference internal" href="../how-to/sensors.html#what-the-world-provides">What the world provides</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/sensors.html#the-pattern">The pattern</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/sensors.html#a-camera">A camera</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/sensors.html#an-underwater-camera">An underwater camera</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/sensors.html#check-a-sensor">Check a sensor</a></li>
 </ul>
 </li>
@@ -214,6 +215,8 @@
 <li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#set-how-far-you-can-see">Set how far you can see</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#change-it-while-the-world-runs">Change it while the world runs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#check-what-the-world-has">Check what the world has</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#add-an-underwater-camera">Add an underwater camera</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#see-its-image">See its image</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/underwater-camera.html#what-comes-next">What comes next</a></li>
 </ul>
 </li>
@@ -243,6 +246,9 @@
 <li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-ocean-looks-flat-or-white-in-the-gui">The ocean looks flat or white in the GUI</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#camera-images-look-green-or-blue">Camera images look green or blue</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#two-simulations-interfere-with-each-other">Two simulations interfere with each other</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-underwater-image-is-the-same-as-the-plain-one">The underwater image is the same as the plain one</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-underwater-image-is-all-one-colour">The underwater image is all one colour</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../how-to/faq.html#the-underwater-image-gets-black-at-depth">The underwater image gets black at depth</a></li>
 </ul>
 </li>
 </ul>
@@ -270,6 +276,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#ocean-current-markup">Ocean current markup</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#ocean-current-parameters">Ocean current parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#water-optics-parameters">Water optics parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#underwater-camera-parameters">Underwater camera parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#thruster-command">Thruster command</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#services">Services</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#examples">Examples</a></li>
@@ -991,6 +998,50 @@ open ocean, so <code class="docutils literal notranslate"><span class="pre">III<
 the <code class="docutils literal notranslate"><span class="pre">WaterOptics</span></code> component; a system that sees through water keeps a
 <code class="docutils literal notranslate"><span class="pre">gz::sim::water_optics::WaterOpticsSampler</span></code>, from the <code class="docutils literal notranslate"><span class="pre">gz_water_optics</span></code>
 library.</p>
+</section>
+<section id="underwater-camera-parameters">
+<h2>Underwater camera parameters<a class="headerlink" href="#underwater-camera-parameters" title="Link to this heading"></a></h2>
+<p>What the underwater camera plugin, <code class="docutils literal notranslate"><span class="pre">gz-maritime-underwater-camera-system</span></code>,
+takes. It goes inside an <code class="docutils literal notranslate"><span class="pre">rgbd_camera</span></code> sensor that has a <code class="docutils literal notranslate"><span class="pre">&lt;topic&gt;</span></code>, and
+publishes <code class="docutils literal notranslate"><span class="pre">&lt;topic&gt;/underwater/image</span></code> (<code class="docutils literal notranslate"><span class="pre">gz.msgs.Image</span></code>, RGB 8 bit) and
+<code class="docutils literal notranslate"><span class="pre">&lt;topic&gt;/underwater/camera_info</span></code>; the sensor’s own topics are unchanged.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Markup</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;output_topic&gt;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&lt;topic&gt;/underwater</span></code></p></td>
+<td><p>Base of the output topics.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;exposure&gt;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p>A gain on linear light, or <code class="docutils literal notranslate"><span class="pre">auto</span></code>, aiming the mean luminance at 0.18.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;max_gain&gt;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">16</span></code></p></td>
+<td><p>With <code class="docutils literal notranslate"><span class="pre">auto</span></code>, the gain stays within 1/max and max.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;white_balance&gt;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">none</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">none</span></code>, or <code class="docutils literal notranslate"><span class="pre">grey_world</span></code>, which takes the water’s tint out.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;shot_noise&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;read_noise&gt;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
+<td><p>Gaussian noise on the light the sensor caught, variance shot_noise · signal + read_noise², before the gain.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;seed&gt;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p>The noise’s seed, mixed with the sensor’s scoped name, so each camera gets its own noise.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The water is the world’s (<code class="docutils literal notranslate"><span class="pre">gz-maritime-water-optics-system</span></code>); without it, or
+above the water, only the camera’s response applies, which by default
+changes nothing. The plugin works only while its output has a subscriber.</p>
 </section>
 <section id="thruster-command">
 <h2>Thruster command<a class="headerlink" href="#thruster-command" title="Link to this heading"></a></h2>
