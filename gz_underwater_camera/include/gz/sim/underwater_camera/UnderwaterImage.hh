@@ -148,10 +148,16 @@ struct Optics
 {
   /// \brief Forward scatter: a Gaussian blur whose width grows with range,
   /// sigma = forwardScatter * range radians (so fx * forwardScatter * range
-  /// pixels), at most 40 pixels. Each object's light spreads by its own
-  /// range; open water, which hit nothing, does not spread. Through the
-  /// levels it is made of, a sigma under 1 pixel comes out smaller (0.40 px
-  /// as about 0.24), and from 1 pixel up within 13 %. Zero for none.
+  /// pixels), at most 40 pixels. Light goes from one pixel to another
+  /// blurred by the smaller of their two widths, since it reaches a pixel
+  /// only through the water in front of what that pixel sees; each pixel is
+  /// then divided by what the same blur gives an image of ones, so one
+  /// colour stays flat across a depth edge. Open water has no direct light
+  /// of its own (its veil is not spread) and takes its neighbours' at their
+  /// width; the sky through the surface spreads by its path to the surface.
+  /// Through the levels it is made of, a sigma under 0.5 pixel comes out
+  /// smaller (0.40 px as about 0.24), and from 0.5 pixel up within 13 %.
+  /// Zero for none.
   double forwardScatter{0.0};
 
   /// \brief The port in front of the lens.
