@@ -1,0 +1,97 @@
+<?xml version="1.0"?>
+<!--
+  Coastal water (Jerlov 3C) with still water at z = 0. One camera 3 m deep
+  looks along +x at a plate 2.5 m away (left of the image) and a wall 6 m
+  away; one beside it, pitched up 1 rad, sees the wall below and open
+  water above it; one above the water looks at the same wall.
+-->
+<sdf version="1.9">
+  <world name="uwcam">
+    <physics name="p" type="ignored">
+      <max_step_size>0.01</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-maritime-water-optics-system"
+            name="gz::sim::maritime::WaterOptics">
+      <jerlov>3C</jerlov>
+    </plugin>
+    <scene><ambient>0.6 0.6 0.6 1</ambient><background>0.3 0.5 0.7 1</background></scene>
+    <light type="directional" name="sun">
+      <direction>-0.3 0.2 -1</direction>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+    </light>
+    <model name="wall">
+      <static>true</static>
+      <pose>6 0 -2 0 0 0</pose>
+      <link name="l"><visual name="v">
+        <geometry><box><size>0.2 30 20</size></box></geometry>
+        <material><ambient>0.7 0.6 0.5 1</ambient><diffuse>0.7 0.6 0.5 1</diffuse></material>
+      </visual></link>
+    </model>
+    <model name="plate">
+      <static>true</static>
+      <pose>2.5 1.2 -3 0 0 0</pose>
+      <link name="l"><visual name="v">
+        <geometry><box><size>0.05 1.4 1.4</size></box></geometry>
+        <material><ambient>0.9 0.9 0.9 1</ambient><diffuse>0.9 0.9 0.9 1</diffuse></material>
+      </visual></link>
+    </model>
+    <model name="rig">
+      <static>true</static>
+      <link name="under">
+        <pose>0 0 -3 0 0 0</pose>
+        <sensor name="cam" type="rgbd_camera">
+          <topic>uwcam/under</topic>
+          <update_rate>10</update_rate>
+          <always_on>1</always_on>
+          <camera>
+            <horizontal_fov>1.2</horizontal_fov>
+            <image><width>160</width><height>120</height></image>
+            <clip><near>0.1</near><far>60</far></clip>
+            <depth_camera><clip><near>0.1</near><far>60</far></clip></depth_camera>
+          </camera>
+          <plugin filename="gz-maritime-underwater-camera-system"
+                  name="gz::sim::maritime::UnderwaterCamera"/>
+        </sensor>
+      </link>
+      <link name="pitched">
+        <pose>0 0 -3 0 -1.0 0</pose>
+        <sensor name="cam" type="rgbd_camera">
+          <topic>uwcam/pitched</topic>
+          <update_rate>10</update_rate>
+          <always_on>1</always_on>
+          <camera>
+            <horizontal_fov>1.2</horizontal_fov>
+            <image><width>160</width><height>120</height></image>
+            <clip><near>0.1</near><far>60</far></clip>
+            <depth_camera><clip><near>0.1</near><far>60</far></clip></depth_camera>
+          </camera>
+          <plugin filename="gz-maritime-underwater-camera-system"
+                  name="gz::sim::maritime::UnderwaterCamera"/>
+        </sensor>
+      </link>
+      <link name="above">
+        <pose>0 0 1 0 0 0</pose>
+        <sensor name="cam" type="rgbd_camera">
+          <topic>uwcam/above</topic>
+          <update_rate>10</update_rate>
+          <always_on>1</always_on>
+          <camera>
+            <horizontal_fov>1.2</horizontal_fov>
+            <image><width>160</width><height>120</height></image>
+            <clip><near>0.1</near><far>60</far></clip>
+            <depth_camera><clip><near>0.1</near><far>60</far></clip></depth_camera>
+          </camera>
+          <plugin filename="gz-maritime-underwater-camera-system"
+                  name="gz::sim::maritime::UnderwaterCamera"/>
+        </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>

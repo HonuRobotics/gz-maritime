@@ -41,6 +41,7 @@ site-worlds
 aquatic-centre
 own-world
 wind-and-current
+underwater-camera
 acoustic-pingers
 faq
 ```

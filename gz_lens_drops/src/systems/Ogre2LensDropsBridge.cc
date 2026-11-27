@@ -72,6 +72,9 @@ struct Link
   /// \brief The system's function; null once the handle went.
   lens_drops_pull_t pull{nullptr};
 
+  /// \brief Whether the system wants the pass; null once the handle went.
+  lens_drops_wanted_t wanted{nullptr};
+
   /// \brief Its context.
   void *context{nullptr};
 };
@@ -145,9 +148,6 @@ class LensDropsPass : public gz::rendering::Ogre2RenderPass
   /// \brief 0 blurred to 1 sharp, from the last pull.
   private: float focus{0.5f};
 
-  /// \brief Whether the system wants the pass drawn, from the last pull.
-  private: bool wanted{false};
-
   /// \brief Set once the pass gave up.
   private: bool failed{false};
 };
@@ -179,6 +179,15 @@ LensDropsPass::~LensDropsPass()
     return;
   try
   {
+    // The node definition this pass added, as gz-rendering's own render
+    // targets remove theirs: the camera's workspace that used it is gone
+    // with the camera that owned this pass
+    auto *compositorManager = Ogre::Root::getSingleton().getCompositorManager2();
+    if (compositorManager && !this->ogreCompositorNodeDefName.empty() &&
+        compositorManager->hasNodeDefinition(this->ogreCompositorNodeDefName))
+    {
+      compositorManager->removeNodeDefinition(this->ogreCompositorNodeDefName);
+    }
     // The material, which samples the texture, first
     if (this->material)
       Ogre::MaterialManager::getSingleton().remove(this->material);
@@ -216,9 +225,13 @@ bool LensDropsPass::CompileError() const
 //////////////////////////////////////////////////
 bool LensDropsPass::IsEnabled() const
 {
-  // Asked before the passes are chained for a frame: a shader that did not
-  // compile in the frame before takes the pass out of the next one
-  return this->wanted && !this->failed && !this->CompileError();
+  // Asked before the passes are chained for a frame, so asked of the
+  // system now: the first wet frame has its drops. A shader that did not
+  // compile in the frame before takes the pass out of the next one.
+  if (this->failed || this->CompileError())
+    return false;
+  const std::lock_guard<std::mutex> lock(this->link->mutex);
+  return this->link->wanted && this->link->wanted(this->link->context) != 0;
 }
 
 //////////////////////////////////////////////////
@@ -234,16 +247,12 @@ void LensDropsPass::PreRender(const gz::rendering::CameraPtr &_camera)
     {
       const std::lock_guard<std::mutex> lock(this->link->mutex);
       if (!this->link->pull)
-      {
-        this->wanted = false;
         return;
-      }
       const double stamp = std::chrono::duration<double>(
           _camera->Scene()->Time()).count();
       int enabled{0};
       map = this->link->pull(this->link->context, stamp, &this->focus,
                              &enabled);
-      this->wanted = enabled != 0;
       // The map is the system's until its next pull, which this lock keeps
       // from coming: upload it now
       if (map && this->texture)
@@ -427,9 +436,10 @@ int lens_drops_ogre2_abi_version(void)
 
 //////////////////////////////////////////////////
 lens_drops_pass_t lens_drops_ogre2_create(const char *_vs, const char *_fs,
-    int _mapWidth, int _mapHeight, lens_drops_pull_t _pull, void *_context)
+    int _mapWidth, int _mapHeight, lens_drops_pull_t _pull,
+    lens_drops_wanted_t _wanted, void *_context)
 {
-  if (!_vs || !_fs || !*_vs || !*_fs || !_pull || _mapWidth < 1 ||
+  if (!_vs || !_fs || !*_vs || !*_fs || !_pull || !_wanted || _mapWidth < 1 ||
       _mapHeight < 1 || _mapWidth > kMaxMapSize || _mapHeight > kMaxMapSize)
   {
     return nullptr;
@@ -439,6 +449,7 @@ lens_drops_pass_t lens_drops_ogre2_create(const char *_vs, const char *_fs,
     auto handle = std::make_unique<Handle>();
     handle->link = std::make_shared<Link>();
     handle->link->pull = _pull;
+    handle->link->wanted = _wanted;
     handle->link->context = _context;
     handle->pass = std::make_shared<LensDropsPass>(_vs, _fs,
         static_cast<unsigned int>(_mapWidth),
@@ -462,7 +473,17 @@ int lens_drops_ogre2_attach(lens_drops_pass_t _pass, void *_camera)
   try
   {
     auto *camera = static_cast<gz::rendering::Camera *>(_camera);
+    // First in the chain: the drops are on the lens, so the image goes
+    // through them, then the lens's distortion and the sensor's noise,
+    // which belongs on top
+    std::vector<gz::rendering::RenderPassPtr> after;
+    for (unsigned int i = 0; i < camera->RenderPassCount(); ++i)
+      after.push_back(camera->RenderPassByIndex(i));
+    for (const auto &pass : after)
+      camera->RemoveRenderPass(pass);
     camera->AddRenderPass(handle->pass);
+    for (const auto &pass : after)
+      camera->AddRenderPass(pass);
     // The camera owns it now; the handle keeps only the link
     handle->pass.reset();
     return 1;
@@ -489,6 +510,7 @@ void lens_drops_ogre2_destroy(lens_drops_pass_t _pass)
     // Waits for a pull in progress; none comes after
     const std::lock_guard<std::mutex> lock(handle->link->mutex);
     handle->link->pull = nullptr;
+    handle->link->wanted = nullptr;
     handle->link->context = nullptr;
   }
   delete handle;

@@ -189,6 +189,17 @@
       <direction>0</direction>
     </plugin>
 
+    <!-- The water's optics (gz_water_optics): Jerlov I, a pool: the clearest water, near pure.
+         It applies everywhere below z = 0, outside the pool too.
+         Cameras with the underwater camera plugin see through it; add
+         model://underwater_optics to draw it in the sensors' cameras and the
+         GUI's view too. -->
+    <plugin
+      filename="gz-maritime-water-optics-system"
+      name="gz::sim::maritime::WaterOptics">
+      <jerlov>I</jerlov>
+    </plugin>
+
     <!-- Acoustics (gz_acoustics): pingers ping, receivers hear them, both
          found on any model (a pinger is the gz-maritime-acoustic-pinger-system
          plugin on a link, model://acoustic_pinger is one ready made; a

@@ -53,6 +53,17 @@ uniform float foamThreshold;
 // single sample instead of finite-differencing the displacement.
 uniform int useFoamMap;
 
+// The water between an underwater camera and the surface above it, set when
+// the renderer draws the world's water (gz_underwater_rendering): the
+// attenuation of the surface's light, beta^D (xyz; w is 1 when set, else 0
+// and the surface is left as it is); the attenuation of the veil's
+// build-up, beta^B; the veil just below the surface, scaled by the daylight
+// (xyz; w is the daylight); and the daylight's attenuation with depth, K_d.
+uniform vec4 uwAttenuation;
+uniform vec4 uwBackscatter;
+uniform vec4 uwVeil;
+uniform vec4 uwDiffuse;
+
 in block
 {
   mat3 rotMatrix;
@@ -115,12 +126,69 @@ float ComputeFoamMask()
   return 1.0 - smoothstep(-foamThreshold, foamThreshold, J);
 }
 
+// The surface seen from below. Within Snell's window, a cone of half-angle
+// asin(1 / n) = 48.6 degrees about the vertical, the sky shows through,
+// refracted and weighted by the transmission (1 - Schlick's reflectance);
+// outside it the surface is a mirror of the water below (total internal
+// reflection), drawn as the deep water colour.
+const float kWaterIndex = 1.333;
+vec4 FromBelow(vec3 _E, vec3 _N)
+{
+  // With the water drawn, what the mirror shows is the water itself: its
+  // veil; and the sky is as bright as the daylight.
+  bool fade = uwAttenuation.w > 0.5;
+  vec4 below = vec4(fade ? uwVeil.rgb : deepColor.rgb, 1.0);
+  // _E climbs to the surface; the normal facing the camera points down.
+  vec3 T = refract(_E, -_N, kWaterIndex);
+  if (dot(T, T) < 1e-6)
+    return below;  // total internal reflection
+  vec3 S = vec3(T.x, T.y, -T.z);  // gz-rendering cubemap Z flip
+  vec4 sky = texture(cubeMap, S, roughness * 8.0);
+  sky.rgb *= (sky.r + sky.g + sky.b) * hdrMultiplier;
+  if (fade)
+    sky.rgb *= uwVeil.w;
+  float cosAir = abs(T.z);
+  float r0 = pow((kWaterIndex - 1.0) / (kWaterIndex + 1.0), 2.0);
+  float transmission = 1.0 - (r0 + (1.0 - r0) * pow(1.0 - cosAir, 5.0));
+  return vec4(mix(below.rgb, sky.rgb, transmission), 1.0);
+}
+
 void main()
 {
   vec4 bump = texture(bumpMap, inPs.bumpCoord) * 2.0 - 1.0;
   vec3 N = normalize(inPs.rotMatrix * bump.xyz);
 
   vec3 E = normalize(inPs.eyeVec);
+  // Seen from below: the view ray runs along the normal of the triangle
+  // drawn here, pointing up out of the water. That triangle's own normal,
+  // from how the position changes across the pixel, not the normal
+  // interpolated from its corners, which far away, at grazing angles,
+  // disagrees with the triangle drawn and would shade parts of a surface
+  // seen from above as seen from below. Not "higher than the camera",
+  // which a crest above a camera on a boat also is (it faces the camera);
+  // and not gl_FrontFacing, which render targets flip against the window:
+  // the cross product's sign flips with them too, so it is taken to point
+  // up, as a surface that does not fold over does.
+  vec3 face = cross(dFdx(inPs.eyeVec), dFdy(inPs.eyeVec));
+  if (face.z < 0.0)
+    face = -face;
+  if (dot(E, face) > 0.0)
+  {
+    fragColor = FromBelow(E, N);
+    if (uwAttenuation.w > 0.5)
+    {
+      // Seen through the water, by the same model as every other surface
+      // (gz_underwater_rendering): the light fades over the range and the
+      // veil of the camera's depth builds up, so far away the surface is
+      // the colour of the water.
+      float range = length(inPs.eyeVec);
+      float depth = max(inPs.eyeVec.z, 0.0);
+      vec3 veil = uwVeil.rgb * exp(-uwDiffuse.rgb * depth);
+      fragColor.rgb = fragColor.rgb * exp(-uwAttenuation.rgb * range) +
+                      veil * (vec3(1.0) - exp(-uwBackscatter.rgb * range));
+    }
+    return;
+  }
   vec3 R = reflect(E, N);
   R = vec3(R.x, R.y, -R.z);  // gz-rendering cubemap Z flip
 

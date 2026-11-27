@@ -1,0 +1,29 @@
+// The water for Ogre's unlit shaders (particles), per pass, appended to the
+// unlit pass buffer by the underwater listener (gz_underwater_rendering).
+@property( gz_underwater )
+	@piece( custom_passBuffer_underwater_unlit )
+		// xyz: the camera's world position; w: the water's surface over the
+		// camera (the still level and the wave there).
+		float4 uwCamPos_level;
+		// xyz: beta^D, how fast an object's light fades, 1/m.
+		float4 uwAttenuation;
+		// xyz: beta^B, how fast the veil builds, 1/m.
+		float4 uwBackscatter;
+		// xyz: the veil, B-infinity, at the camera's depth.
+		float4 uwVeil;
+		// From the camera to a vertex, in the world, out of its clip-space
+		// position (the unlit shaders have no other): x, y and w times
+		// these. A perspective camera's w is the depth along its axis,
+		// whatever the depth buffer's convention.
+		float4 uwClipX;
+		float4 uwClipY;
+		float4 uwClipW;
+	@end
+	// Not on what is drawn straight to the screen (the identity view and
+	// projection), nor on gz's solid colours.
+	@property( !hlms_shadowcaster && !gz_render_solid_color && !hlms_identity_viewproj && !hlms_identity_viewproj_dynamic )
+		@piece( custom_VStoPS_underwater_unlit )
+			INTERPOLANT( float3 uwRay, @counter(texcoord) );
+		@end
+	@end
+@end

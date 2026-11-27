@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!-- Jerlov 3C with an explicit veil colour. -->
+<sdf version="1.9">
+  <world name="optics_veil">
+    <physics name="fast" type="ignored">
+      <max_step_size>0.01</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-maritime-water-optics-system"
+            name="gz::sim::maritime::WaterOptics">
+      <jerlov>3C</jerlov>
+      <veil>0.05 0.3 0.2</veil>
+    </plugin>
+  </world>
+</sdf>
