@@ -103,7 +103,9 @@ Five times a second of simulation time, the plugin reports the lens on
 - `covered`, the share of the image with water;
 - `flux` and the gravity along the lens;
 - `draws`, how many times the drops were drawn;
-- `attached`, which turns true once the drops can be drawn on the camera.
+- `attached`, which turns true once the render pass is on the camera (a
+  shader that fails is in the log), and `drawing`, whether it drew the
+  drops in the last frame.
 
 If `attached` stays false while the camera publishes images, the server's
 log says why, under `[LensDrops]`.
@@ -111,7 +113,8 @@ log says why, under `[LensDrops]`.
 ## Ground truth for perception
 
 With `<mask>true</mask>`, the plugin also publishes `.../lens_drops/mask`.
-It is a grey image at half the camera's resolution, 255 where a drop is,
+It is a grey image at the drop map's size (half the camera's resolution
+with the default `<map_scale>`), 255 where a drop is,
 published with each camera frame while someone subscribes and stamped as
 that frame. Use it to train or
 score a raindrop detector against the camera's images.

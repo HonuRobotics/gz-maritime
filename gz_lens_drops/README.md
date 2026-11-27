@@ -37,12 +37,16 @@ What it works with:
 - **Rendering:** the ogre2 engine with OpenGL only (no Vulkan or Metal).
 - **Who sees the drops:** only the sensor's images; the GUI's view of the
   world is not affected.
-- **Pass order:** the drops are drawn after the sensor's own noise and
-  distortion passes.
+- **Pass order:** the drops are drawn first, before the lens distortion
+  and the sensor's noise: they are on the lens, and the noise is the
+  sensor's, on top.
+- **Spawned cameras:** a camera spawned at run time works as one in the
+  world file. Its topics and its pass are set up on the first step that
+  finds its model under the world.
 
 | Library | What |
 |---|---|
-| `gz_lens_drops` | The drop model (`Drops`) and the drop map (`DropMap`), with no Gazebo or rendering dependency. |
+| `gz_lens_drops_core` | The drop model (`Drops`) and the drop map (`DropMap`), with no Gazebo or rendering dependency. A static library the system and the tests link; not installed. |
 | `gz-maritime-lens-drops-system` | The system, inside the camera sensor. |
 | `lens-drops-ogre2-bridge` | The render pass and its texture, loaded by the system with `dlopen`. It is the only library that links `gz-rendering-ogre2`. |
 
@@ -100,7 +104,8 @@ With `<sensor>` the sensor's scoped name, for example
   - `add_x`, `add_y` and `add_radius`, together, put one still drop on the
     lens: x and y from the image's top left, in [0, 1] of its width and
     height, the radius in (0, 0.12] image heights. A drop out of range, or
-    on a full lens, is refused with a warning.
+    on a full lens, is refused; the 1st, 10th, 100th... refusal warns,
+    with the count so far.
 
   An unknown key, or a value that is not a finite number, is skipped with a
   warning; the rest of the message still applies.
@@ -113,12 +118,14 @@ With `<sensor>` the sensor's scoped name, for example
   - `gravity_x` and `gravity_y`, gravity along the lens, in g, to the
     image's right and down it;
   - `enabled`, and `draws`, how many maps were drawn so far;
-  - `attached`, true once the render pass is on the camera. It stays true
-    while the pass is off (a dry lens, `enabled` false).
+  - `attached`, true once the render pass is on the camera, also if its
+    shader then fails (the log says so);
+  - `drawing`, whether the pass was on for the last frame: off with a dry
+    lens or `enabled` false.
 - **`<sensor>/lens_drops/mask`**, with `<mask>true</mask>` only: a
   `gz.msgs.Image`, `L_INT8`, at the drop map's size. It is 255 where a drop
-  is and 0 elsewhere. It is published once per frame the camera draws,
-  while someone subscribes, stamped as that frame. It is ground truth for
+  is and 0 elsewhere. It is published once per frame the camera draws the
+  drops, while someone subscribes, stamped as that frame. It is ground truth for
   raindrop detection.
 
 ```bash
@@ -208,7 +215,8 @@ colcon test --packages-select gz_lens_drops && colcon test-result --verbose
 
 - **`lens_drops_core_test`** checks the drop model without a world:
   - the rate against the rain and the flux;
-  - the limit of drops;
+  - the parameters made safe, the contact angle's clamp included;
+  - the limit of drops, in rain that reaches it;
   - pinning, and sliding by gravity and by air;
   - beads and trails, merging keeping the water, and drying with the
     contact circle kept;
@@ -219,13 +227,28 @@ colcon test --packages-select gz_lens_drops && colcon test-result --verbose
   a drop's area and peak, wobbly rims, the blur keeping the water, sliding
   drops stretched, trails, the mask, a dried drop's footprint, a wide map,
   the border, and prints the time for a full lens.
-- **`lens_drops_test`** runs the system in worlds that do not render:
-  - the topics, a seeded run, a sensor that is not a camera;
+- **`lens_drops_test`** runs the system in worlds that do not render,
+  stepped from the test:
+  - the topics, a seeded run, bad values and bad drops, paused steps, a
+    reset;
+  - a sensor that is not a plain camera (an IMU, an RGBD camera);
+  - a camera spawned at run time;
   - gravity and rain flux for a level camera, a rolled one and one looking
-    up;
-  - rain brought by the wind.
-- **`lens_drops_camera_test`** renders a camera; it needs a GPU and skips
-  without one:
-  - drops change the image and a wipe gives the dry image back;
+    up, and a world whose gravity is not straight down;
+  - rain brought by the wind, and none with `<wind>false`;
+  - a moving camera, and a teleport that is no motion.
+- **`lens_drops_camera_test`** renders cameras, stepped from the test. It
+  needs a GPU and skips without one, or fails with
+  `GZ_LENS_DROPS_EXPECT_GPU` set:
+  - drops change the image, a wipe gives the dry image back, and the pass
+    is off with a dry lens;
+  - `<enabled>`, maps drawn only when the drops change;
+  - two cameras, one with noise and distortion; a camera removed while it
+    renders; a camera spawned at run time;
   - a drop centred on the horizon shows the sea above and the sky below,
-    the reverse of the scene beside it, and the mask has its area.
+    the reverse of the scene beside it; flat water off the centre turns
+    no ray; the mask has its area and a frame's stamp;
+  - a shader that does not compile leaves the image as it is.
+
+  On a machine with no EGL at all, gz-rendering crashes while creating its
+  render system, before the test can skip; that is upstream.
