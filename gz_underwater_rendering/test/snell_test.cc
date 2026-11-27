@@ -38,42 +38,78 @@
 #include <gz/sim/ServerConfig.hh>
 #include <gz/transport/Node.hh>
 
+#include "OwnPartition.hh"
+
 using namespace gz;
 using namespace sim;
 
-TEST(Snell, WindowAt48Point6Degrees)
+namespace
+{
+/// \brief Step a world until _n frames of a camera from _from s on have
+/// come. The test steps it: a server on a thread of its own can hang when
+/// it is destroyed (gz-sim 10.5, in its Sensors system).
+/// \param[out] _rendered Whether any frame came at all: none means no GPU.
+std::vector<msgs::Image> Frames(const std::string &_world,
+    const std::string &_topic, std::size_t _n, int _from, bool &_rendered)
 {
   std::mutex mutex;
-  std::optional<msgs::Image> frame;
+  std::vector<msgs::Image> frames;
   bool rendered = false;
   transport::Node node;
   std::function<void(const msgs::Image &)> cb = [&](const msgs::Image &_m)
   {
     const std::lock_guard<std::mutex> lock(mutex);
     rendered = true;
-    if (_m.header().stamp().sec() < 2)
-      return;
-    frame = _m;
+    if (_m.header().stamp().sec() >= _from)
+      frames.push_back(_m);
   };
-  node.Subscribe("/uwsnell/cam", cb);
+  node.Subscribe(_topic, cb);
   ServerConfig config;
-  config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, "snell.sdf"));
+  config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, _world));
   auto server = std::make_unique<Server>(config);
-  server->Run(false, 0, false);
-  for (int i = 0; i < 600; ++i)
+  for (int i = 0; i < 4000; ++i)
   {
     {
       const std::lock_guard<std::mutex> lock(mutex);
-      if (frame || (i == 200 && !rendered))
+      if (frames.size() >= _n || (i == 100 && !rendered))
         break;
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    server->Run(true, 5, false);
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
   server.reset();
+  node.Unsubscribe(_topic);
   const std::lock_guard<std::mutex> lock(mutex);
+  _rendered = rendered;
+  return frames;
+}
+
+/// \brief Pixels green as the test worlds' veil, which only the surface
+/// seen from below fades into.
+std::size_t Green(const msgs::Image &_m)
+{
+  std::size_t n = 0;
+  for (std::uint32_t v = 0; v < _m.height(); ++v)
+  {
+    for (std::uint32_t u = 0; u < _m.width(); ++u)
+    {
+      const auto *p = reinterpret_cast<const std::uint8_t *>(
+          _m.data().data() + v * _m.step() + 3 * u);
+      n += p[1] > 40 && p[1] > p[0] + 30 && p[1] > p[2] + 30;
+    }
+  }
+  return n;
+}
+}  // namespace
+
+TEST(Snell, WindowAt48Point6Degrees)
+{
+  bool rendered = false;
+  const auto frames = Frames("snell.sdf", "/uwsnell/cam", 1, 2, rendered);
   if (!rendered)
     GTEST_SKIP() << "nothing rendered: no GPU?";
-  ASSERT_TRUE(frame) << "no frame";
+  ASSERT_FALSE(frames.empty()) << "no frame";
+  const msgs::Image *frame = &frames.back();
 
   const int w = frame->width(), h = frame->height();
   const double fx = w / (2 * std::tan(2.6 / 2));
@@ -119,68 +155,75 @@ TEST(Snell, WindowAt48Point6Degrees)
 // pure green.
 TEST(Snell, CrestsAboveACameraOnABoatAreSeenFromAbove)
 {
-  std::mutex mutex;
-  std::vector<msgs::Image> frames;
+  // A whole wave period at 5 Hz, from 4 s: in its first seconds the
+  // surface is still settling, and two runs differ
   bool rendered = false;
-  transport::Node node;
-  std::function<void(const msgs::Image &)> cb = [&](const msgs::Image &_m)
-  {
-    const std::lock_guard<std::mutex> lock(mutex);
-    rendered = true;
-    if (_m.header().stamp().sec() >= 2)
-      frames.push_back(_m);
-  };
-  node.Subscribe("/uwcrest/cam", cb);
-  ServerConfig config;
-  config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, "crest.sdf"));
-  auto server = std::make_unique<Server>(config);
-  server->Run(false, 0, false);
-  for (int i = 0; i < 600; ++i)
-  {
-    {
-      const std::lock_guard<std::mutex> lock(mutex);
-      // A whole wave period at 5 Hz
-      if (frames.size() >= 30 || (i == 200 && !rendered))
-        break;
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  }
-  server.reset();
-  const std::lock_guard<std::mutex> lock(mutex);
+  const auto frames = Frames("crest.sdf", "/uwcrest/cam", 30, 4, rendered);
   if (!rendered)
     GTEST_SKIP() << "nothing rendered: no GPU?";
   ASSERT_GE(frames.size(), 30u);
-  // Frames with the camera in air: the top row is the sky, blue. Under a
-  // crest it is the surface seen from below, faded into the green veil.
+  // Frames with the camera in air: the top row is the sky, blue (under a
+  // crest it is the surface seen from below, faded into the green veil),
+  // and the bottom row is the surface below the camera, not the background
+  // (at the instant a crest's flank passes through the camera, the surface
+  // is edge on, and nothing is drawn above or below it).
   std::size_t dark = 0, above = 0, inAir = 0;
   for (const auto &m : frames)
   {
-    int sky = 0;
+    const auto *corner = reinterpret_cast<const std::uint8_t *>(
+        m.data().data());
+    int sky = 0, surface = 0;
     for (std::uint32_t u = 0; u < m.width(); ++u)
     {
       const auto *p = reinterpret_cast<const std::uint8_t *>(
           m.data().data() + 3 * u);
       sky += p[2] > p[1] && p[2] > 150;
+      const auto *q = reinterpret_cast<const std::uint8_t *>(
+          m.data().data() + (m.height() - 1) * m.step() + 3 * u);
+      int off = 0;
+      for (int c = 0; c < 3; ++c)
+        off = std::max(off, std::abs(int(q[c]) - int(corner[c])));
+      surface += off > 10;
     }
-    if (sky < static_cast<int>(m.width()) * 9 / 10)
+    if (sky < static_cast<int>(m.width()) * 9 / 10 ||
+        surface < static_cast<int>(m.width()) * 9 / 10)
+    {
       continue;
+    }
     ++inAir;
     // Green: the veil, which only the surface seen from below fades into.
     // From above, the surface is the sky's blue reflected, or the deep blue
     // at grazing angles.
-    for (std::uint32_t v = 0; v < m.height(); ++v)
-    {
-      for (std::uint32_t u = 0; u < m.width(); ++u, ++above)
-      {
-        const auto *p = reinterpret_cast<const std::uint8_t *>(
-            m.data().data() + v * m.step() + 3 * u);
-        dark += p[1] > 40 && p[1] > p[0] + 30 && p[1] > p[2] + 30;
-      }
-    }
+    dark += Green(m);
+    above += m.width() * m.height();
   }
   std::cout << "camera in air in " << inAir << " frames of " << frames.size()
             << "\n";
   ASSERT_GE(inAir, 5u) << "the camera was never above the surface";
   std::cout << "green pixels: " << dark << " of " << above << "\n";
   EXPECT_LT(dark, above / 250) << "crests above the camera drawn from below";
+}
+
+/////////////////////////////////////////////////
+// A camera 2 m above a rippled sea, looking at the horizon: all of the
+// surface is below it, and none of it is shaded as seen from below, even
+// far away, where the view grazes it and a normal interpolated from the
+// corners of a triangle disagrees with the triangle drawn.
+TEST(Snell, NoSpecklesAtTheHorizon)
+{
+  bool rendered = false;
+  const auto frames =
+      Frames("horizon.sdf", "/uwhorizon/cam", 10, 4, rendered);
+  if (!rendered)
+    GTEST_SKIP() << "nothing rendered: no GPU?";
+  ASSERT_GE(frames.size(), 10u);
+  std::size_t green = 0, all = 0;
+  for (const auto &m : frames)
+  {
+    green += Green(m);
+    all += m.width() * m.height();
+  }
+  std::cout << "seen from below at the horizon: " << green << " pixels of "
+            << all << "\n";
+  EXPECT_LT(green, all / 2000) << "speckles of the surface seen from below";
 }

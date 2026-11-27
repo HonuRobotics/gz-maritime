@@ -138,7 +138,8 @@ class UnderwaterRendering
     // builds one from the recipe. Smoothed over 0.5 s of simulation time,
     // whatever the step.
     const double t = std::chrono::duration<double>(_info.simTime).count();
-    if (_ecm.Component<components::Wavefield>(world))
+    // Only for caustics: with none, the default, nothing to sample
+    if (o.caustics > 0.0 && _ecm.Component<components::Wavefield>(world))
     {
       const math::Vector3d centre = this->cameraCentre;
       double sum = 0, sum2 = 0;

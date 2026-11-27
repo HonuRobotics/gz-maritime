@@ -159,12 +159,20 @@ void main()
   vec3 N = normalize(inPs.rotMatrix * bump.xyz);
 
   vec3 E = normalize(inPs.eyeVec);
-  // Seen from below: the view ray runs along the surface's geometric
-  // normal, which points up out of the water. Not "higher than the
-  // camera", which a crest above a camera on a boat also is (it faces the
-  // camera); and not gl_FrontFacing, which render targets flip against the
-  // window.
-  if (dot(E, normalize(inPs.rotMatrix[2])) > 0.0)
+  // Seen from below: the view ray runs along the normal of the triangle
+  // drawn here, pointing up out of the water. That triangle's own normal,
+  // from how the position changes across the pixel, not the normal
+  // interpolated from its corners, which far away, at grazing angles,
+  // disagrees with the triangle drawn and would shade parts of a surface
+  // seen from above as seen from below. Not "higher than the camera",
+  // which a crest above a camera on a boat also is (it faces the camera);
+  // and not gl_FrontFacing, which render targets flip against the window:
+  // the cross product's sign flips with them too, so it is taken to point
+  // up, as a surface that does not fold over does.
+  vec3 face = cross(dFdx(inPs.eyeVec), dFdy(inPs.eyeVec));
+  if (face.z < 0.0)
+    face = -face;
+  if (dot(E, face) > 0.0)
   {
     fragColor = FromBelow(E, N);
     if (uwAttenuation.w > 0.5)

@@ -285,8 +285,9 @@ What a world says to the water optics system,
 | `<publish_rate>` | Rate of the ground truth in wall time, 1 Hz by default, so it keeps coming while paused; a change is published at once. 0 publishes on a change only. |
 
 Any other element is warned about and ignored. An unknown type, a visibility
-out of range or a negative value is one error, and the world has
-clear water. An explicit `<attenuation>` wins over `<visibility>`, with a
+out of range, a negative coefficient or daylight, or a caustics or marine
+snow that is not a number is one error, and the world has clear water. A
+caustics or marine snow outside 0 to 1 is clamped to it, with a warning. An explicit `<attenuation>` wins over `<visibility>`, with a
 warning.
 
 The Jerlov types, from Solonenko and Mobley (2015), at red 625 nm, green

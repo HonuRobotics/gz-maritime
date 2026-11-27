@@ -242,21 +242,28 @@ water optics to publish each new water, not a fixed time, and skips
 without a GPU.
 
 `effects_test`, rendered: caustics' contrast at 8 m against 3 m deep is
-`exp(−K_d · 5)` within 6 % (time-averaged), none on flat water; the
+`exp(−K_d · 5)` within 10 % (time-averaged), the pattern a second later
+another pattern, none on flat water, none without `<caustics>`; the
 surface drawn above the seabed not darkening it (caustics off, to the
-rounding); open water the veil; marine snow
+rounding); open water the veil, for a camera and an RGBD camera, without
+a sky and with one; marine snow
 specks fixed frame to frame, none once the snow is off, the depth image
 unchanged; at night with the lamps off, nothing to see.
 
 `snell_test`, rendered: Snell's window's half-angle 48.5 degrees (Snell's
 law: 48.6), from 5 m below near-flat water; a camera above the still water
-in a 1 m sea seeing the crests higher than itself from above.
+in a 1 m sea seeing the crests higher than itself from above, from 4 s
+on, once the surface has settled; a camera 2 m above a rippled sea seeing
+none of it from below, out to the horizon.
 
 `effects_test` also: `<quality>` low and high close to medium, an unknown
 value the medium image; a lidar's scan, a thermal image and a bounding box
 camera's boxes the same with the GPU path and without (the backdrop is
-hidden from those cameras). The rendered tests skip
-without a GPU.
+hidden from those cameras). `lamp_edges_test` also: four lamps at
+`<quality>low`, which lights two in the shader, each plate lit. The
+rendered tests skip without a GPU, step the world themselves and take a
+transport partition with their process id. `bridge_pieces_test` also: the
+caustics' phase wrapped without a jump, to a million seconds.
 
 `lamp_edges_test`, rendered, in a process of its own: five lamps, one past
 the limit, which Ogre lights as in air, and four that light nothing in view

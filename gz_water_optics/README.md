@@ -38,8 +38,10 @@ world system:
 | `<publish_rate>` | Rate of the ground truth, Hz of wall time, so it keeps coming while paused; it is also published on every change. 0 publishes on a change only. Default 1. |
 
 Any other element is warned about. A water type nobody knows, a visibility
-that is not positive or a negative coefficient is one error, and the world
-has clear water until a good message comes on the set topic.
+out of range, a negative coefficient or daylight, or a caustics or marine
+snow that is not a number is one error, and the world has clear water until
+a good message comes on the set topic. A caustics or marine snow outside 0
+to 1 is clamped to it, with a warning.
 
 ### What a water type means
 

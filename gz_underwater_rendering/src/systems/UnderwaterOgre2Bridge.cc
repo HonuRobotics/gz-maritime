@@ -51,7 +51,9 @@
 
 #include <gz/common/Console.hh>
 #include <gz/rendering/BoundingBoxCamera.hh>
+#include <gz/rendering/DepthCamera.hh>
 #include <gz/rendering/Light.hh>
+#include <gz/rendering/Material.hh>
 #include <gz/rendering/RenderEngine.hh>
 #include <gz/rendering/RenderingIface.hh>
 #include <gz/rendering/Scene.hh>
@@ -75,14 +77,17 @@
 #include <OgreHlmsPbsDatablock.h>
 #include <OgreItem.h>
 #include <OgreLight.h>
+#include <OgreMaterialManager.h>
 #include <OgreMatrix4.h>
 #include <OgreMesh2.h>
 #include <OgreMeshManager2.h>
+#include <OgrePass.h>
 #include <OgreRenderSystem.h>
 #include <OgreSceneNode.h>
 #include <OgreString.h>
 #include <OgreSubItem.h>
 #include <OgreSubMesh2.h>
+#include <OgreTechnique.h>
 #include <Vao/OgreVaoManager.h>
 
 namespace
@@ -219,6 +224,20 @@ constexpr float kBeamSteps[3] = {8.0f, 12.0f, 16.0f};
 constexpr float kSnowRange[3] = {1.5f, 3.0f, 3.0f};
 constexpr int kQualityLamps[3] = {2, 4, 4};
 
+/// \brief A caustic wave's phase at a time: its rate times the time,
+/// wrapped to [0, 2 pi) in double before it becomes a float, so the shader's
+/// float keeps its precision however long the world runs, with no jump.
+/// \param[in] _rate Its angular rate, rad/s.
+/// \param[in] _time Simulation time, s.
+/// \return The phase, rad.
+float CausticPhase(double _rate, double _time)
+{
+  double phase = std::fmod(_rate * _time, 6.283185307179586);
+  if (phase < 0.0)
+    phase += 6.283185307179586;
+  return static_cast<float>(phase);
+}
+
 /// \brief A lamp dimmer than this (its power scale times its brightest
 /// diffuse channel) counts as off: the shader neither lights with it nor
 /// marches its beam. With every lamp off the lamp code is compiled out.
@@ -301,10 +320,53 @@ class Backdrop : public Ogre::Camera::Listener
     }
   }
 
+  /// \brief Tell each RGBD camera's colour pass, while the backdrop
+  /// shows, that the scene has a background, so it keeps the backdrop
+  /// where nothing was hit: without a sky, that pass paints those pixels
+  /// with the scene's background colour, and the backdrop writes no depth.
+  /// Hidden, the camera has gz-rendering's own setting back: a background
+  /// only with a sky. The depth is not touched.
+  /// \param[in] _show Whether the backdrop shows.
+  private: void MarkDepthCameras(bool _show)
+  {
+    if (!gz::rendering::isEngineLoaded("ogre2"))
+      return;
+    gz::rendering::RenderEngine *engine = gz::rendering::engine("ogre2");
+    auto &materials = Ogre::MaterialManager::getSingleton();
+    for (unsigned int s = 0; engine && s < engine->SceneCount(); ++s)
+    {
+      const auto scene = engine->SceneByIndex(s);
+      if (!scene)
+        continue;
+      const auto sky = scene->BackgroundMaterial();
+      const int own = sky && !sky->EnvironmentMap().empty() ? 1 : 0;
+      for (unsigned int i = 0; i < scene->SensorCount(); ++i)
+      {
+        const auto sensor = scene->SensorByIndex(i);
+        if (!std::dynamic_pointer_cast<gz::rendering::DepthCamera>(sensor))
+          continue;
+        const Ogre::MaterialPtr material =
+            materials.getByName(sensor->Name() + "_DepthCamera");
+        if (!material || !material->getNumTechniques() ||
+            !material->getTechnique(0)->getNumPasses())
+        {
+          continue;
+        }
+        Ogre::Pass *pass = material->getTechnique(0)->getPass(0);
+        if (!pass->hasFragmentProgram())
+          continue;
+        auto params = pass->getFragmentProgramParameters();
+        if (params->_findNamedConstantDefinition("hasBackground"))
+          params->setNamedConstant("hasBackground", _show ? 1 : own);
+      }
+    }
+  }
+
   /// \brief Show it in every scene, around the water level, or hide it.
   public: void Update(bool _show, float _level)
   {
     this->WatchCameras();
+    this->MarkDepthCameras(_show && !this->failed);
     Ogre::Root *root = Ogre::Root::getSingletonPtr();
     if (!root)
       return;
@@ -347,6 +409,7 @@ class Backdrop : public Ogre::Camera::Listener
   /// \brief Take it out of the scenes that are still there.
   public: void Destroy()
   {
+    this->MarkDepthCameras(false);
     Ogre::Root *root = Ogre::Root::getSingletonPtr();
     if (root)
     {
@@ -547,8 +610,8 @@ class UnderwaterListener : public Ogre::HlmsListener
   /// \brief The scene's lamps: its spot and point lights whose own name,
   /// after the model and link that scope it, contains "lamp" (any case).
   /// Other lights are not lamps: Ogre lights with them as in air. At most
-  /// kMaxLamps, the first by name; a warning, once, for the others, which
-  /// are left to Ogre too.
+  /// as many as the quality lights in the shader, the first by name; a
+  /// warning, once, for the others, which are left to Ogre too.
   /// \param[out] _alive Every light of the scenes, lamp or not.
   /// \return The lamps.
   private: std::set<Ogre::Light *> Lamps(std::set<Ogre::Light *> &_alive)
@@ -585,17 +648,18 @@ class UnderwaterListener : public Ogre::HlmsListener
       }
     }
     std::sort(named.begin(), named.end());
-    if (static_cast<int>(named.size()) > kMaxLamps && !this->warnedLamps)
+    const int limit = kQualityLamps[this->water.quality];
+    if (static_cast<int>(named.size()) > limit && this->warnedLamps != limit)
     {
-      gzwarn << "[underwater] " << named.size() << " lamps, more than "
-             << kMaxLamps << ": the lamps after " << named[kMaxLamps - 1].first
-             << " are lit by Ogre, as in air\n";
-      this->warnedLamps = true;
+      gzwarn << "[underwater] " << named.size() << " lamps, more than the "
+             << limit << " this quality lights: the lamps after "
+             << named[limit - 1].first << " are lit by Ogre, as in air\n";
+      this->warnedLamps = limit;
     }
     std::set<Ogre::Light *> lamps;
     for (const auto &[name, l] : named)
     {
-      if (static_cast<int>(lamps.size()) < kMaxLamps)
+      if (static_cast<int>(lamps.size()) < limit)
         lamps.insert(l);
     }
     return lamps;
@@ -629,8 +693,9 @@ class UnderwaterListener : public Ogre::HlmsListener
     this->hidden.clear();
   }
 
-  /// \brief Whether there were more lamps than the shader takes, warned
-  private: bool warnedLamps{false};
+  /// \brief The limit last warned about, when there were more lamps than
+  /// the shader takes; 0 for none
+  private: int warnedLamps{0};
 
   private: void CollectLamps(Ogre::SceneManager *_sm)
   {
@@ -774,11 +839,8 @@ class UnderwaterListener : public Ogre::HlmsListener
     put4(static_cast<float>(this->lamps.size()), kBeamSteps[w.quality],
          kBeamRange, 1.0f);
     put4(w.caustics, w.snow, 0.0f, kSnowRange[w.quality]);
-    const auto phase = [&w](double _rate)
-    {
-      return static_cast<float>(std::fmod(_rate * w.time, 6.283185307179586));
-    };
-    put4(phase(0.8), phase(1.0), phase(0.9), phase(1.1));
+    put4(CausticPhase(0.8, w.time), CausticPhase(1.0, w.time),
+         CausticPhase(0.9, w.time), CausticPhase(1.1, w.time));
     // The lamps, in view space, as Ogre's own light buffer has them.
     Ogre::Matrix4 view = Ogre::Matrix4::IDENTITY;
     if (camera)
@@ -907,6 +969,9 @@ void SetWater(const UwWater *_v)
   auto &s = State();
   auto &w = s.listener.water;
   w.active = nullptr != _v;
+  // The quality first: it says how many lamps the shader lights
+  if (_v)
+    w.quality = std::clamp(_v->quality, 0, 2);
   // The lamps hidden while the water is drawn, given back when it is not.
   // Lamps that appear later (a vehicle spawned with its lights) are hidden
   // on the frame they appear.
@@ -923,7 +988,6 @@ void SetWater(const UwWater *_v)
   w.caustics = _v->caustics;
   w.snow = _v->snow;
   w.time = _v->time;
-  w.quality = std::clamp(_v->quality, 0, 2);
 }
 
 /// \brief Where a piece is defined: "@piece( name )", any spacing.
