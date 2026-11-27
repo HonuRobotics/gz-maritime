@@ -1,0 +1,121 @@
+<?xml version="1.0"?>
+<!--
+  What the world does to a lens, without rendering: three static cameras
+  with the lens drops system and no rain, and the world's wind, calm until a
+  test sets it.
+
+  * level: looks along +x. Gravity runs down its image, and rain falling
+    straight down does not reach its lens.
+  * rolled: rolled a quarter turn about x. Gravity runs across its image.
+  * up: pitched to look straight up. Gravity is square to its lens, and
+    rain falls straight onto it.
+  * still_air: as level, with <wind>false</wind>: the wind does not reach it.
+  * mover: as level, free and weightless, driven on
+    /model/mover/cmd_vel and moved on the world's set_pose service.
+-->
+<sdf version="1.9">
+  <world name="lens_drops_pose">
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin
+      filename="gz-maritime-wind-system"
+      name="gz::sim::maritime::Wind">
+      <speed>0</speed>
+      <direction>0</direction>
+      <!-- The speed is at 10 m, as in weather reports; over the sea the wind
+           falls off towards the water with this roughness length. -->
+      <reference_height>10</reference_height>
+      <roughness_length>0.0002</roughness_length>
+    </plugin>
+
+    <model name="level">
+      <static>true</static>
+      <pose>0 0 1 0 0 0</pose>
+      <link name="link">
+        <sensor name="camera" type="camera">
+          <topic>/lens_drops_pose/level</topic>
+          <camera>
+            <horizontal_fov>1.2</horizontal_fov>
+            <image><width>160</width><height>120</height></image>
+          </camera>
+          <plugin filename="gz-maritime-lens-drops-system"
+                  name="gz::sim::maritime::LensDrops">
+            <seed>1</seed>
+          </plugin>
+        </sensor>
+      </link>
+    </model>
+    <model name="rolled">
+      <static>true</static>
+      <pose>0 2 1 1.5707963 0 0</pose>
+      <link name="link">
+        <sensor name="camera" type="camera">
+          <topic>/lens_drops_pose/rolled</topic>
+          <camera>
+            <horizontal_fov>1.2</horizontal_fov>
+            <image><width>160</width><height>120</height></image>
+          </camera>
+          <plugin filename="gz-maritime-lens-drops-system"
+                  name="gz::sim::maritime::LensDrops">
+            <seed>2</seed>
+          </plugin>
+        </sensor>
+      </link>
+    </model>
+    <model name="up">
+      <static>true</static>
+      <pose>0 4 1 0 -1.5707963 0</pose>
+      <link name="link">
+        <sensor name="camera" type="camera">
+          <topic>/lens_drops_pose/up</topic>
+          <camera>
+            <horizontal_fov>1.2</horizontal_fov>
+            <image><width>160</width><height>120</height></image>
+          </camera>
+          <plugin filename="gz-maritime-lens-drops-system"
+                  name="gz::sim::maritime::LensDrops">
+            <seed>3</seed>
+          </plugin>
+        </sensor>
+      </link>
+    </model>
+    <model name="still_air">
+      <static>true</static>
+      <pose>0 6 1 0 0 0</pose>
+      <link name="link">
+        <sensor name="camera" type="camera">
+          <topic>/lens_drops_pose/still_air</topic>
+          <camera>
+            <horizontal_fov>1.2</horizontal_fov>
+            <image><width>160</width><height>120</height></image>
+          </camera>
+          <plugin filename="gz-maritime-lens-drops-system"
+                  name="gz::sim::maritime::LensDrops">
+            <seed>4</seed>
+            <wind>false</wind>
+          </plugin>
+        </sensor>
+      </link>
+    </model>
+    <model name="mover">
+      <pose>0 8 1 0 0 0</pose>
+      <link name="link">
+        <gravity>false</gravity>
+        <sensor name="camera" type="camera">
+          <topic>/lens_drops_pose/mover</topic>
+          <camera>
+            <horizontal_fov>1.2</horizontal_fov>
+            <image><width>160</width><height>120</height></image>
+          </camera>
+          <plugin filename="gz-maritime-lens-drops-system"
+                  name="gz::sim::maritime::LensDrops">
+            <seed>5</seed>
+          </plugin>
+        </sensor>
+      </link>
+      <plugin filename="gz-sim-velocity-control-system"
+              name="gz::sim::systems::VelocityControl"/>
+    </model>
+  </world>
+</sdf>

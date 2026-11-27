@@ -22,6 +22,7 @@
   <!-- The world's wind, which brings rain onto the lens and pushes drops. -->
   <depend>gz_wind</depend>
 
+  <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
