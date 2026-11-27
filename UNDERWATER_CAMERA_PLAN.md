@@ -398,6 +398,8 @@ A blur whose radius grows with range.
 |---|---|---|
 | A sharp edge (scene A, a black/white plate) at 1, 4, 8 m | render | edge width grows with range as configured, ±10 % |
 | At 0 range | render | no blur |
+| A depth edge: a bright near plate beside dark open water or a far wall, and a dark near plate beside a bright far wall or the sky | unit | light crosses the edge by the smaller of the two ranges: nothing past 4 sigma of the near side |
+| One colour, only a depth step | unit | the image unchanged |
 
 ### 4.3 Marine snow
 
