@@ -15,6 +15,7 @@
 
 #include "gz/sim/systems/WavesSystemBase.hh"
 #include "gz/sim/waves/GerstnerWaveSimulation.hh"  // MakeGerstnerWaveField
+#include "gz/sim/waves/WaveSimulation.hh"  // RegisterWaveEngineFactory
 #include "gz/sim/waves/Wavefield.hh"               // WaveParameters
 
 namespace gz::sim::systems
@@ -93,6 +94,19 @@ class GerstnerWaves : public WavesSystemBase
   }
 };
 }  // namespace gz::sim::systems
+
+namespace
+{
+/// \brief Register the "gerstner" engine factory on the server too, so a
+/// consumer on another thread, such as a renderer, can build an engine of
+/// its own from the recipe instead of reading this system's.
+const bool kRegistered = []
+{
+  gz::sim::waves::RegisterWaveEngineFactory(
+    "gerstner", &gz::sim::waves::MakeGerstnerWaveField);
+  return true;
+}();
+}  // namespace
 
 GZ_ADD_PLUGIN(gz::sim::systems::GerstnerWaves,
               gz::sim::System,

@@ -115,7 +115,55 @@ if(BUILD_TESTING)
       gz-msgs::core)
     set_tests_properties(underwater_rendering_test PROPERTIES
       ENVIRONMENT
-      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH};GZ_PARTITION=gz_underwater_rendering_test")
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH}")
+  endif()
+
+  # The bridge's reading of Ogre's pieces, without Ogre running: no GPU.
+  ament_add_gtest(bridge_pieces_test test/bridge_pieces_test.cc)
+  if(TARGET bridge_pieces_test)
+    target_link_libraries(bridge_pieces_test
+      gz-rendering::gz-rendering
+      gz-rendering::ogre2
+      gz-common::gz-common
+      ${OGRE_NEXT_MAIN} ${OGRE_NEXT_HLMS_PBS})
+    target_include_directories(bridge_pieces_test SYSTEM PRIVATE
+      ${OGRE_NEXT_INCLUDE_DIR}
+      ${OGRE_NEXT_INCLUDE_DIR}/Hlms/Common
+      ${OGRE_NEXT_INCLUDE_DIR}/Hlms/Pbs)
+    target_compile_definitions(bridge_pieces_test PRIVATE
+      OGRE_IGNORE_UNKNOWN_DEBUG
+      "PIECES_SRC=\"${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater\"")
+  endif()
+
+  # The world's mark, which instance it names: no GPU.
+  ament_add_gtest(world_mark_test test/world_mark_test.cc)
+  if(TARGET world_mark_test)
+    target_link_libraries(world_mark_test
+      gz_water_optics::gz_water_optics
+      gz-sim::core)
+  endif()
+
+  # A bridge of another version, found first: the plugin refuses it and the
+  # reference camera draws the water. The fallback test's checks, in a
+  # process of its own.
+  add_library(fake-underwater-ogre2-bridge SHARED test/FakeBridge.cc)
+  set_target_properties(fake-underwater-ogre2-bridge PROPERTIES
+    OUTPUT_NAME underwater-ogre2-bridge
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/fake_bridge)
+  ament_add_gtest(underwater_rendering_version_test
+    test/underwater_rendering_fallback_test.cc TIMEOUT 300)
+  if(TARGET underwater_rendering_version_test)
+    add_dependencies(underwater_rendering_version_test
+      fake-underwater-ogre2-bridge)
+    target_compile_definitions(underwater_rendering_version_test PRIVATE
+      "TEST_WORLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/worlds\"")
+    target_link_libraries(underwater_rendering_version_test
+      gz-sim::core
+      gz-transport::core
+      gz-msgs::core)
+    set_tests_properties(underwater_rendering_version_test PROPERTIES
+      ENVIRONMENT
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}/fake_bridge:${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH}")
   endif()
 
   # Lamps at night: the lit plate faded both ways and the beam, against the
@@ -165,7 +213,7 @@ if(BUILD_TESTING)
       gz-msgs::core)
     set_tests_properties(underwater_rendering_fallback_test PROPERTIES
       ENVIRONMENT
-      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_BINARY_DIR}/no_such_pieces;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH};GZ_PARTITION=gz_underwater_rendering_fallback_test")
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_BINARY_DIR}/no_such_pieces;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH}")
   endif()
   # Turned off and on while running, and its model removed. A process of
   # its own, so nothing is installed before.
@@ -180,7 +228,7 @@ if(BUILD_TESTING)
       gz-msgs::core)
     set_tests_properties(underwater_rendering_runtime_test PROPERTIES
       ENVIRONMENT
-      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH};GZ_PARTITION=gz_underwater_rendering_runtime_test")
+      "GZ_SIM_SYSTEM_PLUGIN_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{GZ_SIM_SYSTEM_PLUGIN_PATH};LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH};GZ_UNDERWATER_HLMS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/share/hlms/Underwater;GZ_SIM_RESOURCE_PATH=${CMAKE_CURRENT_SOURCE_DIR}/share/models:$ENV{GZ_SIM_RESOURCE_PATH}")
   endif()
 endif()
 

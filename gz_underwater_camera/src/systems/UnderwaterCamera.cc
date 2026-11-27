@@ -91,12 +91,16 @@ struct Mailbox
   /// \brief Set to stop the worker.
   bool stop{false};
 
-  /// \brief Keep a frame, dropping all but the newest few.
+  /// \brief Keep a frame, dropping all but the newest few. A topic
+  /// delivers in order, so a frame older than those kept means time went
+  /// back, after a reset: the ones after it are gone.
   void Keep(std::map<Duration, msgs::Image> &_frames, const msgs::Image &_m)
   {
     {
       const std::lock_guard<std::mutex> lock(this->mutex);
-      _frames[Stamp(_m.header())] = _m;
+      const Duration stamp = Stamp(_m.header());
+      _frames.erase(_frames.upper_bound(stamp), _frames.end());
+      _frames[stamp] = _m;
       while (_frames.size() > 4)
         _frames.erase(_frames.begin());
     }
@@ -130,15 +134,28 @@ class gz::sim::maritime::UnderwaterCameraPrivate
   /// \brief The worker: process the newest pair of frames, one at a time.
   public: void Run();
 
-  /// \brief Check a pair of frames against the camera and make the
-  /// underwater image. Outside the lock.
+  /// \brief Check a pair of frames against the camera's info, before
+  /// anything is built from the info.
+  /// \param[in] _img Colour.
+  /// \param[in] _dep Depth.
+  /// \param[in] _info The camera's info.
+  /// \return What is wrong with them, empty if nothing.
+  public: static std::string Check(const msgs::Image &_img,
+                                   const msgs::Image &_dep,
+                                   const msgs::CameraInfo &_info);
+
+  /// \brief Make the underwater image from frames that fit the camera.
+  /// Outside the lock.
   /// \param[in] _img Colour.
   /// \param[in] _dep Depth.
   /// \param[in] _water The water at the camera at their step.
   /// \param[out] _out The underwater image.
-  /// \return False, with a warning once, for frames that do not fit.
-  public: bool Make(const msgs::Image &_img, const msgs::Image &_dep,
+  public: void Make(const msgs::Image &_img, const msgs::Image &_dep,
                     const uc::Water &_water, msgs::Image &_out);
+
+  /// \brief Warn once about frames that cannot be made.
+  /// \param[in] _problem What is wrong.
+  public: void WarnOnce(const std::string &_problem);
 
   /// \brief Whether Configure set the camera up.
   public: bool active{false};
@@ -208,6 +225,11 @@ void UnderwaterCameraPrivate::Listen(bool _listen)
   {
     for (const char *t : {"/image", "/depth_image", "/camera_info"})
       this->node.Unsubscribe(this->base + t);
+    // What is left is stale by the time anyone listens again
+    const std::lock_guard<std::mutex> lock(this->mailbox->mutex);
+    this->mailbox->images.clear();
+    this->mailbox->depths.clear();
+    this->mailbox->info.reset();
     return;
   }
   // The callbacks hold the mailbox, not the plugin.
@@ -272,68 +294,98 @@ void UnderwaterCameraPrivate::Run()
       info = box.info;
     }
 
-    // The camera's rays, again when its intrinsics change
-    uc::Intrinsics k;
-    k.width = info->width();
-    k.height = info->height();
-    if (info->intrinsics().k_size() >= 9)
+    const std::string problem = Check(img, dep, *info);
+    if (!problem.empty())
     {
-      k.fx = info->intrinsics().k(0);
-      k.cx = info->intrinsics().k(2);
-      k.fy = info->intrinsics().k(4);
-      k.cy = info->intrinsics().k(5);
-    }
-    if (!this->rays || this->rays->Camera().width != k.width ||
-        this->rays->Camera().height != k.height ||
-        this->rays->Camera().fx != k.fx || this->rays->Camera().fy != k.fy ||
-        this->rays->Camera().cx != k.cx || this->rays->Camera().cy != k.cy)
-    {
-      this->rays.emplace(k);
-    }
-    this->info = info;
-
-    msgs::Image out;
-    if (!this->Make(img, dep, water, out))
+      this->WarnOnce(problem + " (" + std::to_string(img.width()) + "x" +
+                     std::to_string(img.height()) + ", the camera is " +
+                     std::to_string(info->width()) + "x" +
+                     std::to_string(info->height()) + ")");
       continue;
-    this->imagePub.Publish(out);
-    msgs::CameraInfo outInfo = *info;
-    *outInfo.mutable_header() = img.header();
-    this->infoPub.Publish(outInfo);
+    }
+
+    // Nothing here may end the simulation: a frame that cannot be made is
+    // skipped.
+    try
+    {
+      // The camera's rays, again when its intrinsics change
+      uc::Intrinsics k;
+      k.width = info->width();
+      k.height = info->height();
+      if (info->intrinsics().k_size() >= 9)
+      {
+        k.fx = info->intrinsics().k(0);
+        k.cx = info->intrinsics().k(2);
+        k.fy = info->intrinsics().k(4);
+        k.cy = info->intrinsics().k(5);
+      }
+      if (!this->rays || this->rays->Camera().width != k.width ||
+          this->rays->Camera().height != k.height ||
+          this->rays->Camera().fx != k.fx ||
+          this->rays->Camera().fy != k.fy ||
+          this->rays->Camera().cx != k.cx || this->rays->Camera().cy != k.cy)
+      {
+        this->rays.reset();
+        this->rays.emplace(k);
+      }
+      this->info = info;
+
+      msgs::Image out;
+      this->Make(img, dep, water, out);
+      this->imagePub.Publish(out);
+      msgs::CameraInfo outInfo = *info;
+      *outInfo.mutable_header() = img.header();
+      this->infoPub.Publish(outInfo);
+    }
+    catch (const std::exception &_e)
+    {
+      this->rays.reset();
+      this->WarnOnce(std::string("a frame that could not be made: ") +
+                     _e.what());
+    }
   }
 }
 
 //////////////////////////////////////////////////
-bool UnderwaterCameraPrivate::Make(const msgs::Image &_img,
+std::string UnderwaterCameraPrivate::Check(const msgs::Image &_img,
+    const msgs::Image &_dep, const msgs::CameraInfo &_info)
+{
+  const std::uint64_t w = _info.width(), h = _info.height();
+  const std::uint64_t n = w * h;
+  if (_img.pixel_format_type() != msgs::PixelFormatType::RGB_INT8)
+    return "a colour image that is not RGB, 8 bits";
+  if (_dep.pixel_format_type() != msgs::PixelFormatType::R_FLOAT32)
+    return "a depth image that is not float";
+  if (_img.width() != w || _img.height() != h || _dep.width() != w ||
+      _dep.height() != h)
+    return "frames of another size than the camera's";
+  if (n == 0)
+    return "an empty camera";
+  if (_img.step() < w * 3 ||
+      _img.data().size() < static_cast<std::uint64_t>(_img.step()) *
+      (h - 1) + w * 3)
+    return "a colour image shorter than its size";
+  if (_dep.data().size() < n * sizeof(float))
+    return "a depth image shorter than its size";
+  return {};
+}
+
+//////////////////////////////////////////////////
+void UnderwaterCameraPrivate::WarnOnce(const std::string &_problem)
+{
+  if (this->warnedFrame)
+    return;
+  gzwarn << "UnderwaterCamera: " << _problem << "; such frames are "
+         << "skipped\n";
+  this->warnedFrame = true;
+}
+
+//////////////////////////////////////////////////
+void UnderwaterCameraPrivate::Make(const msgs::Image &_img,
     const msgs::Image &_dep, const uc::Water &_water, msgs::Image &_out)
 {
   const auto &k = this->rays->Camera();
   const std::size_t n = static_cast<std::size_t>(k.width) * k.height;
-  std::string problem;
-  if (_img.pixel_format_type() != msgs::PixelFormatType::RGB_INT8)
-    problem = "a colour image that is not RGB, 8 bits";
-  else if (_dep.pixel_format_type() != msgs::PixelFormatType::R_FLOAT32)
-    problem = "a depth image that is not float";
-  else if (_img.width() != k.width || _img.height() != k.height ||
-           _dep.width() != k.width || _dep.height() != k.height)
-    problem = "frames of another size than the camera's";
-  else if (k.height > 0 && (_img.step() < k.width * 3 ||
-           _img.data().size() < static_cast<std::size_t>(_img.step()) *
-           (k.height - 1) + k.width * 3))
-    problem = "a colour image shorter than its size";
-  else if (_dep.data().size() < n * sizeof(float))
-    problem = "a depth image shorter than its size";
-  if (!problem.empty())
-  {
-    if (!this->warnedFrame)
-    {
-      gzwarn << "UnderwaterCamera: " << problem << " (" << _img.width()
-             << "x" << _img.height() << ", the camera is " << k.width << "x"
-             << k.height << "); such frames are skipped\n";
-      this->warnedFrame = true;
-    }
-    return false;
-  }
-
   std::vector<std::uint8_t> rgb(n * 3);
   for (std::uint32_t v = 0; v < k.height; ++v)
   {
@@ -354,7 +406,6 @@ bool UnderwaterCameraPrivate::Make(const msgs::Image &_img,
   _out.set_step(k.width * 3);
   _out.set_pixel_format_type(msgs::PixelFormatType::RGB_INT8);
   _out.set_data(pixels.data(), pixels.size());
-  return true;
 }
 
 //////////////////////////////////////////////////

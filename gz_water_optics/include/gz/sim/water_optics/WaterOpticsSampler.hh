@@ -32,14 +32,20 @@ class WaterOpticsSamplerPrivate;
 /// \brief Asks the world's water what it does to light, at any point.
 ///
 /// A system keeps one sampler, calls Sync once per step (or per frame),
-/// then asks as often as it likes, from any thread. Sync reads the
-/// WaterOptics recipe and, when the world has one, the wave field, so depth
-/// is measured below the local wave surface, not below a flat level. It
-/// means the same in every process: where the wave field's own engine is
-/// not there (a GUI, or a sensor process, receives the recipe only), the
-/// sampler builds one of its own from the recipe, as the water's visual
-/// does. A world without the water optics system has clear water: nothing
-/// attenuates, there is no veil, and the daylight does not fade.
+/// then asks as often as it likes. Sync reads the WaterOptics recipe and,
+/// when the world has one, the wave field, so depth is measured below the
+/// local wave surface, not below a flat level. A world without the water
+/// optics system has clear water: nothing attenuates, there is no veil, and
+/// the daylight does not fade.
+///
+/// Every call is safe from any thread, while Sync runs on another. Depth
+/// reads the wave source's own engine only on the thread that calls Sync,
+/// which is the simulation thread when Sync is called from a system; on any
+/// other thread, and in a process without the source (a GUI, or a sensor
+/// process, receives the recipe only), it asks an engine of its own, built
+/// from the recipe the first time a depth is asked for, as the water's
+/// visual does. So a renderer never reads a grid the simulation is
+/// advancing.
 class WaterOpticsSampler
 {
   /// \brief Constructor.
@@ -59,8 +65,8 @@ class WaterOpticsSampler
   public: bool Valid() const;
 
   /// \brief The optics, clear water if there are none.
-  /// \return The optics.
-  public: const WaterOpticsData &Data() const;
+  /// \return A copy of the optics.
+  public: WaterOpticsData Data() const;
 
   /// \brief Depth below the local water surface: the still water level plus
   /// the wave field's elevation above the point, minus the point's z.
