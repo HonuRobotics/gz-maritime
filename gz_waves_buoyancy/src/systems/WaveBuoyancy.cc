@@ -27,6 +27,7 @@
 #include <gz/sim/components/Inertial.hh>
 #include <gz/sim/components/Volume.hh>
 
+#include "gz/sim/components/WaveCoupling.hh"
 #include "gz/sim/components/Wavefield.hh"
 #include "gz/sim/marked_shapes/MarkedShapes.hh"
 #include "gz/sim/waves/Eval.hh"
@@ -73,11 +74,15 @@ WaveBuoyancy::~WaveBuoyancy() = default;
 //////////////////////////////////////////////////
 void WaveBuoyancy::Configure(const Entity &_entity,
     const std::shared_ptr<const sdf::Element> &_sdf,
-    EntityComponentManager &/*_ecm*/,
+    EntityComponentManager &_ecm,
     EventManager &/*_eventMgr*/)
 {
   auto &d = *this->dataPtr;
   d.world = _entity;
+  // Tell the systems that damp against the water that it moves with the
+  // waves here.
+  if (!_ecm.EntityHasComponentType(_entity, components::WaveCoupling::typeId))
+    _ecm.CreateComponent(_entity, components::WaveCoupling());
   const double water = _sdf->Get<double>("water_density", 1025.0).first;
   if (water > 0.0)
     d.waterDensity = water;
@@ -179,9 +184,16 @@ void WaveBuoyancy::PostUpdate(const UpdateInfo &,
 }
 
 //////////////////////////////////////////////////
-void WaveBuoyancy::Reset(const UpdateInfo &, EntityComponentManager &)
+void WaveBuoyancy::Reset(const UpdateInfo &, EntityComponentManager &_ecm)
 {
   this->dataPtr->marked.Reset();
+  // A reset restores the world as it started; the tag stays either way.
+  const Entity world = this->dataPtr->world;
+  if (world != kNullEntity &&
+      !_ecm.EntityHasComponentType(world, components::WaveCoupling::typeId))
+  {
+    _ecm.CreateComponent(world, components::WaveCoupling());
+  }
 }
 
 GZ_ADD_PLUGIN(WaveBuoyancy,

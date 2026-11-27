@@ -296,7 +296,8 @@ TEST(Gerstner, FieldSamplesAnalyticGrid)
   ASSERT_NE(f->dz, nullptr);
   ASSERT_NE(f->dx, nullptr);
   ASSERT_NE(f->dy, nullptr);
-  ASSERT_NE(f->foam, nullptr);
+  const double *foam = g->Foam();
+  ASSERT_NE(foam, nullptr);
 
   const int N = static_cast<int>(f->n);
   const double T = f->tile;
@@ -308,7 +309,7 @@ TEST(Gerstner, FieldSamplesAnalyticGrid)
       const double x = static_cast<double>(i) * T / N;
       const double y = static_cast<double>(j) * T / N;
       EXPECT_NEAR(f->dz[i + j * N], g->Elevation(x, y, 3.0), 1e-9);
-      EXPECT_NEAR(f->foam[i + j * N], g->Jacobian(x, y, 3.0), 1e-9);
+      EXPECT_NEAR(foam[i + j * N], g->Jacobian(x, y, 3.0), 1e-9);
       EXPECT_TRUE(std::isfinite(f->dx[i + j * N]));
       EXPECT_TRUE(std::isfinite(f->dy[i + j * N]));
       const double a = std::abs(f->dz[i + j * N]);

@@ -21,6 +21,7 @@
 #include <gz/rendering/ogre2/Ogre2Scene.hh>
 
 #include <OgreCommon.h>
+#include <OgreHlmsCommon.h>
 #include <OgreHlmsSamplerblock.h>
 #include <OgrePass.h>
 #include <OgrePixelFormatGpu.h>
@@ -152,6 +153,13 @@ try
     auto mat = ogreMat->Material();
     hm->ogreMaterial = mat.get();
     auto *pass = mat->getTechnique(0u)->getPass(0u);
+    // Two-sided: an underwater camera sees the surface from below (Snell's
+    // window, in the fragment shader).
+    {
+      Ogre::HlmsMacroblock macroblock = *pass->getMacroblock();
+      macroblock.mCullMode = Ogre::CULL_NONE;
+      pass->setMacroblock(macroblock);
+    }
     Ogre::TextureUnitState *texUnit = nullptr;
     for (unsigned int i = 0; i < pass->getNumTextureUnitStates(); ++i)
     {

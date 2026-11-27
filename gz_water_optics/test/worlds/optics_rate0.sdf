@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!-- Ground truth on a change only, and an element the system does not know,
+     which it warns about and otherwise ignores. -->
+<sdf version="1.9">
+  <world name="optics_rate0">
+    <physics name="fast" type="ignored">
+      <max_step_size>0.01</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-maritime-water-optics-system"
+            name="gz::sim::maritime::WaterOptics">
+      <jerlov>3C</jerlov>
+      <publish_rate>0</publish_rate>
+      <colour>red</colour>
+    </plugin>
+  </world>
+</sdf>

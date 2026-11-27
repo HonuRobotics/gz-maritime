@@ -81,6 +81,18 @@ and nothing else. To see it against a newer upstream:
    correction for a link's `<fluid_added_mass>` keeps the link origin,
    where that matrix is defined. Meant for upstream.
 
+7. **The waves' water velocity.** In a world tagged with `gz_waves`'
+   `WaveCoupling` component, which the wave buoyancy (`gz_waves_buoyancy`)
+   writes, the plugin adds the waves' water velocity at the centre of
+   pressure to the current it damps against (`waves::WaterVelocity`: the
+   surface particle velocity faded with depth as e^(-k d), below the still
+   water of the world's ocean current recipe). A vehicle near the surface is
+   carried by the waves, one deep down hardly. Where the waves are only
+   drawn, without the tag, nothing changes. `gz_waves_buoyancy`'s
+   `hydrodynamics_waves_test` covers both, there so that this package
+   depends on the wave core alone. This one stays here: it reads this
+   repository's waves.
+
 This package is a fork until upstream has a current component its
 Hydrodynamics reads, and deltas 4 to 6. Retire it when a Gazebo release that
 ROS ships carries them all, and switch the vehicles back to

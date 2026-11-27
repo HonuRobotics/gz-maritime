@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<!-- No water optics: clear water. -->
+<sdf version="1.9">
+  <world name="optics_none">
+    <physics name="fast" type="ignored">
+      <max_step_size>0.01</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+  </world>
+</sdf>

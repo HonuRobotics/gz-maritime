@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<!--
+  Cameras 2 m down in coastal water, with no Sensors system: nothing is
+  rendered, and the test publishes the frames itself on the cameras'
+  topics. A stereo pair, left and right, with read noise and the default
+  seed.
+-->
+<sdf version="1.9">
+  <world name="frames">
+    <physics name="p" type="ignored">
+      <max_step_size>0.01</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-maritime-water-optics-system"
+            name="gz::sim::maritime::WaterOptics">
+      <jerlov>3C</jerlov>
+    </plugin>
+    <model name="rig">
+      <static>true</static>
+      <pose>0 0 -2 0 0 0</pose>
+      <link name="link">
+      <sensor name="cam" type="rgbd_camera">
+        <pose>0 0.0 0 0 0 0</pose>
+        <topic>fcam/cam</topic>
+        <update_rate>10</update_rate>
+        <camera>
+          <horizontal_fov>1.2</horizontal_fov>
+          <image><width>8</width><height>6</height></image>
+          <clip><near>0.1</near><far>60</far></clip>
+        </camera>
+        <plugin filename="gz-maritime-underwater-camera-system"
+                name="gz::sim::maritime::UnderwaterCamera"></plugin>
+      </sensor>
+      <sensor name="left" type="rgbd_camera">
+        <pose>0 0.06 0 0 0 0</pose>
+        <topic>fcam/left</topic>
+        <update_rate>10</update_rate>
+        <camera>
+          <horizontal_fov>1.2</horizontal_fov>
+          <image><width>8</width><height>6</height></image>
+          <clip><near>0.1</near><far>60</far></clip>
+        </camera>
+        <plugin filename="gz-maritime-underwater-camera-system"
+                name="gz::sim::maritime::UnderwaterCamera">
+          <read_noise>0.02</read_noise>
+        </plugin>
+      </sensor>
+      <sensor name="right" type="rgbd_camera">
+        <pose>0 -0.06 0 0 0 0</pose>
+        <topic>fcam/right</topic>
+        <update_rate>10</update_rate>
+        <camera>
+          <horizontal_fov>1.2</horizontal_fov>
+          <image><width>8</width><height>6</height></image>
+          <clip><near>0.1</near><far>60</far></clip>
+        </camera>
+        <plugin filename="gz-maritime-underwater-camera-system"
+                name="gz::sim::maritime::UnderwaterCamera">
+          <read_noise>0.02</read_noise>
+        </plugin>
+      </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>
