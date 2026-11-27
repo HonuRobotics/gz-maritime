@@ -445,6 +445,41 @@ TEST(Conversions, NarrowAndOneSampleFansAreDrawn)
 }
 
 //////////////////////////////////////////////////
+TEST(Conversions, FanWithEndsThatAreNotNumbersHasNoView)
+{
+  // The first and last azimuth and the first and last range size the view.
+  // From a publisher that sends NaN or infinity there, no view, not a throw.
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const double inf = std::numeric_limits<double>::infinity();
+  for (const double bad : {nan, inf, -inf})
+  {
+    for (const auto &az : {std::vector<double>{bad, 0.0, -0.3},
+                           std::vector<double>{0.3, 0.0, bad},
+                           std::vector<double>{bad}})
+    {
+      EXPECT_NO_THROW({
+        EXPECT_TRUE(kai_sonar_bridge::LayOutFan(FanOf(az, 8), 600)
+          .lookup.empty());
+        EXPECT_EQ(Draw(FanOf(az, 8), 600, 0).count, 0u);
+      });
+    }
+    for (const std::size_t k : {std::size_t{0}, std::size_t{7}})
+    {
+      RosImage img = FanOf({0.3, 0.0, -0.3}, 8);
+      img.ranges[k] = static_cast<float>(bad);
+      EXPECT_NO_THROW({
+        EXPECT_TRUE(kai_sonar_bridge::LayOutFan(img, 600).lookup.empty());
+      });
+    }
+  }
+  // A middle azimuth or range that is not a number is survived: the view
+  // is sized by the ends.
+  RosImage middle = FanOf({0.3, nan, -0.3}, 8);
+  middle.ranges[3] = static_cast<float>(nan);
+  EXPECT_NO_THROW(Draw(middle, 600, 0));
+}
+
+//////////////////////////////////////////////////
 TEST(Conversions, WideFanDrawnAsBefore)
 {
   // A fan wider than the least width is laid out as it always was: every

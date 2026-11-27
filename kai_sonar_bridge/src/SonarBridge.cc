@@ -360,9 +360,18 @@ SonarBridge::SonarBridge(const rclcpp::NodeOptions &_options)
   }
   if (lazy)
   {
+    // The check owns the gate and passes it before it touches anything of
+    // the node's, as the gz callbacks do: the executor may already have
+    // dispatched a check when the destructor cancels the timer, and that
+    // check must not reach through a node that is gone.
     this->dataPtr->timer = this->create_wall_timer(
       std::chrono::milliseconds(heartbeat),
-      [this]() { this->dataPtr->Update(); });
+      [impl = this->dataPtr.get(), gate = this->dataPtr->gate]()
+      {
+        const Pass pass(*gate);
+        if (pass)
+          impl->Update();
+      });
   }
 }
 
@@ -436,11 +445,8 @@ void SonarBridge::Implementation::Unsubscribe(Sonar &_s)
 //////////////////////////////////////////////////
 void SonarBridge::Implementation::Update()
 {
-  // Through the gate, like a gz callback: the executor may run this on
-  // another thread than the one destroying the node.
-  const Pass pass(*this->gate);
-  if (!pass)
-    return;
+  // Called inside the gate (see the timer in the constructor), so the node
+  // is alive for the whole check.
   for (auto &s : this->sonars)
   {
     if (Wanted(s->pub) || Wanted(s->viewPub) || Wanted(s->detPub) ||

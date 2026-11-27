@@ -256,6 +256,14 @@ FanLayout LayOutFan(const RosImage &_image, int _maxSide)
   const double rFirst = samples > 1 ? _image.ranges.front() : 0.0;
   const double aFirst = BeamAzimuth(_image.beam_directions.front());
   const double aLast = BeamAzimuth(_image.beam_directions.back());
+  // The ends of the fan and of the range window size the image, so a
+  // message whose ends are not numbers has no view, rather than a view of a
+  // garbage size. gz_sonar never sends one; another publisher might.
+  if (!std::isfinite(aFirst) || !std::isfinite(aLast) ||
+      !std::isfinite(rFirst))
+  {
+    return layout;
+  }
   // A fan narrower than kMinHalfFan either side of its middle is drawn
   // that wide, the width FanSize gives its box, with its beams spread over
   // the width. One beam's first and last azimuth are the same angle, which
