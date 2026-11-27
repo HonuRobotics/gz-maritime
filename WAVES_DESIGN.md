@@ -166,7 +166,7 @@ engine-agnostic (N1, N3).
 | `std::string_view Kind() const` | Engine token, e.g. `"gerstner"`, `"fft"`. |
 | `std::optional<TileSize> Bounds() const` | Periodic extent (grid engines); `nullopt` for unbounded analytic ones. |
 | `const WaveField2D *Field() const` | The renderable grid (see below); `nullptr` if the engine has none. |
-| `const double *Foam() const` | The grid's folding metric for the renderer, computed on request by an engine that defers it; default `Field()->foam`. |
+| `const double *Foam() const` | The grid's folding metric for the renderer, column-major N×N like `Field()`, computed on request by an engine that defers it; `nullptr` by default (no foam). Not safe from two threads at once. |
 
 **`WaveField2D` — the rendering contract.** A Plain Old Data (POD) view the
 renderer consumes without knowing the engine:
@@ -178,16 +178,14 @@ struct WaveField2D {
   const double *dz{nullptr}; // vertical displacement η [m]  (required)
   const double *dx{nullptr}; // FINAL horizontal displacement x [m] (null ⇒ 0)
   const double *dy{nullptr}; // FINAL horizontal displacement y [m] (null ⇒ 0)
-  const double *foam{nullptr}; // folding metric: 1 flat, <1 folding (null ⇒ none)
 };
 ```
 
 Arrays are **column-major N×N**, periodic over `tile`, owned by the engine, and
 valid until the next `SetParameters`; `Update` refreshes their contents in place.
-`foam` may be null until `Foam()` was asked for: an engine that computes the
-folding metric only on request leaves it out of `Update`, so a consumer that
-reads the view for the heights (`Eval::SurfaceHeight`, on the server) never
-pays for it; the renderer asks `Foam()`.
+The folding metric is not in the view: the renderer asks `Foam()`. An engine
+may compute it only then, so a consumer that reads the view for the heights
+(`Eval::SurfaceHeight`, on the server) never pays for it.
 `TileSize` is `{double x, double y}` (a periodic tile that starts at the world
 origin: element (i, j) is the water at (i·tile/N, j·tile/N)).
 
@@ -466,8 +464,10 @@ as little of the generation as it likes.
   transforms, and only the renderer reads it. `Update`, synchronous or
   prepared ahead, propagates without it (Ehukai's `propagate(..., false)`),
   and the first `Jacobian()` or `Foam()` after an update runs
-  `propagateMinE` for that time, on the caller's thread, into the live grid;
-  `Field()->foam` is null until then. A server world never computes foam.
+  `propagateMinE` for that time, on the caller's thread, into the live grid.
+  A server world never computes foam. Like the velocity, it fills a grid on
+  the caller's thread, so `Jacobian()` is not safe from two threads at once.
+  Needs Ehukai 0.0.4.
 - **Particle velocity** is computed by **time finite-difference**: Ehukai
   exposes no analytic velocity field, so a scratch state is propagated a small
   `dt` ahead and the displacement grids differenced (∂Dx/∂t, ∂Dy/∂t, ∂η/∂t).

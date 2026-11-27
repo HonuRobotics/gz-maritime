@@ -337,11 +337,10 @@ TEST(FFTWaveSimulation, FieldExposesGridViews)
   ASSERT_NE(f->dz, nullptr);
   ASSERT_NE(f->dx, nullptr);
   ASSERT_NE(f->dy, nullptr);
-  // Foam is computed on request: null in the view until asked for.
-  EXPECT_EQ(f->foam, nullptr);
+  // Foam is computed on request, not by Update
+  EXPECT_EQ(sim.FoamComputations(), 0u);
   const double *foam = sim.Foam();
   ASSERT_NE(foam, nullptr);
-  EXPECT_EQ(sim.Field()->foam, foam) << "in the view once computed";
 
   const int N = static_cast<int>(f->n);
   const auto &eta = sim.HeightGrid();
@@ -406,28 +405,32 @@ TEST(FFTWaveSimulation, FoamOnRequest)
 {
   auto sim = MakeSim(/*seed=*/3);
   sim.Update(6.0);
-  EXPECT_EQ(sim.Field()->foam, nullptr) << "not computed by Update";
+  EXPECT_EQ(sim.FoamComputations(), 0u) << "computed by Update";
 
-  // Through Jacobian(): the grid behind it is the one Foam() hands out.
+  // Through Jacobian(): the grid behind it is the one Foam() hands out,
+  // computed once however often either is asked
   const double j = sim.Jacobian(10.0, 20.0, 6.0);
   const double *foam = sim.Foam();
   ASSERT_NE(foam, nullptr);
-  EXPECT_EQ(sim.Field()->foam, foam);
   EXPECT_DOUBLE_EQ(j, sim.Jacobian(10.0, 20.0, 6.0));
-  EXPECT_EQ(sim.Foam(), foam) << "the same grid, not computed again";
+  EXPECT_EQ(sim.Foam(), foam);
+  EXPECT_EQ(sim.FoamComputations(), 1u) << "computed again for one update";
 
   // The next update makes it stale again; asked for, it is that update's.
   auto other = MakeSim(/*seed=*/3);
   other.Update(6.0);
   other.Update(9.0);
   sim.Update(9.0);
-  EXPECT_EQ(sim.Field()->foam, nullptr);
+  EXPECT_EQ(sim.FoamComputations(), 1u) << "computed by Update";
   const double *now = sim.Foam();
+  sim.Jacobian(10.0, 20.0, 9.0);
+  EXPECT_EQ(sim.FoamComputations(), 2u);
   const double *fresh = other.Foam();
   for (std::size_t i = 0; i < sim.GridSize() * sim.GridSize(); ++i)
     ASSERT_EQ(fresh[i], now[i]) << i;
 
-  // A reconfigure: the new recipe's foam, not the old.
+  // A reconfigure, then an update at the very time of the last one: the new
+  // recipe's foam, not the old one kept for that time.
   gsw::WaveParameters p = DefaultParams();
   p.period = 9.0;
   p.tileSize = 100.0;
@@ -435,8 +438,8 @@ TEST(FFTWaveSimulation, FoamOnRequest)
   p.seed = 3;
   sim.SetParameters(p);
   auto plain = gsw::FFTWaveSimulation(p, p.tileSize, p.gridSize, p.seed);
-  sim.Update(4.0);
-  plain.Update(4.0);
+  sim.Update(9.0);
+  plain.Update(9.0);
   const double *a = sim.Foam();
   const double *b = plain.Foam();
   for (std::size_t i = 0; i < sim.GridSize() * sim.GridSize(); ++i)

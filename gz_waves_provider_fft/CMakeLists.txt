@@ -49,7 +49,8 @@ find_package(Eigen3 REQUIRED)
 # instead. Note ehukaiConfigVersion.cmake is written with COMPATIBILITY
 # SameMajorVersion, so while this rejects a future 1.x, it still accepts any
 # 0.x — tightening that is an upstream change to ehukai/CMakeLists.txt.
-find_package(ehukai 0.0.1 REQUIRED)
+# 0.0.4 has propagate(..., false) and propagateMinE, for foam on request.
+find_package(ehukai 0.0.4 REQUIRED)
 
 # --------------------------------------------------------------------------
 # FFT wave-field engine (libgz-waves-provider-fft): a plain IWaveField

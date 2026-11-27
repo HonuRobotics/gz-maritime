@@ -525,8 +525,8 @@ void FFTWaveSimulation::Update(double _simTime)
 
   // The folding metric is not computed here, by either path below: three
   // of the six transforms, which only the renderer reads. Jacobian() and
-  // Foam() compute it on request, for this time.
-  this->foamTime = -1.0;
+  // Foam() compute it on request, for this time (foamTime no longer matches
+  // it, lastUpdateT having moved).
 
   auto &e = *this->ehukai;
 
@@ -595,6 +595,7 @@ void FFTWaveSimulation::EnsureFoam() const
   ToFoamGrid(*e.state, this->AmplitudeScale(this->lastUpdateT),
              this->minEGrid);
   this->foamTime = this->lastUpdateT;
+  ++this->foamComputations;
 }
 
 //////////////////////////////////////////////////
@@ -766,10 +767,6 @@ const WaveField2D *FFTWaveSimulation::Field() const
   this->field.dz   = this->heightGrid.data();
   this->field.dx   = this->dispXGrid.data();
   this->field.dy   = this->dispYGrid.data();
-  // Null until computed for this update: a reader of the heights, such as
-  // Eval::SurfaceHeight on the server, must not trigger the foam.
-  this->field.foam = this->foamTime == this->lastUpdateT ?
-      this->minEGrid.data() : nullptr;
   return &this->field;
 }
 

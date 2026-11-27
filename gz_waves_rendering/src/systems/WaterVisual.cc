@@ -585,10 +585,9 @@ void WaterVisual::Implementation::OnSceneUpdate()
       // heightmap/bridge (no reflow; the bridge's texel pack preserves the
       // physics orientation). Null displacement channels (dx/dy) upload as
       // zeros; a null folding metric leaves the alpha channel at 0. The FS
-      // reads alpha as foam when useFoamMap=1 — the grid engines that
-      // compute folding fill it, the analytic ones don't. Foam() rather
-      // than f->foam: an engine that computes foam only on request computes
-      // it there, for this frame, and only the renderer asks.
+      // reads alpha as foam when useFoamMap=1. Foam() is not in the view: an
+      // engine that computes it only on request does so there, for this
+      // frame, and only the renderer asks.
       ok = this->heightMap->Upload(f->dz, f->dx, f->dy, this->sim->Foam(),
                                    f->n);
       if (ok && !this->firstUploadLogged)
