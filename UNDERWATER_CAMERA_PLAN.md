@@ -385,7 +385,7 @@ BlueROV2's Lumen lights) are the only light.
 |---|---|---|
 | A lit plate at known lamp and camera ranges | render | its value is `J·E·exp(−β^D(r_l + r_c))/r_l²` within one step |
 | Scene D, the beam's centre row | render | matches `uw-expected-beam.png`'s profile, normalised, within 5 % |
-| Beam brightness ordering | render | turbid > coastal > clear near the lens; clear reaches farthest |
+| Beam reach | render | clear water carries the beam farther across the view, murky water keeps it nearer the lamp (corrected in phase 4: brightest-near-the-lens is not monotonic in murkiness, see Progress) |
 | Lamp outside the view | render | the beam still lights the water in view (scatter, not geometry) |
 | Lights off | render | equals §3 output byte for byte |
 | Throughput with 2 lamps | benchmark | 1080p ≥ 20 Hz |
@@ -565,6 +565,49 @@ What it settled:
   background needs a compositor listener; the surface is §4.5. Depth is from
   the still water level, not the waves. No throughput benchmark in CI yet
   (the PBS change costs a few ALU instructions per fragment).
+
+### Phase 4, vehicle lights and their beams: done, on `ahcorde/uw_phase4_lights`
+
+In the GPU path (`gz_underwater_rendering`), as the spike said it must be.
+
+- **Lamps** are the world's spot and point lights (up to four). The shader
+  lights with them itself, by Ogre's own default BRDF (diffuse and
+  specular, metal included; no clear coat) with Ogre's spot cone and
+  attenuation, so a lamp above the water lights as Ogre would, faded `exp(−β^D d)` from lamp to fragment, then the
+  water to the camera as for any light. To count them once, they are hidden
+  from Ogre's lighting while the water is drawn. (Switching Forward+ off by
+  property was tried first: Ogre still writes Forward+'s data into the pass
+  buffer, so every field after it moved. Hiding the lamps keeps the layout.)
+- **Beams**: single scatter along the view ray, Henyey–Greenstein g = 0.9,
+  up to 8 attenuation lengths of the clearest channel. Each lamp is marched
+  over the piece of the view ray inside its range and its cone (found in
+  closed form), in 12 steps spaced quadratically (dense at the near end,
+  where the cone enters). That is as close to the fine integral as the
+  first version's 32 steps over the whole ray, at a third of the work.
+  Uniform steps over the whole ray were 57 % off in coastal water;
+  equi-angular and exponential spacings were tried and were worse.
+- **`<daylight>`** joins the water optics (default 1, 0 at night): it scales
+  the veil, for both the reference camera and the GPU path.
+- **gz gives Ogre a light's power as `<intensity>` × π**; the tests use it.
+- **Results** (rendered, at night 20 m down): a lamp-lit plate within 1
+  step of its clear-water colour faded both ways; the beam within 2 % of a
+  single-scatter integration in IB, 3C and 7C.
+- **A correction to this plan**: "brighter near the lens the murkier the
+  water" does not hold with a lamp 35 cm from the lens: in 7C the lamp's
+  light fades before it reaches the view, and 3C glows brightest. What holds,
+  and is tested: clear water carries the beam farther; murky water keeps it
+  nearer the lamp.
+- **Speed**: the beams are the costliest part of the shader. A lamp that
+  gives no light (its power times its brightest diffuse channel under 0.01)
+  is left out, and with every lamp out the lamp code is not compiled into
+  the shaders. At 1920x1080 on an Intel Iris Xe, against 32 steps over the
+  whole ray for every lamp: 25.8 ms a frame to 14.8 ms with two lamps off,
+  25.9 to 18.2 with two on; on an RTX 4090 Laptop the whole effect is about
+  1 ms.
+- **Limits**: no shadows, in air too while the renderer draws; four lamps;
+  the beam shows where something is drawn behind it; the reference camera
+  has no lamps. Once the renderer's model is removed, the lamps are Ogre's
+  again.
 
 ## Open questions
 

@@ -119,6 +119,7 @@ class UnderwaterRendering
       v.diffuse[c] = static_cast<float>(o.diffuseAttenuation[c]);
     }
     v.level = static_cast<float>(o.waterLevel);
+    v.daylight = static_cast<float>(o.daylight);
     this->water = v;
   }
 

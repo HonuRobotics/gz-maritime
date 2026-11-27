@@ -69,6 +69,11 @@ bool Resolve(const WaterOpticsSpec &_spec, WaterOpticsData &_out,
     _error = "<water_level> must be a finite number";
     return false;
   }
+  if (!std::isfinite(_spec.daylight) || _spec.daylight < 0.0)
+  {
+    _error = "<daylight> must be a number, 0 or more";
+    return false;
+  }
 
   Rgb a = type->absorption;
   Rgb b = type->scattering;
@@ -129,6 +134,7 @@ bool Resolve(const WaterOpticsSpec &_spec, WaterOpticsData &_out,
                  c.Z() > 0 ? b.Z() / c.Z() : 0.0);
   out.diffuseAttenuation = kd;
   out.waterLevel = _spec.waterLevel;
+  out.daylight = _spec.daylight;
 
   struct Override
   {
@@ -171,6 +177,11 @@ const std::vector<NumberParam> &NumberParams()
      { _s.waterLevel = _v.value_or(0.0); },
      false,
      [](const WaterOpticsData &_d) { return _d.waterLevel; }},
+    {"daylight",
+     [](WaterOpticsSpec &_s, std::optional<double> _v)
+     { _s.daylight = _v.value_or(1.0); },
+     false,
+     [](const WaterOpticsData &_d) { return _d.daylight; }},
   };
   return params;
 }

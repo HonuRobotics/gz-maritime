@@ -2,45 +2,266 @@
 // colour: the revised underwater image formation model, the same as the
 // reference camera (gz_underwater_camera) computes per pixel.
 //
-//   lit = J exp(-K_d z_object)
-//   I   = lit exp(-beta^D w) + B-inf(z_camera) (1 - exp(-beta^B w))
+//   lit = J exp(-K_d z_object) + sum over lamps of L_i exp(-beta^D d_i)
+//   I   = lit exp(-beta^D w) + B-inf(z_camera) (1 - exp(-beta^B w)) + beams
 //
-// w is the range through the water: up to where a climbing ray leaves it.
+// J is the fragment lit by daylight; L_i is lamp i's light on it, which this
+// piece computes itself: Ogre's default BRDF, diffuse and specular, with its
+// spot cone and attenuation, so a lamp lights as Ogre would in air (but for
+// shadows, which a lamp does not cast). The
+// lamps are hidden from Ogre's own lighting (the bridge's HideLamps), so
+// they count once. Faded over the lamp's distance d_i. w is the range through the water: up to where a climbing ray leaves
+// it. The beams are each lamp's light scattered back to the camera by the
+// water inside its cone, ray-marched along the view ray (single scatter,
+// Henyey-Greenstein phase function).
 // Not in shadow-caster or depth-only passes, and not on gz's solid colours
 // (segmentation and the like), which must keep their exact values.
 @property( gz_underwater )
+@piece( custom_ps_functions_underwater )
+	// Whether a point at f from a spot lamp is inside its cone (its axis,
+	// the cosine of its half angle).
+	bool uwInCone( float3 f, float3 axis, float cosOuter )
+	{
+		return dot( f, axis ) >= cosOuter * length( f );
+	}
+	// Ogre's default BRDF (GGX specular, normalised Disney diffuse), as it
+	// lights a fragment from lightDir: what Ogre itself would give the lamp.
+	// Ogre does not declare its BRDF in a pass without lights of its own, so
+	// it is written out here, with Ogre's own Fresnel pieces. Clear coat is
+	// left out.
+	float3 uwBrdf( float3 lightDir, float3 lightDiffuse, float3 lightSpecular,
+	               PixelData pixelData )
+	{
+		float3 halfWay = normalize( lightDir + pixelData.viewDir );
+		float NdotL = saturate( dot( pixelData.normal, lightDir ) );
+		float NdotH = saturate( dot( pixelData.normal, halfWay ) );
+		float VdotH = saturate( dot( pixelData.viewDir, halfWay ) );
+		float sqR = pixelData.roughness * pixelData.roughness;
+		float f = ( NdotH * sqR - NdotH ) * NdotH + 1.0;
+		float R = sqR / ( f * f );
+	@property( GGX_height_correlated )
+		float Lambda_GGXV = NdotL * sqrt( ( -pixelData.NdotV * sqR + pixelData.NdotV ) * pixelData.NdotV + sqR );
+		float Lambda_GGXL = pixelData.NdotV * sqrt( ( -NdotL * sqR + NdotL ) * NdotL + sqR );
+		float G = 0.5 / ( ( Lambda_GGXV + Lambda_GGXL + 1e-6f ) * 3.141592654 );
+	@else
+		float gL = NdotL * ( 1.0 - sqR ) + sqR;
+		float gV = pixelData.NdotV * ( 1.0 - sqR ) + sqR;
+		float G = 1.0 / ( ( gL * gV + 1e-4f ) * 4.0 * 3.141592654 );
+	@end
+		float_fresnel fresnelS = @insertpiece( getSpecularFresnel );
+		float3 Rs = ( fresnelS * ( R * G ) ) * pixelData.specular.xyz;
+		float pr = pixelData.perceptualRoughness;
+		float energyBias = pr * 0.5;
+		float energyFactor = lerp( 1.0, 1.0 / 1.51, pr );
+		float fd90 = energyBias + 2.0 * VdotH * VdotH * pr;
+		float lightScatter = 1.0 + ( fd90 - 1.0 ) * pow( 1.0 - NdotL, 5.0 );
+		float viewScatter = 1.0 + ( fd90 - 1.0 ) * pow( 1.0 - pixelData.NdotV, 5.0 );
+	@property( fresnel_separate_diffuse )
+		float_fresnel fresnelD = @insertpiece( getDiffuseFresnel );
+	@else
+		float fresnelD = 1.0f - @insertpiece( getMaxFresnelS );
+	@end
+		float3 Rd = ( lightScatter * viewScatter * energyFactor * fresnelD ) *
+		            pixelData.diffuse.xyz;
+		return NdotL * ( Rs * lightSpecular + Rd * lightDiffuse );
+	}
+@end
 @piece( custom_ps_posExecution_underwater )
 @property( !hlms_shadowcaster && !hlms_render_depth_only && !gz_render_solid_color && ( hlms_normal || hlms_qtangent ) )
 	{
 		float uwLevel = passBuf.uwCamPos_level.w;
 		float3 uwCam = passBuf.uwCamPos_level.xyz;
 		float uwCamDepth = uwLevel - uwCam.z;
+		float3 uwV = inPs.pos.xyz;
+		float3 uwWorld = uwCam + uwV.x * passBuf.uwViewX.xyz +
+		                 uwV.y * passBuf.uwViewY.xyz + uwV.z * passBuf.uwViewZ.xyz;
+		float uwRange = length( uwV );
+		float3 uwRayV = uwV / max( uwRange, 1e-6 );
+	@property( hw_gamma_write )
+		float3 uwJ = outPs_colour0.xyz;
+	@else
+		float3 uwJ = outPs_colour0.xyz * outPs_colour0.xyz;
+	@end
+		float3 uwLamps = float3( 0.0, 0.0, 0.0 );
+		float3 uwBeams = float3( 0.0, 0.0, 0.0 );
+		bool uwFragUnder = uwWorld.z < uwLevel;
+	@property( gz_underwater_lamps )
+		// Each lamp's light on the fragment (Ogre's BRDF, spot cone and
+		// attenuation), faded over the lamp's distance when the fragment is
+		// under water.
+		int uwCount = int( passBuf.uwLampInfo.x );
+		for( int i = 0; i < uwCount; ++i )
+		{
+			float4 lp = passBuf.uwLamp[i * 5];
+			float4 ld = passBuf.uwLamp[i * 5 + 1];
+			float4 lc = passBuf.uwLamp[i * 5 + 2];
+			float4 ls = passBuf.uwLamp[i * 5 + 3];
+			float3 toLamp = lp.xyz - uwV;
+			float dist = length( toLamp );
+			float3 lightDir = toLamp / max( dist, 1e-6 );
+			float spotAtten = 1.0;
+			if( lp.w > 0.5 )
+			{
+				float spotCos = dot( -lightDir, ld.xyz );
+				spotAtten = spotCos >= ls.y ?
+				    pow( saturate( ( spotCos - ls.y ) * ls.x ), ls.z ) : 0.0;
+			}
+			if( dist <= ld.w && spotAtten > 0.0 )
+			{
+				// Ogre's attenuation, faded to nothing at the lamp's range as
+				// Forward+ does
+				float atten = 1.0 / ( 0.5 + ( lc.w + ls.w * dist ) * dist ) *
+				              max( ( ld.w - dist ) / ld.w, 0.0 );
+				float3 light = uwBrdf( lightDir, lc.xyz,
+				                       passBuf.uwLamp[i * 5 + 4].xyz, pixelData ) *
+				               ( atten * spotAtten );
+				if( uwFragUnder )
+					light *= exp( -passBuf.uwAttenuation.xyz * dist );
+				uwLamps += light;
+			}
+		}
+	@end
 		if( uwCamDepth > 0.0 )
 		{
-			float3 uwV = inPs.pos.xyz;
-			float3 uwWorld = uwCam + uwV.x * passBuf.uwViewX.xyz +
-			                 uwV.y * passBuf.uwViewY.xyz + uwV.z * passBuf.uwViewZ.xyz;
-			float uwRange = length( uwV );
 			float uwClimb = ( uwWorld.z - uwCam.z ) / max( uwRange, 1e-6 );
 			float uwW = uwRange;
 			if( uwClimb > 1e-6 )
 				uwW = min( uwRange, uwCamDepth / uwClimb );
 			float uwObjDepth = max( 0.0, uwLevel - uwWorld.z );
-		@property( hw_gamma_write )
-			float3 uwJ = outPs_colour0.xyz;
-		@else
-			float3 uwJ = outPs_colour0.xyz * outPs_colour0.xyz;
+			float3 uwLit = uwJ * exp( -passBuf.uwDiffuse.xyz * uwObjDepth ) + uwLamps;
+		@property( gz_underwater_lamps )
+			// The beams: single scatter along the view ray, up to the fragment.
+			{
+				int uwCount = int( passBuf.uwLampInfo.x );
+				float g = passBuf.uwScatter.w;
+				float steps = passBuf.uwLampInfo.y;
+				// Only as far as light survives: 8 attenuation lengths of the
+				// clearest channel (less than 0.03 % left), so the steps are
+				// fine where the light is, in murky water too.
+				float uwCMin = max( min( passBuf.uwAttenuation.x,
+				                         min( passBuf.uwAttenuation.y, passBuf.uwAttenuation.z ) ), 1e-3 );
+				float tMax = min( min( uwW, passBuf.uwLampInfo.z ), 8.0 / uwCMin );
+				for( int i = 0; i < uwCount; ++i )
+				{
+					float4 lp = passBuf.uwLamp[i * 5];
+					float4 ld = passBuf.uwLamp[i * 5 + 1];
+					float4 lc = passBuf.uwLamp[i * 5 + 2];
+					float4 ls = passBuf.uwLamp[i * 5 + 3];
+					// March only the part of the view ray the lamp lights: inside
+					// its range (a sphere) and, for a spot, inside its cone. A ray
+					// that misses both costs no steps.
+					float uwB = dot( uwRayV, lp.xyz );
+					float uwDisc = uwB * uwB - dot( lp.xyz, lp.xyz ) + ld.w * ld.w;
+					if( uwDisc <= 0.0 )
+						continue;
+					float uwSq = sqrt( uwDisc );
+					float tA = max( 0.0, uwB - uwSq );
+					float tB = min( tMax, uwB + uwSq );
+					// The sphere is behind the camera or beyond the march: nothing
+					// to march, and a reversed interval must not make a beam.
+					if( tB <= tA )
+						continue;
+					if( lp.w > 0.5 )
+					{
+						// Where the ray crosses the cone's surface (a quadratic;
+						// its roots also hold the mirror cone behind the lamp).
+						// The roots cut [tA, tB] in up to three pieces; a cone is
+						// convex, so the lit ones are those whose middle is inside.
+						float uwRa = dot( uwRayV, ld.xyz );
+						float uwCa = -dot( lp.xyz, ld.xyz );
+						float uwC2 = ls.y * ls.y;
+						float uwQa = uwRa * uwRa - uwC2;
+						float uwQb = 2.0 * ( uwRa * uwCa + uwC2 * uwB );
+						float uwQc = uwCa * uwCa - uwC2 * dot( lp.xyz, lp.xyz );
+						float r1 = tA;
+						float r2 = tA;
+						if( abs( uwQa ) > 1e-6 )
+						{
+							float uwQd = uwQb * uwQb - 4.0 * uwQa * uwQc;
+							if( uwQd > 0.0 )
+							{
+								float uwQs = sqrt( uwQd );
+								r1 = ( -uwQb - uwQs ) / ( 2.0 * uwQa );
+								r2 = ( -uwQb + uwQs ) / ( 2.0 * uwQa );
+							}
+						}
+						else if( abs( uwQb ) > 1e-9 )
+						{
+							r1 = -uwQc / uwQb;
+							r2 = r1;
+						}
+						float rLo = clamp( min( r1, r2 ), tA, tB );
+						float rHi = clamp( max( r1, r2 ), tA, tB );
+						float segA = tB;
+						float segB = tA;
+						if( rLo - tA > 1e-5 &&
+						    uwInCone( uwRayV * ( 0.5 * ( tA + rLo ) ) - lp.xyz, ld.xyz, ls.y ) )
+						{ segA = min( segA, tA ); segB = max( segB, rLo ); }
+						if( rHi - rLo > 1e-5 &&
+						    uwInCone( uwRayV * ( 0.5 * ( rLo + rHi ) ) - lp.xyz, ld.xyz, ls.y ) )
+						{ segA = min( segA, rLo ); segB = max( segB, rHi ); }
+						if( tB - rHi > 1e-5 &&
+						    uwInCone( uwRayV * ( 0.5 * ( rHi + tB ) ) - lp.xyz, ld.xyz, ls.y ) )
+						{ segA = min( segA, rHi ); segB = max( segB, tB ); }
+						tA = segA;
+						tB = segB;
+					}
+					float uwLen = tB - tA;
+					if( uwLen <= 0.0 )
+						continue;
+					float3 uwBeam = float3( 0.0, 0.0, 0.0 );
+					// Steps spaced quadratically: dense at the near end, where
+					// the cone enters the view and the light changes fastest.
+					for( float s = 0.5; s < steps; s += 1.0 )
+					{
+						float uwU = s / steps;
+						float t = tA + uwLen * uwU * uwU;
+						float dt = uwLen * 2.0 * uwU / steps;
+						float3 fromLamp = uwRayV * t - lp.xyz;
+						float d = length( fromLamp );
+						float3 prop = fromLamp / max( d, 1e-6 );
+						float spotAtten = 1.0;
+						if( lp.w > 0.5 )
+						{
+							spotAtten = saturate( ( dot( prop, ld.xyz ) - ls.y ) * ls.x );
+							if( ls.z != 1.0 )
+								spotAtten = pow( spotAtten, ls.z );
+						}
+						float atten = 1.0 / ( 0.5 + ( lc.w + ls.w * d ) * d );
+						// Henyey-Greenstein.
+						float uwPh = 1.0 + g * g - 2.0 * g * dot( prop, -uwRayV );
+						float phase = ( 1.0 - g * g ) / ( 12.566371 * uwPh * sqrt( uwPh ) );
+						// Faded from the lamp to the point and from there to the
+						// camera.
+						uwBeam += exp( -passBuf.uwAttenuation.xyz * ( d + t ) ) *
+						          ( phase * atten * spotAtten * dt );
+					}
+					uwBeams += passBuf.uwScatter.xyz * lc.xyz * uwBeam;
+				}
+				uwBeams *= passBuf.uwLampInfo.w;
+			}
 		@end
-			float3 uwLit = uwJ * exp( -passBuf.uwDiffuse.xyz * uwObjDepth );
 			float3 uwOut = uwLit * exp( -passBuf.uwAttenuation.xyz * uwW ) +
 			               passBuf.uwVeil.xyz *
-			               ( float3( 1.0, 1.0, 1.0 ) - exp( -passBuf.uwBackscatter.xyz * uwW ) );
+			               ( float3( 1.0, 1.0, 1.0 ) - exp( -passBuf.uwBackscatter.xyz * uwW ) ) +
+			               uwBeams;
 		@property( hw_gamma_write )
 			outPs_colour0.xyz = uwOut;
 		@else
 			outPs_colour0.xyz = sqrt( uwOut );
 		@end
 		}
+	@property( gz_underwater_lamps )
+		else
+		{
+			// Above the water: the lamps in air.
+		@property( hw_gamma_write )
+			outPs_colour0.xyz = uwJ + uwLamps;
+		@else
+			outPs_colour0.xyz = sqrt( uwJ + uwLamps );
+		@end
+		}
+	@end
 	}
 @end
 @end

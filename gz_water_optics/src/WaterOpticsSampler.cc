@@ -221,9 +221,10 @@ Rgb WaterOpticsSampler::Veil(double _depth) const
     return Rgb::Zero;
   const std::lock_guard<std::mutex> lock(this->dataPtr->mutex);
   const Rgb &k = this->dataPtr->data.diffuseAttenuation;
+  const double day = this->dataPtr->data.daylight;
   const Rgb &v = this->dataPtr->data.veil;
-  return Rgb(v.X() * std::exp(-k.X() * _depth),
-             v.Y() * std::exp(-k.Y() * _depth),
-             v.Z() * std::exp(-k.Z() * _depth));
+  return Rgb(day * v.X() * std::exp(-k.X() * _depth),
+             day * v.Y() * std::exp(-k.Y() * _depth),
+             day * v.Z() * std::exp(-k.Z() * _depth));
 }
 }  // namespace gz::sim::water_optics

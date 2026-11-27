@@ -842,3 +842,36 @@ TEST(Docs, EveryElementAndPresetDocumented)
     EXPECT_NE(readme.find(topic), std::string::npos) << topic;
   }
 }
+
+/////////////////////////////////////////////////
+// Daylight scales the veil, and only the veil; night has none.
+TEST(Sampler, DaylightScalesTheVeil)
+{
+  WaterOpticsSpec spec;
+  spec.jerlov = "3C";
+  spec.daylight = 0.25;
+  const auto optics = MustResolve(spec);
+  EXPECT_DOUBLE_EQ(optics.daylight, 0.25);
+
+  EntityComponentManager ecm;
+  const Entity world = ecm.CreateEntity();
+  ecm.CreateComponent(world, components::World());
+  ecm.CreateComponent(world, components::WaterOptics(optics));
+  water_optics::WaterOpticsSampler sampler;
+  ASSERT_TRUE(sampler.Sync(ecm));
+  const Rgb &k = optics.diffuseAttenuation;
+  ExpectRgb(sampler.Veil(5.0),
+            Rgb(optics.veil.X() * std::exp(-k.X() * 5.0) * 0.25,
+                optics.veil.Y() * std::exp(-k.Y() * 5.0) * 0.25,
+                optics.veil.Z() * std::exp(-k.Z() * 5.0) * 0.25));
+
+  spec.daylight = 0.0;
+  auto night = MustResolve(spec);
+  night.generation = optics.generation + 1;
+  ecm.SetComponentData<components::WaterOptics>(world, night);
+  sampler.Sync(ecm);
+  ExpectRgb(sampler.Veil(5.0), Rgb::Zero);
+
+  spec.daylight = -1.0;
+  EXPECT_NE(MustFail(spec).find("daylight"), std::string::npos);
+}

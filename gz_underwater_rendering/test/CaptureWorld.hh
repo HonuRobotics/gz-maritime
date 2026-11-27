@@ -21,8 +21,6 @@
 
 #include <gz/msgs/image.pb.h>
 
-#include <unistd.h>
-
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -41,19 +39,13 @@
 #include <gz/sim/ServerConfig.hh>
 #include <gz/transport/Node.hh>
 
+#include "OwnPartition.hh"
+
 // The scene of test/worlds/gpu_on.sdf and gpu_off.sdf, captured: shared by
 // the tests that run it in one process and those that need a process of
 // their own.
 namespace gz::sim::underwater_test
 {
-/// \brief A transport partition of this process's own, set before any
-/// node is made, so copies of a test run at once do not hear each other.
-inline const bool kOwnPartition = []
-{
-  const std::string partition =
-      "gz_underwater_rendering_test_" + std::to_string(getpid());
-  return setenv("GZ_PARTITION", partition.c_str(), 1) == 0;
-}();
 
 /// \brief One frame of every topic the test reads, from one run.
 struct Capture
