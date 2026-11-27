@@ -190,6 +190,16 @@
       <direction>0</direction>
     </plugin>
 
+    <!-- The water's optics (gz_water_optics): Jerlov 5C, a murky lake, about 3 m visibility.
+         Cameras with the underwater camera plugin see through it; add
+         model://underwater_optics to draw it in the sensors' cameras and the
+         GUI's view too. -->
+    <plugin
+      filename="gz-maritime-water-optics-system"
+      name="gz::sim::maritime::WaterOptics">
+      <jerlov>5C</jerlov>
+    </plugin>
+
     <!-- Acoustics (gz_acoustics): pingers ping, receivers hear them, both
          found on any model (a pinger is the gz-maritime-acoustic-pinger-system
          plugin on a link, model://acoustic_pinger is one ready made; a
