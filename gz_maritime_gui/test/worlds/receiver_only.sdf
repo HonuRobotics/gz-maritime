@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!--
+  A world with acoustics and no pinger, the case of every world but the
+  demo: the acoustics panel hears the receiver listed and no pinger, and
+  asks nobody for more.
+-->
+<sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">
+  <world name="default">
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-maritime-acoustics-system"
+            name="gz::sim::maritime::Acoustics"/>
+    <model name="listener">
+      <static>true</static>
+      <pose>20 0 -1 0 0 0</pose>
+      <link name="link">
+        <sensor name="receiver" type="custom" gz:type="acoustic_receiver">
+          <topic>/listener/acoustic_receiver</topic>
+        </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>

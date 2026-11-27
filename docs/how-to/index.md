@@ -24,6 +24,7 @@ from its files.
 - [Dive in the aquatic centre](aquatic-centre.md)
 - [Use your own world](own-world.md)
 - [Change and see the wind and the current](wind-and-current.md)
+- [Find an acoustic pinger](acoustic-pingers.md)
 - [Troubleshooting](faq.md)
 
 ```{toctree}
@@ -41,5 +42,6 @@ aquatic-centre
 own-world
 wind-and-current
 underwater-camera
+acoustic-pingers
 faq
 ```

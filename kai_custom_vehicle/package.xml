@@ -27,6 +27,10 @@
   <exec_depend>gz_hydrodynamics</exec_depend>
   <exec_depend>gz_wind</exec_depend>
   <exec_depend>gz_thruster</exec_depend>
+  <!-- The acoustic receiver and the acoustic demo's pinger homing. -->
+  <exec_depend>gz_acoustics</exec_depend>
+  <exec_depend>ros_gz_interfaces</exec_depend>
+  <exec_depend>rclpy</exec_depend>
   <exec_depend>xacro</exec_depend>
   <exec_depend>ros_gz_sim</exec_depend>
   <exec_depend>ros_gz_bridge</exec_depend>
