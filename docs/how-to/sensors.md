@@ -106,6 +106,12 @@ matter to you, use a copy of the world with a neutral ambient light, such as
 `0.4 0.4 0.4` ([Use your own world](own-world.md)).
 ```
 
+## An underwater camera
+
+A camera under water sees through the water: put the underwater camera
+plugin inside an `rgbd_camera` and it publishes what the camera sees through
+the world's water. See [See through the water](underwater-camera.md).
+
 ## Check a sensor
 
 ```bash
