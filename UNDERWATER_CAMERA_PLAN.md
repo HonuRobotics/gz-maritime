@@ -717,8 +717,10 @@ below.** What this phase built is everything the comparison needs:
 ### After the phases: depth below the waves, and unlit materials, on `ahcorde/uw_wave_depth_and_unlit`
 
 The shader took the still level as the surface. Each camera now has the
-level of the wave over it, which the plugin asks the wave field for every
-step, as the reference camera does. And Ogre's unlit shaders (in
+level of the wave over it: the bridge asks the plugin, on the render
+thread, at the camera's place and the frame's instant, and the plugin's
+water optics sampler answers from a wave engine of its own, built from the
+recipe, never the one the simulation advances. And Ogre's unlit shaders (in
 gz-rendering, a particle emitter's particles) get the fade and the veil:
 their own colour, no daylight, no lamps. Terrain is still drawn as in air.
 
