@@ -24,10 +24,13 @@
 #include <gz/msgs/param.pb.h>
 #include <gz/msgs/world_control.pb.h>
 
+#include <unistd.h>
+
 #include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <limits>
@@ -50,6 +53,15 @@ using namespace sim;
 namespace
 {
 constexpr std::uint32_t kWidth = 8, kHeight = 6;
+
+/// \brief A transport partition of this process's own, set before any
+/// node is made, so copies of the test run at once do not hear each other.
+const bool kOwnPartition = []
+{
+  const std::string partition =
+      "gz_underwater_camera_frames_test_" + std::to_string(getpid());
+  return setenv("GZ_PARTITION", partition.c_str(), 1) == 0;
+}();
 
 /// \brief A world, stepped by the test.
 std::unique_ptr<Server> Start(const std::string &_world)
@@ -110,6 +122,14 @@ msgs::CameraInfo Info()
 /// and keeps the underwater images by stamp.
 class Camera
 {
+  /// \brief What the callback writes into. It holds it, not the camera, so
+  /// a callback still running as the camera goes touches nothing gone.
+  private: struct Received
+  {
+    std::mutex mutex;
+    std::map<long, std::string> out;
+  };
+
   public: Camera(transport::Node &_node, const std::string &_base)
     : image(_node.Advertise<msgs::Image>(_base + "/image")),
       depth(_node.Advertise<msgs::Image>(_base + "/depth_image")),
@@ -118,18 +138,26 @@ class Camera
   {
   }
 
+  public: ~Camera()
+  {
+    if (this->watching)
+      this->node.Unsubscribe(this->base + "/underwater/image");
+  }
+
   /// \brief Subscribe to the underwater image.
   public: void Watch()
   {
+    std::shared_ptr<Received> into = this->received;
     std::function<void(const msgs::Image &)> cb =
-        [this](const msgs::Image &_m)
+        [into](const msgs::Image &_m)
         {
-          const std::lock_guard<std::mutex> lock(this->mutex);
+          const std::lock_guard<std::mutex> lock(into->mutex);
           const double stamp = _m.header().stamp().sec() +
                                1e-9 * _m.header().stamp().nsec();
-          this->out[std::lround(stamp * 1000)] = _m.data();
+          into->out[std::lround(stamp * 1000)] = _m.data();
         };
-    this->node.Subscribe(this->base + "/underwater/image", cb);
+    this->watching =
+        this->node.Subscribe(this->base + "/underwater/image", cb);
   }
 
   /// \brief Whether the plugin listens to the camera.
@@ -137,9 +165,10 @@ class Camera
 
   /// \brief Publish a frame pair, with the intrinsics.
   public: void Send(const msgs::Image &_colour,
-                    std::optional<msgs::Image> _depth = std::nullopt)
+                    std::optional<msgs::Image> _depth = std::nullopt,
+                    const msgs::CameraInfo &_info = Info())
   {
-    this->info.Publish(Info());
+    this->info.Publish(_info);
     this->image.Publish(_colour);
     this->depth.Publish(_depth ? *_depth : Depth(_colour));
   }
@@ -150,9 +179,9 @@ class Camera
     for (int i = 0; i < _waitMs / 20; ++i)
     {
       {
-        const std::lock_guard<std::mutex> lock(this->mutex);
-        const auto it = this->out.find(std::lround(_stamp * 1000));
-        if (it != this->out.end())
+        const std::lock_guard<std::mutex> lock(this->received->mutex);
+        const auto it = this->received->out.find(std::lround(_stamp * 1000));
+        if (it != this->received->out.end())
           return it->second;
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(20));
@@ -163,8 +192,8 @@ class Camera
   public: transport::Node::Publisher image, depth, info;
   public: std::string base;
   public: transport::Node &node;
-  public: std::mutex mutex;
-  public: std::map<long, std::string> out;
+  private: std::shared_ptr<Received> received{std::make_shared<Received>()};
+  private: bool watching{false};
 };
 
 /// \brief Wait until the publisher has a subscriber, stepping the world.
@@ -279,17 +308,72 @@ TEST(Frames, FramesThatDoNotFitAreSkipped)
   ASSERT_TRUE(WaitHeard(*server, cam));
   server->Run(true, 10, false);
 
-  // Another size, another format, a colour image shorter than its size
-  cam.Send(Colour(100, 0.01, kWidth + 2));
-  cam.Send(Colour(100, 0.02, kWidth, msgs::PixelFormatType::L_INT8));
+  // Each alone, the newest frame then, and a good one after it: another
+  // size, another format, a colour image shorter than its size, a depth
+  // image shorter than its size, a depth image not float
   msgs::Image shortFrame = Colour(100, 0.03);
   shortFrame.set_data(shortFrame.data().substr(0, 10));
-  cam.Send(shortFrame);
-  for (const double stamp : {0.01, 0.02, 0.03})
-    EXPECT_FALSE(cam.Out(stamp, 300)) << stamp;
+  msgs::Image shortDepth = Depth(Colour(100, 0.04));
+  shortDepth.set_data(shortDepth.data().substr(0, 10));
+  msgs::Image intDepth = Depth(Colour(100, 0.05));
+  intDepth.set_pixel_format_type(msgs::PixelFormatType::L_INT16);
+  const std::vector<std::pair<msgs::Image, std::optional<msgs::Image>>> bad{
+      {Colour(100, 0.01, kWidth + 2), std::nullopt},
+      {Colour(100, 0.02, kWidth, msgs::PixelFormatType::L_INT8),
+       std::nullopt},
+      {shortFrame, std::nullopt},
+      {Colour(100, 0.04), shortDepth},
+      {Colour(100, 0.05), intDepth}};
+  double stamp = 0.01;
+  for (const auto &[colour, depth] : bad)
+  {
+    SCOPED_TRACE(stamp);
+    cam.Send(colour, depth);
+    EXPECT_FALSE(cam.Out(stamp, 300));
+    cam.Send(Colour(100, stamp + 0.001));
+    EXPECT_TRUE(cam.Out(stamp + 0.001));
+    stamp += 0.01;
+  }
+}
 
-  cam.Send(Colour(100, 0.04));
-  EXPECT_TRUE(cam.Out(0.04));
+/////////////////////////////////////////////////
+// A camera info no frame fits, however large, skips the frames without
+// building anything for it; the camera's own info makes them again.
+TEST(Frames, AnInfoNoFrameFits)
+{
+  auto server = Start("frames.sdf");
+  transport::Node node;
+  Camera cam(node, "/fcam/cam");
+  cam.Watch();
+  ASSERT_TRUE(WaitHeard(*server, cam));
+  server->Run(true, 10, false);
+
+  msgs::CameraInfo huge = Info();
+  huge.set_width(400000);
+  huge.set_height(400000);
+  cam.Send(Colour(100, 0.01), std::nullopt, huge);
+  EXPECT_FALSE(cam.Out(0.01, 500));
+  cam.Send(Colour(100, 0.02));
+  EXPECT_TRUE(cam.Out(0.02));
+}
+
+/////////////////////////////////////////////////
+// Colour frames with no depth pile up, then time goes back: the frames
+// after it are dropped, not the new one.
+TEST(Frames, TimeGoesBackWithFramesWaiting)
+{
+  auto server = Start("frames.sdf");
+  transport::Node node;
+  Camera cam(node, "/fcam/cam");
+  cam.Watch();
+  ASSERT_TRUE(WaitHeard(*server, cam));
+  server->Run(true, 100, false);
+
+  for (const double stamp : {0.5, 0.6, 0.7, 0.8, 0.9})
+    cam.image.Publish(Colour(100, stamp));
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  cam.Send(Colour(100, 0.05));
+  EXPECT_TRUE(cam.Out(0.05));
 }
 
 /////////////////////////////////////////////////
@@ -369,12 +453,33 @@ TEST(Frames, ConfigureErrors)
   for (const auto &t : topics)
     EXPECT_EQ(t.find("/ferr/plain/underwater"), std::string::npos) << t;
 
-  Camera odd(node, "/ferr/odd");
-  odd.Watch();
-  ASSERT_TRUE(WaitHeard(*server, odd));
-  server->Run(true, 10, false);
-  odd.Send(Colour(150, 0.05));
-  EXPECT_TRUE(odd.Out(0.05));
+  // Each odd camera's values fall back to the defaults its reference
+  // camera, at the same place, gives explicitly: the same image
+  for (const auto &[oddBase, refBase] :
+       {std::make_pair("/ferr/odd", "/ferr/ref"),
+        std::make_pair("/ferr/odd_auto", "/ferr/ref_auto")})
+  {
+    SCOPED_TRACE(oddBase);
+    Camera odd(node, oddBase), ref(node, refBase);
+    odd.Watch();
+    ref.Watch();
+    ASSERT_TRUE(WaitHeard(*server, odd));
+    ASSERT_TRUE(WaitHeard(*server, ref));
+    server->Run(true, 10, false);
+    // A gradient, so a gain shows
+    msgs::Image in = Colour(0, 0.05);
+    std::string data = in.data();
+    for (std::size_t i = 0; i < data.size(); ++i)
+      data[i] = static_cast<char>(i * 5 % 200);
+    in.set_data(data);
+    odd.Send(in);
+    ref.Send(in);
+    const auto a = odd.Out(0.05), b = ref.Out(0.05);
+    ASSERT_TRUE(a);
+    ASSERT_TRUE(b);
+    EXPECT_EQ(*a, *b);
+    EXPECT_NE(*a, in.data()) << "the water did nothing";
+  }
 }
 
 /////////////////////////////////////////////////

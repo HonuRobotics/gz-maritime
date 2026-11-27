@@ -20,8 +20,12 @@
 #include <gz/msgs/param.pb.h>
 #include <gz/msgs/world_control.pb.h>
 
+#include <unistd.h>
+
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
+#include <functional>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -37,6 +41,7 @@
 #include "gz/sim/components/Wavefield.hh"
 #include "gz/sim/components/WaterOptics.hh"
 #include "gz/sim/waves/Eval.hh"
+#include "gz/sim/water_optics/Jerlov.hh"
 #include "gz/sim/water_optics/WaterOptics.hh"
 #include "gz/sim/water_optics/WaterOpticsSampler.hh"
 
@@ -46,6 +51,15 @@ using water_optics::Rgb;
 
 namespace
 {
+/// \brief A transport partition of this process's own, set before any
+/// node is made, so copies of the test run at once do not hear each other.
+const bool kOwnPartition = []
+{
+  const std::string partition =
+      "gz_water_optics_test_" + std::to_string(getpid());
+  return setenv("GZ_PARTITION", partition.c_str(), 1) == 0;
+}();
+
 std::string World(const std::string &_name)
 {
   return common::joinPaths(TEST_WORLD_DIR, _name);
@@ -162,7 +176,11 @@ std::uint64_t SendThenMark(Sim &_run, transport::Node &_node,
     before = _run.optics.generation;
     level = _run.optics.waterLevel;
   }
+  // The message alone first, applied in a step of its own, so a change it
+  // makes and the marker's are two writes
   pub.Publish(_msg);
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  _run.Steps(2);
   pub.Publish(SetNumber("water_level", level + 0.25));
   for (int i = 0; i < 200; ++i)
   {
@@ -176,6 +194,34 @@ std::uint64_t SendThenMark(Sim &_run, transport::Node &_node,
   }
   ADD_FAILURE() << "the marker never came";
   return before;
+}
+
+/// \brief Reset the world, stepping until the condition holds.
+/// \return Whether the reset was accepted.
+bool ResetUntil(Sim &_run, transport::Node &_node, const std::string &_world,
+                const std::function<bool()> &_done)
+{
+  msgs::WorldControl control;
+  control.mutable_reset()->set_all(true);
+  msgs::Boolean reply;
+  bool result{false};
+  std::thread request([&]
+  {
+    _node.Request("/world/" + _world + "/control", control, 5000, reply,
+                  result);
+  });
+  for (int i = 0; i < 100; ++i)
+  {
+    _run.Steps(1);
+    {
+      const std::lock_guard<std::mutex> lock(_run.mutex);
+      if (_done())
+        break;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  request.join();
+  return result;
 }
 
 /// \brief The ground truth messages a world publishes, as they come.
@@ -287,6 +333,14 @@ TEST(WaterOpticsSystem, SetTopicAndGroundTruth)
   run.Steps(2);
   EXPECT_NE(run.optics.veil, Rgb(0.1, 0.2, 0.3));
 
+  // The visibility removed: 9C's own
+  Send(node, "/world/optics/water_optics/set", Set("visibility", ""));
+  run.Steps(2);
+  EXPECT_NEAR(run.optics.Visibility(),
+              water_optics::kVisibilityConstant /
+                  (water_optics::Jerlov("9C")->absorption.Y() +
+                   water_optics::Jerlov("9C")->scattering.Y()), 1e-9);
+
   // Bad messages, each whole: nothing changes. A marker sent after each
   // shows it was handled.
   const std::string topic = "/world/optics/water_optics/set";
@@ -365,21 +419,8 @@ TEST(WaterOpticsSystem, ResetBringsBackTheWorldFile)
   ASSERT_TRUE(StepPast(run, initial.generation));
   ASSERT_EQ(run.optics.jerlov, "9C");
 
-  msgs::WorldControl control;
-  control.mutable_reset()->set_all(true);
-  msgs::Boolean reply;
-  bool result{false};
-  std::thread request([&]
-  {
-    node.Request("/world/optics/control", control, 5000, reply, result);
-  });
-  for (int i = 0; i < 100 && run.optics.jerlov != "3C"; ++i)
-  {
-    run.Steps(1);
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
-  }
-  request.join();
-  EXPECT_TRUE(result);
+  EXPECT_TRUE(ResetUntil(run, node, "optics",
+                         [&] { return run.optics.jerlov == "3C"; }));
   EXPECT_EQ(run.optics.jerlov, "3C");
   EXPECT_EQ(run.optics.attenuation, initial.attenuation);
   EXPECT_DOUBLE_EQ(run.optics.waterLevel, 0.5);
@@ -415,8 +456,12 @@ TEST(WaterOpticsSystem, PublishRateZeroPublishesOnAChange)
   std::this_thread::sleep_for(std::chrono::milliseconds(300));
   const auto atStart = truth.Count();
   EXPECT_LE(atStart, 1u);
-  run.Steps(50);
-  std::this_thread::sleep_for(std::chrono::milliseconds(300));
+  // Two and a half seconds: the default 1 Hz would publish twice
+  for (int i = 0; i < 25; ++i)
+  {
+    run.Steps(10);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
   EXPECT_EQ(truth.Count(), atStart) << "published without a change";
 
   Send(node, "/world/optics_rate0/water_optics/set", Set("jerlov", "7C"));
@@ -452,7 +497,38 @@ TEST(WaterOpticsSystem, BadWorldFileGivesClearWaterUntilAGoodMessage)
     Send(node, "/world/" + world + "/water_optics/set", Set("jerlov", "5C"));
     ASSERT_TRUE(StepPast(run, 0));
     EXPECT_EQ(run.optics.jerlov, "5C");
+
+    // A reset: the world file's clear water again
+    EXPECT_TRUE(ResetUntil(run, node, world, [&] { return !run.valid; }));
+    EXPECT_FALSE(run.valid);
+    EXPECT_EQ(run.sampler.Data().attenuation, Rgb::Zero);
+
+    // The same water as before the reset brings it back
+    Send(node, "/world/" + world + "/water_optics/set", Set("jerlov", "5C"));
+    EXPECT_TRUE(StepPast(run, 0));
+    EXPECT_EQ(run.optics.jerlov, "5C");
   }
+}
+
+/////////////////////////////////////////////////
+// Explicit colours in the world file, over a type, and a visibility
+// ignored when every coefficient is given.
+TEST(WaterOpticsSystem, ExplicitColoursFromTheWorldFile)
+{
+  Sim run("optics_explicit.sdf");
+  run.Steps(2);
+  ASSERT_TRUE(run.valid);
+  EXPECT_EQ(run.optics.jerlov, "");
+  EXPECT_EQ(run.optics.attenuation, Rgb(1.0, 0.5, 0.25));
+  EXPECT_EQ(run.optics.backscatter, Rgb(0.9, 0.4, 0.2));
+  EXPECT_EQ(run.optics.veil, Rgb(0.1, 0.2, 0.3));
+  EXPECT_EQ(run.optics.diffuseAttenuation, Rgb(0.2, 0.1, 0.05));
+
+  Sim veil("optics_veil.sdf");
+  veil.Steps(2);
+  ASSERT_TRUE(veil.valid);
+  EXPECT_EQ(veil.optics.jerlov, "3C");
+  EXPECT_EQ(veil.optics.veil, Rgb(0.05, 0.3, 0.2));
 }
 
 /////////////////////////////////////////////////
@@ -475,6 +551,12 @@ TEST(WaterOpticsSystem, DepthBelowTheWaves)
       maxElevation = std::max(maxElevation, std::abs(eta));
       EXPECT_NEAR(_sampler.Depth({x, 0.0, -2.0}, _info.simTime), eta + 2.0,
                   1e-3) << "x " << x;
+      // Asked from another thread, as a renderer: an engine of its own,
+      // the same wave
+      double other{0.0};
+      std::thread([&] { other = _sampler.Depth({x, 0.0, -2.0},
+                                               _info.simTime); }).join();
+      EXPECT_NEAR(other, eta + 2.0, 1e-3) << "x " << x << ", other thread";
     }
     ++checked;
   };

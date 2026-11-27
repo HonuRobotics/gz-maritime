@@ -20,12 +20,12 @@ Jerlov type:
 The open ocean types run from `I`, the clearest, through `IA`, `IB`, `II` and
 `III`; the coastal ones from `1C` to `9C`, the murkiest. Coastal water is
 greener and murkier than ocean water. Without the system, the world has
-clear water.
+clear water. `II` and `III` scatter far more than real open ocean, so for
+open ocean use `IB`, or `IB` with a `<visibility>`.
 
 | If your water is | Try | Visibility |
 |---|---|---|
 | Tropical open ocean, very clear | `IB` | about 46 m |
-| Open ocean | `II` | about 11 m |
 | A clear coast | `1C` | about 10 m |
 | A typical harbour or coast | `3C` | about 4 m |
 | A murky harbour, a river mouth | `7C` | about 1.7 m |

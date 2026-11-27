@@ -52,7 +52,9 @@
 
 #include <gz/common/Console.hh>
 #include <gz/rendering/BoundingBoxCamera.hh>
+#include <gz/rendering/DepthCamera.hh>
 #include <gz/rendering/Light.hh>
+#include <gz/rendering/Material.hh>
 #include <gz/rendering/RenderEngine.hh>
 #include <gz/rendering/RenderingIface.hh>
 #include <gz/rendering/Scene.hh>
@@ -65,6 +67,7 @@
 #include <OgreArchive.h>
 #include <OgreArchiveManager.h>
 #include <OgreDataStream.h>
+#include <OgreFrameListener.h>
 #include <OgreCamera.h>
 #include <OgreHlms.h>
 #include <OgreHlmsListener.h>
@@ -75,24 +78,30 @@
 #include <OgreHlmsPbsDatablock.h>
 #include <OgreItem.h>
 #include <OgreLight.h>
+#include <OgreMaterialManager.h>
 #include <OgreMatrix4.h>
 #include <OgreMesh2.h>
 #include <OgreMeshManager2.h>
 #include <OgrePixelFormatGpuUtils.h>
 #include <OgreRenderPassDescriptor.h>
+#include <OgrePass.h>
 #include <OgreRenderSystem.h>
 #include <OgreSceneNode.h>
 #include <OgreString.h>
 #include <OgreSubItem.h>
 #include <OgreSubMesh2.h>
 #include <OgreTextureGpu.h>
+#include <OgreTechnique.h>
 #include <Vao/OgreVaoManager.h>
 
 namespace
 {
 /// \brief The gz-rendering major version whose pieces this was written
-/// against.
+/// against. A build against another fails here; at run time, the strict
+/// parse of the pieces is the guard.
 constexpr int kGzRenderingMajor = 10;
+static_assert(GZ_RENDERING_MAJOR_VERSION == kGzRenderingMajor,
+              "the underwater pieces were written against gz-rendering 10");
 
 /// \brief Ogre's customization hooks we add to: the pass buffer block, the
 /// functions the lamps use, and the final colour.
@@ -226,6 +235,20 @@ constexpr float kBeamSteps[3] = {8.0f, 12.0f, 16.0f};
 constexpr float kSnowRange[3] = {1.5f, 3.0f, 3.0f};
 constexpr int kQualityLamps[3] = {2, 4, 4};
 
+/// \brief A caustic wave's phase at a time: its rate times the time,
+/// wrapped to [0, 2 pi) in double before it becomes a float, so the shader's
+/// float keeps its precision however long the world runs, with no jump.
+/// \param[in] _rate Its angular rate, rad/s.
+/// \param[in] _time Simulation time, s.
+/// \return The phase, rad.
+float CausticPhase(double _rate, double _time)
+{
+  double phase = std::fmod(_rate * _time, 6.283185307179586);
+  if (phase < 0.0)
+    phase += 6.283185307179586;
+  return static_cast<float>(phase);
+}
+
 /// \brief A lamp dimmer than this (its power scale times its brightest
 /// diffuse channel) counts as off: the shader neither lights with it nor
 /// marches its beam. With every lamp off the lamp code is compiled out.
@@ -345,10 +368,53 @@ class Backdrop : public Ogre::Camera::Listener
     }
   }
 
+  /// \brief Tell each RGBD camera's colour pass, while the backdrop
+  /// shows, that the scene has a background, so it keeps the backdrop
+  /// where nothing was hit: without a sky, that pass paints those pixels
+  /// with the scene's background colour, and the backdrop writes no depth.
+  /// Hidden, the camera has gz-rendering's own setting back: a background
+  /// only with a sky. The depth is not touched.
+  /// \param[in] _show Whether the backdrop shows.
+  private: void MarkDepthCameras(bool _show)
+  {
+    if (!gz::rendering::isEngineLoaded("ogre2"))
+      return;
+    gz::rendering::RenderEngine *engine = gz::rendering::engine("ogre2");
+    auto &materials = Ogre::MaterialManager::getSingleton();
+    for (unsigned int s = 0; engine && s < engine->SceneCount(); ++s)
+    {
+      const auto scene = engine->SceneByIndex(s);
+      if (!scene)
+        continue;
+      const auto sky = scene->BackgroundMaterial();
+      const int own = sky && !sky->EnvironmentMap().empty() ? 1 : 0;
+      for (unsigned int i = 0; i < scene->SensorCount(); ++i)
+      {
+        const auto sensor = scene->SensorByIndex(i);
+        if (!std::dynamic_pointer_cast<gz::rendering::DepthCamera>(sensor))
+          continue;
+        const Ogre::MaterialPtr material =
+            materials.getByName(sensor->Name() + "_DepthCamera");
+        if (!material || !material->getNumTechniques() ||
+            !material->getTechnique(0)->getNumPasses())
+        {
+          continue;
+        }
+        Ogre::Pass *pass = material->getTechnique(0)->getPass(0);
+        if (!pass->hasFragmentProgram())
+          continue;
+        auto params = pass->getFragmentProgramParameters();
+        if (params->_findNamedConstantDefinition("hasBackground"))
+          params->setNamedConstant("hasBackground", _show ? 1 : own);
+      }
+    }
+  }
+
   /// \brief Show it in every scene, around the water level, or hide it.
   public: void Update(bool _show, float _level)
   {
     this->WatchCameras();
+    this->MarkDepthCameras(_show && !this->failed);
     Ogre::Root *root = Ogre::Root::getSingletonPtr();
     if (!root)
       return;
@@ -391,6 +457,7 @@ class Backdrop : public Ogre::Camera::Listener
   /// \brief Take it out of the scenes that are still there.
   public: void Destroy()
   {
+    this->MarkDepthCameras(false);
     Ogre::Root *root = Ogre::Root::getSingletonPtr();
     if (root)
     {
@@ -421,6 +488,15 @@ class Backdrop : public Ogre::Camera::Listener
       }
     }
     this->watched.clear();
+  }
+
+  /// \brief Forget the boxes and the cameras, touching none: the Ogre
+  /// they were in may be gone.
+  public: void Forget()
+  {
+    this->items.clear();
+    this->watched.clear();
+    this->failed = false;
   }
 
   /// \brief Whether a scene manager is still Ogre's.
@@ -641,7 +717,8 @@ class UnderwaterListener : public ChainedListener
   public: Backdrop backdrop;
   public: Surface surface;
 
-  /// \brief Set from any thread when the plugin is gone: draw nothing.
+  /// \brief Set from any thread when the plugin is gone: draw nothing, and
+  /// on the next frame turn the water off as a plugin would.
   public: std::atomic<bool> released{false};
 
   /// \brief Whether the water is drawn in a pass: not for an orthographic
@@ -666,8 +743,8 @@ class UnderwaterListener : public ChainedListener
   /// \brief The scene's lamps: its spot and point lights whose own name,
   /// after the model and link that scope it, contains "lamp" (any case).
   /// Other lights are not lamps: Ogre lights with them as in air. At most
-  /// kMaxLamps, the first by name; a warning, once, for the others, which
-  /// are left to Ogre too.
+  /// as many as the quality lights in the shader, the first by name; a
+  /// warning, once, for the others, which are left to Ogre too.
   /// \param[out] _alive Every light of the scenes, lamp or not.
   /// \return The lamps.
   private: std::set<Ogre::Light *> Lamps(std::set<Ogre::Light *> &_alive)
@@ -704,17 +781,18 @@ class UnderwaterListener : public ChainedListener
       }
     }
     std::sort(named.begin(), named.end());
-    if (static_cast<int>(named.size()) > kMaxLamps && !this->warnedLamps)
+    const int limit = kQualityLamps[this->water.quality];
+    if (static_cast<int>(named.size()) > limit && this->warnedLamps != limit)
     {
-      gzwarn << "[underwater] " << named.size() << " lamps, more than "
-             << kMaxLamps << ": the lamps after " << named[kMaxLamps - 1].first
-             << " are lit by Ogre, as in air\n";
-      this->warnedLamps = true;
+      gzwarn << "[underwater] " << named.size() << " lamps, more than the "
+             << limit << " this quality lights: the lamps after "
+             << named[limit - 1].first << " are lit by Ogre, as in air\n";
+      this->warnedLamps = limit;
     }
     std::set<Ogre::Light *> lamps;
     for (const auto &[name, l] : named)
     {
-      if (static_cast<int>(lamps.size()) < kMaxLamps)
+      if (static_cast<int>(lamps.size()) < limit)
         lamps.insert(l);
     }
     return lamps;
@@ -740,8 +818,17 @@ class UnderwaterListener : public ChainedListener
     this->hidden = lamps;
   }
 
-  /// \brief Whether there were more lamps than the shader takes, warned
-  private: bool warnedLamps{false};
+  /// \brief Forget the lamps, touching none: the Ogre they were in may be
+  /// gone.
+  public: void Forget()
+  {
+    this->lamps.clear();
+    this->hidden.clear();
+  }
+
+  /// \brief The limit last warned about, when there were more lamps than
+  /// the shader takes; 0 for none
+  private: int warnedLamps{0};
 
   private: void CollectLamps(Ogre::SceneManager *_sm)
   {
@@ -843,11 +930,8 @@ class UnderwaterListener : public ChainedListener
     put4(static_cast<float>(this->lamps.size()), kBeamSteps[w.quality],
          kBeamRange, 1.0f);
     put4(w.caustics, w.snow, 0.0f, kSnowRange[w.quality]);
-    const auto phase = [&w](double _rate)
-    {
-      return static_cast<float>(std::fmod(_rate * w.time, 6.283185307179586));
-    };
-    put4(phase(0.8), phase(1.0), phase(0.9), phase(1.1));
+    put4(CausticPhase(0.8, w.time), CausticPhase(1.0, w.time),
+         CausticPhase(0.9, w.time), CausticPhase(1.1, w.time));
     // The lamps, in view space, as Ogre's own light buffer has them.
     Ogre::Matrix4 view = Ogre::Matrix4::IDENTITY;
     if (camera)
@@ -904,8 +988,12 @@ class UnlitListener : public ChainedListener
   private: bool On(const Ogre::CompositorShadowNode *_shadow, bool _caster,
                    bool _dual, Ogre::SceneManager *_sm) const
   {
-    if (!this->shared || !this->shared->water.active || _caster)
+    // Not once the plugin is gone, as the PBS listener
+    if (!this->shared || !this->shared->water.active ||
+        this->shared->released || _caster)
+    {
       return false;
+    }
     return !this->previous ||
         this->previous->getPassBufferSize(_shadow, _caster, _dual, _sm) == 0u;
   }
@@ -1002,11 +1090,25 @@ class UnlitListener : public ChainedListener
   }
 };
 
+void SetWater(const UwWater *_v);
+
+/// \brief Finishes a release on the render thread, at the start of each
+/// frame: what turning the water off does, done by nobody else once the
+/// plugin is gone.
+class Settler : public Ogre::FrameListener
+{
+  public: bool frameStarted(const Ogre::FrameEvent &) override;
+};
+
 /// \brief Everything installed, to put back.
 struct Installed
 {
+  /// \brief The Ogre we installed into. Compared, never followed, once
+  /// it may be gone.
+  Ogre::Root *root{nullptr};
   Ogre::HlmsPbs *pbs{nullptr};
   UnderwaterListener listener;
+  Settler settler;
   Ogre::ArchiveVec originalLibrary;
   /// \brief Ogre's unlit shaders, when the water went into them too.
   Ogre::Hlms *unlit{nullptr};
@@ -1020,6 +1122,86 @@ Installed &State()
 {
   static Installed installed;
   return installed;
+}
+
+/// \brief Whether what we installed is still in this Ogre: its PBS is the
+/// one we changed and still has our listener. A world after ours, in the
+/// same process, has a new Ogre, even at the same address.
+/// \param[in] _pbs The PBS of the Ogre running now, or null.
+/// \return True if ours is installed there.
+bool Live(Ogre::HlmsPbs *_pbs)
+{
+  const auto &s = State();
+  return s.done && _pbs && _pbs == s.pbs &&
+         _pbs->getListener() == &s.listener;
+}
+
+/// \brief Forget what was installed, touching no Ogre object: the Ogre it
+/// was in may be gone.
+void Drop()
+{
+  auto &s = State();
+  s.archives.clear();
+  s.originalLibrary.clear();
+  s.pbs = nullptr;
+  s.root = nullptr;
+  s.done = false;
+  s.listener.previous = nullptr;
+  s.listener.water = Water{};
+  s.listener.released = false;
+  s.listener.Forget();
+  s.listener.backdrop.Forget();
+  s.listener.surface.Set(nullptr, nullptr);
+  s.unlit = nullptr;
+  s.unlitListener.previous = nullptr;
+  s.originalUnlitLibrary.clear();
+}
+
+/// \brief The PBS of the Ogre running now.
+/// \return It, or null if there is none.
+Ogre::HlmsPbs *CurrentPbs()
+{
+  Ogre::Root *root = Ogre::Root::getSingletonPtr();
+  if (!root || !root->getHlmsManager())
+    return nullptr;
+  return dynamic_cast<Ogre::HlmsPbs *>(
+      root->getHlmsManager()->getHlms(Ogre::HLMS_PBS));
+}
+
+bool Settler::frameStarted(const Ogre::FrameEvent &)
+{
+  if (State().listener.released.exchange(false))
+    SetWater(nullptr);
+  return true;
+}
+
+/// \brief Set the water, or turn it off. Render thread.
+/// \param[in] _v The water, or null.
+void SetWater(const UwWater *_v)
+{
+  auto &s = State();
+  auto &w = s.listener.water;
+  w.active = nullptr != _v;
+  // The quality first: it says how many lamps the shader lights
+  if (_v)
+    w.quality = std::clamp(_v->quality, 0, 2);
+  // The lamps hidden while the water is drawn, given back when it is not.
+  // Lamps that appear later (a vehicle spawned with its lights) are hidden
+  // on the frame they appear.
+  s.listener.HideLamps(w.active);
+  s.listener.backdrop.Update(s.done && w.active, _v ? _v->level : 0.0f);
+  if (!_v)
+    return;
+  std::memcpy(w.attenuation, _v->attenuation, sizeof(w.attenuation));
+  std::memcpy(w.backscatter, _v->backscatter, sizeof(w.backscatter));
+  std::memcpy(w.veil, _v->veil, sizeof(w.veil));
+  std::memcpy(w.diffuse, _v->diffuse, sizeof(w.diffuse));
+  w.level = _v->level;
+  w.daylight = _v->daylight;
+  w.caustics = _v->caustics;
+  w.snow = _v->snow;
+  w.time = _v->time;
+  s.listener.surface.Set(_v->surface, _v->surfaceContext);
 }
 
 /// \brief Where a piece is defined: "@piece( name )", any spacing.
@@ -1265,26 +1447,19 @@ int uw_ogre2_install(const char *_piecesDir)
 try
 {
   auto &s = State();
-  if (s.done)
-    return 1;
   Ogre::Root *root = Ogre::Root::getSingletonPtr();
   if (!root || !root->getHlmsManager())
     return 0;
-  auto *pbs = dynamic_cast<Ogre::HlmsPbs *>(
-      root->getHlmsManager()->getHlms(Ogre::HLMS_PBS));
+  auto *pbs = CurrentPbs();
   if (!pbs)
   {
     gzerr << "[underwater] no PBS Hlms\n";
     return 0;
   }
-
-  if (GZ_RENDERING_MAJOR_VERSION != kGzRenderingMajor)
-  {
-    gzerr << "[underwater] written against gz-rendering "
-          << kGzRenderingMajor << ", not " << GZ_RENDERING_MAJOR_VERSION
-          << "; not installed\n";
-    return 0;
-  }
+  if (Live(pbs))
+    return 1;
+  // Installed in an Ogre that is gone, by a world before this one
+  Drop();
 
   // Our pieces: each hook's must be there, or the shaders would insert
   // nothing while the world is marked as drawn. Ogre reads a folder that is
@@ -1306,7 +1481,9 @@ try
 
   s.originalLibrary = pbs->getPiecesLibraryAsArchiveVec();
   s.archives = std::move(archives);
+  s.root = root;
   s.pbs = pbs;
+  root->addFrameListener(&s.settler);
   s.listener.previous = pbs->getListener();
   pbs->setListener(&s.listener);
   pbs->reloadFrom(pbs->getDataFolder(), &library);
@@ -1338,28 +1515,9 @@ void uw_ogre2_release()
 //////////////////////////////////////////////////
 void uw_ogre2_set(const UwWater *_v)
 {
-  auto &s = State();
   // A plugin sets the water: drawn again, if it was released
-  s.listener.released = false;
-  auto &w = s.listener.water;
-  w.active = nullptr != _v;
-  // Lamps that appear later (a vehicle spawned with its lights) are hidden
-  // on the frame they appear.
-  s.listener.HideLamps(w.active);
-  s.listener.backdrop.Update(s.done && w.active, _v ? _v->level : 0.0f);
-  if (!_v)
-    return;
-  std::memcpy(w.attenuation, _v->attenuation, sizeof(w.attenuation));
-  std::memcpy(w.backscatter, _v->backscatter, sizeof(w.backscatter));
-  std::memcpy(w.veil, _v->veil, sizeof(w.veil));
-  std::memcpy(w.diffuse, _v->diffuse, sizeof(w.diffuse));
-  w.level = _v->level;
-  w.daylight = _v->daylight;
-  w.caustics = _v->caustics;
-  w.snow = _v->snow;
-  w.time = _v->time;
-  w.quality = std::clamp(_v->quality, 0, 2);
-  s.listener.surface.Set(_v->surface, _v->surfaceContext);
+  State().listener.released = false;
+  SetWater(_v);
 }
 
 //////////////////////////////////////////////////
@@ -1371,7 +1529,8 @@ try
   auto &s = State();
   if (!s.done)
     return;
-  if (Ogre::Root::getSingletonPtr() && s.pbs)
+  // Put back only into the Ogre we changed, if it is still there
+  if (Live(CurrentPbs()))
   {
     s.listener.HideLamps(false);
     s.listener.backdrop.Destroy();
@@ -1383,13 +1542,12 @@ try
       s.unlit->setListener(s.unlitListener.previous);
       s.unlit->reloadFrom(s.unlit->getDataFolder(), &s.originalUnlitLibrary);
     }
+    s.root->removeFrameListener(&s.settler);
   }
-  s.archives.clear();
-  s.done = false;
-  s.pbs = nullptr;
-  s.unlit = nullptr;
+  Drop();
 }
 catch (...)
 {
+  Drop();
 }
 }  // extern "C"

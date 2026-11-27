@@ -18,11 +18,14 @@
 #include <gtest/gtest.h>
 
 #include <gz/msgs/annotated_axis_aligned_2d_box_v.pb.h>
+#include <gz/msgs/boolean.pb.h>
+#include <gz/msgs/entity.pb.h>
 #include <gz/msgs/image.pb.h>
 #include <gz/msgs/laserscan.pb.h>
 #include <gz/msgs/param.pb.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -40,9 +43,13 @@
 #include <gz/common/Filesystem.hh>
 #include <gz/sim/Server.hh>
 #include <gz/sim/ServerConfig.hh>
+#include <gz/sim/TestFixture.hh>
 #include <gz/transport/Node.hh>
 
+#include "OwnPartition.hh"
+
 #include "gz/sim/underwater_camera/UnderwaterImage.hh"
+#include "gz/sim/water_optics/WaterOpticsSampler.hh"
 
 using namespace gz;
 using namespace sim;
@@ -72,7 +79,15 @@ class Capture
     ServerConfig config;
     config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, _world));
     this->server = std::make_unique<Server>(config);
-    this->server->Run(false, 0, false);
+  }
+
+  /// \brief A few steps of the world. The test steps it: a server on a
+  /// thread of its own can hang when it is destroyed (gz-sim 10.5, in its
+  /// Sensors system).
+  public: void Step()
+  {
+    this->server->Run(true, 5, false);
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
 
   /// \brief Wait for _n more frames on a topic; return the last _n.
@@ -84,18 +99,18 @@ class Capture
       const std::lock_guard<std::mutex> lock(this->mutex);
       have = this->frames[_topic].size();
     }
-    for (int i = 0; i < 600; ++i)
+    for (int i = 0; i < 6000; ++i)
     {
       {
         const std::lock_guard<std::mutex> lock(this->mutex);
         auto &f = this->frames[_topic];
         if (f.size() >= have + _n)
           return std::vector<msgs::Image>(f.end() - _n, f.end());
-        // Nothing at all in 10 s: nothing renders here; the test skips
-        if (i == 200 && !this->rendered)
+        // Nothing at all in 500 steps: nothing renders here; the test skips
+        if (i == 100 && !this->rendered)
           return {};
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      this->Step();
     }
     ADD_FAILURE() << "no frames on " << _topic;
     return {};
@@ -109,6 +124,28 @@ class Capture
     auto &f = this->frames[_topic];
     return std::vector<msgs::Image>(f.end() - std::min(_n, f.size()),
                                     f.end());
+  }
+
+  /// \brief Remove a model, stepping the world while the request waits.
+  /// \return Whether it was removed.
+  public: bool Remove(const std::string &_world, const std::string &_model)
+  {
+    msgs::Entity req;
+    req.set_name(_model);
+    req.set_type(msgs::Entity::MODEL);
+    msgs::Boolean rep;
+    bool result = false, sent = false;
+    std::atomic<bool> done{false};
+    std::thread request([&]
+    {
+      sent = this->node.Request("/world/" + _world + "/remove", req, 5000,
+                                rep, result);
+      done = true;
+    });
+    while (!done)
+      this->Step();
+    request.join();
+    return sent && result && rep.data();
   }
 
   /// \brief Whether any frame came: none means no GPU.
@@ -147,9 +184,9 @@ class Capture
       std::this_thread::sleep_for(std::chrono::milliseconds(20));
     pub.Publish(msg);
     bool done = false;
-    for (int i = 0; i < 500 && !done; ++i)
+    for (int i = 0; i < 1000 && !done; ++i)
     {
-      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      this->Step();
       const std::lock_guard<std::mutex> lock(m);
       done = now && *now == _value;
     }
@@ -187,6 +224,42 @@ double Contrast(const msgs::Image &_m)
   const double mean = sum / n;
   return std::sqrt(std::max(0.0, sum2 / n - mean * mean)) / mean;
 }
+
+/// \brief How alike the pattern of two frames is, in the middle half of
+/// the image: the correlation of their linear green about each one's mean.
+/// A frame brighter or darker all over, as when the camera bobs under a
+/// wave and its veil changes, is as alike as itself; a pattern that moved
+/// is not.
+double Alike(const msgs::Image &_a, const msgs::Image &_b)
+{
+  std::vector<double> a, b;
+  for (std::uint32_t v = _a.height() / 4; v < 3 * _a.height() / 4; ++v)
+  {
+    for (std::uint32_t u = _a.width() / 4; u < 3 * _a.width() / 4; ++u)
+    {
+      a.push_back(G(_a, u, v));
+      b.push_back(G(_b, u, v));
+    }
+  }
+  const auto centre = [](std::vector<double> &_x)
+  {
+    double m = 0;
+    for (double x : _x)
+      m += x / _x.size();
+    for (double &x : _x)
+      x -= m;
+  };
+  centre(a);
+  centre(b);
+  double ab = 0, aa = 0, bb = 0;
+  for (std::size_t i = 0; i < a.size(); ++i)
+  {
+    ab += a[i] * b[i];
+    aa += a[i] * a[i];
+    bb += b[i] * b[i];
+  }
+  return ab / std::sqrt(std::max(aa * bb, 1e-30));
+}
 }  // namespace
 
 /////////////////////////////////////////////////
@@ -222,7 +295,24 @@ TEST(Caustics, FadeWithDepthAndNeedWaves)
               << "\n";
     EXPECT_GT(ca, 0.05) << "no caustics on the waves";
     EXPECT_NEAR(ratio, std::exp(-0.2 * 5), 0.1 * std::exp(-0.2 * 5));
-    EXPECT_NE(a[0].data(), a[1].data()) << "the caustics do not move";
+    // The pattern moves: a second apart, it is another pattern. The same
+    // frame is as alike as can be.
+    const double moved = Alike(a[0], a[10]);
+    std::cout << "caustics a second apart: " << moved << " alike\n";
+    EXPECT_NEAR(Alike(a[0], a[0]), 1.0, 1e-9);
+    EXPECT_LT(moved, 0.8) << "the caustics do not move";
+  }
+  {
+    // No <caustics>: none, on the same waves
+    Capture c("caustics_default.sdf", {"/uwcaustics/a"});
+    c.Next("/uwcaustics/a", 20);
+    const auto a = c.Next("/uwcaustics/a", 1);
+    if (!c.Rendered())
+      GTEST_SKIP() << "nothing rendered: no GPU?";
+    c.server.reset();
+    ASSERT_EQ(a.size(), 1u);
+    std::cout << "caustics by default, contrast " << Contrast(a[0]) << "\n";
+    EXPECT_LT(Contrast(a[0]), 0.01) << "caustics without <caustics>";
   }
   {
     Capture c("caustics_flat.sdf", {"/uwflat/a"});
@@ -287,38 +377,61 @@ TEST(Caustics, TheSurfaceDoesNotShadeTheSeabed)
 // background is untouched.
 TEST(OpenWater, TheWatersColourUnderItTheBackgroundAboveIt)
 {
-  Capture c("open_water.sdf", {"/uwopen/under", "/uwopen/above"});
-  const auto under = c.Next("/uwopen/under", 10);
-  const auto above = c.Next("/uwopen/above", 1);
-  if (!c.Rendered())
-    GTEST_SKIP() << "nothing rendered: no GPU?";
-  c.server.reset();
-  ASSERT_EQ(under.size(), 10u);
-  ASSERT_EQ(above.size(), 1u);
-  const auto &m = under.back();
   // The veil just below the surface, 0.3 in the green, faded by the
   // daylight's attenuation over the camera's depth.
   const double expected = 0.3 * std::exp(-0.1 * 6);
-  double low = 1e9, high = -1e9;
-  for (std::uint32_t v = 0; v < m.height(); ++v)
+  const auto range = [](const msgs::Image &_m, double &_low, double &_high)
   {
-    for (std::uint32_t u = 0; u < m.width(); ++u)
+    _low = 1e9;
+    _high = -1e9;
+    for (std::uint32_t v = 0; v < _m.height(); ++v)
     {
-      low = std::min(low, G(m, u, v));
-      high = std::max(high, G(m, u, v));
+      for (std::uint32_t u = 0; u < _m.width(); ++u)
+      {
+        _low = std::min(_low, G(_m, u, v));
+        _high = std::max(_high, G(_m, u, v));
+      }
     }
-  }
-  std::cout << "open water, linear green: " << low << " to " << high
-            << ", the veil is " << expected << "\n";
-  EXPECT_NEAR(low, expected, 0.1 * expected);
-  EXPECT_NEAR(high, expected, 0.1 * expected);
+  };
+  // Without a sky and with one, a camera and an RGBD camera under the
+  // water: the RGBD camera's colour pass paints where nothing was hit with
+  // the background colour unless told there is a background, and the sky
+  // is drawn wherever nothing was drawn yet
+  for (const std::string world : {"open_water.sdf", "open_water_sky.sdf"})
+  {
+    SCOPED_TRACE(world);
+    Capture c(world, {"/uwopen/under", "/uwopen/rgbd/image", "/uwopen/above"});
+    const auto under = c.Next("/uwopen/under", 10);
+    const auto rgbd = c.Next("/uwopen/rgbd/image", 1);
+    const auto above = c.Next("/uwopen/above", 1);
+    if (!c.Rendered())
+      GTEST_SKIP() << "nothing rendered: no GPU?";
+    c.server.reset();
+    ASSERT_EQ(under.size(), 10u);
+    ASSERT_EQ(rgbd.size(), 1u);
+    ASSERT_EQ(above.size(), 1u);
+    for (const auto *m : {&under.back(), &rgbd[0]})
+    {
+      double low, high;
+      range(*m, low, high);
+      std::cout << world << ", " << (m == &rgbd[0] ? "RGBD" : "camera")
+                << ": open water, linear green " << low << " to " << high
+                << ", the veil is " << expected << "\n";
+      EXPECT_NEAR(low, expected, 0.1 * expected);
+      EXPECT_NEAR(high, expected, 0.1 * expected);
+    }
 
-  // The top of the image above the water: the scene's background, 0.9.
-  const auto &t = above[0];
-  const auto top = static_cast<std::uint8_t>(
-      t.data()[2 * t.step() + 3 * (t.width() / 2) + 1]);
-  std::cout << "above the water, the background is " << int(top) << "\n";
-  EXPECT_GT(top, 200);
+    // The top of the image above the water: the scene's background, 0.9
+    // grey, or the sky, blue; not the backdrop, the veil, greener than it
+    // is blue
+    const auto &t = above[0];
+    const auto *top = reinterpret_cast<const std::uint8_t *>(
+        t.data().data() + 2 * t.step() + 3 * (t.width() / 2));
+    std::cout << "above the water, the top is " << int(top[0]) << " "
+              << int(top[1]) << " " << int(top[2]) << "\n";
+    EXPECT_GT(top[2], 120);
+    EXPECT_GE(top[2], top[1]);
+  }
 }
 
 /////////////////////////////////////////////////
@@ -363,7 +476,8 @@ TEST(MarineSnow, LitByLampsFixedInTheWorld)
   for (int i = 0; i < 50 && !pub.HasConnections(); ++i)
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
   pub.Publish(noSnow);
-  std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+  for (int i = 0; i < 40; ++i)
+    c.Step();
   const auto off = c.Next("/uwsnow/cam/image", 1);
   const auto depthNone = c.Next("/uwsnow/cam/depth_image", 1);
   if (!c.Rendered())
@@ -529,9 +643,10 @@ TEST(WaveDepth, TheCameraIsUnderTheWaveNotTheStillLevel)
 // frame of the slow one is, pixel for pixel, the fast one's of the same
 // instant. The surface over a camera is asked for each pass, whatever the
 // camera's rate, not kept from a frame before.
-TEST(WaveDepth, ASlowCameraBesideAFastOne)
+void SlowBesideFast(const std::string &_world)
 {
-  Capture c("wave_depth_rates.sdf", {"/uwrates/fast", "/uwrates/slow"});
+  SCOPED_TRACE(_world);
+  Capture c(_world, {"/uwrates/fast", "/uwrates/slow"});
   // Eight seconds, two wave periods, after the wave has grown
   c.Next("/uwrates/fast", 30);
   if (!c.Rendered())
@@ -566,6 +681,106 @@ TEST(WaveDepth, ASlowCameraBesideAFastOne)
   EXPECT_GE(distinct.size(), 2u) << "the wave did not move the water";
 }
 
+TEST(WaveDepth, ASlowCameraBesideAFastOne)
+{
+  SlowBesideFast("wave_depth_rates.sdf");
+}
+
+/////////////////////////////////////////////////
+// The same on an FFT sea, whose grid the simulation advances while the
+// cameras render: the renderer asks an engine of its own, never the one
+// being advanced, so the slow camera's frames are still the fast one's.
+TEST(WaveDepth, ASlowCameraBesideAFastOneOnAnFftSea)
+{
+  SlowBesideFast("wave_depth_rates_fft.sdf");
+}
+
+/////////////////////////////////////////////////
+// A camera at the still level, away from the origin, under a wave along x:
+// the test follows the depth below the wave at the camera at every step,
+// with a sampler of its own on the simulation thread, and each frame is
+// under water exactly when the depth of its own instant says so. A depth
+// of another instant (half a second off), or of another place (x and y
+// swapped), disagrees on many frames.
+TEST(WaveDepth, EachFrameAtTheDepthOfItsInstantAndPlace)
+{
+  std::mutex mutex;
+  std::map<long long, double> depthAt;
+  std::map<long long, msgs::Image> frames;
+  bool rendered = false;
+  transport::Node node;
+  std::function<void(const msgs::Image &)> cb = [&](const msgs::Image &_m)
+  {
+    const std::lock_guard<std::mutex> lock(mutex);
+    rendered = true;
+    frames[_m.header().stamp().sec() * 1000000000LL +
+           _m.header().stamp().nsec()] = _m;
+  };
+  node.Subscribe("/uwwavewhere/cam", cb);
+  water_optics::WaterOpticsSampler sampler;
+  TestFixture fixture(common::joinPaths(TEST_WORLD_DIR,
+                                        "wave_depth_where.sdf"));
+  fixture.OnPostUpdate([&](const UpdateInfo &_info,
+                           const EntityComponentManager &_ecm)
+  {
+    sampler.Sync(_ecm);
+    const double d = sampler.Depth({7.0, -2.0, 0.0}, _info.simTime);
+    const std::lock_guard<std::mutex> lock(mutex);
+    depthAt[std::chrono::duration_cast<std::chrono::nanoseconds>(
+        _info.simTime).count()] = d;
+  }).Finalize();
+  // Let the wave grow, then eight seconds, two periods
+  for (int i = 0; i < 4000; ++i)
+  {
+    {
+      const std::lock_guard<std::mutex> lock(mutex);
+      if (frames.size() >= 110 || (i == 100 && !rendered))
+        break;
+    }
+    fixture.Server()->Run(true, 5, false);
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+  }
+  fixture.Server()->Stop();
+  const std::lock_guard<std::mutex> lock(mutex);
+  if (!rendered)
+    GTEST_SKIP() << "nothing rendered: no GPU?";
+  ASSERT_GE(frames.size(), 110u);
+  const auto brightness = [](const msgs::Image &_m)
+  {
+    double sum = 0;
+    int n = 0;
+    for (std::uint32_t v = 3 * _m.height() / 4; v < _m.height(); ++v)
+      for (std::uint32_t u = 0; u < _m.width(); ++u, ++n)
+        sum += G(_m, u, v);
+    return sum / n;
+  };
+  double air = 0;
+  for (const auto &[stamp, m] : frames)
+    air = std::max(air, brightness(m));
+  ASSERT_GT(air, 0.1) << "the panel is not in view";
+  int checked = 0, wrong = 0, under = 0;
+  for (const auto &[stamp, m] : frames)
+  {
+    if (stamp < 3000000000LL)
+      continue;
+    const auto it = depthAt.find(stamp);
+    ASSERT_NE(it, depthAt.end()) << "no step at a frame's stamp";
+    // Clear of the surface, where a frame cannot be either
+    if (std::abs(it->second) < 0.05)
+      continue;
+    ++checked;
+    const bool isUnder = brightness(m) < 0.5 * air;
+    under += isUnder;
+    wrong += isUnder != (it->second > 0.0);
+  }
+  std::cout << "frames checked " << checked << ", under water " << under
+            << ", not as the depth of their instant says " << wrong << "\n";
+  EXPECT_GE(checked, 50);
+  EXPECT_GT(under, checked / 5) << "never under the wave";
+  EXPECT_LT(under, checked * 4 / 5) << "never above it";
+  EXPECT_EQ(wrong, 0);
+}
+
 /////////////////////////////////////////////////
 // What nothing lights (Ogre's unlit shaders: a particle emitter's particles)
 // is seen through the water too: particles 2 m away have the colour they
@@ -597,7 +812,6 @@ TEST(Unlit, FadesAndTakesTheVeil)
   }
   air = c.Next("/uwunlit/air", 2);
   water = c.Next("/uwunlit/water", 2);
-  c.server.reset();
   ASSERT_EQ(air.size(), 2u);
   ASSERT_EQ(water.size(), 2u);
   const double inAir = centre(air[1]);
@@ -608,6 +822,19 @@ TEST(Unlit, FadesAndTakesTheVeil)
             << inWater << ", expected " << expected << "\n";
   ASSERT_GT(inAir, 0.1) << "no particles in view";
   EXPECT_NEAR(inWater, expected, 0.02);
+
+  // The renderer's model removed: no water drawn, the particles as in air
+  ASSERT_TRUE(c.Remove("uwunlit", "underwater_optics"));
+  c.Next("/uwunlit/water", 5);
+  water = c.Next("/uwunlit/water", 1);
+  air = c.Next("/uwunlit/air", 1);
+  c.server.reset();
+  ASSERT_EQ(water.size(), 1u);
+  ASSERT_EQ(air.size(), 1u);
+  std::cout << "renderer removed: particles in water " << centre(water[0])
+            << ", in air " << centre(air[0]) << "\n";
+  EXPECT_NEAR(centre(water[0]), centre(air[0]), 0.02)
+      << "the water is still drawn on what is unlit";
 }
 
 /////////////////////////////////////////////////
@@ -670,15 +897,15 @@ TEST(Backdrop, LidarThermalAndBoxesUntouched)
     ServerConfig config;
     config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, _world));
     auto server = std::make_unique<Server>(config);
-    server->Run(false, 0, false);
-    for (int i = 0; i < 600; ++i)
+    for (int i = 0; i < 4000; ++i)
     {
       {
         const std::lock_guard<std::mutex> lock(m);
-        if (got == 3 || (i == 200 && !seen.rendered))
+        if (got == 3 || (i == 100 && !seen.rendered))
           break;
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      server->Run(true, 5, false);
+      std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     server.reset();
     node.Unsubscribe("/uwsensors/lidar");

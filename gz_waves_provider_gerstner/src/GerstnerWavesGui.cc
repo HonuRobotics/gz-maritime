@@ -19,8 +19,8 @@ namespace gz::sim::systems
 /// \brief GUI-side registrar for the Gerstner wave engine. Loaded in the GUI
 /// process alongside WaterVisual so the in-process engine registry knows the
 /// "gerstner" token, letting WaterVisual rebuild its own (thread-private) engine
-/// from the replicated recipe via `CreateWaveSimulation`. The server builds its
-/// engine directly (`GerstnerWaves::MakeEngine`) and does not need this. Keeping
+/// from the replicated recipe via `CreateWaveSimulation`. The server's system
+/// registers the same factory. Keeping
 /// registration here — rather than in `gz_waves_rendering` — lets the rendering
 /// package stay provider-agnostic (it depends only on the gz_waves core). The
 /// GUI-side mirror of the server's `gz-sim-waves-gerstner-system`.

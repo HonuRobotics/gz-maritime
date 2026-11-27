@@ -17,6 +17,8 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
@@ -36,6 +38,8 @@
 #include <gz/sim/Server.hh>
 #include <gz/sim/ServerConfig.hh>
 #include <gz/transport/Node.hh>
+
+#include "OwnPartition.hh"
 
 #include "gz/sim/underwater_camera/UnderwaterImage.hh"
 
@@ -66,7 +70,15 @@ class WorldRun
     ServerConfig config;
     config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, _world));
     this->server = std::make_unique<Server>(config);
-    this->server->Run(false, 0, false);
+  }
+
+  /// \brief A few steps of the world. The test steps it: a server on a
+  /// thread of its own can hang when it is destroyed (gz-sim 10.5, in its
+  /// Sensors system).
+  public: void Step()
+  {
+    this->server->Run(true, 5, false);
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
 
   /// \brief Whether any frame came: none means no GPU.
@@ -88,7 +100,7 @@ class WorldRun
   /// \return Whether there was one, within 20 s.
   public: bool Measure(std::int64_t _after, double &_plate, double &_backdrop)
   {
-    for (int i = 0; i < 400; ++i)
+    for (int i = 0; i < 2000; ++i)
     {
       {
         const std::lock_guard<std::mutex> lock(this->mutex);
@@ -124,7 +136,49 @@ class WorldRun
           return n > 50;
         }
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      this->Step();
+    }
+    return false;
+  }
+
+  /// \brief Of the first frame with both images after a stamp: the mean
+  /// linear green of what is nearer than 4 m in each quarter of the image's
+  /// width, middle rows.
+  /// \return Whether there was one.
+  public: bool Quarters(std::int64_t _after, std::array<double, 4> &_mean)
+  {
+    for (int i = 0; i < 2000; ++i)
+    {
+      {
+        const std::lock_guard<std::mutex> lock(this->mutex);
+        for (const auto &[stamp, im] : this->images)
+        {
+          if (stamp <= _after || !this->depths.count(stamp))
+            continue;
+          const auto &dp = this->depths[stamp];
+          std::vector<float> z(dp.width() * dp.height());
+          std::memcpy(z.data(), dp.data().data(), z.size() * 4);
+          std::array<int, 4> n{};
+          _mean = {};
+          for (std::uint32_t v = im.height() / 3; v < 2 * im.height() / 3; ++v)
+          {
+            for (std::uint32_t u = 0; u < im.width(); ++u)
+            {
+              const std::size_t k = v * im.width() + u;
+              if (!(z[k] > 0 && z[k] < 4))
+                continue;
+              const std::size_t q = 4 * u / im.width();
+              _mean[q] += uc::SrgbToLinear(static_cast<std::uint8_t>(
+                  im.data()[v * im.step() + 3 * u + 1]));
+              ++n[q];
+            }
+          }
+          for (int q = 0; q < 4; ++q)
+            _mean[q] /= std::max(n[q], 1);
+          return true;
+        }
+      }
+      this->Step();
     }
     return false;
   }
@@ -139,8 +193,8 @@ class WorldRun
 /// \brief Wait for the first frame; false if nothing renders here.
 bool Started(WorldRun &_run)
 {
-  for (int i = 0; i < 200 && !_run.Rendered(); ++i)
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  for (int i = 0; i < 100 && !_run.Rendered(); ++i)
+    _run.Step();
   return _run.Rendered();
 }
 }  // namespace
@@ -186,9 +240,18 @@ TEST(LampEdges, LampRemovedThenShutdown)
   req.set_name("rov");
   req.set_type(msgs::Entity::MODEL);
   msgs::Boolean rep;
-  bool result = false;
-  ASSERT_TRUE(run.node.Request("/world/uwlampgone/remove", req, 5000, rep,
-                               result));
+  bool result = false, sent = false;
+  std::atomic<bool> done{false};
+  std::thread request([&]
+  {
+    sent = run.node.Request("/world/uwlampgone/remove", req, 5000, rep,
+                            result);
+    done = true;
+  });
+  while (!done)
+    run.Step();
+  request.join();
+  ASSERT_TRUE(sent);
   ASSERT_TRUE(result && rep.data());
   // A second of simulation later
   ASSERT_TRUE(run.Measure(run.Latest() + 1000000000LL, plate, backdrop));
@@ -197,4 +260,64 @@ TEST(LampEdges, LampRemovedThenShutdown)
   EXPECT_LT(plate, 0.002) << "the removed lamp still lights";
   EXPECT_LT(backdrop, 0.002) << "the removed lamp's beam is still drawn";
   run.server.reset();
+}
+
+/////////////////////////////////////////////////
+// The renderer's model removed while a lamp shines: the lamp goes back to
+// Ogre, which lights the plate with it as in air, and the beam is gone.
+TEST(LampEdges, LampsGoBackToOgreWhenTheRendererGoes)
+{
+  WorldRun run("lamp_removed.sdf", "/uwlampgone/cam");
+  if (!Started(run))
+    GTEST_SKIP() << "nothing rendered: no GPU?";
+  double plate = 0, backdrop = 0;
+  ASSERT_TRUE(run.Measure(1000000000LL, plate, backdrop));
+  EXPECT_GT(backdrop, 0.005) << "no beam to begin with";
+
+  msgs::Entity req;
+  req.set_name("underwater_optics");
+  req.set_type(msgs::Entity::MODEL);
+  msgs::Boolean rep;
+  bool result = false, sent = false;
+  std::atomic<bool> done{false};
+  std::thread request([&]
+  {
+    sent = run.node.Request("/world/uwlampgone/remove", req, 5000, rep,
+                            result);
+    done = true;
+  });
+  while (!done)
+    run.Step();
+  request.join();
+  ASSERT_TRUE(sent);
+  ASSERT_TRUE(result && rep.data());
+
+  const double withRenderer = plate;
+  ASSERT_TRUE(run.Measure(run.Latest() + 1000000000LL, plate, backdrop));
+  std::cout << "renderer removed: plate " << plate << " (" << withRenderer
+            << " with it), brightest backdrop " << backdrop << "\n";
+  EXPECT_GT(plate, withRenderer) << "the lamp stays hidden from Ogre: "
+                                    "nobody lights with it";
+  EXPECT_LT(backdrop, 0.002) << "a beam with no renderer";
+  run.server.reset();
+}
+
+/////////////////////////////////////////////////
+// Four lamps at <quality>low</quality>, which lights two in the shader:
+// the other two are left to Ogre, not hidden from it, so each of the four
+// plates is lit by its lamp.
+TEST(LampEdges, LowQualityLeavesTheRestToOgre)
+{
+  WorldRun run("lamps_low.sdf", "/uwlamplow/cam");
+  if (!Started(run))
+    GTEST_SKIP() << "nothing rendered: no GPU?";
+  std::array<double, 4> plate{};
+  ASSERT_TRUE(run.Quarters(1000000000LL, plate));
+  run.server.reset();
+  std::cout << "four lamps at low quality, plates:";
+  for (double p : plate)
+    std::cout << " " << p;
+  std::cout << "\n";
+  for (int q = 0; q < 4; ++q)
+    EXPECT_GT(plate[q], 0.02) << "plate " << q << " is dark";
 }
