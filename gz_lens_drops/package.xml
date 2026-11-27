@@ -9,6 +9,19 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <depend>gz_sim_vendor</depend>
+  <depend>gz_plugin_vendor</depend>
+  <depend>gz_math_vendor</depend>
+  <depend>gz_common_vendor</depend>
+  <!-- The set and state topics. -->
+  <depend>gz_transport_vendor</depend>
+  <depend>gz_msgs_vendor</depend>
+  <!-- The render pass, behind a dlopen'd bridge to Ogre Next. -->
+  <depend>gz_rendering_vendor</depend>
+  <depend>gz_ogre_next_vendor</depend>
+  <!-- The world's wind, which brings rain onto the lens and pushes drops. -->
+  <depend>gz_wind</depend>
+
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
