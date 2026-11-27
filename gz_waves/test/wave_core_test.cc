@@ -16,6 +16,8 @@
 // Reset / the set_parameters service) — through a real EntityComponentManager.
 
 #include <chrono>
+#include <cmath>
+#include <functional>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -23,6 +25,8 @@
 
 #include <gtest/gtest.h>
 
+#include <gz/math/Helpers.hh>
+#include <gz/math/Vector2.hh>
 #include <gz/math/Vector3.hh>
 #include <gz/msgs/boolean.pb.h>
 #include <gz/msgs/param.pb.h>
@@ -87,8 +91,48 @@ class StubWaveField : public gsw::IWaveField
     this->lastUpdate = _t;
     ++this->updateCount;
   }
+  /// \brief Record the hinted time.
+  public: void Prepare(double _t) override
+  {
+    this->prepared.push_back(_t);
+  }
   /// \brief Backend token.
   public: std::string_view Kind() const override { return "stub"; }
+
+  /// \brief The render grid, when `withField` is set.
+  public: const gsw::WaveField2D *Field() const override
+  {
+    return this->withField ? &this->field : nullptr;
+  }
+
+  /// \brief Give the stub a render grid of n x n cells over a tile, with
+  /// the horizontal displacement a function of the cell's position.
+  /// \param[in] _n Cells per axis.
+  /// \param[in] _tile Tile extent [m].
+  /// \param[in] _d Horizontal displacement at a point [m].
+  public: void SetDisplacement(std::size_t _n, double _tile,
+      const std::function<gz::math::Vector2d(double, double)> &_d)
+  {
+    this->dxs.assign(_n * _n, 0.0);
+    this->dys.assign(_n * _n, 0.0);
+    this->dzs.assign(_n * _n, 0.0);
+    const double cell = _tile / static_cast<double>(_n);
+    for (std::size_t j = 0; j < _n; ++j)
+    {
+      for (std::size_t i = 0; i < _n; ++i)
+      {
+        const auto d = _d(i * cell, j * cell);
+        this->dxs[i + j * _n] = d.X();
+        this->dys[i + j * _n] = d.Y();
+      }
+    }
+    this->field.n = _n;
+    this->field.tile = _tile;
+    this->field.dx = this->dxs.data();
+    this->field.dy = this->dys.data();
+    this->field.dz = this->dzs.data();
+    this->withField = true;
+  }
 
   /// \brief Value returned by Jacobian() (drives FoamMask in the tests).
   public: double jac{1.0};
@@ -100,6 +144,14 @@ class StubWaveField : public gsw::IWaveField
   public: double lastUpdate{-1.0};
   /// \brief Number of Update() calls.
   public: int updateCount{0};
+  /// \brief Every time Prepare() was given.
+  public: std::vector<double> prepared;
+  /// \brief Whether Field() returns the grid.
+  public: bool withField{false};
+  /// \brief The render grid view.
+  public: gsw::WaveField2D field;
+  /// \brief The grid's storage.
+  public: std::vector<double> dxs, dys, dzs;
 };
 
 /// \brief A stub source system: selects the "stub" engine and builds one.
@@ -152,6 +204,40 @@ TEST(Eval, ForwardsToEngine)
     static_cast<StubWaveField *>(wf.simulation.get())->updateCount, 1);
   EXPECT_DOUBLE_EQ(
     static_cast<StubWaveField *>(wf.simulation.get())->lastUpdate, 7.5);
+}
+
+//////////////////////////////////////////////////
+/// The drawn surface over a point is the elevation of the water displaced
+/// onto it: none without a grid, the uniform shift undone with one, and a
+/// varying displacement found by its fixed point.
+TEST(Eval, SurfaceHeightUndoesTheHorizontalDisplacement)
+{
+  gsw::WavefieldData wf;
+  auto stub = std::make_shared<StubWaveField>();
+  wf.simulation = stub;
+
+  // No render grid: the elevation.
+  EXPECT_DOUBLE_EQ(gsw::SurfaceHeight(wf, 5.0, 2.0, 1.0), 8.0);
+
+  // Every cell displaced 1 m along x and 0.5 m along y: the water over
+  // (5, 2) came from (4, 1.5).
+  stub->SetDisplacement(16, 32.0, [](double, double)
+      { return gz::math::Vector2d(1.0, 0.5); });
+  EXPECT_NEAR(gsw::SurfaceHeight(wf, 5.0, 2.0, 1.0), 4.0 + 1.5 + 1.0, 1e-12);
+
+  // A Gerstner like chop along x, shorter than the slope that folds it:
+  // the source point, displaced, lands on the query point.
+  const double tile = 20.0;
+  const double k = 2.0 * GZ_PI / tile;
+  const double q = 0.3 / k;
+  stub->SetDisplacement(256, tile, [&](double _x, double)
+      { return gz::math::Vector2d(-q * std::sin(k * _x), 0.0); });
+  for (double x : {-13.0, 0.7, 4.2, 9.9, 31.0})
+  {
+    SCOPED_TRACE(x);
+    const double x0 = gsw::SurfaceHeight(wf, x, 0.0, 0.0);
+    EXPECT_NEAR(x, x0 - q * std::sin(k * x0), 1e-3);
+  }
 }
 
 //////////////////////////////////////////////////
@@ -518,6 +604,63 @@ TEST_F(WavesSystemTest, PreUpdateAdvancesEngineWithThrottle)
   EXPECT_EQ(engine->updateCount, 2);
   sys.PreUpdate(this->Info(2.0, /*paused=*/true), this->ecm);  // paused -> skip
   EXPECT_EQ(engine->updateCount, 2);
+}
+
+//////////////////////////////////////////////////
+/// After each update the system tells the engine when the next one falls,
+/// and that is exactly the time the next update then carries: at steps that
+/// divide the update period and at steps that do not, and with the throttle
+/// off, where every step updates.
+TEST_F(WavesSystemTest, PreUpdateHintsTheNextUpdateTime)
+{
+  struct Case
+  {
+    public: std::string rate;
+    public: std::chrono::steady_clock::duration dt;
+  };
+  const Case cases[] = {
+    {"30", std::chrono::milliseconds(4)},
+    {"30", std::chrono::milliseconds(1)},
+    {"50", std::chrono::milliseconds(4)},
+    {"7", std::chrono::microseconds(2500)},
+    {"0", std::chrono::milliseconds(4)},
+  };
+  for (const auto &c : cases)
+  {
+    SCOPED_TRACE(c.rate + " Hz");
+    this->ecm.RemoveComponent<gz::sim::components::Wavefield>(this->world);
+    StubWavesSystem sys;
+    sys.Configure(this->world,
+      this->Plugin("<update_rate>" + c.rate + "</update_rate>"),
+      this->ecm, this->evm);
+    auto *engine = dynamic_cast<StubWaveField *>(
+      this->Comp()->Data().simulation.get());
+    ASSERT_NE(engine, nullptr);
+
+    gz::sim::UpdateInfo info;
+    info.dt = c.dt;
+    info.paused = false;
+    int updates = 0;
+    for (int i = 1; i <= 2000; ++i)
+    {
+      info.simTime = i * c.dt;
+      const int before = engine->updateCount;
+      sys.PreUpdate(info, this->ecm);
+      if (engine->updateCount == before)
+        continue;
+      // This update was the one hinted after the last.
+      if (updates > 0)
+      {
+        ASSERT_GE(engine->prepared.size(), 2u);
+        ASSERT_EQ(engine->prepared[engine->prepared.size() - 2],
+                  engine->lastUpdate) << "step " << i;
+      }
+      ++updates;
+      // And it hinted the next.
+      ASSERT_EQ(static_cast<int>(engine->prepared.size()), updates);
+    }
+    EXPECT_GT(updates, 10);
+  }
 }
 
 //////////////////////////////////////////////////

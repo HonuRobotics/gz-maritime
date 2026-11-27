@@ -256,12 +256,12 @@ def test_hydrodynamics_on_base_link(boat):
     assert hydro[0].find('link_name').text == 'base_link'
 
 
-def test_four_sensors_at_urdf_frames(boat):
+def test_five_sensors_at_urdf_frames(boat):
     """
-    IMU, magnetometer, NavSat and anemometer at URDF frames, publishing prefixed.
+    IMU, magnetometer, NavSat, anemometer and acoustic receiver at URDF frames, prefixed.
 
-    The anemometer is a custom sensor, known by its gz:type, which the wind
-    system reads.
+    The anemometer and the acoustic receiver are custom sensors, known by
+    their gz:type, which the wind and the acoustics systems read.
 
     Every frame_id is <name>/<URDF link>: the frame robot_state_publisher
     publishes when it runs with frame_prefix set to the instance name.
@@ -273,9 +273,9 @@ def test_four_sensors_at_urdf_frames(boat):
             if kind == 'custom':
                 kind = sensor.get(f'{GZ_NS}type')
             sensors[kind] = (link, sensor)
-    assert set(sensors) == {'imu', 'magnetometer', 'navsat', 'anemometer'}
+    assert set(sensors) == {'imu', 'magnetometer', 'navsat', 'anemometer', 'acoustic_receiver'}
     expected_frame = {'imu': 'imu_link', 'magnetometer': 'imu_link', 'navsat': 'gps_link',
-                      'anemometer': 'gps_link'}
+                      'anemometer': 'gps_link', 'acoustic_receiver': 'hydrophone_link'}
     urdf_links = {li.get('name') for li in boat.urdf.findall('link')}
     for kind, (link, sensor) in sensors.items():
         assert link.find('pose').get('relative_to') == expected_frame[kind]
@@ -295,8 +295,8 @@ def test_references_survive_the_urdf_conversion(boat):
     links = {li.get('name') for li in boat.converted_urdf.findall('link')}
     joints = {j.get('name') for j in boat.converted_urdf.findall('joint')}
     frames = {f.get('name') for f in boat.converted_urdf.findall('frame')}
-    assert {'imu_link', 'gps_link'} <= frames
-    assert {'imu_link', 'gps_link'}.isdisjoint(links)
+    assert {'imu_link', 'gps_link', 'hydrophone_link'} <= frames
+    assert {'imu_link', 'gps_link', 'hydrophone_link'}.isdisjoint(links)
     assert {'motor_port_joint', 'motor_stbd_joint'} <= joints
     for plugin in boat.model.findall('plugin'):
         for ref in plugin.findall('joint_name'):
@@ -320,6 +320,11 @@ def test_bridge_config_matches_the_model_topics(boat):
         topics |= {topic, f'{topic}/ang_vel'}
     for jsp in plugins(boat.model, 'gz-sim-joint-state-publisher-system'):
         topics.add(jsp.find('topic').text)
+    # An acoustic receiver is retuned on its own set topic.
+    for li in boat.model.findall('link'):
+        for sensor in li.findall('sensor'):
+            if sensor.get(f'{GZ_NS}type') == 'acoustic_receiver':
+                topics.add(f"{sensor.find('topic').text}/set")
     model_topics = {'/' + t.lstrip('/') for t in topics}
     bridged = {e['gz_topic_name'] for e in boat.bridge}
     assert bridged == model_topics
