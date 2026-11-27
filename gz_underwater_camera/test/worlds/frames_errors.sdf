@@ -42,6 +42,9 @@
           <exposure>2abc</exposure>
           <white_balance>magic</white_balance>
           <shot_noise>-1</shot_noise>
+          <forward_scatter>-0.1</forward_scatter>
+          <port>fisheye</port>
+          <water_index>0.5</water_index>
           <read_noise>-2</read_noise>
         </plugin>
       </sensor>
@@ -59,6 +62,9 @@
           <white_balance>none</white_balance>
           <shot_noise>0</shot_noise>
           <read_noise>0</read_noise>
+          <forward_scatter>0</forward_scatter>
+          <port>none</port>
+          <water_index>1.333</water_index>
         </plugin>
       </sensor>
       <sensor name="odd_auto" type="rgbd_camera">

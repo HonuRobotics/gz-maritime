@@ -42,7 +42,8 @@ target_include_directories(${PROJECT_NAME}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(${PROJECT_NAME} PUBLIC gz-math::gz-math)
+find_package(Threads REQUIRED)
+target_link_libraries(${PROJECT_NAME} PUBLIC gz-math::gz-math PRIVATE Threads::Threads)
 
 # --------------------------------------------------------------------------
 # The plugin that goes inside an rgbd_camera sensor.

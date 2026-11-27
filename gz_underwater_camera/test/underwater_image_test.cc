@@ -22,6 +22,7 @@
 #include <limits>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <gz/math/Helpers.hh>
@@ -123,6 +124,44 @@ TEST(Srgb, RoundTripsEveryValue)
   EXPECT_EQ(LinearToSrgb(-1.0), 0);
   EXPECT_EQ(LinearToSrgb(2.0), 255);
   EXPECT_EQ(LinearToSrgb(std::nan("")), 0);
+}
+
+/////////////////////////////////////////////////
+// LinearToSrgb looks its answer up; the answer is the formula's, for a
+// million values across [0, 1] and for the values right at each step.
+TEST(Srgb, LookupIsTheFormula)
+{
+  const auto formula = [](double _v)
+  {
+    const double c = _v <= 0.0031308 ? 12.92 * _v
+                                     : 1.055 * std::pow(_v, 1.0 / 2.4) - 0.055;
+    return static_cast<std::uint8_t>(std::lround(c * 255.0));
+  };
+  int wrong = 0;
+  for (int i = 1; i < 1000000; ++i)
+  {
+    // Denser near zero, where the steps are narrow.
+    const double u = i / 1e6;
+    for (const double v : {u, u * u * u})
+      wrong += LinearToSrgb(v) != formula(v);
+  }
+  for (int k = 0; k < 256; ++k)
+  {
+    const double at = SrgbToLinear(static_cast<std::uint8_t>(k));
+    double v = at;
+    for (int n = 0; n < 4 && v < 1.0; ++n)
+    {
+      wrong += LinearToSrgb(v) != formula(v);
+      v = std::nextafter(v, 2.0);
+    }
+    v = at;
+    for (int n = 0; n < 4 && v > 0.0; ++n)
+    {
+      wrong += LinearToSrgb(v) != formula(v);
+      v = std::nextafter(v, -1.0);
+    }
+  }
+  EXPECT_EQ(wrong, 0);
 }
 
 /////////////////////////////////////////////////
@@ -407,8 +446,9 @@ TEST(Response, NoiseStatistics)
 }
 
 /////////////////////////////////////////////////
-// Throughput: 640x480 within a 15 Hz frame on this machine.
-TEST(Throughput, VgaAt15Hz)
+// Throughput at 640x480, printed: a time depends on the machine and what
+// else runs on it, so it is not a pass or fail.
+TEST(Throughput, Vga)
 {
   const Intrinsics k = Camera(640, 480, 1.2);
   const RayTable rays(k);
@@ -425,8 +465,121 @@ TEST(Throughput, VgaAt15Hz)
     MakeUnderwater(rgb, z, rays, w, Response{}, rng, out);
   const double ms = std::chrono::duration<double, std::milli>(
       std::chrono::steady_clock::now() - t0).count() / frames;
-  std::cout << "640x480: " << ms << " ms per frame\n";
-  EXPECT_LT(ms, 1000.0 / 15.0);
+  std::cout << "640x480: " << ms << " ms per frame (a 15 Hz frame is "
+            << 1000.0 / 15.0 << " ms)\n";
+  EXPECT_GT(ms, 0.0);
+}
+
+/////////////////////////////////////////////////
+// The pipeline runs its rows on several cores. A frame large enough for
+// that (320x240, with noise, forward scatter and a flat port) is the same
+// frame every time, and the same on one thread as on eight: the noise is
+// drawn per row, from generators the frame's one draw seeds.
+TEST(Throughput, ParallelFramesAreTheSame)
+{
+  const Intrinsics k = Camera(320, 240, 1.2);
+  const RayTable rays(k);
+  std::vector<std::uint8_t> rgb;
+  std::vector<float> z;
+  Uniform(k, 120, 140, 160, 6.0f, rgb, z);
+  for (std::size_t i = 0; i < z.size(); ++i)
+  {
+    z[i] = 2.0f + 6.0f * static_cast<float>(i / k.width) / k.height;
+    rgb[3 * i] = static_cast<std::uint8_t>((i * 7) & 255);
+  }
+  const Water w = CoastalAt(5.0);
+  Response r;
+  r.shotNoise = 1e-4;
+  r.readNoise = 2e-3;
+  Optics o;
+  o.forwardScatter = 0.002;
+  o.port = Optics::Port::kFlat;
+  std::vector<std::uint8_t> first, again;
+  std::mt19937 rng(11);
+  MakeUnderwater(rgb, z, rays, w, r, rng, first, o);
+  for (int n = 0; n < 3; ++n)
+  {
+    rng.seed(11);
+    MakeUnderwater(rgb, z, rays, w, r, rng, again, o);
+    EXPECT_EQ(first, again);
+  }
+  for (const unsigned int threads : {1u, 8u})
+  {
+    SetMaxThreads(threads);
+    rng.seed(11);
+    MakeUnderwater(rgb, z, rays, w, r, rng, again, o);
+    EXPECT_EQ(first, again) << threads << " threads";
+  }
+  SetMaxThreads(0);
+
+  // Two cameras at once, each on its own thread, share the pool: each gets
+  // the frame it gets alone
+  std::vector<std::uint8_t> outs[2];
+  std::vector<std::thread> cameras;
+  for (int c = 0; c < 2; ++c)
+  {
+    cameras.emplace_back([&, c]()
+    {
+      for (int n = 0; n < 5; ++n)
+      {
+        std::mt19937 own(11);
+        MakeUnderwater(rgb, z, rays, w, r, own, outs[c], o);
+        if (outs[c] != first)
+          return;
+      }
+    });
+  }
+  for (auto &t : cameras)
+    t.join();
+  EXPECT_EQ(outs[0], first);
+  EXPECT_EQ(outs[1], first);
+}
+
+/////////////////////////////////////////////////
+// The borders blurred as if the edge went on: an image with detail up to
+// its edges, blurred, against the same image padded far out with its edge
+// values, blurred, and cropped back.
+TEST(Optics, BlurBordersAsIfTheEdgeWentOn)
+{
+  const std::uint32_t w = 61, h = 47;
+  const auto value = [](std::uint32_t _u, std::uint32_t _v)
+  {
+    return Rgb(0.5 + 0.4 * std::sin(0.37 * _u + 0.11 * _v),
+               (_u * 7 + _v * 3) % 11 / 11.0, _u < 4 || _v > 42 ? 1.0 : 0.1);
+  };
+  for (const double sigma : {1.5, 4.0, 9.0})
+  {
+    std::vector<Rgb> img(w * h);
+    for (std::uint32_t v = 0; v < h; ++v)
+      for (std::uint32_t u = 0; u < w; ++u)
+        img[v * w + u] = value(u, v);
+    const std::uint32_t pad = static_cast<std::uint32_t>(12 * sigma);
+    const std::uint32_t W = w + 2 * pad, H = h + 2 * pad;
+    std::vector<Rgb> big(W * H);
+    for (std::uint32_t v = 0; v < H; ++v)
+    {
+      for (std::uint32_t u = 0; u < W; ++u)
+      {
+        const auto cu = std::clamp<int>(int(u) - int(pad), 0, int(w) - 1);
+        const auto cv = std::clamp<int>(int(v) - int(pad), 0, int(h) - 1);
+        big[v * W + u] = value(cu, cv);
+      }
+    }
+    GaussianBlur(img, w, h, sigma);
+    GaussianBlur(big, W, H, sigma);
+    double worst = 0.0;
+    for (std::uint32_t v = 0; v < h; ++v)
+    {
+      for (std::uint32_t u = 0; u < w; ++u)
+      {
+        worst = std::max(worst, (img[v * w + u] -
+                                 big[(v + pad) * W + u + pad]).Length());
+      }
+    }
+    std::cout << "sigma " << sigma << ": worst border difference " << worst
+              << "\n";
+    EXPECT_LT(worst, 1e-3) << "sigma " << sigma;
+  }
 }
 
 /////////////////////////////////////////////////
@@ -446,9 +599,266 @@ TEST(Docs, EveryParameterDocumented)
   ASSERT_FALSE(readme.empty());
   for (const std::string tag : {"output_topic", "exposure", "max_gain",
                                 "white_balance", "shot_noise", "read_noise",
-                                "seed"})
+                                "seed", "forward_scatter", "port",
+                                "water_index"})
   {
     EXPECT_NE(reference.find("`<" + tag + ">`"), std::string::npos) << tag;
     EXPECT_NE(readme.find("`<" + tag + ">`"), std::string::npos) << tag;
+  }
+}
+
+/////////////////////////////////////////////////
+// Forward scatter: a black-to-white edge in clear water, at 2, 4 and 8 m,
+// blurs as a Gaussian of sigma fx * forward_scatter * range: its 10-90 %
+// width is 2.563 sigma, within 10 %, after the 0.8 px a sharp edge between
+// two pixels already measures (added in quadrature). With none, no blur.
+TEST(Optics, ForwardScatterGrowsWithRange)
+{
+  const Intrinsics k = Camera(320, 60, 1.0);
+  const RayTable rays(k);
+  Water clear;
+  clear.cameraDepth = 2.0;
+  Optics optics;
+  optics.forwardScatter = 0.003;
+  for (const double r : {2.0, 4.0, 8.0})
+  {
+    std::vector<std::uint8_t> rgb;
+    std::vector<float> z;
+    Uniform(k, 0, 0, 0, static_cast<float>(r), rgb, z);
+    for (std::uint32_t v = 0; v < k.height; ++v)
+      for (std::uint32_t u = k.width / 2; u < k.width; ++u)
+        for (int c = 0; c < 3; ++c)
+          rgb[3 * (v * k.width + u) + c] = 255;
+    std::mt19937 rng(1);
+    std::vector<std::uint8_t> out;
+    MakeUnderwater(rgb, z, rays, clear, Response{}, rng, out, optics);
+    // The range at the edge, on the centre row.
+    const std::uint32_t v = k.height / 2;
+    const double range = r * rays.RangeFactor(k.width / 2, v);
+    const double sigma = k.fx * optics.forwardScatter * range;
+    double u10 = 0, u90 = 0;
+    for (std::uint32_t u = 1; u < k.width; ++u)
+    {
+      const double a = SrgbToLinear(out[3 * (v * k.width + u - 1) + 1]);
+      const double b = SrgbToLinear(out[3 * (v * k.width + u) + 1]);
+      if (a < 0.1 && b >= 0.1)
+        u10 = u - 1 + (0.1 - a) / (b - a);
+      if (a < 0.9 && b >= 0.9)
+        u90 = u - 1 + (0.9 - a) / (b - a);
+    }
+    const double expected = std::hypot(2.563 * sigma, 0.8);
+    std::cout << "range " << range << ": sigma " << sigma << " px, 10-90 "
+              << u90 - u10 << " px, expected " << expected << "\n";
+    EXPECT_NEAR(u90 - u10, expected, 0.1 * expected) << r;
+  }
+}
+
+/////////////////////////////////////////////////
+// A bright plate 1 m away beside dark open water, or beside a dark wall
+// 10 m away: the plate's light spreads only as far as its own 1 m says,
+// above the horizon (where open water ends at the surface) and below it
+// (where it does not), and not as far as the water's range or the wall's.
+TEST(Optics, ObjectsSpreadByTheirOwnRange)
+{
+  const Intrinsics k = Camera(200, 80, 1.0);
+  const RayTable rays(k);
+  Water w = CoastalAt(5.0);
+  w.veil *= 0.05;
+  w.cameraRotation = math::Quaterniond::Identity;
+  Optics optics;
+  optics.forwardScatter = 0.02;
+  // The plate's spread, px, and how far out to look past it
+  const double plateSigma = k.fx * optics.forwardScatter * 1.0;
+  const std::uint32_t from =
+      k.width / 2 + static_cast<std::uint32_t>(std::ceil(4 * plateSigma)) + 2;
+  ASSERT_LT(from + 20, k.width);
+  for (const bool wall : {false, true})
+  {
+    std::vector<std::uint8_t> rgb;
+    std::vector<float> z;
+    Uniform(k, 255, 255, 255, 1.0f, rgb, z);
+    for (std::uint32_t v = 0; v < k.height; ++v)
+    {
+      for (std::uint32_t u = k.width / 2; u < k.width; ++u)
+      {
+        const std::size_t i = v * k.width + u;
+        z[i] = wall ? 10.0f : std::numeric_limits<float>::infinity();
+        for (int c = 0; c < 3; ++c)
+          rgb[3 * i + c] = 10;
+      }
+    }
+    std::mt19937 rng(1);
+    std::vector<std::uint8_t> blurred, sharp;
+    MakeUnderwater(rgb, z, rays, w, Response{}, rng, blurred, optics);
+    MakeUnderwater(rgb, z, rays, w, Response{}, rng, sharp);
+    // A row above the horizon, climbing, and one below it
+    for (const std::uint32_t v : {8u, k.height - 8})
+    {
+      int worst = 0;
+      for (std::uint32_t u = from; u < k.width; ++u)
+      {
+        for (int c = 0; c < 3; ++c)
+        {
+          const std::size_t i = 3 * (v * k.width + u) + c;
+          worst = std::max(worst, std::abs(int(blurred[i]) - int(sharp[i])));
+        }
+      }
+      EXPECT_LE(worst, 1) << (wall ? "wall" : "open water") << ", row " << v
+                          << ": the plate's light spread past its own range";
+    }
+    // The plate's own edge does spread
+    const std::size_t edge = 3 * ((k.height - 8) * k.width + k.width / 2 + 1);
+    EXPECT_GT(blurred[edge], sharp[edge] + 5) << "no forward scatter at all";
+  }
+}
+
+/////////////////////////////////////////////////
+// The other side of a depth edge: a dark plate 0.5 m away beside a bright
+// wall 6 m away, or beside the bright sky seen through the surface. The far
+// light reaches the plate only through the water in front of the plate, so
+// it spreads into the plate no further than the plate's own range says.
+// Clear water, so the far light stays bright and its spread is wide.
+TEST(Optics, NearDarkTakesLittleFromFarBright)
+{
+  const Intrinsics k = Camera(200, 80, 1.0);
+  const RayTable rays(k);
+  Water clear;
+  clear.cameraDepth = 1.0;
+  Optics optics;
+  optics.forwardScatter = 0.02;
+  const double plateSigma = k.fx * optics.forwardScatter * 0.5;
+  // Look from 4 plate sigmas into the plate, away from the edge
+  const std::uint32_t to =
+      k.width / 2 - static_cast<std::uint32_t>(std::ceil(4 * plateSigma)) - 2;
+  ASSERT_GT(to, 20u);
+  for (const bool wall : {true, false})
+  {
+    std::vector<std::uint8_t> rgb;
+    std::vector<float> z;
+    Uniform(k, 10, 10, 10, 0.5f, rgb, z);
+    for (std::uint32_t v = 0; v < k.height; ++v)
+    {
+      for (std::uint32_t u = k.width / 2; u < k.width; ++u)
+      {
+        const std::size_t i = v * k.width + u;
+        z[i] = wall ? 6.0f : std::numeric_limits<float>::infinity();
+        for (int c = 0; c < 3; ++c)
+          rgb[3 * i + c] = 255;
+      }
+    }
+    std::mt19937 rng(1);
+    std::vector<std::uint8_t> blurred, sharp;
+    MakeUnderwater(rgb, z, rays, clear, Response{}, rng, blurred, optics);
+    MakeUnderwater(rgb, z, rays, clear, Response{}, rng, sharp);
+    // Beside the sky only above the horizon, where rays climb to the surface
+    const std::vector<std::uint32_t> rows = wall ?
+        std::vector<std::uint32_t>{8u, k.height / 2, k.height - 8} :
+        std::vector<std::uint32_t>{4u, 8u};
+    for (const std::uint32_t v : rows)
+    {
+      int worst = 0;
+      for (std::uint32_t u = 0; u < to; ++u)
+      {
+        for (int c = 0; c < 3; ++c)
+        {
+          const std::size_t i = 3 * (v * k.width + u) + c;
+          worst = std::max(worst, std::abs(int(blurred[i]) - int(sharp[i])));
+        }
+      }
+      EXPECT_LE(worst, 1) << (wall ? "wall" : "sky") << ", row " << v
+                          << ": far light spread into the near plate";
+    }
+    // The far side does take the plate's dark, at the edge
+    const std::size_t edge = 3 * (8 * k.width + k.width / 2 + 1);
+    EXPECT_LT(blurred[edge] + 5, sharp[edge]) << "no forward scatter at all";
+  }
+}
+
+/////////////////////////////////////////////////
+// One colour and only a depth step, in clear water: forward scatter has
+// nothing to show, and the image stays flat on both sides of the edge.
+TEST(Optics, DepthStepAloneStaysFlat)
+{
+  const Intrinsics k = Camera(200, 80, 1.0);
+  const RayTable rays(k);
+  Water clear;
+  clear.cameraDepth = 2.0;
+  Optics optics;
+  optics.forwardScatter = 0.02;
+  std::vector<std::uint8_t> rgb;
+  std::vector<float> z;
+  Uniform(k, 128, 128, 128, 0.5f, rgb, z);
+  for (std::uint32_t v = 0; v < k.height; ++v)
+    for (std::uint32_t u = k.width / 2; u < k.width; ++u)
+      z[v * k.width + u] = 3.0f;
+  std::mt19937 rng(1);
+  std::vector<std::uint8_t> blurred, sharp;
+  MakeUnderwater(rgb, z, rays, clear, Response{}, rng, blurred, optics);
+  MakeUnderwater(rgb, z, rays, clear, Response{}, rng, sharp);
+  int worst = 0;
+  for (std::size_t i = 0; i < blurred.size(); ++i)
+    worst = std::max(worst, std::abs(int(blurred[i]) - int(sharp[i])));
+  EXPECT_LE(worst, 1) << "a depth step alone changed the image";
+}
+
+/////////////////////////////////////////////////
+// A flat port: a point at radius r_src in the rendered image appears at the
+// radius the refraction model gives, within half a pixel; a dome port
+// changes nothing.
+TEST(Optics, FlatPortRefracts)
+{
+  const Intrinsics k = Camera(401, 401, 1.4);
+  const RayTable rays(k);
+  Water clear;
+  clear.cameraDepth = 2.0;
+  for (const double rOut : {40.0, 100.0, 160.0})
+  {
+    // Where the port takes the point from.
+    const double rSrc = FlatPortSource(rOut, k.fx, 1.333);
+    std::vector<std::uint8_t> rgb;
+    std::vector<float> z;
+    Uniform(k, 0, 0, 0, 3.0f, rgb, z);
+    // A 3x3 white square centred on (cx + rSrc, cy).
+    const int cu = static_cast<int>(std::lround(k.cx - 0.5 + rSrc));
+    const int cv = static_cast<int>(std::lround(k.cy - 0.5));
+    for (int dv = -1; dv <= 1; ++dv)
+      for (int du = -1; du <= 1; ++du)
+        for (int c = 0; c < 3; ++c)
+          rgb[3 * ((cv + dv) * k.width + cu + du) + c] = 255;
+    const double srcCentre = cu + 0.5 - k.cx;
+    const double expected = [&]
+    {
+      // Invert the port's map at the square's actual centre.
+      double lo = 0, hi = k.width;
+      for (int i = 0; i < 60; ++i)
+      {
+        const double mid = 0.5 * (lo + hi);
+        (FlatPortSource(mid, k.fx, 1.333) < srcCentre ? lo : hi) = mid;
+      }
+      return 0.5 * (lo + hi);
+    }();
+    Optics flat;
+    flat.port = Optics::Port::kFlat;
+    std::mt19937 rng(1);
+    std::vector<std::uint8_t> out;
+    MakeUnderwater(rgb, z, rays, clear, Response{}, rng, out, flat);
+    double sum = 0, sumU = 0;
+    for (std::uint32_t v = 0; v < k.height; ++v)
+      for (std::uint32_t u = 0; u < k.width; ++u)
+      {
+        const double val = SrgbToLinear(out[3 * (v * k.width + u)]);
+        sum += val;
+        sumU += val * (u + 0.5);
+      }
+    const double measured = sumU / sum - k.cx;
+    std::cout << "flat port: source radius " << srcCentre << " px appears at "
+              << measured << ", model " << expected << "\n";
+    EXPECT_NEAR(measured, expected, 0.5);
+    EXPECT_GT(expected, srcCentre) << "a flat port magnifies";
+
+    Optics dome;
+    dome.port = Optics::Port::kDome;
+    MakeUnderwater(rgb, z, rays, clear, Response{}, rng, out, dome);
+    EXPECT_EQ(out, rgb) << "a dome centred on the lens does not refract";
   }
 }

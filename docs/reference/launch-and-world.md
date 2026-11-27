@@ -328,6 +328,9 @@ publishes `<topic>/underwater/image` (`gz.msgs.Image`, RGB 8 bit) and
 | `<white_balance>` | `none` | `none`, or `grey_world`, which takes the water's tint out. |
 | `<shot_noise>`, `<read_noise>` | `0` | Gaussian noise on the light the sensor caught, variance shot_noise · signal + read_noise², before the gain. |
 | `<seed>` | `1` | The noise's seed, mixed with the sensor's scoped name, so each camera gets its own noise. |
+| `<forward_scatter>` | `0` | Forward scatter: the light from the objects blurred by their range, sigma = forward_scatter · range radians, at most 40 px; between two pixels, by the smaller of their two ranges. |
+| `<port>` | `none` | `flat` (refracts, magnifies about 1.33×) or `dome` (centred on the lens: no change). |
+| `<water_index>` | `1.333` | Refractive index of the water, for a flat port; 1 or more. |
 
 The water is the world's (`gz-maritime-water-optics-system`); without it, or
 above the water, only the camera's response applies, which by default

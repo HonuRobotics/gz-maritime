@@ -58,6 +58,9 @@ it; a frame that comes while another is processed replaces the one waiting.
 | `<white_balance>` | `none` | `none`, or `grey_world`: each channel's mean made the mean luminance, so the water's tint is taken out, as a camera's auto white balance does. |
 | `<shot_noise>`, `<read_noise>` | `0` | Gaussian noise on the linear light the sensor caught, of variance shot_noise · signal + read_noise², before the gain, which amplifies it as in a real camera. |
 | `<seed>` | `1` | The noise's seed, mixed with the sensor's scoped name: each camera, say each of a stereo pair, gets its own noise, the same every run. |
+| `<forward_scatter>` | `0` | Forward scatter: a Gaussian blur whose width grows with the range through the water, sigma = forward_scatter · range radians, at most 40 pixels. `0.005` to `0.02` looks like coastal water. |
+| `<port>` | `none` | The port in front of the lens: `flat` refracts (Snell's law: the image is magnified about 1.33 times at the centre, more at the edges), `dome` (centred on the lens) does not. |
+| `<water_index>` | `1.333` | The water's refractive index, for a flat port; 1 or more. |
 
 ## What it computes
 
@@ -81,12 +84,40 @@ For each pixel, from the in-air frame's colour J and z-depth:
    with B∞(z_cam) = B∞ exp(−K_d z_cam), the veil at the camera's depth, in
    units of a white surface lit by the surface daylight. A pixel that hits
    nothing sees the open water: the veil, or the sky through the surface.
-5. **The camera.** Noise on the light caught, then exposure and white
+5. **Forward scatter**, a blur of the light from the objects (not the
+   veil). Light goes from one pixel to another blurred by the smaller of
+   their two paths through the water, since it reaches a pixel only
+   through the water in front of what that pixel sees: a near object's
+   light spreads little onto open water or a far wall beside it, and a far
+   bright one's spreads little onto a near dark object. Each pixel is
+   divided by what the same blur gives an image of ones, so one colour
+   stays flat across a depth edge, and light is kept there to within
+   0.5 %. Recursive Gaussian levels, each pixel's light shared between the
+   two around its sigma: a sigma under 0.5 pixel comes out smaller, 0.40
+   as about 0.24, and from 0.5 pixel up within 13 %. And the
+   **port**: a flat one maps each output radius r to the rendered radius
+   f tan(asin(sin(atan(r / f)) / n)). Under water only.
+6. **The camera.** Noise on the light caught, then exposure and white
    balance; back to sRGB.
 
 With the camera above the water, only step 5 applies: with the default
 response, the image comes out unchanged. Depth comes
 from the world's water optics: below the wave field's local surface.
+
+## Speed
+
+The image pipeline runs on the CPU, its rows on up to 16 cores. A
+1920x1080 frame on a 13th generation Core laptop: 27 ms for the water
+alone, 32 ms with auto exposure and white balance, 42 ms with noise (drawn
+per row, from generators one draw per frame seeds, so a seed gives the same
+frame on any number of threads), 59 ms with a flat port. Forward scatter
+takes two blurs per level of sigma in use: on a 20-thread desktop, 290 ms
+for a few objects over open water and 420 ms for a depth that changes
+across the whole frame (51 and 64 ms at 640x480). The threads are a pool
+the process keeps, one fewer than the cores it may run on, at most 15;
+the calling thread makes up the rest. For every
+camera at full frame rate, use the GPU path
+([`gz_underwater_rendering`](../gz_underwater_rendering/README.md)).
 
 ## Limits
 
@@ -96,8 +127,9 @@ from the world's water optics: below the wave field's local surface.
   step, kept for 2 s; a frame older than that gets the oldest kept.
 - The sensor's own `<noise>` and `<distortion>` apply to its in-air image,
   before the water.
-- No vehicle lights, forward scatter, marine snow or port refraction yet;
-  see the [plan](../UNDERWATER_CAMERA_PLAN.md).
+- No vehicle lights, caustics or marine snow: those are drawn by the GPU
+  path ([`gz_underwater_rendering`](../gz_underwater_rendering/README.md)).
+  The `CameraInfo` stays the in-air pinhole's, also with a flat port.
 
 ## Tests
 
@@ -106,13 +138,15 @@ colcon test --packages-select gz_underwater_camera
 ```
 
 - `underwater_image_test`: the ray table against its formula; sRGB round
-  trip for all 256 values; the model, every pixel against the closed form,
+  trip for all 256 values, and its lookup against the formula; the model, every pixel against the closed form,
   at two ranges and with the object's depth; β^D ≠ β^B against the fog
   model; a climbing ray clipped at the surface; nothing hit is the veil; in
   air and in clear water the image unchanged; the response in air too, its
   gain amplifying the noise; fixed and auto exposure; grey world
-  neutralising a tint; the noise's mean and variance; 640×480 within a 15 Hz
-  frame; every parameter documented.
+  neutralising a tint; the noise's mean and variance; a frame the same
+  however many threads run; forward scatter's edge width at 2, 4 and 8 m
+  within 10 % of the Gaussian's; a flat port's points within half a pixel
+  of Snell's law, a dome port unchanged; every parameter documented.
 - `underwater_camera_frames_test`, frames sent by the test, nothing
   rendered: clear water without water optics; listening only while
   listened to; each frame with the water of its own step; frames that do not

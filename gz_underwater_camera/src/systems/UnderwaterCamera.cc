@@ -169,6 +169,9 @@ class gz::sim::maritime::UnderwaterCameraPrivate
   /// \brief The camera's response.
   public: uc::Response response;
 
+  /// \brief Forward scatter and the port. Set in Configure.
+  public: uc::Optics optics;
+
   /// \brief Noise. Worker only.
   public: std::mt19937 rng{1};
 
@@ -398,7 +401,7 @@ void UnderwaterCameraPrivate::Make(const msgs::Image &_img,
 
   std::vector<std::uint8_t> pixels;
   uc::MakeUnderwater(rgb, z, *this->rays, _water, this->response, this->rng,
-                     pixels);
+                     pixels, this->optics);
 
   *_out.mutable_header() = _img.header();
   _out.set_width(k.width);
@@ -486,9 +489,33 @@ void UnderwaterCamera::Configure(const Entity &_entity,
   // Each camera its own noise, and the same every run
   const unsigned int seed = _sdf->Get<unsigned int>("seed", 1u).first;
   const std::string name = scopedName(_entity, _ecm);
-  std::seed_seq seq{seed, static_cast<unsigned int>(
-      std::hash<std::string>{}(name) & 0xffffffffu)};
+  // FNV-1a, the same with any standard library, unlike std::hash
+  std::uint32_t hash = 2166136261u;
+  for (const unsigned char ch : name)
+    hash = (hash ^ ch) * 16777619u;
+  std::seed_seq seq{seed, hash};
   d.rng.seed(seq);
+  d.optics.forwardScatter = _sdf->Get<double>("forward_scatter", 0.0).first;
+  if (!std::isfinite(d.optics.forwardScatter) || d.optics.forwardScatter < 0)
+  {
+    gzerr << "UnderwaterCamera: <forward_scatter> must not be negative; "
+          << "using 0\n";
+    d.optics.forwardScatter = 0.0;
+  }
+  const std::string port = _sdf->Get<std::string>("port", "none").first;
+  if (port == "flat")
+    d.optics.port = uc::Optics::Port::kFlat;
+  else if (port == "dome")
+    d.optics.port = uc::Optics::Port::kDome;
+  else if (port != "none")
+    gzerr << "UnderwaterCamera: unknown <port> '" << port << "'; using none\n";
+  d.optics.waterIndex = _sdf->Get<double>("water_index", 1.333).first;
+  if (!std::isfinite(d.optics.waterIndex) || d.optics.waterIndex < 1.0)
+  {
+    gzerr << "UnderwaterCamera: <water_index> must be 1 or more (a port "
+          << "cannot bend light the other way); using 1.333\n";
+    d.optics.waterIndex = 1.333;
+  }
 
   std::string base = "/" + topic;
   while (base.size() > 1 && base[1] == '/')
