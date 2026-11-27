@@ -53,6 +53,10 @@ namespace gz::sim::maritime
   /// plane, straight up. The waves' pressure under the surface and their
   /// horizontal push are not modelled.
   ///
+  /// It tags the world with the wave core's `WaveCoupling` component, so a
+  /// system that damps against the water (gz_hydrodynamics) adds the waves'
+  /// water velocity.
+  ///
   /// World plugin parameters:
   ///
   /// * `<water_density>`: kg/m^3, default 1025.
