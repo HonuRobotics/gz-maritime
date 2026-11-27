@@ -1,3 +1,7 @@
+// Copyright (C) 2026 Honu Robotics
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+
 #version 330
 
 // Drops as small lenses, by refraction: the height of water on the lens

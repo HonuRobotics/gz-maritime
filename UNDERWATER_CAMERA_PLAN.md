@@ -112,10 +112,9 @@ python3 docs/_tools/underwater_camera_figures.py
 
 The waters in them are **illustrative** (clear, coastal, turbid) until PR 1
 brings the Jerlov table; the script then reads the table, and the figures
-are the expected results for each preset, as far as the table is right. It
-comes from a transcription of Solonenko and Mobley (2015) that is not yet
-checked against the printed paper, so until it is, the figures check the
-code against the table, not the water against the sea.
+are the expected results for each preset. The table is Solonenko and
+Mobley (2015), checked against the paper in review; its `II` and `III` are
+the paper's model, which scatters more than measured open ocean.
 
 ### Test scenes
 
@@ -211,11 +210,11 @@ ground truth on `water_optics_info`, and a sampler any system asks.
   can be seen horizontally, through the standard relation
   `visibility ≈ 4.8 / c_green` (Zaneveld and Pegau 2003), c taken in the
   green, the band cameras are most sensitive in. With a Jerlov type, the
-  type gives the colour balance (the ratio between channels) and
-  `<visibility>` scales its strength: every channel's a and b are scaled by
-  `4.8 / (visibility · c_green)`, and so is K_d, so the colour of the water
-  is kept and only its murkiness changes. Alone, it scales the default type (oceanic
-  II). Explicit coefficients override it.
+  type gives the water and `<visibility>` its strength: what a, b and K_d
+  have above pure water's (type I) is scaled, every channel by the same
+  factor, so that `4.8 / c_green` comes out at the visibility. Clearer
+  water turns bluer and none is clearer than pure water (about 100 m).
+  Alone, it scales the default type (coastal 1C). Explicit coefficients override it.
 - **The water level comes from the wave field** when there is one (the
   `WaveCoupling` level, `SurfaceElevation` above the point), not a fixed
   z = 0.
@@ -230,8 +229,8 @@ ground truth on `water_optics_info`, and a sampler any system asks.
 | β^D, β^B, B∞, K_d derived from a, b as the plan's formulas say | unit | equal to a hand-computed value for 3 presets |
 | Explicit tags override a preset, tag by tag | unit | only the given tags change |
 | `<visibility>` sets the strength: `4.8 / c_green` of the result | unit | equals the given visibility to 1e-6, for 3 types and 1, 5, 20 m |
-| `<visibility>` keeps the type's colour balance | unit | the ratios c_red : c_green : c_blue and b : c per channel are unchanged |
-| `<visibility>` alone; with explicit coefficients | unit | alone, it scales oceanic II; explicit coefficients win, with a warning |
+| `<visibility>` scales what the type has above pure water | unit | at the type's own visibility nothing changes; clearer water is bluer; beyond pure water, or for type I, an error |
+| `<visibility>` alone; with explicit coefficients | unit | alone, it scales coastal 1C; explicit coefficients win, with a warning |
 | `<visibility>` zero, negative or missing | unit | an error naming the tag for zero or negative; missing leaves the type as it is |
 | Unknown type, negative or missing values | unit | an error naming the tag; the world keeps clear water |
 | `water_optics/set` changes the recipe while running; `water_optics_info` reports it | integration | the sampler returns the new values within one step |
@@ -386,7 +385,7 @@ BlueROV2's Lumen lights) are the only light.
 |---|---|---|
 | A lit plate at known lamp and camera ranges | render | its value is `J·E·exp(−β^D(r_l + r_c))/r_l²` within one step |
 | Scene D, the beam's centre row | render | matches `uw-expected-beam.png`'s profile, normalised, within 5 % |
-| Beam brightness ordering | render | turbid > coastal > clear near the lens; clear reaches farthest |
+| Beam reach | render | clear water carries the beam farther across the view, murky water keeps it nearer the lamp (corrected in phase 4: brightest-near-the-lens is not monotonic in murkiness, see Progress) |
 | Lamp outside the view | render | the beam still lights the water in view (scatter, not geometry) |
 | Lights off | render | equals §3 output byte for byte |
 | Throughput with 2 lamps | benchmark | 1080p ≥ 20 Hz |
@@ -399,6 +398,8 @@ A blur whose radius grows with range.
 |---|---|---|
 | A sharp edge (scene A, a black/white plate) at 1, 4, 8 m | render | edge width grows with range as configured, ±10 % |
 | At 0 range | render | no blur |
+| A depth edge: a bright near plate beside dark open water or a far wall, and a dark near plate beside a bright far wall or the sky | unit | light crosses the edge by the smaller of the two ranges: nothing past 4 sigma of the near side |
+| One colour, only a depth step | unit | the image unchanged |
 
 ### 4.3 Marine snow
 
@@ -474,6 +475,256 @@ Brown–Conrady distortion).
 What we do differently: water from the world recipe, not hardcoded; the
 water level from the waves; per-sensor settings; the revised model (β^D ≠
 β^B) on linear colour; validation.
+
+## Progress
+
+### Phase 1, water optics the world owns: done, on `ahcorde/uw_phase1_water_optics`
+
+What it settled, beyond this plan:
+
+- **The Jerlov table** (`gz_water_optics/src/Jerlov.cc`): a, b and K_d of
+  all ten types at red 625, green 525, blue 450 nm, from Solonenko and
+  Mobley (2015) Tables 4–8, through the Apache-2.0 transcription in
+  `tishibashi-cpu/jerlov`, which checks it against the paper's equations.
+  Not yet checked against the printed paper by us. 5C at 625 nm uses
+  Williamson and Hollins (2022) and Jerlov (1976), the printed row being
+  corrupted.
+- **From a type**, β^D = β^B = c = a + b at each channel's wavelength; the
+  revised model's β^D ≠ β^B is reached through explicit values. B∞ = b / c,
+  the single-scattering albedo, as a fraction of the daylight: the veil
+  matches a white target lit by the same daylight when b / c = 1.
+- **`<visibility>`** scales K_d along with a and b.
+- **Ground truth** at 1 Hz by default; any unknown element is warned about.
+- **Figures** now read the real table: the IB, 3C and 7C waters, and a new
+  `uw-jerlov-presets.svg`.
+- **Docs**: `gz_water_optics/README.md`, `docs/how-to/underwater-camera.md`,
+  the reference's water optics parameters (with the presets table) and
+  topics, a design section, the `AGENTS.md` row; a test checks every element
+  and preset is in the reference and the README; Sphinx builds with no
+  warnings.
+
+### Phase 2, the reference camera: done, on `ahcorde/uw_phase2_reference_camera`
+
+What it settled, beyond this plan:
+
+- **No new rendering sensor.** Gazebo's `rgbd_camera` already renders
+  colour and depth in one pass with one stamp; the camera is a plugin inside
+  it (Gazebo loads plugins inside a `<sensor>`), pairing the two by stamp.
+  The depth image holds z-depth (checked: a wall 4.95 m away reads 4.95 at
+  the centre and the corners), so the ray table converts it to range, using
+  the intrinsics of the sensor's own `camera_info`.
+- **Parameters** are `<exposure>` (a gain or `auto`), `<max_gain>`,
+  `<white_balance>` (`none`, `grey_world`), `<shot_noise>`, `<read_noise>`,
+  `<seed>` and `<output_topic>`, rather than one `<noise>` keyword.
+- **Per pixel**, the daylight is faded to each object's own depth, and a
+  climbing ray counts only the water up to the surface (flat at the camera's
+  local surface); a pixel that hits nothing is the veil, or the sky through
+  the surface for a climbing ray.
+- **Results**: the rendered test finds the published image identical to the
+  model computed in the test (19,200 pixels, 0 steps of difference); 640×480
+  in 22 ms (45 Hz) on the CPU; above the water byte for byte unchanged.
+- **The demo** is `kai_gazebo/worlds/underwater_camera_demo.sdf` (open water,
+  a neutral ambient, charts at 0.5–16 m, an image panel per camera), in the
+  world tests. **The BlueROV2's own camera is not switched yet**: it lives in
+  `bluerobotics_models`, a separate PR there.
+
+### Phase 3, the GPU path: done, on `ahcorde/uw_phase3_gpu_path`
+
+**The spike's answers.**
+
+1. *Can a render pass reach the camera's depth without forking
+   gz-rendering?* **No.** `Ogre2RenderTarget::UpdateRenderPassChain` chains
+   passes between two colour textures (`_ogreTextures[2]`); the camera's
+   depth buffer is Ogre's pooled one, not a texture the chain exposes.
+   Approach B would need gz-rendering internals or a change.
+2. *Can the chosen path see the lights?* **Yes, for approach A**: the PBS
+   pixel shader is where lights are evaluated; their data is in the pass
+   buffer, and more can be appended by the same listener.
+
+So **approach A**: `gz_underwater_rendering`, the model in Ogre's PBS
+shaders, chaining gz-rendering's composite pieces (copied at run time with
+one more `@insertpiece`) and its Hlms listener.
+
+What it settled:
+
+- **Matches the reference camera**: mean 0.01 of an 8-bit step, 99th
+  percentile 1 (criterion 1 and 3), rendered test; depth, a camera above the
+  water and segmentation labels byte for byte unchanged; the reference
+  camera passes through when the GPU path is on (an `UnderwaterRendering`
+  marker component on the world).
+- **The GUI uses it**: checked with screenshots on a virtual display. It
+  can load after the GUI's first state, which then lacks the water optics
+  component, never sent again unchanged; the plugin asks for the world's
+  state once and reads it until the component comes (on a virtual display,
+  8 starts of 8 draw the water; 2 of 8 without).
+- **Removed, added again, the next world**: a plugin going cannot reach the
+  render thread, so the bridge turns the water off itself at the next frame;
+  a new instance takes over the world's mark; and an install in a new Ogre
+  (the next world in the same process) forgets what was left in the old one.
+  Each has a test.
+- **Not done, against the plan**: unlit materials were drawn as in air (only
+  PBS was shaded) until the fix below. The sky, the background and the water surface were too,
+  until the fixes below. Depth was from
+  the still water level, not the waves, until the fix below. No throughput
+  benchmark in CI yet
+  (the PBS change costs a few ALU instructions per fragment).
+
+### Phase 4, vehicle lights and their beams: done, on `ahcorde/uw_phase4_lights`
+
+In the GPU path (`gz_underwater_rendering`), as the spike said it must be.
+
+- **Lamps** are the world's spot and point lights (up to four). The shader
+  lights with them itself, by Ogre's own default BRDF (diffuse and
+  specular, metal included; no clear coat) with Ogre's spot cone and
+  attenuation, so a lamp above the water lights as Ogre would, faded `exp(−β^D d)` from lamp to fragment, then the
+  water to the camera as for any light. To count them once, they are hidden
+  from Ogre's lighting while the water is drawn. (Switching Forward+ off by
+  property was tried first: Ogre still writes Forward+'s data into the pass
+  buffer, so every field after it moved. Hiding the lamps keeps the layout.)
+- **Beams**: single scatter along the view ray, Henyey–Greenstein g = 0.9,
+  up to 8 attenuation lengths of the clearest channel. Each lamp is marched
+  over the piece of the view ray inside its range and its cone (found in
+  closed form), in 12 steps spaced quadratically (dense at the near end,
+  where the cone enters). That is as close to the fine integral as the
+  first version's 32 steps over the whole ray, at a third of the work.
+  Uniform steps over the whole ray were 57 % off in coastal water;
+  equi-angular and exponential spacings were tried and were worse.
+- **`<daylight>`** joins the water optics (default 1, 0 at night): it scales
+  the veil, for both the reference camera and the GPU path.
+- **gz gives Ogre a light's power as `<intensity>` × π**; the tests use it.
+- **Results** (rendered, at night 20 m down): a lamp-lit plate within 1
+  step of its clear-water colour faded both ways; the beam within 2 % of a
+  single-scatter integration in IB, 3C and 7C.
+- **A correction to this plan**: "brighter near the lens the murkier the
+  water" does not hold with a lamp 35 cm from the lens: in 7C the lamp's
+  light fades before it reaches the view, and 3C glows brightest. What holds,
+  and is tested: clear water carries the beam farther; murky water keeps it
+  nearer the lamp.
+- **Speed**: the beams are the costliest part of the shader. A lamp that
+  gives no light (its power times its brightest diffuse channel under 0.01)
+  is left out, and with every lamp out the lamp code is not compiled into
+  the shaders. At 1920x1080 on an Intel Iris Xe, against 32 steps over the
+  whole ray for every lamp: 25.8 ms a frame to 14.8 ms with two lamps off,
+  25.9 to 18.2 with two on; on an RTX 4090 Laptop the whole effect is about
+  1 ms.
+- **Limits**: no shadows, in air too while the renderer draws; four lamps
+  (two at `<quality>low`, below, the others left to Ogre); the reference
+  camera has no lamps. Once the renderer's model is removed, the lamps are
+  Ogre's again. (The beam used to show only where something was drawn
+  behind it; the backdrop of the fixes below ended that.)
+
+### Phase 5, what makes it look real: done, on `ahcorde/uw_phase5a_scatter_and_port` and `ahcorde/uw_phase5b_caustics_snow_snell`
+
+| Effect | Where | Result |
+|---|---|---|
+| Forward scatter | reference camera, `<forward_scatter>` | edge width at 2, 4, 8 m within 7 % of the Gaussian's (after the 0.8 px of a sharp pixel edge) |
+| The port | reference camera, `<port>` | flat: within 0.1 px of Snell's law; dome: no change |
+| Caustics | GPU path, water's `<caustics>` | none on flat water; contrast fades with depth as `exp(−K_d z)`, within 6 % (time-averaged) |
+| Marine snow | GPU path, water's `<marine_snow>` | fixed frame to frame, lit by the lamps, depth untouched |
+| The surface from below | `gz_waves_rendering`'s water shader | Snell's window at 48.5 degrees (48.6 by Snell's law) |
+
+What changed from the plan:
+
+- Forward scatter and the port are in the reference camera only (they need
+  the whole image); caustics and snow in the GPU path only (per fragment).
+- Caustics are procedural, scaled by the wave height the plugin estimates
+  from the wave field, not traced from the surface. A first estimator
+  sampled in step with the test wave and swung with its phase; 64 points on
+  a golden-angle spiral fixed it.
+- Marine snow is tested frame to frame with a still camera, not across two
+  cameras; it does not drift.
+- The surface from below is drawn in Snell's window. Since the fixes below
+  it is seen through the water too.
+- **The reference camera.** Its
+  loops run on a pool of threads the process keeps, and the sRGB encoding
+  is a lookup that gives the formula's own answer: 1920x1080 in 27 ms for
+  the water alone, 42 with noise. Forward scatter spreads each pixel's
+  direct light by its own path through the water (a scatter, not a gather;
+  the veil is not spread), so a near object does not bleed into open water
+  or onto a far wall beside it, and no light is lost at a depth edge: 160
+  ms at 1920x1080.
+
+Found later with a demo, a two-minute BlueROV2 dive at Sand Island over the
+site's bathymetry, and fixed here:
+
+- **The water's surface shaded the seabed.** With a sun that casts shadows,
+  the surface, an opaque mesh to the renderer, put everything under it in
+  shadow: a seabed a quarter as bright, and caustics too dim to see. The
+  surface casts no shadow now. This also explained caustics missing on a
+  bathymetry mesh: the mesh was fine, it was in that shadow.
+- **The surface from below was drawn as in air.** `gz_waves_rendering`'s
+  water visual now reads the water optics when the renderer draws the
+  water, and its shader fades the surface over the range to it and adds the
+  veil, with the same model as the PBS pieces. Outside Snell's window the
+  mirror is the veil's colour; the sky dims with the daylight.
+- **Open water was the sky.** Past the last thing in view an underwater
+  camera saw the sky or the background colour. A black box around the
+  world, drawn behind everything (depth clamped to the far plane, after the
+  sky, no depth written), is the veil through the water. The shader clears
+  it for cameras above the water and for gz-rendering's solid-colour
+  cameras, which also need their custom parameter set on it before every
+  pass (they take it off every renderable after each of theirs).
+- **Not reproduced**: Snell's window once drew black in a run with a
+  Gerstner sea. Fourteen runs since, with both seas, all drew the sky.
+- **What open water costs.** With the
+  backdrop, open water is shaded like any surface, so beams and snow are
+  paid on every pixel of an underwater view. At a wreck at night with snow
+  at 0.35, a 1920x1080 frame on the Intel went from 21.5 ms to 29.4. The
+  snow's walk now stops at the first speck the ray touches and lights it
+  once (28.2 ms; by day 26.3 to 22.0), and the plugin has a `<quality>`:
+  at `low` (8 beam steps, snow to 1.5 m, 2 lamps) that frame is 22.2 ms.
+- **A half-resolution pass for beams and snow: not possible from a
+  plugin.** It would compute them once per pixel from the depth buffer.
+  gz-rendering chains a camera's render passes on its colour image only
+  (`Ogre2RenderTarget` connects `rt0` and `rt1`); the depth is not handed
+  to an added pass, so this needs a change in gz-rendering first.
+
+Found in review, and fixed here:
+
+- **A speckled band at the horizon**, in every world with the surface: far
+  away, at grazing angles, the normal interpolated from a triangle's corners
+  disagrees with the triangle drawn, and parts of a surface seen from above
+  were shaded as seen from below. The side is now the drawn triangle's own
+  normal, from screen derivatives: from 2 m over a rippled sea, 106 pixels
+  of 768,000 seen from below, 14,078 before.
+- **An RGBD camera without a sky saw open water as the background
+  colour**: its colour pass paints whatever nothing was hit with it, and the
+  backdrop writes no depth. While the backdrop shows, the pass is told the
+  scene has a background; the depth is not touched.
+- **At `<quality>low` two lamps were dark**: four were hidden from Ogre and
+  two lit in the shader. Only those the shader lights are hidden now.
+
+### Phase 6, validation against reality: tools done, validation not done, on `ahcorde/uw_phase6_validation`
+
+**No real footage has been compared yet: that is still the open question
+below.** What this phase built is everything the comparison needs:
+
+- `make_chart_world.py`: a world reproducing a chart shot (a 24-patch
+  ColorChecker at a range and depth, in a Jerlov type or visibility, facing
+  the reference camera), and the patches' pixel boxes.
+- `chart_validation.py`: OceanSim's metric, the RGB angular error per patch
+  in linear light (brightness does not count), and the luminance ratio per
+  patch; one render per water, ranked closest first, each image with its own
+  boxes; a pass or fail only with `--threshold`.
+- `save_frame.py`: one frame of a camera topic as a PNG.
+- Tests: the metric's properties; a closed loop on synthetic charts (the
+  same water near 0, an exposure change near 0, another water far); the
+  command line; the chart world (valid SDF, patches in the image, in order).
+- End to end on renders: two renders of the same 3C scene compare at 0.00
+  degrees; a 5C render standing in for "real" against the 3C one at 13.4
+  (a fail, as it should). That example report is in the docs, labelled as
+  not a validation.
+- Docs: how to shoot the footage, simulate it, mark the patches and compare.
+
+### After the phases: depth below the waves, and unlit materials, on `ahcorde/uw_wave_depth_and_unlit`
+
+The shader took the still level as the surface. Each camera now has the
+level of the wave over it: the bridge asks the plugin, on the render
+thread, at the camera's place and the frame's instant, and the plugin's
+water optics sampler answers from a wave engine of its own, built from the
+recipe, never the one the simulation advances. And Ogre's unlit shaders (in
+gz-rendering, a particle emitter's particles) get the fade and the veil:
+their own colour, no daylight, no lamps. Terrain is still drawn as in air.
 
 ## Open questions
 

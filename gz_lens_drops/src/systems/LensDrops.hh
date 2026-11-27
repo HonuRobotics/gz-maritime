@@ -66,7 +66,9 @@ class LensDropsPrivate;
 ///   simulation time: the parameters, `enabled`, `count`, `sliding`,
 ///   `covered` (share of the map with water), `flux`, `gravity_x`,
 ///   `gravity_y` (what the world does to the lens), `draws` (maps drawn so
-///   far) and `attached` (true once the render pass is on the camera).
+///   far), `attached` (true once the render pass is on the camera, even if
+///   its shader then fails) and `drawing` (whether the pass was on for the
+///   last frame: off with a dry lens or the drops disabled).
 /// * `<sensor>/lens_drops/mask`, `gz.msgs.Image`, `L_INT8` at the map's
 ///   size, 255 where a drop is, with `<mask>true</mask>` only: once per
 ///   frame the camera draws, stamped as that frame, while subscribed.

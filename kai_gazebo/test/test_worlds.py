@@ -38,18 +38,19 @@ import pytest
 WORLDS = Path(get_package_share_directory('kai_gazebo')) / 'worlds'
 ALL = ('open_water', 'sydney_regatta', 'sydney_regatta_lite', 'benderson_park',
        'benderson_park_lite', 'sand_island', 'sand_island_lite', 'la_spezia', 'la_spezia_lite',
-       'marina_bay', 'marina_bay_lite', 'robotx_2026', 'aquatic_centre', 'acoustic_demo')
+       'marina_bay', 'marina_bay_lite', 'robotx_2026', 'aquatic_centre', 'acoustic_demo',
+       'underwater_camera_demo')
 # Worlds indoors, whose water is their own model's: no drawn sea.
 INDOOR = ('aquatic_centre',)
 # Worlds with no Fuel model in them, so they load with no network and no cache.
-LOCAL = ('open_water', 'acoustic_demo')
+LOCAL = ('open_water', 'acoustic_demo', 'underwater_camera_demo')
 REQUIRED_SYSTEMS = (
     'gz-sim-physics-system', 'gz-sim-user-commands-system',
     'gz-sim-scene-broadcaster-system', 'gz-sim-sensors-system',
     'gz-sim-imu-system', 'gz-sim-magnetometer-system', 'gz-sim-navsat-system',
     'gz-sim-air-pressure-system', 'gz-maritime-buoyancy-system',
     'gz-maritime-wind-system', 'gz-maritime-ocean-current-system',
-    'gz-maritime-acoustics-system',
+    'gz-maritime-acoustics-system', 'gz-maritime-water-optics-system',
 )
 # The gz_maritime_gui panels every world docks, drawing off (but in the
 # acoustic demo, whose point is the acoustics panel's drawing).
@@ -74,6 +75,13 @@ def test_world_keeps_the_contract(world):
     plugins = {p.get('filename') for p in w.findall('plugin')}
     assert set(REQUIRED_SYSTEMS) <= plugins, set(REQUIRED_SYSTEMS) - plugins
     assert any(f.startswith('gz-sim-waves-') for f in plugins), 'no wave source'
+    # The water's optics: a Jerlov type the system knows. A copy of the
+    # names in gz_water_optics' table (src/Jerlov.cc), matched without case
+    # as the system does.
+    optics = next(p for p in w.findall('plugin')
+                  if p.get('filename') == 'gz-maritime-water-optics-system')
+    assert (optics.findtext('jerlov') or '').upper() in (
+        'I', 'IA', 'IB', 'II', 'III', '1C', '3C', '5C', '7C', '9C')
     buoyancy = next(p for p in w.findall('plugin')
                     if p.get('filename') == 'gz-maritime-buoyancy-system')
     assert buoyancy.find('enable_by_default').text == 'false'

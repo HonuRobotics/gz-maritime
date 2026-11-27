@@ -18,6 +18,7 @@
 
 #include <dlfcn.h>
 
+#include <atomic>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -50,6 +51,7 @@
 #include <gz/sim/components/Camera.hh>
 #include <gz/sim/components/Gravity.hh>
 #include <gz/sim/components/ParentEntity.hh>
+#include <gz/sim/components/World.hh>
 #include <gz/sim/rendering/Events.hh>
 #include <gz/transport/Node.hh>
 #include <gz/transport/TopicUtils.hh>
@@ -84,6 +86,7 @@ struct BridgeApi
   bool loaded{false};
 };
 
+//////////////////////////////////////////////////
 /// \brief Load the bridge once, on the render thread, after the render
 /// engine. The only point where Ogre symbols enter the process from here.
 /// \return The bridge; `loaded` false if it could not be loaded.
@@ -127,6 +130,7 @@ const BridgeApi &LoadBridge()
   return api;
 }
 
+//////////////////////////////////////////////////
 /// \brief Read a whole file.
 /// \param[in] _path The file.
 /// \return Its text, or empty if it cannot be opened.
@@ -140,6 +144,7 @@ std::string ReadFile(const std::string &_path)
   return text.str();
 }
 
+//////////////////////////////////////////////////
 /// \brief Where the shaders are: where this package installs them, or
 /// GZ_LENS_DROPS_SHADER_PATH, if set and not empty, for development.
 /// \return The directory.
@@ -151,6 +156,7 @@ std::string ShaderDir()
   return LENS_DROPS_SHADER_DIR;
 }
 
+//////////////////////////////////////////////////
 /// \brief A message value as a number.
 /// \param[in] _value The value.
 /// \param[out] _out The number.
@@ -171,6 +177,7 @@ bool Number(const gz::msgs::Any &_value, double &_out)
   return true;
 }
 
+//////////////////////////////////////////////////
 /// \brief Add a number to a Param message.
 /// \param[in,out] _msg The message.
 /// \param[in] _key The key.
@@ -182,6 +189,7 @@ void SetDouble(gz::msgs::Param &_msg, const std::string &_key, double _value)
   any.set_double_value(_value);
 }
 
+//////////////////////////////////////////////////
 /// \brief Add an integer to a Param message.
 /// \param[in,out] _msg The message.
 /// \param[in] _key The key.
@@ -193,6 +201,7 @@ void SetInt(gz::msgs::Param &_msg, const std::string &_key, int _value)
   any.set_int_value(_value);
 }
 
+//////////////////////////////////////////////////
 /// \brief Add a flag to a Param message.
 /// \param[in,out] _msg The message.
 /// \param[in] _key The key.
@@ -235,6 +244,13 @@ class LensDropsPrivate
   public: static const float *Pull(void *_context, double _stamp,
                                    float *_focus, int *_enabled);
 
+  /// \brief Whether the next frame needs the pass: the lens wet and the
+  /// drops enabled. The bridge asks it before the frame's passes are
+  /// chained. Render thread.
+  /// \param[in] _context This.
+  /// \return Non-zero if so.
+  public: static int Wanted(void *_context);
+
   /// \brief What the world does to the lens this step, from the sensor's
   /// pose, its link's motion, the world's gravity and its wind. Sim thread.
   /// \param[in] _info The step.
@@ -264,8 +280,15 @@ class LensDropsPrivate
   /// \brief Maps drawn so far.
   public: std::uint64_t draws{0};
 
-  /// \brief The drop map's size. Set in Configure.
+  /// \brief Whether the pass was wanted the last time the renderer asked,
+  /// as it chained the frame's passes: on, or off with a dry lens or the
+  /// drops disabled.
+  public: bool drawing{false};
+
+  /// \brief The drop map's width, texels. Set in Configure.
   public: int mapWidth{1};
+
+  /// \brief The drop map's height, texels. Set in Configure.
   public: int mapHeight{1};
 
   /// \brief True to publish the mask. Set in Configure.
@@ -298,14 +321,35 @@ class LensDropsPrivate
   /// \brief The world's wind. Sim thread only.
   public: wind::WindSampler sampler;
 
-  /// \brief The camera's name in the rendering scene. Set in Configure.
+  /// \brief Take the camera's names and the topics, and start the drops,
+  /// once the sensor is under the world: a model spawned at run time is
+  /// not yet in Configure, and its names would then lack the world's.
+  /// \param[in] _ecm The entity component manager.
+  /// \return True once named.
+  public: bool Name(const EntityComponentManager &_ecm);
+
+  /// \brief The parameters and seed from the SDF, until Name starts the
+  /// drops with them.
+  public: lens_drops::Params params;
+
+  /// \brief Drops refused on the set topic so far. Under the mutex.
+  public: std::uint64_t refused{0};
+
+  /// \brief The refusal count at which to warn next. Under the mutex.
+  public: std::uint64_t nextRefusalWarning{1};
+
+  /// \brief True once Configure found a camera. Sim thread only.
+  public: bool configured{false};
+
+  /// \brief The camera's name in the rendering scene. Set by Name.
   public: std::string cameraName;
 
-  /// \brief The base of the topics. Set in Configure.
+  /// \brief The base of the topics. Set by Name.
   public: std::string base;
 
-  /// \brief True once Configure found a camera and a topic.
-  public: bool valid{false};
+  /// \brief True once named: the topics are up and the drops started.
+  /// Written after cameraName and base, read on the render thread.
+  public: std::atomic<bool> valid{false};
 
   /// \brief The pass's handle. Guarded by passMutex.
   public: lens_drops_pass_t pass{nullptr};
@@ -432,51 +476,71 @@ void LensDrops::Configure(const Entity &_entity,
     gzmsg << "[LensDrops] <seed> 0: drew " << seed << "\n";
   }
 
-  const std::string scoped = scopedName(_entity, _ecm);
-  this->dataPtr->cameraName =
-      removeParentScope(scopedName(_entity, _ecm, "::", false), "::");
-  this->dataPtr->base =
-      transport::TopicUtils::AsValidTopic("/" + scoped + "/lens_drops");
-  if (this->dataPtr->base.empty())
-  {
-    gzerr << "[LensDrops] no valid topic for [" << scoped << "]\n";
-    return;
-  }
-
-  {
-    const std::lock_guard<std::mutex> lock(this->dataPtr->mutex);
-    this->dataPtr->seed = seed;
-    this->dataPtr->drops = lens_drops::Drops(
-        seed ^ lens_drops::Hash(this->dataPtr->cameraName), params);
-  }
-
-  this->dataPtr->node.Subscribe(this->dataPtr->base + "/set",
-      &LensDropsPrivate::OnSet, this->dataPtr.get());
-  this->dataPtr->statePub = this->dataPtr->node.Advertise<msgs::Param>(
-      this->dataPtr->base + "/state");
-  if (this->dataPtr->publishMask)
-  {
-    this->dataPtr->maskPub = this->dataPtr->node.Advertise<msgs::Image>(
-        this->dataPtr->base + "/mask");
-  }
+  this->dataPtr->seed = seed;
+  this->dataPtr->params = params;
+  this->dataPtr->configured = true;
 
   // Scene updates, not PreRender: a PreRender connection makes the sensors
-  // system update the scene on every physics step
+  // system update the scene on every physics step. Nothing is drawn until
+  // the camera is named.
   this->dataPtr->sceneUpdateConn = _eventMgr.Connect<events::SceneUpdate>(
       std::bind(&LensDropsPrivate::OnSceneUpdate, this->dataPtr.get()));
   this->dataPtr->teardownConn = _eventMgr.Connect<events::RenderTeardown>(
       std::bind(&LensDropsPrivate::OnTeardown, this->dataPtr.get()));
 
-  this->dataPtr->valid = true;
-  gzmsg << "[LensDrops] on [" << this->dataPtr->cameraName << "], seed "
-        << seed << ", set on [" << this->dataPtr->base << "/set]\n";
+  // A camera in the world file is under the world now; a spawned one is
+  // named on the first step that finds it there
+  this->dataPtr->Name(_ecm);
+}
+
+//////////////////////////////////////////////////
+bool LensDropsPrivate::Name(const EntityComponentManager &_ecm)
+{
+  if (this->valid)
+    return true;
+  // Up the parents to the world
+  Entity top = this->sensor;
+  while (const auto *parent = _ecm.Component<components::ParentEntity>(top))
+    top = parent->Data();
+  if (!_ecm.Component<components::World>(top))
+    return false;
+
+  const std::string scoped = scopedName(this->sensor, _ecm);
+  const std::string name =
+      removeParentScope(scopedName(this->sensor, _ecm, "::", false), "::");
+  const std::string topic =
+      transport::TopicUtils::AsValidTopic("/" + scoped + "/lens_drops");
+  if (topic.empty())
+  {
+    gzerr << "[LensDrops] no valid topic for [" << scoped << "]\n";
+    this->configured = false;
+    return false;
+  }
+  this->cameraName = name;
+  this->base = topic;
+  {
+    const std::lock_guard<std::mutex> lock(this->mutex);
+    this->drops = lens_drops::Drops(
+        this->seed ^ lens_drops::Hash(this->cameraName), this->params);
+  }
+  this->node.Subscribe(this->base + "/set", &LensDropsPrivate::OnSet, this);
+  this->statePub = this->node.Advertise<msgs::Param>(this->base + "/state");
+  if (this->publishMask)
+    this->maskPub = this->node.Advertise<msgs::Image>(this->base + "/mask");
+
+  this->valid = true;
+  gzmsg << "[LensDrops] on [" << this->cameraName << "], seed " << this->seed
+        << ", set on [" << this->base << "/set]\n";
+  return true;
 }
 
 //////////////////////////////////////////////////
 void LensDrops::PostUpdate(const UpdateInfo &_info,
     const EntityComponentManager &_ecm)
 {
-  if (!this->dataPtr->valid || _info.paused)
+  if (!this->dataPtr->configured || _info.paused)
+    return;
+  if (!this->dataPtr->Name(_ecm))
     return;
 
   if (_info.simTime < this->dataPtr->lastState)
@@ -528,6 +592,7 @@ void LensDrops::PostUpdate(const UpdateInfo &_info,
     SetInt(msg, "draws", static_cast<int>(this->dataPtr->draws));
     SetBool(msg, "enabled", this->dataPtr->enabled);
     SetBool(msg, "attached", this->dataPtr->attached);
+    SetBool(msg, "drawing", this->dataPtr->drawing);
   }
   this->dataPtr->statePub.Publish(msg);
 
@@ -538,6 +603,8 @@ void LensDrops::PostUpdate(const UpdateInfo &_info,
 //////////////////////////////////////////////////
 void LensDrops::Reset(const UpdateInfo &, EntityComponentManager &)
 {
+  if (!this->dataPtr->valid)
+    return;
   {
     const std::lock_guard<std::mutex> lock(this->dataPtr->mutex);
     this->dataPtr->drops.Reset(
@@ -654,17 +721,31 @@ void LensDropsPrivate::OnSet(const msgs::Param &_msg)
     this->drops.Clear();
   if (!add.empty())
   {
-    if (add.size() != 3)
+    const bool partial = add.size() != 3;
+    if (partial ||
+        !this->drops.Add(add["add_x"], add["add_y"], add["add_radius"]))
     {
-      gzwarn << "[LensDrops] add_x, add_y and add_radius go together; no "
-             << "drop added\n";
-    }
-    else if (!this->drops.Add(add["add_x"], add["add_y"], add["add_radius"]))
-    {
-      gzwarn << "[LensDrops] no drop added: add_x and add_y go in [0, 1], "
-             << "add_radius in (0, " << lens_drops::kMaxMergedRadius
-             << "] image heights, and the lens holds "
-             << lens_drops::kMaxDrops << " drops at most\n";
+      // The 1st, 10th, 100th... refusal warns, with the count so far: a
+      // stream of bad drops does not flood the log
+      ++this->refused;
+      if (this->refused >= this->nextRefusalWarning)
+      {
+        this->nextRefusalWarning *= 10;
+        if (partial)
+        {
+          gzwarn << "[LensDrops] no drop added: add_x, add_y and add_radius "
+                 << "go together; " << this->refused << " refused so far\n";
+        }
+        else
+        {
+          gzwarn << "[LensDrops] no drop added: add_x and add_y go in "
+                 << "[0, 1], add_radius in (0, "
+                 << lens_drops::kMaxMergedRadius << "] image heights, and "
+                 << "the lens holds " << lens_drops::kMaxDrops
+                 << " drops at most; " << this->refused
+                 << " refused so far\n";
+        }
+      }
     }
   }
 }
@@ -724,7 +805,8 @@ void LensDropsPrivate::OnSceneUpdate()
   this->map = std::make_unique<lens_drops::DropMap>(this->mapWidth,
                                                     this->mapHeight);
   lens_drops_pass_t made = api.create(vs.c_str(), fs.c_str(), this->mapWidth,
-      this->mapHeight, &LensDropsPrivate::Pull, this);
+      this->mapHeight, &LensDropsPrivate::Pull, &LensDropsPrivate::Wanted,
+      this);
   if (!made || !api.attach(made, camera.get()))
   {
     api.destroy(made);
@@ -743,6 +825,17 @@ void LensDropsPrivate::OnSceneUpdate()
   }
   gzmsg << "[LensDrops] render pass on [" << this->cameraName << "], map "
         << this->mapWidth << "x" << this->mapHeight << "\n";
+}
+
+//////////////////////////////////////////////////
+int LensDropsPrivate::Wanted(void *_context)
+{
+  auto *self = static_cast<LensDropsPrivate *>(_context);
+  const std::lock_guard<std::mutex> lock(self->mutex);
+  const bool wet =
+      !self->drops.List().empty() || !self->drops.Trails().empty();
+  self->drawing = self->enabled && wet;
+  return self->drawing ? 1 : 0;
 }
 
 //////////////////////////////////////////////////
@@ -777,8 +870,9 @@ const float *LensDropsPrivate::Pull(void *_context, double _stamp,
     ++self->draws;
   }
 
-  // The mask of this frame, stamped as it, while someone listens
-  if (self->publishMask && self->maskPub.HasConnections())
+  // The mask of this frame, stamped as it, while someone listens and the
+  // drops are drawn
+  if (self->publishMask && *_enabled && self->maskPub.HasConnections())
   {
     self->map->Mask(self->mask);
     msgs::Image image;
@@ -803,6 +897,7 @@ void LensDropsPrivate::OnTeardown()
   this->failed = true;
   const std::lock_guard<std::mutex> lock(this->mutex);
   this->attached = false;
+  this->drawing = false;
 }
 }  // namespace gz::sim::maritime
 

@@ -265,6 +265,102 @@ library; `gz::sim::ocean_current::OceanCurrentAt` builds the model on every
 call and suits an occasional query. The query is a point query: a consumer that spans a gradient
 integrates over its own extent with repeated queries.
 
+## Water optics parameters
+
+What a world says to the water optics system,
+`gz-maritime-water-optics-system`. Without it, the world has clear water.
+
+| Markup | Meaning |
+|---|---|
+| `<jerlov>` | The Jerlov water type, below. Default `1C`. |
+| `<visibility>` | Horizontal visibility of a black target, m: scales what the type's absorption, scattering and diffuse attenuation have above pure water's (type `I`) by the same factor, so that 4.8 / c in the green comes out at this distance (Zaneveld and Pegau 2003). Clearer water turns bluer; beyond about 100 m, clearer than pure water, below 0.1 m, and for type `I`, it is an error. Ignored, with a warning, when all four coefficients are given. |
+| `<attenuation>` | β^D, how fast an object's light fades with range, 1/m, as `r g b`. Replaces c = a + b. |
+| `<backscatter>` | β^B, how fast the veil builds with range, 1/m, as `r g b`. Replaces c. |
+| `<veil>` | B∞, the veil just below the surface as a fraction of the daylight there, as `r g b`. Replaces b / c. |
+| `<diffuse_attenuation>` | K_d, how fast the daylight fades with depth, 1/m, as `r g b`. Replaces the type's K_d. |
+| `<water_level>` | World z of the still water, m, default 0. Under a wave field, depth is below the local wave surface. |
+| `<daylight>` | How strong the daylight is against the renderer's sun, default 1: it scales the veil. 0 at night, when only lamps light the water. |
+| `<caustics>` | Strength of the caustics the waves cast on what faces up, 0 to 1, default 0 (off); scaled by the wave height, so none on flat water. Drawn by the underwater rendering. |
+| `<marine_snow>` | Marine snow: the fraction of 25 cm cells near the camera that hold a speck, 0 to 1, default 0 (none). Lit by the lamps and faintly by daylight. Drawn by the underwater rendering. |
+| `<publish_rate>` | Rate of the ground truth in wall time, 1 Hz by default, so it keeps coming while paused; a change is published at once. 0 publishes on a change only. |
+
+Any other element is warned about and ignored. An unknown type, a visibility
+out of range, a negative coefficient or daylight, or a caustics or marine
+snow that is not a number is one error, and the world has clear water. A
+caustics or marine snow outside 0 to 1 is clamped to it, with a warning. An explicit `<attenuation>` wins over `<visibility>`, with a
+warning.
+
+The Jerlov types, from Solonenko and Mobley (2015), at red 625 nm, green
+525 nm and blue 450 nm:
+
+| Type | Water | c = a + b (1/m) | Veil b / c | K_d (1/m) | Visibility (m) |
+|---|---|---|---|---|---|
+| `I` | Clearest open ocean | 0.296, 0.0481, 0.0218 | 0.00, 0.04, 0.17 | 0.302, 0.049, 0.022 | 99.9 |
+| `IA` | Clear open ocean | 0.298, 0.0508, 0.0284 | 0.01, 0.08, 0.22 | 0.303, 0.0503, 0.0264 | 94.5 |
+| `IB` | Clear open ocean | 0.343, 0.103, 0.0915 | 0.14, 0.55, 0.74 | 0.31, 0.0572, 0.0342 | 46.4 |
+| `II` | Open ocean | 0.584, 0.434, 0.528 | 0.49, 0.89, 0.95 | 0.337, 0.0845, 0.062 | 11.1 |
+| `III` | Turbid open ocean | 1.08, 1.11, 1.42 | 0.73, 0.95, 0.97 | 0.39, 0.129, 0.124 | 4.32 |
+| `1C` | Clearest coastal | 0.597, 0.463, 0.619 | 0.49, 0.85, 0.83 | 0.395, 0.121, 0.179 | 10.4 |
+| `3C` | Coastal | 1.16, 1.23, 1.65 | 0.74, 0.94, 0.91 | 0.456, 0.187, 0.319 | 3.91 |
+| `5C` | Coastal | 1.4, 1.57, 2.17 | 0.77, 0.92, 0.86 | 0.48, 0.277, 0.535 | 3.06 |
+| `7C` | Turbid coastal | 2.26, 2.77, 3.84 | 0.84, 0.92, 0.86 | 0.6, 0.47, 0.924 | 1.73 |
+| `9C` | Most turbid coastal | 2.95, 3.81, 5.33 | 0.85, 0.89, 0.82 | 0.763, 0.826, 1.56 | 1.26 |
+
+Each triple is red, green, blue. The values match the paper's tables (5C in
+the red, whose printed row is corrupted, comes from Williamson and Hollins,
+2022, and Jerlov, 1976). `II` and `III` are the paper's too, but its model
+gives them about two and three and a half times the scattering measured in
+open ocean, so `III` comes out as murky as a harbour. For open ocean use
+`IB`, with a `<visibility>` if it should be murkier; `1C` is the default. The optics are kept on the world entity as
+the `WaterOptics` component; a system that sees through water keeps a
+`gz::sim::water_optics::WaterOpticsSampler`, from the `gz_water_optics`
+library.
+
+## Underwater camera parameters
+
+What the underwater camera plugin, `gz-maritime-underwater-camera-system`,
+takes. It goes inside an `rgbd_camera` sensor that has a `<topic>`, and
+publishes `<topic>/underwater/image` (`gz.msgs.Image`, RGB 8 bit) and
+`<topic>/underwater/camera_info`; the sensor's own topics are unchanged.
+
+| Markup | Default | Meaning |
+|---|---|---|
+| `<output_topic>` | `<topic>/underwater` | Base of the output topics. |
+| `<exposure>` | `1` | A gain on linear light, or `auto`, aiming the mean luminance at 0.18. |
+| `<max_gain>` | `16` | With `auto`, the gain stays within 1/max and max. |
+| `<white_balance>` | `none` | `none`, or `grey_world`, which takes the water's tint out. |
+| `<shot_noise>`, `<read_noise>` | `0` | Gaussian noise on the light the sensor caught, variance shot_noise · signal + read_noise², before the gain. |
+| `<seed>` | `1` | The noise's seed, mixed with the sensor's scoped name, so each camera gets its own noise. |
+| `<forward_scatter>` | `0` | Forward scatter: the light from the objects blurred by their range, sigma = forward_scatter · range radians, at most 40 px; between two pixels, by the smaller of their two ranges. |
+| `<port>` | `none` | `flat` (refracts, magnifies about 1.33×) or `dome` (centred on the lens: no change). |
+| `<water_index>` | `1.333` | Refractive index of the water, for a flat port; 1 or more. |
+
+The water is the world's (`gz-maritime-water-optics-system`); without it, or
+above the water, only the camera's response applies, which by default
+changes nothing. The plugin works only while its output has a subscriber.
+
+## Underwater rendering
+
+Include `model://underwater_optics` (from `gz_underwater_rendering`) in a
+world with water optics, and every ogre2 camera, and the GUI's 3D view, sees
+through the water: the same model as the underwater camera, per fragment, on
+the GPU. The water is the world's; `<enabled>false</enabled>` in its plugin
+starts it off, and a `gz.msgs.Boolean` on
+`/world/<world>/underwater_rendering/enable` turns it off and on.
+`<quality>` in its plugin, `low`, `medium` (default) or `high`, sets how
+finely the lamps' beams are marched and how far marine snow is drawn.
+Cameras above the water see as in air (lamps included, lit as Ogre lights
+them), and an underwater camera plugin in the same world applies only its
+own response while it is on. Depth is measured below the wave over each
+camera. What PBS shades and what is unlit (particles) is drawn through the
+water; looking at nothing, a camera under water sees the veil; the water
+surface from below shows Snell's window, faded by the water; terrain is
+drawn as in air. A spot or point light with `lamp` in its own name (up to
+four, the first by name) is a lamp: its light fades both ways through the
+water and its beam is drawn, and it casts no shadow, in air too; other
+lights are lit by Ogre and, under water, fade with the daylight; set `<daylight>0` in
+the water optics for night.
+
 ## Thruster command
 
 What a vehicle's Thruster plugins expect, with `gz-maritime-thruster-system`
@@ -404,6 +500,26 @@ From Gazebo, turning it to set south, and reading it back:
 gz topic -t /world/default/ocean_current/set -m gz.msgs.Param \
   -p 'params {key: "direction" value {type: DOUBLE double_value: 180}}'
 gz topic -e -t /world/default/ocean_current_info -n 1
+```
+
+## Water optics
+
+The water is set in the world file and changes while the simulation runs on
+the topic `/world/<world>/water_optics/set`: a `gz.msgs.Param` whose keys are
+the elements above. `jerlov` takes a string; `visibility`, `water_level`,
+`daylight`, `caustics` and `marine_snow` a number (or a string holding one);
+`attenuation`, `backscatter`, `veil` and `diffuse_attenuation` a string
+`"r g b"`. An empty string removes a
+visibility or an explicit value, going back to what the type gives. A
+message is applied whole or not at all. The resolved optics are published on
+`/world/<world>/water_optics_info` as `gz.msgs.Param`: `jerlov`,
+`visibility`, the four per-channel values as strings, `water_level`,
+`daylight`, `caustics`, `marine_snow` and `generation`.
+
+```bash
+gz topic -t /world/default/water_optics/set -m gz.msgs.Param \
+  -p 'params {key: "jerlov" value {type: STRING string_value: "7C"}}'
+gz topic -e -t /world/default/water_optics_info -n 1
 ```
 
 ## Topics

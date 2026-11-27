@@ -43,6 +43,7 @@ aquatic-centre
 own-world
 wind-and-current
 lens-drops
+underwater-camera
 acoustic-pingers
 faq
 ```

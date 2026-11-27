@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<!--
+  A world whose gravity is not straight down, (3, 2, -4) m/s^2, and a level
+  camera looking along +x: gravity along its lens is the world's, -2 / g to
+  the image's right (+y is the image's left) and 4 / g down it, not 1 g
+  down.
+-->
+<sdf version="1.9">
+  <world name="lens_drops_gravity">
+    <gravity>3 2 -4</gravity>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <model name="level">
+      <static>true</static>
+      <pose>0 0 1 0 0 0</pose>
+      <link name="link">
+        <sensor name="camera" type="camera">
+          <topic>/lens_drops_gravity/level</topic>
+          <camera>
+            <horizontal_fov>1.2</horizontal_fov>
+            <image><width>160</width><height>120</height></image>
+          </camera>
+          <plugin filename="gz-maritime-lens-drops-system"
+                  name="gz::sim::maritime::LensDrops">
+            <seed>1</seed>
+          </plugin>
+        </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>
