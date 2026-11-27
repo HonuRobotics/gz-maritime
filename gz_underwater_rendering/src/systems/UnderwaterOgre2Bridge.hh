@@ -52,7 +52,8 @@ int uw_ogre2_version();
 typedef int (*UwVersionFn)();
 
 /// \brief Put the underwater pieces and listener into Ogre's PBS. Call on
-/// the render thread once Ogre is up.
+/// the render thread once Ogre is up. What was installed in an Ogre that is
+/// gone, by a world before this one in the same process, is forgotten.
 /// \param[in] _piecesDir The folder of the underwater pieces.
 /// \return 1 if installed (or already), 0 if not.
 int uw_ogre2_install(const char *_piecesDir);
@@ -64,7 +65,8 @@ void uw_ogre2_set(const UwWater *_water);
 typedef void (*UwSetFn)(const UwWater *);
 
 /// \brief Stop drawing the water, from any thread: the plugin is going (its
-/// model removed) and cannot reach the render thread any more. The bridge
+/// model removed) and cannot reach the render thread any more. At the start
+/// of the next frame the bridge does what uw_ogre2_set(nullptr) does, and
 /// stays installed, drawing nothing, until a plugin sets the water again.
 void uw_ogre2_release();
 typedef void (*UwReleaseFn)();

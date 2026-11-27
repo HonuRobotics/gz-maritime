@@ -88,9 +88,11 @@ the camera's pose and the water come in the pass buffer.
   reference camera.
 - **ogre2 only, and gz-rendering 10.** The bridge chains its pieces into
   the pieces that define Ogre's hooks, in a copy kept in memory. With
-  another render engine, another gz-rendering major version, its own pieces
-  missing, or gz-rendering's pieces not as expected, it does not install,
-  the world is not marked, and the reference camera draws the water.
+  another render engine, its own pieces missing, a bridge of another
+  version, or gz-rendering's pieces not as expected (a hook defined twice,
+  or defined by code it cannot extend), it does not install, the world is
+  not marked, and the reference camera draws the water. Another
+  gz-rendering major version does not build.
 
 ## Tests
 
@@ -104,9 +106,16 @@ camera's: mean difference 0.01 of an 8-bit step, 99th percentile 1 (the
 criterion is 1 and 3). Depth images byte for byte the same; a camera above
 the water byte for byte the same; segmentation labels byte for byte the
 same; the reference camera passing its image through.
-`underwater_rendering_fallback_test`, in a process of its own: with the
-pieces missing, nothing is installed and the reference camera draws the
-water, as without the GPU path. `underwater_rendering_runtime_test`, in a
-process of its own: turned off on its topic, then on again, then its model
-removed; off and removed look as without the GPU path. All three skip
-without a GPU.
+`underwater_rendering_fallback_test` and `underwater_rendering_version_test`,
+each in a process of its own: with the pieces missing, or a bridge of
+another version found first, nothing is installed and the reference camera
+draws the water, as without the GPU path.
+`underwater_rendering_runtime_test`, in a process of its own: `<enabled>`
+false from the start; turned off on its topic, then on again; its model
+removed; the next world after that removal, installed again in its own
+Ogre; the model removed and added again four times, drawn once. Off and
+removed look as without the GPU path. These skip without a GPU; each takes
+a transport partition with its process id and steps the world itself.
+Without a GPU: `bridge_pieces_test`, the bridge's reading of the pieces
+and each case it refuses, and `world_mark_test`, which plugin instance the
+world's mark names.

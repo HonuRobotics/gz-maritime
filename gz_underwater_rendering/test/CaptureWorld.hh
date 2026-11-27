@@ -21,8 +21,12 @@
 
 #include <gz/msgs/image.pb.h>
 
+#include <unistd.h>
+
+#include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <map>
@@ -42,6 +46,15 @@
 // their own.
 namespace gz::sim::underwater_test
 {
+/// \brief A transport partition of this process's own, set before any
+/// node is made, so copies of a test run at once do not hear each other.
+inline const bool kOwnPartition = []
+{
+  const std::string partition =
+      "gz_underwater_rendering_test_" + std::to_string(getpid());
+  return setenv("GZ_PARTITION", partition.c_str(), 1) == 0;
+}();
+
 /// \brief One frame of every topic the test reads, from one run.
 struct Capture
 {
@@ -54,10 +67,13 @@ struct Capture
 };
 
 /// \brief Run a world until every topic has published past 1 s, and keep
-/// one frame of each.
+/// one frame of each. The test steps the world itself: a server on a
+/// thread of its own can hang when it is destroyed (gz-sim 10.5, in its
+/// Sensors system).
 /// \param[in] _world The world file, in the test worlds.
 /// \param[in] _action If given, called once every topic has published past
-/// 1 s; then only frames 1 s after the latest of those count.
+/// 1 s, on a thread of its own while the world keeps stepping; then only
+/// frames 1 s after the latest of those count.
 inline Capture CaptureWorld(const std::string &_world,
     const std::function<void(transport::Node &)> &_action = {})
 {
@@ -92,27 +108,39 @@ inline Capture CaptureWorld(const std::string &_world,
   ServerConfig config;
   config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, _world));
   auto server = std::make_unique<Server>(config);
-  server->Run(false, 0, false);
+  const auto step = [&]()
+  {
+    server->Run(true, 5, false);
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+  };
   // Until every topic has a frame that counts; true if they all do
   const auto wait = [&]()
   {
-    for (int i = 0; i < 600; ++i)
+    for (int i = 0; i < 3000; ++i)
     {
       {
         const std::lock_guard<std::mutex> lock(mutex);
         if (latest.size() == topics.size())
           return true;
-        // Nothing at all in 10 s: nothing renders here
-        if (i == 200 && !any)
+        // Nothing at all in 500 steps: nothing renders here
+        if (i == 100 && !any)
           return false;
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      step();
     }
     return false;
   };
   if (wait() && _action)
   {
-    _action(node);
+    std::atomic<bool> done{false};
+    std::thread actor([&]
+    {
+      _action(node);
+      done = true;
+    });
+    while (!done)
+      step();
+    actor.join();
     const std::lock_guard<std::mutex> lock(mutex);
     double last = 0.0;
     for (const auto &[topic, m] : latest)
