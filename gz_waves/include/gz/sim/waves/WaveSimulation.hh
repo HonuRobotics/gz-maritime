@@ -13,6 +13,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -193,6 +194,18 @@ using WaveEngineFactory =
 /// \param[in] _factory Factory that builds a default-constructed engine.
 void RegisterWaveEngineFactory(const std::string &_token,
                                WaveEngineFactory _factory);
+
+/// \brief Whether an engine is registered under a token, without building
+/// one or logging. Thread-safe.
+/// \param[in] _token Engine identifier.
+/// \return True if `RegisterWaveEngineFactory` was called with it.
+bool HasWaveEngineFactory(const std::string &_token);
+
+/// \brief A number that changes every time a factory is registered: a
+/// consumer that found no engine tries again when it changes, not on a
+/// clock. Thread-safe and cheap.
+/// \return The registry's version.
+std::uint64_t WaveEngineRegistryVersion();
 
 /// \brief Construct and configure the wave-field engine named by `_algorithm`
 /// (e.g. "gerstner", "fft"): look the token up in the registry populated by

@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -34,16 +35,6 @@
 
 namespace gz::sim::water_optics
 {
-namespace
-{
-/// \brief Tries at building our own engine before giving up until the
-/// recipe changes: its registrar may load a little after us.
-constexpr int kEngineTries{5};
-
-/// \brief Wall time between two tries.
-constexpr std::chrono::seconds kEngineRetry{1};
-}  // namespace
-
 class WaterOpticsSamplerPrivate
 {
   /// \brief Guards everything Sync writes.
@@ -75,11 +66,13 @@ class WaterOpticsSamplerPrivate
   /// \brief The simulation time our own engine is at, s.
   public: double engineTime{-1.0};
 
-  /// \brief Failed tries at building our own engine for this recipe.
-  public: int engineTries{0};
+  /// \brief The engine registry's version at our last try at building
+  /// our own engine: we try again only when it changes, as when the
+  /// engine's registrar loads after us.
+  public: std::optional<std::uint64_t> triedVersion;
 
-  /// \brief When the last try failed.
-  public: std::chrono::steady_clock::time_point lastTry;
+  /// \brief Whether we said there is no engine for this recipe.
+  public: bool warned{false};
 };
 
 //////////////////////////////////////////////////
@@ -174,30 +167,45 @@ double WaterOpticsSampler::Depth(const math::Vector3d &_position,
   if (!recipe)
     return surface - _position.Z();
 
-  // Our own engine, built from the recipe
+  // Our own engine, built from the recipe. Only a newer recipe, or
+  // another engine for the same one, replaces it: a reader holding a recipe
+  // from before the last Sync uses the newer engine rather than building
+  // the old one back, so a change builds one engine however many read.
   const std::lock_guard<std::mutex> lock(d.engineMutex);
-  if (d.own && (d.own->generation != recipe->generation ||
-                d.own->algorithm != recipe->algorithm))
+  if (d.own && (recipe->generation > d.own->generation ||
+                (recipe->generation == d.own->generation &&
+                 recipe->algorithm != d.own->algorithm)))
   {
     d.own.reset();
-    d.engineTries = 0;
+    d.triedVersion.reset();
+    d.warned = false;
   }
-  const auto now = std::chrono::steady_clock::now();
-  if ((!d.own || !d.own->simulation) && d.engineTries < kEngineTries &&
-      (d.engineTries == 0 || now - d.lastTry >= kEngineRetry))
+  const std::uint64_t version = waves::WaveEngineRegistryVersion();
+  if ((!d.own || !d.own->simulation) && d.triedVersion != version)
   {
-    d.own = *recipe;
-    d.own->simulation =
-        waves::CreateWaveSimulation(recipe->algorithm, recipe->params);
-    d.engineTime = -1.0;
-    if (!d.own->simulation)
+    d.triedVersion = version;
+    const waves::WavefieldData &want = d.own ? *d.own : *recipe;
+    if (waves::HasWaveEngineFactory(want.algorithm))
     {
-      d.lastTry = now;
-      if (++d.engineTries == kEngineTries)
+      waves::WavefieldData built = want;
+      built.simulation =
+          waves::CreateWaveSimulation(want.algorithm, want.params);
+      d.own = std::move(built);
+      d.engineTime = -1.0;
+    }
+    else
+    {
+      if (!d.own)
       {
-        gzwarn << "WaterOpticsSampler: no '" << recipe->algorithm << "' wave "
-               << "engine in this process; depth is below the still water "
-               << "level\n";
+        d.own = want;
+        d.own->simulation.reset();
+      }
+      if (!d.warned)
+      {
+        gzwarn << "WaterOpticsSampler: no '" << want.algorithm << "' wave "
+               << "engine in this process yet; depth is below the still "
+               << "water level until one is registered\n";
+        d.warned = true;
       }
     }
   }

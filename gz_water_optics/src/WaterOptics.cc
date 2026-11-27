@@ -232,6 +232,18 @@ const std::vector<ColourParam> &ColourParams()
 }
 
 //////////////////////////////////////////////////
+WaterOpticsSpec WithoutIgnored(const WaterOpticsSpec &_spec)
+{
+  WaterOpticsSpec out = _spec;
+  if (out.attenuation && out.backscatter && out.veil && out.diffuseAttenuation)
+  {
+    out.jerlov.clear();
+    out.visibility.reset();
+  }
+  return out;
+}
+
+//////////////////////////////////////////////////
 bool SameWater(const WaterOpticsData &_a, const WaterOpticsData &_b)
 {
   if (_a.jerlov != _b.jerlov)
