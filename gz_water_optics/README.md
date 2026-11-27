@@ -28,7 +28,7 @@ world system:
 | Element | Meaning |
 |---|---|
 | `<jerlov>` | The Jerlov water type: `I`, `IA`, `IB`, `II`, `III` (open ocean, clearest first) or `1C`, `3C`, `5C`, `7C`, `9C` (coastal). Default `1C`. Case does not matter. Ignored, with a warning, when all four coefficients below are given. |
-| `<visibility>` | How far a black target can be seen horizontally, m. It scales what the type has above pure water, up to about 100 m. Optional. |
+| `<visibility>` | How far a black target can be seen horizontally, m. It scales what the type has above pure water, from 0.1 m up to about 100 m. Ignored when all four coefficients are given. Optional. |
 | `<attenuation>`, `<backscatter>`, `<diffuse_attenuation>` | Per red, green, blue, 1/m, as `r g b`: each replaces the value the type gives. Optional. |
 | `<veil>` | Per red, green, blue, the veil's colour just below the surface as a fraction of the daylight there. Optional. |
 | `<water_level>` | World z of the still water, m. Default 0. Under a wave field, depth is measured below the local wave surface. |
@@ -38,8 +38,10 @@ world system:
 | `<publish_rate>` | Rate of the ground truth, Hz of wall time, so it keeps coming while paused; it is also published on every change. 0 publishes on a change only. Default 1. |
 
 Any other element is warned about. A water type nobody knows, a visibility
-that is not positive or a negative coefficient is one error, and the world
-has clear water until a good message comes on the set topic.
+out of range, a negative coefficient or daylight, or a caustics or marine
+snow that is not a number is one error, and the world has clear water until
+a good message comes on the set topic. A caustics or marine snow outside 0
+to 1 is clamped to it, with a warning.
 
 ### What a water type means
 
@@ -158,7 +160,9 @@ colcon test --packages-select gz_water_optics
   Jerlov water types. *Applied Optics* 54(17), 5392–5401. The values are
   taken from the Apache-2.0 transcription of its tables in
   [tishibashi-cpu/jerlov](https://github.com/tishibashi-cpu/jerlov), which
-  checks them against the paper's equations; 5C at 625 nm, whose printed
+  checks them against the paper's equations, and they match the paper's
+  tables (`II` and `III` are its model's, which scatters more than measured
+  open ocean); 5C at 625 nm, whose printed
   row is corrupted, uses Williamson and Hollins (2022), *Applied Optics* 61,
   9951, and Jerlov, *Marine Optics* (1976). See `src/Jerlov.cc`.
 - Zaneveld, J. R. V. and Pegau, W. S. (2003). Robust underwater visibility

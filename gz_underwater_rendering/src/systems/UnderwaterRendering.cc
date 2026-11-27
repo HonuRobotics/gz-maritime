@@ -29,6 +29,7 @@
 
 #include <gz/common/Console.hh>
 #include <gz/msgs/boolean.pb.h>
+#include <gz/msgs/serialized_map.pb.h>
 #include <gz/transport/Node.hh>
 #include <gz/plugin/Register.hh>
 #include <gz/math/Vector3.hh>
@@ -41,10 +42,13 @@
 #include <gz/sim/Util.hh>
 #include <gz/sim/rendering/Events.hh>
 
+#include <gz/sim/EntityComponentManager.hh>
 #include <gz/sim/components/Name.hh>
 
 #include "UnderwaterOgre2Bridge.hh"
+#include "WorldMark.hh"
 #include "gz/sim/components/UnderwaterRendering.hh"
+#include "gz/sim/components/WaterOptics.hh"
 #include "gz/sim/components/Wavefield.hh"
 #include "gz/sim/water_optics/WaterOpticsSampler.hh"
 
@@ -82,6 +86,7 @@ class UnderwaterRendering
     {
       world = name->Data();
     }
+    this->worldName = world;
     std::function<void(const msgs::Boolean &)> onEnable =
         [this](const msgs::Boolean &_msg) { this->enabled = _msg.data(); };
     this->node.Subscribe("/world/" + world + "/underwater_rendering/enable",
@@ -111,23 +116,14 @@ class UnderwaterRendering
 
   public: void PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm) override
   {
-    this->sampler.Sync(_ecm);
+    const Entity world = worldEntity(_ecm);
+    this->SyncOptics(_ecm, world);
+
     // Mark the world while the renderer draws the water, and only then:
     // otherwise the reference camera does. In the GUI's own entity manager
     // this is a no-op that nobody reads.
-    const Entity world = worldEntity(_ecm);
-    const auto *mark = world != kNullEntity ?
-        _ecm.Component<components::UnderwaterRendering>(world) : nullptr;
-    const bool drawing = this->installed.load() && this->enabled.load();
-    if (world != kNullEntity && drawing && !mark)
-    {
-      _ecm.CreateComponent(world,
-                           components::UnderwaterRendering(this->owner));
-    }
-    else if (mark && !drawing)
-    {
-      _ecm.RemoveComponent<components::UnderwaterRendering>(world);
-    }
+    UpdateWorldMark(_ecm, this->owner,
+                    this->installed.load() && this->enabled.load());
     const std::lock_guard<std::mutex> lock(this->mutex);
     if (!this->sampler.Valid())
     {
@@ -142,7 +138,8 @@ class UnderwaterRendering
     // builds one from the recipe. Smoothed over 0.5 s of simulation time,
     // whatever the step.
     const double t = std::chrono::duration<double>(_info.simTime).count();
-    if (_ecm.Component<components::Wavefield>(world))
+    // Only for caustics: with none, the default, nothing to sample
+    if (o.caustics > 0.0 && _ecm.Component<components::Wavefield>(world))
     {
       const math::Vector3d centre = this->cameraCentre;
       double sum = 0, sum2 = 0;
@@ -191,6 +188,44 @@ class UnderwaterRendering
     v.time = t;
     v.quality = this->quality;
     this->water = v;
+  }
+
+  /// \brief Catch up with the world's water. A GUI can miss it: the first
+  /// state may come before this library registered the component, and an
+  /// unchanged component is not sent again. Then the world's state is
+  /// asked for once, and read until the component arrives.
+  /// \param[in] _ecm This process's entity component manager.
+  /// \param[in] _world The world entity.
+  private: void SyncOptics(const EntityComponentManager &_ecm, Entity _world)
+  {
+    const bool here = _world != kNullEntity &&
+        _ecm.Component<components::WaterOptics>(_world);
+    if (!here && _world != kNullEntity && !this->askedState)
+    {
+      this->askedState = true;
+      std::shared_ptr<Pulled> into = this->pulled;
+      std::function<void(const msgs::SerializedStepMap &, const bool)> cb =
+          [into](const msgs::SerializedStepMap &_rep, const bool _ok)
+          {
+            if (!_ok)
+              return;
+            auto ecm = std::make_unique<EntityComponentManager>();
+            ecm->SetState(_rep.state());
+            const std::lock_guard<std::mutex> lock(into->mutex);
+            into->ecm = std::move(ecm);
+          };
+      this->node.Request("/world/" + this->worldName + "/state", cb);
+    }
+    if (!here)
+    {
+      const std::lock_guard<std::mutex> lock(this->pulled->mutex);
+      if (this->pulled->ecm)
+      {
+        this->sampler.Sync(*this->pulled->ecm);
+        return;
+      }
+    }
+    this->sampler.Sync(_ecm);
   }
 
   private: void OnSceneUpdate()
@@ -288,6 +323,17 @@ class UnderwaterRendering
       this->uninstall();
     this->installed = false;
   }
+
+  /// \brief The world's state, asked for once, while this process's
+  /// entity manager has no water optics. Shared with the reply's callback.
+  private: struct Pulled
+  {
+    std::mutex mutex;
+    std::unique_ptr<EntityComponentManager> ecm;
+  };
+  private: std::shared_ptr<Pulled> pulled{std::make_shared<Pulled>()};
+  private: bool askedState{false};
+  private: std::string worldName{"default"};
 
   private: water_optics::WaterOpticsSampler sampler;
   private: std::mutex mutex;

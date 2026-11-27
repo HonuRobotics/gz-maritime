@@ -98,9 +98,11 @@ that scope it) contains `lamp`, in any case, is a lamp, up to four, the
 first by name; other lights are lit by Ogre as in air, with no beam, so a
 harbour light on a pier stays as it is. A lamp:
 
-- **It lights as Ogre would**: the diffuse term of Ogre's default BRDF,
-  with Ogre's attenuation, spot cone and range fade, so in air, or seen by a
-  camera above the water, a lamp looks as any other light.
+- **It lights as Ogre would**: Ogre's default BRDF, diffuse and specular
+  (metal included), with Ogre's attenuation, spot cone and range fade, so in
+  air, or seen by a camera above the water, a lamp looks as any other light,
+  but for its shadows: a lamp casts none while the renderer draws the water,
+  in air too.
 - **Its light fades both ways**: from the lamp to what it lights, and from
   there to the camera, `exp(−β^D (d_lamp + r))`.
 - **Its beam**: the light the water scatters back to the camera inside the
@@ -206,18 +208,22 @@ off, set its intensity to 0: it then costs nothing.
 - **Depth from the still water level**, not the wave surface, unlike the
   reference camera.
 - **Lamps**: lights named `lamp` only, up to four (the others are lit by
-  Ogre, with a warning); lit by Ogre's diffuse term (no specular), with no
-  shadows; their beams show only where something is drawn behind them (the
-  open water's background is not shaded). The reference camera has no
-  lamps.
+  Ogre, with a warning); lit by Ogre's default BRDF without clear coat, and
+  with no shadows, in air too; their beams show only where something is
+  drawn behind them (the open water's background is not shaded). The
+  reference camera has no lamps. A light that is not a lamp is lit by Ogre
+  and, under water, fades with the daylight: by its depth, not over its own
+  distance, so a torch 20 m down is much dimmer than a lamp there.
 - **ogre2 and GLSL only** (the pieces use GLSL's `fract`).
 - **Caustics** are a procedural pattern scaled by the wave height, not
   traced from the actual surface; the snow does not drift.
 - **ogre2 only, and gz-rendering 10.** The bridge chains its pieces into
   the pieces that define Ogre's hooks, in a copy kept in memory. With
-  another render engine, another gz-rendering major version, its own pieces
-  missing, or gz-rendering's pieces not as expected, it does not install,
-  the world is not marked, and the reference camera draws the water.
+  another render engine, its own pieces missing, a bridge of another
+  version, or gz-rendering's pieces not as expected (a hook defined twice,
+  or defined by code it cannot extend), it does not install, the world is
+  not marked, and the reference camera draws the water. Another
+  gz-rendering major version does not build.
 
 ## Tests
 
@@ -236,27 +242,39 @@ water optics to publish each new water, not a fixed time, and skips
 without a GPU.
 
 `effects_test`, rendered: caustics' contrast at 8 m against 3 m deep is
-`exp(−K_d · 5)` within 6 % (time-averaged), none on flat water; the
+`exp(−K_d · 5)` within 10 % (time-averaged), the pattern a second later
+another pattern, none on flat water, none without `<caustics>`; the
 surface drawn above the seabed not darkening it (caustics off, to the
-rounding); open water the veil; marine snow
+rounding); open water the veil, for a camera and an RGBD camera, without
+a sky and with one; marine snow
 specks fixed frame to frame, none once the snow is off, the depth image
 unchanged; at night with the lamps off, nothing to see.
 
 `snell_test`, rendered: Snell's window's half-angle 48.5 degrees (Snell's
 law: 48.6), from 5 m below near-flat water; a camera above the still water
-in a 1 m sea seeing the crests higher than itself from above.
+in a 1 m sea seeing the crests higher than itself from above, from 4 s
+on, once the surface has settled; a camera 2 m above a rippled sea seeing
+none of it from below, out to the horizon.
 
 `effects_test` also: `<quality>` low and high close to medium, an unknown
 value the medium image; a lidar's scan, a thermal image and a bounding box
 camera's boxes the same with the GPU path and without (the backdrop is
-hidden from those cameras). The rendered tests skip
-without a GPU.
+hidden from those cameras). `lamp_edges_test` also: four lamps at
+`<quality>low`, which lights two in the shader, each plate lit. The
+rendered tests skip without a GPU, step the world themselves and take a
+transport partition with their process id. `bridge_pieces_test` also: the
+caustics' phase wrapped without a jump, to a million seconds.
 
 `lamp_edges_test`, rendered, in a process of its own: five lamps, one past
 the limit, which Ogre lights as in air, and four that light nothing in view
 (one whose range lies wholly behind the camera, three aimed behind it) and
 draw no beam; a lamp on a vehicle removed while the world runs, its light
-and beam gone, then the world shut down.
+and beam gone, then the world shut down; the renderer's model removed, and
+the lamp given back to Ogre, which lights the plate with it.
+
+`lamp_air_test`, rendered, in a process of its own: a camera above the
+water and a lamp lighting a metal plate and a glossy one, with and without
+the GPU path: the same image, to the 8-bit step, specular included.
 
 `underwater_rendering_test`, rendered (needs a GPU): the same scene without
 and with the GPU path, in one process. The GPU image against the reference
@@ -264,9 +282,16 @@ camera's: mean difference 0.01 of an 8-bit step, 99th percentile 1 (the
 criterion is 1 and 3). Depth images byte for byte the same; a camera above
 the water byte for byte the same; segmentation labels byte for byte the
 same; the reference camera passing its image through.
-`underwater_rendering_fallback_test`, in a process of its own: with the
-pieces missing, nothing is installed and the reference camera draws the
-water, as without the GPU path. `underwater_rendering_runtime_test`, in a
-process of its own: turned off on its topic, then on again, then its model
-removed; off and removed look as without the GPU path. All three skip
-without a GPU.
+`underwater_rendering_fallback_test` and `underwater_rendering_version_test`,
+each in a process of its own: with the pieces missing, or a bridge of
+another version found first, nothing is installed and the reference camera
+draws the water, as without the GPU path.
+`underwater_rendering_runtime_test`, in a process of its own: `<enabled>`
+false from the start; turned off on its topic, then on again; its model
+removed; the next world after that removal, installed again in its own
+Ogre; the model removed and added again four times, drawn once. Off and
+removed look as without the GPU path. These skip without a GPU; each takes
+a transport partition with its process id and steps the world itself.
+Without a GPU: `bridge_pieces_test`, the bridge's reading of the pieces
+and each case it refuses, and `world_mark_test`, which plugin instance the
+world's mark names.

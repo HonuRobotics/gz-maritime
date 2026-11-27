@@ -472,12 +472,12 @@ TEST(Throughput, Vga)
 
 /////////////////////////////////////////////////
 // The pipeline runs its rows on several cores. A frame large enough for
-// that (1280x720, with noise, forward scatter and a flat port) is the same
+// that (320x240, with noise, forward scatter and a flat port) is the same
 // frame every time, and the same on one thread as on eight: the noise is
 // drawn per row, from generators the frame's one draw seeds.
 TEST(Throughput, ParallelFramesAreTheSame)
 {
-  const Intrinsics k = Camera(1280, 720, 1.2);
+  const Intrinsics k = Camera(320, 240, 1.2);
   const RayTable rays(k);
   std::vector<std::uint8_t> rgb;
   std::vector<float> z;
@@ -654,35 +654,61 @@ TEST(Optics, ForwardScatterGrowsWithRange)
 }
 
 /////////////////////////////////////////////////
-// Open water beside an object stays the veil: pixels that hit nothing are
-// not blurred, so the object does not bleed a halo into them.
-TEST(Optics, NoHaloInOpenWater)
+// A bright plate 1 m away beside dark open water, or beside a dark wall
+// 10 m away: the plate's light spreads only as far as its own 1 m says,
+// above the horizon (where open water ends at the surface) and below it
+// (where it does not), and not as far as the water's range or the wall's.
+TEST(Optics, ObjectsSpreadByTheirOwnRange)
 {
-  const Intrinsics k = Camera(200, 40, 1.0);
+  const Intrinsics k = Camera(200, 80, 1.0);
   const RayTable rays(k);
   Water w = CoastalAt(5.0);
+  w.veil *= 0.05;
   w.cameraRotation = math::Quaterniond::Identity;
-  std::vector<std::uint8_t> rgb;
-  std::vector<float> z;
-  Uniform(k, 255, 255, 255, 3.0f, rgb, z);
-  // The right half hits nothing, looking level: the veil
-  for (std::uint32_t v = 0; v < k.height; ++v)
-    for (std::uint32_t u = k.width / 2; u < k.width; ++u)
-      z[v * k.width + u] = std::numeric_limits<float>::infinity();
   Optics optics;
   optics.forwardScatter = 0.02;
-  std::mt19937 rng(1);
-  std::vector<std::uint8_t> blurred, sharp;
-  MakeUnderwater(rgb, z, rays, w, Response{}, rng, blurred, optics);
-  MakeUnderwater(rgb, z, rays, w, Response{}, rng, sharp);
-  const std::uint32_t v = k.height / 2;
-  for (std::uint32_t u = k.width / 2; u < k.width; ++u)
+  // The plate's spread, px, and how far out to look past it
+  const double plateSigma = k.fx * optics.forwardScatter * 1.0;
+  const std::uint32_t from =
+      k.width / 2 + static_cast<std::uint32_t>(std::ceil(4 * plateSigma)) + 2;
+  ASSERT_LT(from + 20, k.width);
+  for (const bool wall : {false, true})
   {
-    for (int c = 0; c < 3; ++c)
+    std::vector<std::uint8_t> rgb;
+    std::vector<float> z;
+    Uniform(k, 255, 255, 255, 1.0f, rgb, z);
+    for (std::uint32_t v = 0; v < k.height; ++v)
     {
-      const std::size_t i = 3 * (v * k.width + u) + c;
-      ASSERT_EQ(blurred[i], sharp[i]) << "u " << u;
+      for (std::uint32_t u = k.width / 2; u < k.width; ++u)
+      {
+        const std::size_t i = v * k.width + u;
+        z[i] = wall ? 10.0f : std::numeric_limits<float>::infinity();
+        for (int c = 0; c < 3; ++c)
+          rgb[3 * i + c] = 10;
+      }
     }
+    std::mt19937 rng(1);
+    std::vector<std::uint8_t> blurred, sharp;
+    MakeUnderwater(rgb, z, rays, w, Response{}, rng, blurred, optics);
+    MakeUnderwater(rgb, z, rays, w, Response{}, rng, sharp);
+    // A row above the horizon, climbing, and one below it
+    for (const std::uint32_t v : {8u, k.height - 8})
+    {
+      int worst = 0;
+      for (std::uint32_t u = from; u < k.width; ++u)
+      {
+        for (int c = 0; c < 3; ++c)
+        {
+          const std::size_t i = 3 * (v * k.width + u) + c;
+          worst = std::max(worst, std::abs(int(blurred[i]) - int(sharp[i])));
+        }
+      }
+      EXPECT_LE(worst, 1) << (wall ? "wall" : "open water") << ", row " << v
+                          << ": the plate's light spread past its own range";
+    }
+    // The plate's own edge does spread
+    const std::size_t edge = 3 * ((k.height - 8) * k.width + k.width / 2 + 1);
+    EXPECT_GT(blurred[edge], sharp[edge] + 5) << "no forward scatter at all";
   }
 }
 

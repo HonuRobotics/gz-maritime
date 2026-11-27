@@ -39,6 +39,8 @@
 #include <gz/sim/ServerConfig.hh>
 #include <gz/transport/Node.hh>
 
+#include "OwnPartition.hh"
+
 #include "gz/sim/underwater_camera/UnderwaterImage.hh"
 #include "gz/sim/water_optics/WaterOptics.hh"
 
@@ -124,7 +126,6 @@ class LampsTest : public ::testing::Test
         [](const msgs::Image &_m) { Keep(_m, true); };
     node->Subscribe("/uwlamps/cam/image", onImage);
     node->Subscribe("/uwlamps/cam/depth_image", onDepth);
-    server->Run(false, 0, false);
 
     // Clear water, then the three waters, each once the world has it.
     frames["clear"] = Wait();
@@ -132,14 +133,23 @@ class LampsTest : public ::testing::Test
       return;
     for (const std::string type : {"3C", "IB", "7C"})
     {
-      SetWater(*node, "uwlamps", type);
+      SetWater(*server, *node, "uwlamps", type);
       frames[type] = Wait();
     }
   }
 
+  /// \brief A few steps of a world. The test steps it: a server on a
+  /// thread of its own can hang when it is destroyed (gz-sim 10.5, in its
+  /// Sensors system).
+  protected: static void Step(Server &_server)
+  {
+    _server.Run(true, 5, false);
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+  }
+
   /// \brief Set a Jerlov type, and return once the water optics system
-  /// publishes it as the world's water.
-  protected: static void SetWater(transport::Node &_node,
+  /// publishes it as the world's water, stepping the world.
+  protected: static void SetWater(Server &_server, transport::Node &_node,
       const std::string &_world, const std::string &_type)
   {
     std::mutex m;
@@ -172,9 +182,9 @@ class LampsTest : public ::testing::Test
       std::this_thread::sleep_for(std::chrono::milliseconds(20));
     pub.Publish(msg);
     bool done = false;
-    for (int i = 0; i < 500 && !done; ++i)
+    for (int i = 0; i < 1000 && !done; ++i)
     {
-      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      Step(_server);
       const std::lock_guard<std::mutex> lock(m);
       done = now == _type;
     }
@@ -213,7 +223,7 @@ class LampsTest : public ::testing::Test
       if (!images.empty())
         after = images.rbegin()->first;
     }
-    for (int i = 0; i < 400; ++i)
+    for (int i = 0; i < 2000; ++i)
     {
       {
         const std::lock_guard<std::mutex> lock(mutex);
@@ -233,8 +243,11 @@ class LampsTest : public ::testing::Test
             return f;
           }
         }
+        // Nothing at all in 500 steps: nothing renders here
+        if (i == 100 && images.empty())
+          return {};
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      Step(*server);
     }
     // A test that finds no frame fails; with nothing rendered at all, the
     // tests skip
@@ -399,13 +412,14 @@ TEST_F(LampsTest, OnlyLightsNamedLampAreLamps)
   };
   torchNode.Subscribe("/uwtorch/cam/image", keep(false));
   torchNode.Subscribe("/uwtorch/cam/depth_image", keep(true));
+  std::unique_ptr<Server> torch;
   // The newest frame with both, past a stamp
   const auto wait = [&](std::int64_t _after)
   {
     Frame f;
-    for (int i = 0; i < 400 && f.rgb.empty(); ++i)
+    for (int i = 0; i < 2000 && f.rgb.empty(); ++i)
     {
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      Step(*torch);
       const std::lock_guard<std::mutex> lock(mutex);
       for (auto it = images.rbegin(); it != images.rend(); ++it)
       {
@@ -457,15 +471,14 @@ TEST_F(LampsTest, OnlyLightsNamedLampAreLamps)
   server.reset();
   ServerConfig config;
   config.SetSdfFile(common::joinPaths(TEST_WORLD_DIR, "torch.sdf"));
-  auto torch = std::make_unique<Server>(config);
-  torch->Run(false, 0, false);
+  torch = std::make_unique<Server>(config);
 
   // Clear water: Ogre lights the plate
   const Frame clear = wait(1000000000LL);
   ASSERT_FALSE(clear.rgb.empty()) << "no frames: is there a GPU?";
 
   // 3C: no beam
-  SetWater(torchNode, "uwtorch", "3C");
+  SetWater(*torch, torchNode, "uwtorch", "3C");
   const Frame murky = wait(latest() + 300000000LL);
   torch.reset();
   ASSERT_FALSE(murky.rgb.empty());
