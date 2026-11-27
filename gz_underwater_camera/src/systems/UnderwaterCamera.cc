@@ -190,6 +190,11 @@ class gz::sim::maritime::UnderwaterCameraPrivate
   /// only.
   public: bool warnedFrame{false};
 
+  /// \brief The last error making a frame threw, logged once each time it
+  /// changes: apart from warnedFrame, so a frame that does not fit never
+  /// hides a bad_alloc. Worker only.
+  public: std::string lastError;
+
   /// \brief Transport.
   public: transport::Node node;
   public: transport::Node::Publisher imagePub;
@@ -343,8 +348,12 @@ void UnderwaterCameraPrivate::Run()
     catch (const std::exception &_e)
     {
       this->rays.reset();
-      this->WarnOnce(std::string("a frame that could not be made: ") +
-                     _e.what());
+      if (this->lastError != _e.what())
+      {
+        this->lastError = _e.what();
+        gzerr << "UnderwaterCamera: a frame could not be made: " << _e.what()
+              << "; it is skipped\n";
+      }
     }
   }
 }

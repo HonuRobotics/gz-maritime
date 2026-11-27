@@ -46,8 +46,9 @@ water with more than --max-dark of them ranks after every other, and if it
 is the closest, it exits 1.
 
 An image whose patches differ from one another by less than --min-contrast
-degrees, at most, is refused (exit 1): the chart is lost in the water, and
-every water would look alike. Come closer, or into clearer water.
+degrees, at most, is refused (exit 3, apart from a failed comparison's 1
+and a bad command line's 2): the chart is lost in the water, and every
+water would look alike. Come closer, or into clearer water.
 
 Images are read at their own depth: 8 or 16 bit, or floating point in
 [0, 1]. The photo needs the white balance the simulation has (none, by
@@ -284,7 +285,7 @@ def main(argv=None):
         print(f'the patches differ by less than {a.min_contrast} degrees in '
               f'{", ".join(flat)}: the chart is lost in the water; come '
               'closer, or into clearer water', file=sys.stderr)
-        return 1
+        return 3
 
     # Those with too many dark patches last: their few patches say little
     order = sorted(results, key=lambda w: (results[w]['dark'] > a.max_dark,
