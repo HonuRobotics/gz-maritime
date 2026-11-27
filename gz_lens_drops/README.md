@@ -25,7 +25,8 @@ through that water by Snell's law and the camera's field of view:
 
 - each drop shows a wide, upside-down, smaller view of the scene;
 - light reflected inside the water goes back into the camera's dark housing,
-  which darkens the rims; total internal reflection is black;
+  which darkens the rims; where the light is totally reflected, a dim
+  blurred view (15 %) is left;
 - drops on the lens are out of focus as a whole;
 - wet trails blur and haze the image.
 
@@ -128,8 +129,9 @@ gz topic -t /world/default/model/boat/link/camera_link/sensor/camera/lens_drops/
 
 ## How the drops behave
 
-The numbers are named constants in `include/gz/sim/lens_drops/Drops.hh` and
-`DropMap.hh`. The model steps at a fixed 60 Hz of simulation time, so the
+The model's numbers are named constants in
+`include/gz/sim/lens_drops/Drops.hh` and `DropMap.hh`; the optics' are at
+the top of `share/shaders/lens_drops_fs_330.glsl`. The model steps at a fixed 60 Hz of simulation time, so the
 same seed gives the same drops whatever the world's step size.
 
 ### Landing
