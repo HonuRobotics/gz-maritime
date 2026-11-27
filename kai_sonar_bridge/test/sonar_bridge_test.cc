@@ -133,9 +133,22 @@ GzDetections Soundings()
 
 //////////////////////////////////////////////////
 /// \brief A ROS subscriber that counts and keeps the last message.
+///
+/// The callback owns the state it writes, through a shared_ptr, and never
+/// touches the Listener: destroying an rclcpp subscription does not wait
+/// for a callback the executor has already started, so a callback that
+/// captured `this` could run on a Listener that is gone.
 template <typename T>
 class Listener
 {
+  /// \brief What the callback writes and the test reads.
+  private: struct State
+  {
+    std::mutex mutex;
+    std::shared_ptr<const T> last;
+    std::size_t count{0};
+  };
+
   /// \brief Subscribe.
   /// \param[in] _node The node to subscribe with.
   /// \param[in] _topic The topic.
@@ -144,11 +157,11 @@ class Listener
     const rclcpp::QoS &_qos = rclcpp::QoS(5))
   {
     this->sub = _node.create_subscription<T>(_topic, _qos,
-      [this](std::shared_ptr<const T> _msg)
+      [state = this->state](std::shared_ptr<const T> _msg)
       {
-        std::lock_guard<std::mutex> lock(this->mutex);
-        this->last = _msg;
-        ++this->count;
+        std::lock_guard<std::mutex> lock(state->mutex);
+        state->last = _msg;
+        ++state->count;
       });
   }
 
@@ -156,21 +169,19 @@ class Listener
   /// \return The count.
   public: std::size_t Count()
   {
-    std::lock_guard<std::mutex> lock(this->mutex);
-    return this->count;
+    std::lock_guard<std::mutex> lock(this->state->mutex);
+    return this->state->count;
   }
 
   /// \brief The last message.
   /// \return The message; null before the first.
   public: std::shared_ptr<const T> Last()
   {
-    std::lock_guard<std::mutex> lock(this->mutex);
-    return this->last;
+    std::lock_guard<std::mutex> lock(this->state->mutex);
+    return this->state->last;
   }
 
-  private: std::mutex mutex;
-  private: std::shared_ptr<const T> last;
-  private: std::size_t count{0};
+  private: std::shared_ptr<State> state{std::make_shared<State>()};
   private: typename rclcpp::Subscription<T>::SharedPtr sub;
 };
 
