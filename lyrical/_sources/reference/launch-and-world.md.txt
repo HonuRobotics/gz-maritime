@@ -280,11 +280,14 @@ What a world says to the water optics system,
 | `<diffuse_attenuation>` | K_d, how fast the daylight fades with depth, 1/m, as `r g b`. Replaces the type's K_d. |
 | `<water_level>` | World z of the still water, m, default 0. Under a wave field, depth is below the local wave surface. |
 | `<daylight>` | How strong the daylight is against the renderer's sun, default 1: it scales the veil. 0 at night, when only lamps light the water. |
+| `<caustics>` | Strength of the caustics the waves cast on what faces up, 0 to 1, default 0 (off); scaled by the wave height, so none on flat water. Drawn by the underwater rendering. |
+| `<marine_snow>` | Marine snow: the fraction of 25 cm cells near the camera that hold a speck, 0 to 1, default 0 (none). Lit by the lamps and faintly by daylight. Drawn by the underwater rendering. |
 | `<publish_rate>` | Rate of the ground truth in wall time, 1 Hz by default, so it keeps coming while paused; a change is published at once. 0 publishes on a change only. |
 
 Any other element is warned about and ignored. An unknown type, a visibility
-out of range or a negative value is one error, and the world has
-clear water. An explicit `<attenuation>` wins over `<visibility>`, with a
+out of range, a negative coefficient or daylight, or a caustics or marine
+snow that is not a number is one error, and the world has clear water. A
+caustics or marine snow outside 0 to 1 is clamped to it, with a warning. An explicit `<attenuation>` wins over `<visibility>`, with a
 warning.
 
 The Jerlov types, from Solonenko and Mobley (2015), at red 625 nm, green
@@ -498,14 +501,15 @@ gz topic -e -t /world/default/ocean_current_info -n 1
 
 The water is set in the world file and changes while the simulation runs on
 the topic `/world/<world>/water_optics/set`: a `gz.msgs.Param` whose keys are
-the elements above. `jerlov` takes a string; `visibility`, `water_level` and
-`daylight` a number (or a string holding one); `attenuation`, `backscatter`, `veil` and
-`diffuse_attenuation` a string `"r g b"`. An empty string removes a
+the elements above. `jerlov` takes a string; `visibility`, `water_level`,
+`daylight`, `caustics` and `marine_snow` a number (or a string holding one);
+`attenuation`, `backscatter`, `veil` and `diffuse_attenuation` a string
+`"r g b"`. An empty string removes a
 visibility or an explicit value, going back to what the type gives. A
 message is applied whole or not at all. The resolved optics are published on
 `/world/<world>/water_optics_info` as `gz.msgs.Param`: `jerlov`,
 `visibility`, the four per-channel values as strings, `water_level`,
-`daylight` and `generation`.
+`daylight`, `caustics`, `marine_snow` and `generation`.
 
 ```bash
 gz topic -t /world/default/water_optics/set -m gz.msgs.Param \

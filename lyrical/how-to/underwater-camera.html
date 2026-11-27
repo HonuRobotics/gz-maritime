@@ -219,7 +219,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#see-its-image">See its image</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#the-gui-view-and-every-camera-at-once">The GUI view, and every camera at once</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#lights-at-depth">Lights at depth</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#what-comes-next">What comes next</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#more-of-the-water">More of the water</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="acoustic-pingers.html">Find an acoustic pinger</a><ul>
@@ -490,8 +490,8 @@ plugin on each, include the <code class="docutils literal notranslate"><span cla
 </div>
 <p>The renderer then draws the water into every surface, on the GPU. An
 underwater camera plugin in the same world passes its image through, so the
-water is not applied twice. The sky and the water surface are not drawn
-through the water yet: point the GUI at a seabed or a structure.</p>
+water is not applied twice. The water surface seen from below fades into
+the water too, and open water with nothing in view is the water’s colour.</p>
 </section>
 <section id="lights-at-depth">
 <h2>Lights at depth<a class="headerlink" href="#lights-at-depth" title="Link to this heading"></a></h2>
@@ -512,14 +512,27 @@ light on a pier for one, are lit as in air:</p>
 </pre></div>
 </div>
 <p>Turn a lamp off or move it while running with the world’s <code class="docutils literal notranslate"><span class="pre">light_config</span></code>
-service, like any light. Lamps cast no shadows here, and their beams show
-where something is drawn behind them (a seabed, a structure).</p>
+service, like any light. Lamps cast no shadows here. A lamp set to an
+intensity of 0 costs nothing.</p>
 </section>
-<section id="what-comes-next">
-<h2>What comes next<a class="headerlink" href="#what-comes-next" title="Link to this heading"></a></h2>
-<p>Forward scatter, marine snow, caustics, the surface from below and the
-camera’s port. The plan is in
-<a class="reference external" href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/UNDERWATER_CAMERA_PLAN.md">UNDERWATER_CAMERA_PLAN.md</a>.</p>
+<section id="more-of-the-water">
+<h2>More of the water<a class="headerlink" href="#more-of-the-water" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Forward scatter</strong> blurs what is far: <code class="docutils literal notranslate"><span class="pre">&lt;forward_scatter&gt;0.01&lt;/forward_scatter&gt;</span></code>
+in the camera plugin.</p></li>
+<li><p><strong>The camera’s port</strong>: <code class="docutils literal notranslate"><span class="pre">&lt;port&gt;flat&lt;/port&gt;</span></code> refracts like a flat port
+(a narrower, magnified view); <code class="docutils literal notranslate"><span class="pre">&lt;port&gt;dome&lt;/port&gt;</span></code> changes nothing.</p></li>
+<li><p><strong>Caustics</strong> dance on a shallow seabed under waves:
+<code class="docutils literal notranslate"><span class="pre">&lt;caustics&gt;1&lt;/caustics&gt;</span></code> in the water optics, with the <code class="docutils literal notranslate"><span class="pre">underwater_optics</span></code>
+model in the world. Off by default; none on flat water.</p></li>
+<li><p><strong>Marine snow</strong>: <code class="docutils literal notranslate"><span class="pre">&lt;marine_snow&gt;0.2&lt;/marine_snow&gt;</span></code> in the water optics;
+specks show in the lamps’ light.</p></li>
+<li><p><strong>The surface from below</strong> shows Snell’s window: the sky through a
+48.6 degree cone overhead, a mirror of the water outside it. The surface
+casts no shadow: the sun, and the caustics, reach the seabed under it
+whether or not the sun casts shadows. The plan is in
+<a class="reference external" href="https://github.com/HonuRobotics/gz-maritime/blob/lyrical/UNDERWATER_CAMERA_PLAN.md">UNDERWATER_CAMERA_PLAN.md</a>.</p></li>
+</ul>
 </section>
 </section>
 
