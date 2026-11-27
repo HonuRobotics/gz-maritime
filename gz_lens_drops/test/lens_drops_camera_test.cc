@@ -30,6 +30,8 @@
 
 #include <gtest/gtest.h>
 
+#include <gz/msgs/boolean.pb.h>
+#include <gz/msgs/entity_factory.pb.h>
 #include <gz/msgs/image.pb.h>
 #include <gz/msgs/param.pb.h>
 
@@ -334,6 +336,7 @@ TEST(LensDropsCamera, DropsShowAndClear)
   // the first pull: the pass is off.
   const double drawn = state.Value("draws");
   EXPECT_LE(drawn, 1.0);
+  EXPECT_EQ(state.Value("drawing"), 0.0) << "the pass on with a dry lens";
   const auto b = Frame(*server, images, 5);
   ASSERT_TRUE(b);
   EXPECT_LT(Changed(*a, *b), 10);
@@ -348,6 +351,7 @@ TEST(LensDropsCamera, DropsShowAndClear)
   const auto c = Frame(*server, images);
   ASSERT_TRUE(c);
   EXPECT_GT(Changed(*a, *c), 300);
+  EXPECT_EQ(state.Value("drawing"), 1.0);
 
   // A wipe gives the dry image back.
   ASSERT_TRUE(Set(Topic("camera", "set"), {{"rain_rate", 0.0}, {"clear", 1.0}}));
@@ -357,6 +361,8 @@ TEST(LensDropsCamera, DropsShowAndClear)
   const auto d = Frame(*server, images);
   ASSERT_TRUE(d);
   EXPECT_LT(Changed(*a, *d), 10);
+  StepUntil(*server, []() { return false; }, 2);
+  EXPECT_EQ(state.Value("drawing"), 0.0) << "the pass on after the wipe";
 }
 
 //////////////////////////////////////////////////
@@ -485,6 +491,94 @@ TEST(LensDropsCamera, RemovedWhileRendering)
   const auto after = Frame(*server, second, 5);
   ASSERT_TRUE(after) << "the other camera stopped";
   EXPECT_LE(one.Seen(), states + 1) << "the removed camera's lens lives on";
+}
+
+//////////////////////////////////////////////////
+// A camera spawned at run time, as every vehicle enters a world, gets its
+// pass and its drops.
+TEST(LensDropsCamera, ASpawnedCameraGetsItsDrops)
+{
+  Images images("/lens_drops_camera/image");
+  State state(Topic("spawned", "state"));
+  auto server = Start("lens_drops_camera.sdf");
+  REQUIRE_RENDERING(Frame(*server, images, 2));
+
+  gz::msgs::EntityFactory factory;
+  factory.set_sdf(R"(<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="spawned">
+    <static>true</static>
+    <pose>0 -0.5 1 0 -1.5707963 0</pose>
+    <link name="link">
+      <sensor name="camera" type="camera">
+        <topic>/lens_drops_camera/spawned</topic>
+        <update_rate>10</update_rate>
+        <always_on>true</always_on>
+        <camera>
+          <horizontal_fov>1.2</horizontal_fov>
+          <image><width>160</width><height>90</height></image>
+        </camera>
+        <plugin filename="gz-maritime-lens-drops-system"
+                name="gz::sim::maritime::LensDrops">
+          <rain_rate>1000</rain_rate>
+          <dry_time>3600</dry_time>
+        </plugin>
+      </sensor>
+    </link>
+  </model>
+</sdf>)");
+  transport::Node node;
+  std::function<void(const gz::msgs::Boolean &, const bool)> done =
+      [](const gz::msgs::Boolean &, const bool) {};
+  ASSERT_TRUE((node.Request<gz::msgs::EntityFactory, gz::msgs::Boolean>(
+      "/world/lens_drops_camera/create", factory, done)));
+  EXPECT_TRUE(StepUntil(*server, [&]() {
+      return state.Value("attached") == 1.0 && state.Value("draws") >= 1.0; },
+      100)) << "attached " << state.Value("attached") << ", draws "
+            << state.Value("draws") << ", count " << state.Value("count");
+}
+
+//////////////////////////////////////////////////
+// Off the image's centre the flat top of a drop turns no ray: its pixel is
+// the scene behind it, not the edge of the frame. A camera ray there
+// leaves the water at its own angle only if it was refracted into the flat
+// water first; refracted out alone, it would leave the frame, and the
+// pixel would be darkened as beyond it.
+TEST(LensDropsCamera, FlatWaterOffCentreTurnsNoRay)
+{
+  const std::string base =
+      "/world/lens_drops_horizon/model/camera/link/link/sensor/camera/"
+      "lens_drops";
+  Images images("/lens_drops_horizon/image");
+  State state(base + "/state");
+  auto server = Start("lens_drops_horizon.sdf");
+  const auto dry = Frame(*server, images, 3);
+  REQUIRE_RENDERING(dry);
+  ASSERT_TRUE(StepUntil(*server,
+      [&]() { return state.Value("attached") == 1.0; }, 20));
+  const double x = 0.95, y = 0.25;
+  ASSERT_TRUE(Set(base + "/set",
+      {{"add_x", x}, {"add_y", y}, {"add_radius", 0.04}}));
+  ASSERT_TRUE(StepUntil(*server,
+      [&]() { return state.Value("covered") > 0.0; }, 30));
+  const auto wet = Frame(*server, images);
+  ASSERT_TRUE(wet);
+  const int width = 320, height = 180;
+  const auto grey = [&](const std::string &_img)
+  {
+    const int i0 = static_cast<int>(x * width), j0 = static_cast<int>(y * height);
+    double sum = 0;
+    int n = 0;
+    for (int j = j0 - 1; j <= j0 + 1; ++j)
+      for (int i = i0 - 1; i <= i0 + 1; ++i, ++n)
+        for (int c = 0; c < 3; ++c)
+          sum += static_cast<unsigned char>(_img[(j * width + i) * 3 + c]);
+    return sum / (3.0 * n);
+  };
+  std::cout << "the drop's centre at x " << x << ": " << grey(*wet)
+            << ", the sky dry " << grey(*dry) << "\n";
+  EXPECT_GT(grey(*wet), 0.9 * grey(*dry))
+      << "the flat water turned the ray out of the frame";
 }
 
 //////////////////////////////////////////////////

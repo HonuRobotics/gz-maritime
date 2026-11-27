@@ -27,6 +27,7 @@
 
 #include <gtest/gtest.h>
 
+#include <gz/msgs/entity_factory.pb.h>
 #include <gz/msgs/param.pb.h>
 #include <gz/msgs/boolean.pb.h>
 #include <gz/msgs/twist.pb.h>
@@ -625,6 +626,74 @@ TEST(LensDropsEnvironment, MovingCameraRunsIntoRain)
   // Moving straight ahead: no air across the lens beyond the headwind, and
   // gravity down the image
   EXPECT_NEAR(mover.Value("gravity_y"), 1.0, 0.01);
+}
+
+//////////////////////////////////////////////////
+// A camera spawned at run time, as every vehicle enters a world: its
+// topics carry the world's name, and its rain lands.
+TEST(LensDropsSystem, SpawnedCameraIsNamedUnderTheWorld)
+{
+  State spawned(Topic("spawned", "state"));
+  Server server(Config());
+  Advance(server, 10);
+  msgs::EntityFactory factory;
+  factory.set_sdf(R"(<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="spawned">
+    <static>true</static>
+    <pose>0 8 0 0 -1.5707963 0</pose>
+    <link name="link">
+      <sensor name="camera" type="camera">
+        <camera>
+          <horizontal_fov>1.2</horizontal_fov>
+          <image><width>160</width><height>120</height></image>
+        </camera>
+        <plugin filename="gz-maritime-lens-drops-system"
+                name="gz::sim::maritime::LensDrops">
+          <rain_rate>200</rain_rate>
+          <dry_time>3600</dry_time>
+        </plugin>
+      </sensor>
+    </link>
+  </model>
+</sdf>)");
+  transport::Node node;
+  std::function<void(const msgs::Boolean &, const bool)> done =
+      [](const msgs::Boolean &, const bool) {};
+  ASSERT_TRUE((node.Request<msgs::EntityFactory, msgs::Boolean>(
+      "/world/lens_drops_test/create", factory, done)));
+  bool wet = false;
+  for (int i = 0; i < 20 && !wet; ++i)
+  {
+    Advance(server, 200);
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    wet = spawned.Count() >= 3;
+  }
+  EXPECT_TRUE(wet) << "no state with drops under the world's name";
+  std::vector<std::string> topics;
+  node.TopicList(topics);
+  for (const std::string &topic : topics)
+  {
+    EXPECT_NE(topic.rfind("/model/spawned/", 0), 0u)
+        << topic << ": a topic without the world's name";
+  }
+}
+
+//////////////////////////////////////////////////
+// The world's gravity, not a fixed one: (3, 2, -4) m/s^2 on a level
+// camera is -2 / g to the image's right and 4 / g down it.
+TEST(LensDropsEnvironment, GravityIsTheWorlds)
+{
+  State level("/world/lens_drops_gravity/model/level/link/link/sensor/"
+              "camera/lens_drops/state");
+  ServerConfig config;
+  config.SetSdfFile(
+      common::joinPaths(TEST_WORLD_DIR, "lens_drops_gravity.sdf"));
+  Server server(config);
+  Advance(server, 500);
+  ASSERT_TRUE(level.WaitFor(0.401));
+  EXPECT_NEAR(level.Value("gravity_x"), -2.0 / 9.80665, 1e-3);
+  EXPECT_NEAR(level.Value("gravity_y"), 4.0 / 9.80665, 1e-3);
 }
 
 //////////////////////////////////////////////////

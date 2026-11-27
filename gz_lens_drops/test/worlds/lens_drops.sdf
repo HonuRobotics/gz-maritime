@@ -8,6 +8,8 @@
   * wet: a camera in heavy rain (200 mm/h; level, so eight drops a second
     from splashes) whose drops never dry, seeded, for a run that repeats.
   * wrong: the system on an IMU, which it refuses.
+  * spawned: none in the file; a test spawns a camera with rain on the
+    world's create service, as a vehicle enters a world.
   * depth: the system on an RGBD camera, which it refuses too: the pass
     would change its colour image but not its depth.
 -->
@@ -15,6 +17,7 @@
   <world name="lens_drops_test">
     <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
     <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
 
     <model name="dry">
       <static>true</static>

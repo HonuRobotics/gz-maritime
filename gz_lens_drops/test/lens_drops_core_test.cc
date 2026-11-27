@@ -109,7 +109,12 @@ TEST(LensDropsCore, SanitizeClampsAndReplaces)
   p.focus = std::numeric_limits<double>::quiet_NaN();
   p.dryTime = 0.0;
   p.aspect = std::numeric_limits<double>::infinity();
+  p.contactAngle = 3.0;
   const Params s = Sanitize(p);
+  // Past pi/2 a drop map cannot hold the drop: clamped there
+  EXPECT_DOUBLE_EQ(s.contactAngle, kMaxContactAngle);
+  p.contactAngle = 0.01;
+  EXPECT_DOUBLE_EQ(Sanitize(p).contactAngle, 0.17);
   EXPECT_DOUBLE_EQ(s.rainRate, 0.0);
   EXPECT_DOUBLE_EQ(s.exposure, 1.0);
   EXPECT_DOUBLE_EQ(s.focus, 0.5);
@@ -144,15 +149,20 @@ TEST(LensDropsCore, RateFollowsRain)
 }
 
 //////////////////////////////////////////////////
+// Rain that fills the lens: at 100 mm/h and the system's defaults the
+// cap binds (at 1000 mm/h merging keeps the count under it), so without it
+// the count would pass it.
 TEST(LensDropsCore, NeverMoreThanMax)
 {
-  Drops drops(7, Rain(1000.0, 3600.0));
-  for (int i = 0; i < 4000; ++i)
+  Drops drops(7, Rain(100.0));
+  std::size_t most = 0;
+  for (int i = 0; i < 2000; ++i)
   {
     drops.Step(0.05);
     ASSERT_LE(drops.List().size(), kMaxDrops);
+    most = std::max(most, drops.List().size());
   }
-  EXPECT_GT(drops.Spawned(), kMaxDrops);
+  EXPECT_EQ(most, kMaxDrops) << "the cap never bound";
 }
 
 //////////////////////////////////////////////////
